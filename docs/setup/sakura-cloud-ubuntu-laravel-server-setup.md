@@ -260,10 +260,21 @@ sudo systemctl restart php8.4-fpm
 
 - この設定は PHP-FPM 全体に効くため、同じサーバーに載るすべてのアプリの上限になる。
 - アプリごとの上限は、nginx のサイト設定の `client_max_body_size` で決める（アプリ単位手順書）。nginx は PHP より手前で大きすぎるリクエストを断るため、アプリごとに 25MB 以下の値を設定できる。
+- 25MB より大きいファイルを受け取るアプリは、そのアプリ専用の PHP-FPM のプールで上限を個別に上げる（`php_admin_value[upload_max_filesize]`・`php_admin_value[post_max_size]`）。サーバー全体の 25MB は変えない。
 
 実績（sakura-cloud-prod-01）：`/etc/php/8.4/fpm/conf.d/99-upload.ini` で 25MB に設定済み。
 
-#### アプリごとに別のユーザーで PHP を動かすための設定（OPcache）　【sakura-cloud-prod-01 未適用】
+#### アプリごとの実行ユーザーと PHP-FPM のプール（方針）
+
+このサーバーに載せるアプリは、**アプリごとに専用の実行ユーザーと専用の PHP-FPM のプール** で動かす。あるアプリに脆弱性があり、外から PHP のコードを実行されても、同じサーバーの他のアプリの `.env`（DB のパスワード、外部サービスのキーなど）や `storage/` を読めないようにするため。
+
+- ユーザー・プール・権限・`open_basedir` などの具体的な設定は、各アプリのアプリ単位手順書に書く。
+- nginx は `www-data` のまま動かし、各プールのソケットにつなぐ。
+- すべてのアプリが専用のプールに移ったら、標準のプール（`www`）を止める（下記）。
+
+実績（sakura-cloud-prod-01、2026-09-26 時点）：トレーニング記録システムは専用のプール（`trs01`）で稼働。標準のプール（`www`）は、使うアプリがないまま動いている。
+
+#### アプリごとに別のユーザーで PHP を動かすための設定（OPcache）
 
 同居するアプリを、アプリごとに専用のユーザーと PHP-FPM のプールで動かす場合に必要な設定。OPcache（PHP のコンパイル結果のキャッシュ）はすべてのプールで共有されるため、あるプールが、他のユーザーのファイルのキャッシュを使えないようにする。
 
@@ -275,7 +286,31 @@ sudo php-fpm8.4 -i | grep -E 'opcache.validate_(permission|root)'
 
 - 期待値：`opcache.validate_permission` と `opcache.validate_root` がどちらも `On`。
 - 再起動の間、同じサーバーのすべてのアプリが一瞬止まるので、利用の少ない時間帯に行う。
-- すべてのアプリが同じユーザー（`www-data`）で動いている間は不要だが、有効にしても害はない。専用のユーザーで動かすアプリを初めて追加するときに設定する（就労支援記録管理システムの構築時に適用予定）。
+- すべてのアプリが同じユーザー（`www-data`）で動いている間は不要だが、有効にしても害はない。専用のユーザーで動かすアプリを初めて追加するときに設定する。
+
+実績（sakura-cloud-prod-01）：2026-09-26、トレーニング記録システムを専用のプールに移したときに適用。`On` / `On` を確認済み。
+
+#### 標準のプール（`www`）を止める　【sakura-cloud-prod-01 未適用】
+
+すべてのアプリが専用のプールで動くようになったら、PHP-FPM の標準のプール（`www-data` で PHP を動かすプール）を止める。`www-data` で動く PHP がなくなり、常駐している PHP のプロセスの分のメモリも空く。
+
+```bash
+ls /etc/php/8.4/fpm/pool.d/
+sudo nginx -T 2>/dev/null | grep fastcgi_pass
+```
+
+- 先に、`fastcgi_pass` に標準のソケット（`/run/php/php8.4-fpm.sock`）が1つも残っていないこと、`pool.d/` に標準以外のプールがあることを確認する（PHP-FPM は、プールが1つもないと起動しない）。
+
+```bash
+sudo mv /etc/php/8.4/fpm/pool.d/www.conf /etc/php/8.4/fpm/pool.d/www.conf.disabled
+sudo php-fpm8.4 -t
+sudo systemctl restart php8.4-fpm
+ls /run/php/
+```
+
+- `pool.d/` の中で読み込まれるのは `*.conf` だけなので、名前を変えれば無効になる。戻すときは名前を元に戻して再起動する。
+- 期待値：`/run/php/` に標準のソケット（`php8.4-fpm.sock`）がなくなり、各アプリのソケットだけが残っていること。
+- 再起動の間、同じサーバーのすべてのアプリが一瞬止まるので、利用の少ない時間帯に行う。
 
 ### 2-3. MySQL 8
 
@@ -359,5 +394,6 @@ nginx / php8.4-fpm / mysql / supervisor が `running` であること。
 ## 第3段階：サーバーの定常保守
 
 - **OS 更新**：定期的に `sudo apt update && sudo apt upgrade -y`。`System restart required` が出たら、アクセスの少ない時間帯に再起動する。
+- **PHP-FPM のプール**：標準のプールを止めた後は、PHP の更新のあとに `ls /etc/php/8.4/fpm/pool.d/` で `www.conf` が復活していないことを確認する（通常、パッケージの更新で名前を変えた設定ファイルが戻されることはないが、念のため）。
 - **SSL 証明書**：`sudo certbot certificates` で有効期限を確認する（自動更新が効いていれば期限の 30 日前頃に更新される）。
 - **ディスク・メモリ**：`df -h`、`free -h` で余裕を確認する。
