@@ -4,7 +4,7 @@
 
 この手順書は **サーバー1台につき1回だけ行う作業**（OS・ファイアウォール・SSH・ミドルウェアの導入）をまとめたものです。
 
-アプリごとに行う作業（DB 作成、デプロイ、nginx のサイト設定、SSL 証明書の取得、ワーカー、cron など）は、各アプリの **アプリ単位手順書** に記載します。入口は「付録A アプリ追加チェックリスト」を参照。
+アプリごとに行う作業（DB 作成、デプロイ、nginx のサイト設定、SSL 証明書の取得、ワーカー、cron など）は、各アプリの **アプリ単位手順書** に記載します。
 
 - 対象 OS：Ubuntu 24.04 LTS
 - 実績環境：sakura-cloud-prod-01（旧名 trs01-prod。現在はトレーニング記録システムが稼働）
@@ -74,7 +74,13 @@
 
 #### 実績
 
-- sakura-cloud-prod-01：CPU 2コア / メモリ 2GB / ディスク 40GB（根拠はトレーニング記録システムのアプリ単位手順書に記載）
+- sakura-cloud-prod-01：CPU 2コア / メモリ 2GB / ディスク 40GB
+
+**スペックの根拠**
+- 1台に nginx・PHP-FPM・MySQL 8・キューワーカー（メディア変換）を同居させる構成の実用最小ライン。
+- メモリ 2GB は、MySQL・PHP・変換ワーカーの同時稼働と、メディア変換（FFmpeg / ImageMagick）に耐える下限。扱う動画はスマホ撮影の数十秒〜数分のトレーニング動画に限られ、この規模なら 2GB で変換できる。あわせて 2GB のスワップを用意している（サーバー単位手順書 1-6）。
+- 写真・動画の本体はオブジェクトストレージに置くため、サーバーのディスクには OS・アプリ・DB しか乗らない。
+- 本番のアクセスが増えて不足したら、プラン変更でスペックアップする。
 
 ---
 
@@ -188,6 +194,31 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 free -h
 ```
 
+### 1-7. fail2ban を確認する
+
+fail2ban は、SSH へのログインの失敗が続く IP アドレスを、一定時間遮断する仕組み。**さくらのクラウドの Ubuntu のアーカイブに最初から含まれていて、有効になっている**ため、インストールは不要。動いていることを確認する。
+
+```bash
+systemctl status fail2ban --no-pager
+sudo fail2ban-client status
+```
+
+期待値：`Active: active (running)`、jail の一覧が `sshd` のみ。
+
+- 設定はパッケージの既定のまま（`/etc/fail2ban/jail.d/defaults-debian.conf` で `sshd` だけを有効にしている）。`jail.local` などの独自の設定は作っていない。
+- SSH は鍵ログインのみ（1-3）なので、正しい鍵を使っている限り、自分が遮断されることはまずない。
+
+遮断中の IP アドレスの確認と、遮断の解除：
+
+```bash
+sudo fail2ban-client status sshd                    # 遮断中の IP アドレスの一覧
+sudo fail2ban-client set sshd unbanip <IPアドレス>    # 遮断の解除
+```
+
+自分の IP アドレスが遮断されて SSH に入れなくなった場合は、さくらのクラウドのコントロールパネルのコンソールからログインして解除する。
+
+実績（sakura-cloud-prod-01）：サーバー作成時（2026-07-04）以降の dpkg のログに、fail2ban をインストールした記録がないことで、アーカイブに含まれていたことを確認（2026-09-26）。稼働中、jail は `sshd` のみ。
+
 ---
 
 ## 第2段階：ミドルウェアのインストール
@@ -231,6 +262,20 @@ sudo systemctl restart php8.4-fpm
 - アプリごとの上限は、nginx のサイト設定の `client_max_body_size` で決める（アプリ単位手順書）。nginx は PHP より手前で大きすぎるリクエストを断るため、アプリごとに 25MB 以下の値を設定できる。
 
 実績（sakura-cloud-prod-01）：`/etc/php/8.4/fpm/conf.d/99-upload.ini` で 25MB に設定済み。
+
+#### アプリごとに別のユーザーで PHP を動かすための設定（OPcache）　【sakura-cloud-prod-01 未適用】
+
+同居するアプリを、アプリごとに専用のユーザーと PHP-FPM のプールで動かす場合に必要な設定。OPcache（PHP のコンパイル結果のキャッシュ）はすべてのプールで共有されるため、あるプールが、他のユーザーのファイルのキャッシュを使えないようにする。
+
+```bash
+printf 'opcache.validate_permission=1\nopcache.validate_root=1\n' | sudo tee /etc/php/8.4/fpm/conf.d/99-opcache-multiuser.ini
+sudo systemctl restart php8.4-fpm
+sudo php-fpm8.4 -i | grep -E 'opcache.validate_(permission|root)'
+```
+
+- 期待値：`opcache.validate_permission` と `opcache.validate_root` がどちらも `On`。
+- 再起動の間、同じサーバーのすべてのアプリが一瞬止まるので、利用の少ない時間帯に行う。
+- すべてのアプリが同じユーザー（`www-data`）で動いている間は不要だが、有効にしても害はない。専用のユーザーで動かすアプリを初めて追加するときに設定する（就労支援記録管理システムの構築時に適用予定）。
 
 ### 2-3. MySQL 8
 
@@ -316,41 +361,3 @@ nginx / php8.4-fpm / mysql / supervisor が `running` であること。
 - **OS 更新**：定期的に `sudo apt update && sudo apt upgrade -y`。`System restart required` が出たら、アクセスの少ない時間帯に再起動する。
 - **SSL 証明書**：`sudo certbot certificates` で有効期限を確認する（自動更新が効いていれば期限の 30 日前頃に更新される）。
 - **ディスク・メモリ**：`df -h`、`free -h` で余裕を確認する。
-
----
-
-## 付録A　アプリ追加チェックリスト
-
-アプリを1つ載せるごとに行う作業。詳細は各アプリのアプリ単位手順書に記載する。
-
-- [ ] アプリ固有のパッケージを入れる（例：trs01 は FFmpeg、ImageMagick、libheif）
-- [ ] MySQL にアプリ専用の DB とユーザーを作成する
-- [ ] `/var/www/<アプリ名>` に GitHub から clone する
-- [ ] `composer install --no-dev --optimize-autoloader`
-- [ ] （ビルドするアプリのみ）`npm install && npm run build`
-- [ ] 本番用 `.env` を作成する（コミットしない）
-- [ ] artisan は `sudo -u www-data php artisan …` で実行する（key:generate、migrate、キャッシュ生成）
-- [ ] `storage/`、`bootstrap/cache/` の権限を設定する
-- [ ] nginx のサイト設定を作成し、`sites-enabled` にリンクする（アプリごとのアップロード上限は `client_max_body_size` で決める）
-- [ ] DNS の A レコードをサーバーの IP に向ける
-- [ ] certbot でドメインの SSL 証明書を取得する
-- [ ] （キューを使うアプリのみ）supervisor にワーカー設定を追加する
-- [ ] www-data の crontab にバックアップ等を登録する
-- [ ] 同居するアプリが増えたら、メモリ（0-2）を見直す
-
----
-
-## 付録B　sakura-cloud-prod-01 の対応状況
-
-2026-09-25 に対応済み：
-
-- [x] 1-3 SSH のパスワードログイン無効化（`/etc/ssh/sshd_config.d/99-hardening.conf`）
-- [x] 1-6 スワップ作成（2GB、`/etc/fstab` に登録）
-- [x] 保留中の更新の適用と再起動（Ubuntu 24.04.5、カーネル 6.8.0-142）
-- [x] サーバー名の変更（旧名 trs01-prod → sakura-cloud-prod-01）：ローカル端末の `~/.ssh/config`、サーバー内のホスト名と `/etc/hosts`、コントロールパネルのサーバー名
-
-再起動後の確認：ホスト名・スワップ・SSH 設定が保たれ、nginx / php8.4-fpm / mysql が起動、certbot タイマーとバックアップの cron も残っていることを確認済み。
-
-未対応：
-
-- [ ] 2-6 supervisor の導入（トレーニング記録システムのキュー切り替えとあわせて行う）
