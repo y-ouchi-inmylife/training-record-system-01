@@ -4,7 +4,7 @@
 
 この手順書は **サーバー1台につき1回だけ行う作業**（OS・ファイアウォール・SSH・ミドルウェアの導入）をまとめたものです。
 
-アプリごとに行う作業（DB 作成、デプロイ、nginx のサイト設定、SSL 証明書の取得、ワーカー、cron など）は、各アプリの **アプリ単位手順書** に記載します。
+アプリごとに行う作業（DB 作成、デプロイ、nginx のサイト設定、SSL 証明書の取得、ワーカー、cron など）は、各アプリの **アプリ構築手順書** に記載します。
 
 - 対象 OS：Ubuntu 24.04 LTS
 - 実績環境：sakura-cloud-prod-01（旧名 trs01-prod。現在はトレーニング記録システムが稼働）
@@ -80,7 +80,7 @@
 
 **スペックの根拠**
 - 1台に nginx・PHP-FPM・MySQL 8・キューワーカー（メディア変換）を同居させる構成の実用最小ライン。
-- メモリ 2GB は、MySQL・PHP・変換ワーカーの同時稼働と、メディア変換（FFmpeg / ImageMagick）に耐える下限。扱う動画はスマホ撮影の数十秒〜数分のトレーニング動画に限られ、この規模なら 2GB で変換できる。あわせて 2GB のスワップを用意している（サーバー単位手順書 1-6）。
+- メモリ 2GB は、MySQL・PHP・変換ワーカーの同時稼働と、メディア変換（FFmpeg / ImageMagick）に耐える下限。扱う動画はスマホ撮影の数十秒〜数分のトレーニング動画に限られ、この規模なら 2GB で変換できる。あわせて 2GB のスワップを用意している（1-6）。
 - 写真・動画の本体はオブジェクトストレージに置くため、サーバーのディスクには OS・アプリ・DB しか乗らない。
 - 本番のアクセスが増えて不足したら、プラン変更でスペックアップする。
 
@@ -232,7 +232,7 @@ sudo apt install -y nginx
 nginx -v
 ```
 
-サイトごとの設定（`/etc/nginx/sites-available/<アプリ名>`）はアプリ単位手順書で行う。
+サイトごとの設定（`/etc/nginx/sites-available/<アプリ名>`）はアプリ構築手順書で行う。
 
 ### 2-2. PHP 8.4 と PHP-FPM（ondrej PPA）
 
@@ -261,7 +261,7 @@ sudo systemctl restart php8.4-fpm
 ```
 
 - この設定は PHP-FPM 全体に効くため、同じサーバーに載るすべてのアプリの上限になる。
-- アプリごとの上限は、nginx のサイト設定の `client_max_body_size` で決める（アプリ単位手順書）。nginx は PHP より手前で大きすぎるリクエストを断るため、アプリごとに 25MB 以下の値を設定できる。
+- アプリごとの上限は、nginx のサイト設定の `client_max_body_size` で決める（アプリ構築手順書）。nginx は PHP より手前で大きすぎるリクエストを断るため、アプリごとに 25MB 以下の値を設定できる。
 - 25MB より大きいファイルを受け取るアプリは、そのアプリ専用の PHP-FPM のプールで上限を個別に上げる（`php_admin_value[upload_max_filesize]`・`php_admin_value[post_max_size]`）。サーバー全体の 25MB は変えない。
 
 実績（sakura-cloud-prod-01）：`/etc/php/8.4/fpm/conf.d/99-upload.ini` で 25MB に設定済み。
@@ -270,7 +270,7 @@ sudo systemctl restart php8.4-fpm
 
 このサーバーに載せるアプリは、**アプリごとに専用の実行ユーザーと専用の PHP-FPM のプール** で動かす。あるアプリに脆弱性があり、外から PHP のコードを実行されても、同じサーバーの他のアプリの `.env`（DB のパスワード、外部サービスのキーなど）や `storage/` を読めないようにするため。
 
-- ユーザー・プール・権限・`open_basedir` などの具体的な設定は、各アプリのアプリ単位手順書に書く。
+- ユーザー・プール・権限・`open_basedir` などの具体的な設定は、各アプリのアプリ構築手順書に書く。
 - nginx は `www-data` のまま動かし、各プールのソケットにつなぐ。
 - 標準のプール（`www`）は、使うアプリがなくなったら止める。新しいサーバーでは、最初のアプリの専用のプールを作った後に止める（下記）。
 
@@ -336,7 +336,7 @@ sudo mysql_secure_installation
 mysql --version
 ```
 
-アプリ用の DB とユーザーの作成は、アプリ単位手順書で行う（アプリごとに分ける）。
+アプリ用の DB とユーザーの作成は、アプリ構築手順書で行う（アプリごとに分ける）。
 
 ### 2-4. Composer（公式インストーラ）
 
@@ -375,7 +375,7 @@ sudo apt install -y supervisor
 sudo systemctl status supervisor
 ```
 
-ワーカーの設定ファイル（`/etc/supervisor/conf.d/<アプリ名>-worker.conf`）はアプリ単位手順書で作成する。
+ワーカーの設定ファイル（`/etc/supervisor/conf.d/<アプリ名>-worker.conf`）はアプリ構築手順書で作成する。
 
 ### 2-7. certbot（Let's Encrypt）
 
@@ -384,7 +384,7 @@ sudo apt install -y certbot python3-certbot-nginx
 certbot --version
 ```
 
-- 証明書の取得（ドメインごと）はアプリ単位手順書で行う。nginx プラグイン（`--nginx`）を使うと、nginx の設定ファイルへの証明書の記述と HTTP→HTTPS のリダイレクトまで certbot が書き込む（該当行に `# managed by Certbot` の印が付く）。
+- 証明書の取得（ドメインごと）はアプリ構築手順書で行う。nginx プラグイン（`--nginx`）を使うと、nginx の設定ファイルへの証明書の記述と HTTP→HTTPS のリダイレクトまで certbot が書き込む（該当行に `# managed by Certbot` の印が付く）。
 - apt で入れると `certbot.timer` が登録され、1日2回、期限が近い証明書を自動更新する。
 - 証明書を取得したら、自動更新が成功するかを確認する（本番の証明書は更新されない。途中で nginx の設定再読み込みが一瞬入る）：
 
