@@ -418,7 +418,7 @@ server {
 - `location ~ /\.(?!well-known).*` は、`.env` など `.` で始まるファイルを Web から見えなくする設定。
 - SSL の設定は、第8段階で certbot が書き足す。
 
-有効にして、設定を確認・反映する。
+### 7-4. 有効にして設定を反映する
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/training-record-system-01 /etc/nginx/sites-enabled/
