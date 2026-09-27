@@ -1,4 +1,4 @@
-# さくらのクラウド Ubuntu サーバー構築手順書（Laravel 用・サーバー単位）
+# さくらのクラウド Ubuntu サーバー構築手順書（Laravel 用）
 
 ## この手順書の範囲
 
@@ -10,27 +10,29 @@
 - 実績環境：sakura-cloud-prod-01（旧名 trs01-prod。現在はトレーニング記録システムが稼働）
 - 表記：【sakura-cloud-prod-01 未適用】…手順としては推奨だが、sakura-cloud-prod-01 ではまだ実施していない
 
-### 実績環境のバージョン（2026-09-25 確認、同日の更新適用後）
+---
+
+## 本番の構成
 
 | 項目 | 説明 | 導入元 | バージョン |
 |---|---|---|---|
-| OS | サーバーの土台となる基本ソフト | さくらのクラウド パブリックアーカイブ | Ubuntu 24.04.5 LTS（カーネル 6.8.0-142） |
-| nginx | Web サーバー。ブラウザからのアクセスを受け付ける | Ubuntu 標準パッケージ | 1.24.0 |
+| OS | | さくらのクラウド パブリックアーカイブ | Ubuntu 24.04.5 LTS（カーネル 6.8.0-142） |
+| nginx | Web サーバー | Ubuntu 標準パッケージ | 1.24.0 |
 | PHP / PHP-FPM | Laravel を動かすプログラム言語と、nginx から PHP を呼び出す仕組み | ondrej PPA（`ppa:ondrej/php`） | 8.4.26 |
-| MySQL | データベース。アプリのデータを保存する | Ubuntu 標準パッケージ | 8.0.46 |
+| MySQL | データベース | Ubuntu 標準パッケージ | 8.0.46 |
 | Composer | PHP のライブラリを取り込む道具 | 公式インストーラ | 2.10.2 |
-| Node.js / npm | 画面の CSS・JavaScript をビルドする道具 | NodeSource | v22.23.3 / 10.9.9 |
+| Node.js / npm | 入れない（ビルド成果物をコミットする方針。2-5） | — | — |
 | certbot（＋nginx プラグイン） | 無料の SSL 証明書を取得・自動更新する道具 | Ubuntu 標準パッケージ | 2.9.0 |
 | supervisor | キューワーカーなどを常駐させ、止まったら自動で再起動する仕組み | 【sakura-cloud-prod-01 未適用】 | — |
 
 ---
 
-## 0. 前提条件
+## 前提条件
 
 **さくらのクラウド（IaaS）** で借りるのは「空の Linux サーバー1台」です。OS とログインユーザーは用意されますが、Web サーバーもデータベースも入っていません。それらを自分でインストール・設定します。
 （**さくらのレンタルサーバー** は、Web サーバー・PHP・MySQL・メール送信・SSL 証明書などがあらかじめ用意された状態で借りるものです。）
 
-### 0-1. 料金・課金の考え方
+### 料金・課金の考え方
 
 レンタルサーバーは「月額固定で借りる」ものだったが、さくらのクラウド（IaaS）は **リソースを作った時点から課金が始まる従量課金制** である。ここを理解しておかないと、想定外の請求につながる。
 
@@ -51,7 +53,7 @@
 
 ※金額は時期・条件により変動する。
 
-### 0-2. スペック選びの前提（スペックは後から変えられる）
+### スペック選びの前提（スペックは後から変えられる）
 
 さくらのクラウドは後からスペックを変更できるが、**CPU・メモリとディスクで変えやすさが大きく異なる**。
 
@@ -353,16 +355,16 @@ rm composer-setup.php
 composer --version
 ```
 
-### 2-5. Node.js（NodeSource・22 系）
+### 2-5. Node.js（入れない）
 
-本番でフロントをビルドするアプリのために入れる（ビルド成果物をコミットしているアプリでは使わない）。
+フロントのビルド成果物は各アプリのリポジトリにコミットし、本番ではビルドしない方針のため、Node.js は入れない。
 
-```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
-node -v
-npm -v
-```
+実績（sakura-cloud-prod-01）：サーバー作成時（2026-07）に NodeSource の 22 系を導入したが、使うアプリがないため 2026-09-27 に削除した。
+
+- 削除したもの：`nodejs` パッケージ（付属の `npm`・`corepack` を含む）、NodeSource の配布元の登録（`/etc/apt/sources.list.d/nodesource.sources`・`/usr/share/keyrings/nodesource.gpg`・`/etc/apt/preferences.d/nodejs`・`/etc/apt/preferences.d/nsolid`）、npm のキャッシュ（`~/.npm`）、アプリの中に残っていた `node_modules`。
+- 削除後、`which node npm npx` で何も表示されないこと、`apt policy nodejs` が `Installed: (none)` で NodeSource の行がないこと、`apt update` でエラーが出ないことを確認済み。
+- `apt policy nodejs` の候補（Candidate）には Ubuntu 標準の 18 系が表示されるが、入れない限り影響はない。
+- 将来、本番で Node.js が必要なアプリを載せることになった場合は、NodeSource のセットアップスクリプト（`curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -` の後に `sudo apt install -y nodejs`）で入れ直せる。スクリプトが、配布元・鍵・優先度の設定を作り直す。
 
 ### 2-6. supervisor　【sakura-cloud-prod-01 未適用】
 
