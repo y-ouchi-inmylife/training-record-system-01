@@ -1,8 +1,8 @@
-# さくらのクラウド Ubuntu アプリ構築手順書（トレーニング記録システム・アプリ単位）
+# 【トレーニング記録システム（みかん）】さくらのクラウド Ubuntu アプリ構築手順書
 
 ## この手順書の範囲
 
-この手順書は、**トレーニング記録システム（trs01）を本番サーバーに載せるための、アプリ単位の作業** をまとめたものです。
+この手順書は、**トレーニング記録システム（以下「本システム」）を本番サーバーに載せるための、アプリ単位の作業** をまとめたものです。
 
 サーバー自体の準備（OS・ファイアウォール・SSH・nginx・PHP・MySQL・Composer・certbot・supervisor の導入）は、**サーバー単位手順書**（`sakura-cloud-ubuntu-laravel-server-setup.md`）で済ませてある前提です。
 
@@ -19,17 +19,21 @@
 | 項目 | 説明 | 値 |
 |---|---|---|
 | サーバー | アプリを載せるサーバー | sakura-cloud-prod-01（さくらのクラウド 東京第2ゾーン） |
-| トレーナー用ドメイン | トレーナーが使う画面 | `mikan-trs01-staff.inmylife1965.com` |
-| 会員用ドメイン | 会員が使う画面 | `mikan.inmylife1965.com` |
+| ドメイン（トレーナー用） | トレーナーが使う画面 | `mikan-trs01-staff.inmylife1965.com` |
+| ドメイン（会員用） | 会員が使う画面 | `mikan.inmylife1965.com` |
 | 配置先 | アプリのコードを置く場所 | `/var/www/training-record-system-01`（Laravel 本体は `src/` 配下） |
-| 実行ユーザー | PHP・artisan・cron を動かすユーザー | `trs01`（専用の PHP-FPM のプール `trs01`、ソケット `/run/php/php8.4-fpm-trs01.sock`）。2026-09-26 に `www-data` から移行（付録B） |
+| 実行ユーザー | PHP・artisan・cron を動かすユーザー（同じサーバーの他のシステムに脆弱性があり、外から PHP のコードを実行されても、このアプリの `.env`（DB のパスワード、外部サービスのキー、バックアップの暗号化キー）や `storage/` を読めないようにするため） | `trs01`（専用の PHP-FPM のプール `trs01`、ソケット `/run/php/php8.4-fpm-trs01.sock`） |
 | ブランチ | 本番に載せるブランチ | `main` |
 | データベース | DB 名 / ユーザー | `training_record_01` / `trs_user_01@localhost` |
 | メディアの保存先 | 動画・写真・会員のプロフィール写真 | さくらのオブジェクトストレージ 東京第1サイト（バケット `trs01-media-prod`） |
 | DB バックアップの保存先 | 毎日のバックアップ | Cloudflare R2（バケット `trs01-backup-prod`）。サーバー内の `storage/app/backups` は、R2 に送る前にバックアップファイルを一時的に置く場所 |
+| 外部 API | 音声の文字起こし・要約 | OpenAI（Whisper）、Anthropic（Claude） |
+| アクセス制限 | 画面を開ける場所 | nginx で、事業所2拠点の固定 IP アドレスからだけ許可する。利用者が使う事前入力の画面だけは、どこからでも開ける |
 | メール送信 | 招待・通知メール | さくらのレンタルサーバーの SMTP（ポート 587）、送信元 `noreply@inmylife1965.com` |
 
 1つのアプリを2つのドメインで公開し、`.env` の `TRAINER_HOST` / `CLIENT_HOST` で、トレーナー用と会員用の画面を振り分けている。
+
+逆に、このアプリに脆弱性があった場合も、他のシステムに届かない。
 
 ### 0-2. 事前に用意しておくもの（サーバーの外）
 
@@ -38,6 +42,7 @@
 - **メール**：さくらのレンタルサーバーで、送信用のメールアカウント（`noreply@inmylife1965.com`）。
 - **DNS**：inmylife1965.com の DNS はさくらインターネット（さくらのレンタルサーバーと同じアカウント）で管理している。2つのサブドメインの A レコードをここに登録する。
 - **GitHub**：リポジトリ `y-ouchi-inmylife/training-record-system-01` にデプロイキーを登録できること（第4段階）。
+- **外部 API のキー**：OpenAI、Anthropic。
 
 ---
 
@@ -60,27 +65,9 @@ convert -list format | grep -i heic
 
 ---
 
-## 第2段階：データベースの作成
+## 第2段階：実行ユーザー
 
-アプリ専用の DB とユーザーを作る。パスワードは `.env` にだけ記載し、コミットしない。
-
-```bash
-sudo mysql
-```
-
-```sql
-CREATE DATABASE training_record_01 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'trs_user_01'@'localhost' IDENTIFIED BY '<パスワード>';
-GRANT ALL PRIVILEGES ON training_record_01.* TO 'trs_user_01'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
----
-
-## 第3段階：実行ユーザー
-
-このアプリの PHP・artisan・cron・キューワーカーは、すべて **専用のユーザー `trs01`** で動かす。同じサーバーの他のシステムに脆弱性があり、外から PHP のコードを実行されても、このアプリの `.env`（DB のパスワード、外部サービスのキー、バックアップの暗号化キー）や `storage/` を読めないようにするため。逆に、このアプリに脆弱性があった場合も、他のシステムに届かない。
+本システムの PHP・artisan・cron・キューワーカーは、すべて **専用のユーザー `trs01`** で動かす。
 
 ```bash
 sudo adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin trs01
@@ -101,6 +88,24 @@ id trs01
 | cron | `trs01` の crontab（第11段階） |
 | キューワーカー | `trs01`（第10段階） |
 | nginx | `www-data`（PHP-FPM のソケットにつなぐだけ） |
+
+---
+
+## 第3段階：データベースの作成
+
+アプリ専用の DB とユーザーを作る。パスワードは `.env` にだけ記載し、コミットしない。
+
+```bash
+sudo mysql
+```
+
+```sql
+CREATE DATABASE training_record_01 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'trs_user_01'@'localhost' IDENTIFIED BY '<パスワード>';
+GRANT ALL PRIVILEGES ON training_record_01.* TO 'trs_user_01'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
 
 ---
 
@@ -236,7 +241,7 @@ nano .env
 | `BACKUP_STORAGE_ACCESS_KEY_ID` | 秘密情報 |
 | `BACKUP_STORAGE_SECRET_ACCESS_KEY` | 秘密情報 |
 
-#### AI（OpenAI・Anthropic）
+#### 外部 API
 
 | 項目 | 値 |
 |---|---|
@@ -297,9 +302,9 @@ sudo -u trs01 php artisan db:seed --force
 
 このアプリ専用の PHP-FPM のプールを作る。プールは `trs01` で PHP を動かし、PHP から読み書きできる場所を、アプリの配置先と専用の一時ディレクトリだけに制限する。
 
-前提：サーバー単位手順書 2-2 の「アプリごとに別のユーザーで PHP を動かすための設定（OPcache）」を適用済みであること。
+前提：サーバー構築手順書の「アプリごとに別のユーザーで PHP を動かすための設定（OPcache）」を適用済みであること。
 
-### 6-1. 一時ディレクトリを作る
+### 6-1. PHP の一時ファイルの置き場を作る
 
 ```bash
 sudo install -d -o trs01 -g trs01 -m 700 /var/lib/php/trs01-tmp
@@ -307,7 +312,7 @@ sudo install -d -o trs01 -g trs01 -m 700 /var/lib/php/trs01-tmp
 
 アップロードされたファイルの一時置き場と、PHP の一時ファイルの置き場。`/tmp` は他のシステムと共有の場所なので使わない。
 
-### 6-2. プールの設定を作る
+### 6-2. PHP-FPM のプールを作る
 
 ```bash
 sudo nano /etc/php/8.4/fpm/pool.d/trs01.conf
@@ -360,7 +365,9 @@ ls -l /run/php/php8.4-fpm-trs01.sock
 
 ---
 
-## 第7段階：nginx のサイト設定
+## 第7段階：nginx の設定
+
+### 7-1. サイトの設定
 
 1つの設定ファイルに、2つのドメイン分を書く。どちらも同じ `public/` を公開する。
 

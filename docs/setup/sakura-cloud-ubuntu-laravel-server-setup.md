@@ -270,9 +270,9 @@ sudo systemctl restart php8.4-fpm
 
 - ユーザー・プール・権限・`open_basedir` などの具体的な設定は、各アプリのアプリ単位手順書に書く。
 - nginx は `www-data` のまま動かし、各プールのソケットにつなぐ。
-- すべてのアプリが専用のプールに移ったら、標準のプール（`www`）を止める（下記）。
+- 標準のプール（`www`）は、使うアプリがなくなったら止める。新しいサーバーでは、最初のアプリの専用のプールを作った後に止める（下記）。
 
-実績（sakura-cloud-prod-01、2026-09-26 時点）：トレーニング記録システムは専用のプール（`trs01`）で稼働。標準のプール（`www`）は、使うアプリがないまま動いている。
+実績（sakura-cloud-prod-01、2026-09-27 時点）：トレーニング記録システムは専用のプール（`trs01`）で稼働。標準のプール（`www`）は停止済み。
 
 #### アプリごとに別のユーザーで PHP を動かすための設定（OPcache）
 
@@ -290,9 +290,9 @@ sudo php-fpm8.4 -i | grep -E 'opcache.validate_(permission|root)'
 
 実績（sakura-cloud-prod-01）：2026-09-26、トレーニング記録システムを専用のプールに移したときに適用。`On` / `On` を確認済み。
 
-#### 標準のプール（`www`）を止める　【sakura-cloud-prod-01 未適用】
+#### 標準のプール（`www`）を止める
 
-すべてのアプリが専用のプールで動くようになったら、PHP-FPM の標準のプール（`www-data` で PHP を動かすプール）を止める。`www-data` で動く PHP がなくなり、常駐している PHP のプロセスの分のメモリも空く。
+PHP-FPM の標準のプール（`www-data` で PHP を動かすプール）は、使うアプリがなくなったら止める。新しいサーバーでは、最初のアプリの専用のプールを作った後に止める（PHP-FPM は、プールが1つもないと起動しないため、それより前には止められない）。止めると、`www-data` で動く PHP がなくなり、常駐している PHP のプロセスの分のメモリも空く。
 
 ```bash
 ls /etc/php/8.4/fpm/pool.d/
@@ -306,11 +306,25 @@ sudo mv /etc/php/8.4/fpm/pool.d/www.conf /etc/php/8.4/fpm/pool.d/www.conf.disabl
 sudo php-fpm8.4 -t
 sudo systemctl restart php8.4-fpm
 ls /run/php/
+ps -o user,pid,cmd -C php-fpm8.4
 ```
 
 - `pool.d/` の中で読み込まれるのは `*.conf` だけなので、名前を変えれば無効になる。戻すときは名前を元に戻して再起動する。
 - 期待値：`/run/php/` に標準のソケット（`php8.4-fpm.sock`）がなくなり、各アプリのソケットだけが残っていること。
+- `ps` の結果に `pool www` のプロセスがないこと。`root` の `master process` は表示される。各アプリのプールは `pm = ondemand` のため、画面を開く前は表示されないことがある。
 - 再起動の間、同じサーバーのすべてのアプリが一瞬止まるので、利用の少ない時間帯に行う。
+- 止めた後、各アプリの画面を開いてログインできること、`sudo tail /var/log/php8.4-fpm.log` にエラーがないことを確認する（このログは root だけが読める）。
+
+戻し方：
+
+```bash
+sudo mv /etc/php/8.4/fpm/pool.d/www.conf.disabled /etc/php/8.4/fpm/pool.d/www.conf
+sudo php-fpm8.4 -t
+sudo systemctl restart php8.4-fpm
+ls -l /run/php/
+```
+
+実績（sakura-cloud-prod-01）：2026-09-27 に停止。`/run/php/` には `php8.4-fpm-trs01.sock` だけが残り、`ps` で `pool www` のプロセスがないこと、トレーニング記録システムの画面が `pool trs01`（ユーザー `trs01`）で動くことを確認済み。
 
 ### 2-3. MySQL 8
 
