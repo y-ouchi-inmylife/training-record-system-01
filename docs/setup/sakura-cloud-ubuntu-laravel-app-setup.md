@@ -336,6 +336,8 @@ pm.max_requests = 500
 php_admin_value[open_basedir] = /var/www/training-record-system-01/:/var/lib/php/trs01-tmp/
 php_admin_value[upload_tmp_dir] = /var/lib/php/trs01-tmp
 php_admin_value[sys_temp_dir] = /var/lib/php/trs01-tmp
+php_admin_value[upload_max_filesize] = 100M
+php_admin_value[post_max_size] = 110M
 ```
 
 | 設定 | 説明 |
@@ -346,9 +348,11 @@ php_admin_value[sys_temp_dir] = /var/lib/php/trs01-tmp
 | `pm.max_children` | 同時に動かす PHP のプロセスの上限 |
 | `open_basedir` | PHP から読み書きできる場所を、アプリの配置先と一時ディレクトリだけに制限する。外部コマンド（ImageMagick・FFmpeg・mysqldump・openssl）が起動した先のプロセスには効かない |
 | `upload_tmp_dir` / `sys_temp_dir` | アップロードの一時ファイルと、PHP の一時ファイルの置き場所 |
+| `upload_max_filesize` | アップロードする1つのファイルの上限。録音のアプリの上限（100MB）に合わせる |
+| `post_max_size` | 1回の送信全体の上限。ファイルのほかの項目の分を見込んで、ファイルの上限より少し大きくする |
 
 - `memory_limit` は設定しない（PHP の既定の 128M）。
-- アップロードの上限は設定しない（サーバー全体の 25MB、サーバー構築手順書 2-2）。アプリで個別に変えたくなったら、このプールに `php_admin_value[upload_max_filesize]`・`php_admin_value[post_max_size]` を書く。
+- アップロードの上限は、このプールで個別に上げている（サーバー全体の 25MB は変えない。サーバー構築手順書 2-2）。録音のファイル（アプリの上限 100MB）を受け取るため。
 - アプリが使う一時ファイル（メディア変換・サムネイル・プロフィール写真）は、すべて `storage/app/tmp/` の中に作られるため、`open_basedir` の範囲に入っている。
 
 ### 6-3. 反映する
@@ -386,7 +390,7 @@ server {
     index index.php;
     charset utf-8;
 
-    client_max_body_size 200M;
+    client_max_body_size 110M;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
@@ -412,9 +416,9 @@ server {
 ```
 
 - `fastcgi_pass` は、第6段階で作ったこのアプリ専用のプールのソケット。2つの `server` ブロックの両方に書く。
-- `client_max_body_size` は、このアプリで受け付けるリクエストの大きさの上限。PHP 側の上限（サーバー全体で 25MB、サーバー構築手順書 2-2）より大きくしても、実際には 25MB までしか受け付けない。
-- このアプリで Laravel 経由で受け取るファイルは、会員のプロフィール写真（アプリの上限 20MB）と録音（アプリの上限 500MB）。動画・写真の本体は、オブジェクトストレージに直接アップロードするため、この上限とは関係ない。
-- 録音は本番ではまだ使っていない。使い始めるときは、PHP の上限（第6段階のプールで個別に設定できる）と `client_max_body_size` を、録音の大きさに合わせて見直す。
+- `client_max_body_size` は、このアプリで受け付けるリクエストの大きさの上限。第6段階のプールの `post_max_size`（110M）に合わせる。
+- このアプリで Laravel 経由で受け取るファイルは、会員のプロフィール写真（アプリの上限 20MB）と録音（アプリの上限 100MB）。動画・写真の本体は、オブジェクトストレージに直接アップロードするため、この上限とは関係ない。
+- 上限を超えたときの表示：100MB を少し超える程度なら、アプリのエラーメッセージが表示される。110MB を超えると nginx が先に断り、nginx の既定のエラーページ（413）が表示される。
 - `location ~ /\.(?!well-known).*` は、`.env` など `.` で始まるファイルを Web から見えなくする設定。
 - SSL の設定は、第8段階で certbot が書き足す。
 
