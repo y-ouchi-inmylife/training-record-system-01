@@ -422,7 +422,31 @@ server {
 - `location ~ /\.(?!well-known).*` は、`.env` など `.` で始まるファイルを Web から見えなくする設定。
 - SSL の設定は、第8段階で certbot が書き足す。
 
-### 7-4. 有効にして設定を反映する
+### 7-2. 文字起こし・要約の API の待ち時間を延ばす
+
+文字起こしと要約は、ブラウザからのリクエストの中で実行する（`QUEUE_CONNECTION=sync`）。60 分の録音の文字起こしは、音声の変換と外部 API の応答を合わせて 1 分半〜2 分かかり、nginx が PHP の応答を待つ時間の初期値（`fastcgi_read_timeout` 60 秒）を超える。そのため、**この2つの API だけ**、待ち時間を 300 秒に延ばす。
+
+トレーナー用ドメイン（`mikan-trs01-staff.inmylife1965.com`）の `server` ブロックの中、`location ~ \.php$` の前に、次を加える。
+
+```nginx
+    # 文字起こし・要約は処理に時間がかかるため、この API だけ PHP の応答を待つ時間を延ばす
+    location ~ ^/api/audio-records/[0-9]+/(transcribe|summarize)$ {
+        fastcgi_pass unix:/run/php/php8.4-fpm-trs01.sock;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+        fastcgi_read_timeout 300s;
+    }
+```
+
+- この2つの API へのリクエストを、`index.php` に直接渡す。`SCRIPT_FILENAME` と `SCRIPT_NAME` を `index.php` に合わせるのは、Laravel が URL を正しく読み取れるようにするため。
+- 300 秒の根拠：変換後に上限に収まる最長の録音（約 2 時間 10 分）でも、変換が約 1 分、外部 API が 2〜3 分の見込みで、300 秒に収まる。`OPENAI_REQUEST_TIMEOUT`（300 秒）とも合う。
+- ほかのページやリクエストの待ち時間は、初期値（60 秒）のまま。
+- 処理が終わるまで、PHP のプロセスを1つ使い続ける（プールの `pm.max_children` は 5）。同時に何人も長い文字起こしをすると、ほかの画面の表示が遅くなることがある。利用が増えてきたら、キューへの切り替え（第10段階）を検討する。
+
+実績（2026-09-28）：60 分の録音で、変換約 27 秒、外部 API 約 70 秒、合わせて約 1 分半〜2 分。
+
+### 7-3. 有効にして設定を反映する
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/training-record-system-01 /etc/nginx/sites-enabled/
@@ -490,14 +514,18 @@ sudo certbot renew --dry-run
 現在は `QUEUE_CONNECTION=sync` のため、メディア変換や AI の処理が、ブラウザからのリクエストの中で実行される。そのため、1回のリクエストにかけられる時間の上限を意識する必要がある。
 
 - **PHP の `max_execution_time`（30 秒）**：Linux では、PHP 自身が計算している時間だけを数える。外部コマンド（FFmpeg・ImageMagick）の実行、API（OpenAI・Anthropic）の応答、DB の応答を待つ時間は数えない。そのため、変換や AI の処理では、この上限には当たりにくい。（Windows ではこれらの待ち時間も数えるため、開発環境では 30 秒で止まることがある。）
-- **nginx の `fastcgi_read_timeout`（初期値 60 秒）**：nginx が PHP の応答を待つ時間。trs01 のサイト設定では指定しておらず、初期値の 60 秒になっている。本番で実際に先に効くのはこちら。60 秒を超えると、ブラウザに「504 Gateway Time-out」が表示される。このとき PHP 側の処理は裏で続いていることがあり、画面はエラーでも、結果は保存されている、という分かりにくい状態になり得る。
+- **nginx の `fastcgi_read_timeout`（初期値 60 秒）**：nginx が PHP の応答を待つ時間。本番で実際に先に効くのはこちら。60 秒を超えると、ブラウザに「504 Gateway Time-out」が表示される。このとき PHP 側の処理は裏で続いていることがあり、画面はエラーでも、結果は保存されている、という分かりにくい状態になり得る。
+  - 文字起こし・要約の API だけは、300 秒に延ばしている（7-2）。ほかのリクエストは初期値の 60 秒のまま。
 
 ### 10-2. 運用の方針
 
-AI の応答を同期にするか非同期にするかも含めて、実際の運用と相談しながら決める。設定値は現在のまま（`QUEUE_CONNECTION=sync`、`OPENAI_REQUEST_TIMEOUT=300`、nginx の `fastcgi_read_timeout` は初期値）とし、504 が出る、画面の待ち時間が長い、といった状況が出てきたら、次のどちらかを検討する。
+60 分の録音への対応で、文字起こしが 60 秒を超えるようになったため、まず **文字起こし・要約の API だけ nginx の待ち時間を 300 秒に延ばした**（7-2、2026-09-28）。`QUEUE_CONNECTION=sync`・`OPENAI_REQUEST_TIMEOUT=300` は変えていない。これで、画面は処理が終わるまで待ち、結果（「録音が長すぎる」などのエラーのメッセージを含む）を受け取れる。
 
-- **nginx の `fastcgi_read_timeout` を延ばす**：trs01 のサイト設定にだけ効くため、他のアプリには影響しない。ただし、会員やトレーナーはその間、画面で待ち続けることになる。
-- **キューに切り替える**（10-3 の手順）：処理を裏（ワーカー）で実行するため、リクエストの時間の上限から切り離せる。根本的な解決策。
+キューへの切り替え（10-3）は、別の件として採用するかを検討する。次のような状況が出てきたら、改めて検討する。
+
+- 利用者が増え、同時に長い文字起こしをすることで、ほかの画面の表示が遅くなる
+- 処理が終わるまで画面で待たされることが、現場で不満になる
+- AI の応答を非同期にする必要が出てくる
 
 ### 10-3. キューに切り替える手順
 
