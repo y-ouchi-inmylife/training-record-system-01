@@ -111,6 +111,13 @@ class TranscriptionService
             '-ar', '16000',
             '-c:a', 'libopus',
             '-b:a', '24k',
+            // -vbr off: ビットレートを 24 kbps に固定する。
+            // libopus は既定で可変ビットレート（VBR）のため、音の内容によって
+            // 実際のビットレートが上下し、変換後のファイルサイズが読めない
+            // （試験用ファイルで約 38 kbps 相当になった実測がある）。
+            // 変換の目的は API の 1 リクエスト上限（25MB）に確実に収めることなので、
+            // どんな音でも計算どおりのサイズになるよう CBR を明示する。
+            '-vbr', 'off',
             $tmpOut,
         ]);
         $elapsed = microtime(true) - $startTime;
