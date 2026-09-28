@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\TranscriptionInputTooLargeException;
 use App\Models\AudioRecord;
 use App\Services\TranscriptionService;
 use Illuminate\Bus\Queueable;
@@ -66,6 +67,16 @@ class TranscribeAudioJob implements ShouldQueue
             ]);
 
             Log::info("TranscribeAudioJob: 文字起こし完了 (ID: {$this->audioRecordId})");
+
+        } catch (TranscriptionInputTooLargeException $e) {
+            // 再試行しても結果は変わらないため、即エラー確定
+            Log::warning("TranscribeAudioJob: 変換後も上限超過のため中断 (ID: {$this->audioRecordId}): {$e->getMessage()}");
+            $audioRecord->update(['status' => AudioRecord::STATUS_ERROR]);
+            // 将来 QUEUE_CONNECTION をキューに切り替えたとき、tries を消費せず即失敗させる
+            // （sync 実行時は fail() は実質何もしないが、キュー切替時の防御として明示的に呼ぶ）
+            $this->fail($e);
+            // sync 実行時：呼び出し元（コントローラ）にメッセージを伝える
+            throw $e;
 
         } catch (\Throwable $e) {
             Log::error("TranscribeAudioJob: 文字起こし失敗 (ID: {$this->audioRecordId}, 試行 {$this->attempts()}/{$this->tries}): {$e->getMessage()}");

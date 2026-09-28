@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\TranscriptionInputTooLargeException;
 use App\Jobs\SummarizeJob;
 use App\Jobs\TranscribeAudioJob;
 use App\Models\AudioRecord;
@@ -340,6 +341,12 @@ class AudioRecordController extends Controller
                     'message' => '文字起こしが完了しました。',
                 ],
             ]);
+        } catch (TranscriptionInputTooLargeException $e) {
+            // 入力サイズ超過は利用者向けのメッセージをそのまま返す（接頭辞を付けない）
+            $audioRecord->refresh();
+            return response()->json([
+                'error' => ['message' => $e->getMessage()],
+            ], 422);
         } catch (\Throwable $e) {
             Log::error('文字起こしエラー', [
                 'audio_record_id' => $audioRecord->id,
