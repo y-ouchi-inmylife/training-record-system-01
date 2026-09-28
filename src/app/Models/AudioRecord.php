@@ -37,8 +37,8 @@ class AudioRecord extends Model
     // 許可する音声ファイル拡張子
     const ALLOWED_EXTENSIONS = ['mp3', 'm4a', 'wav', 'mp4', 'webm'];
 
-    // 最大ファイルサイズ（500MB）
-    const MAX_FILE_SIZE = 500 * 1024 * 1024;
+    // 最大ファイルサイズ（100MB）
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
     protected $fillable = [
         'trainer_id',

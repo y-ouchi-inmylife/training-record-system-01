@@ -39,7 +39,7 @@
                 <div class="invalid-feedback">{{ $message }}</div>
             @enderror
             <div class="form-text">
-                対応形式: MP3, M4A, WAV, MP4, WebM（最大500MB）
+                対応形式: MP3, M4A, WAV, MP4, WebM（最大100MB）
             </div>
         </div>
     </form>

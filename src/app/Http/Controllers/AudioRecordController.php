@@ -74,7 +74,7 @@ class AudioRecordController extends Controller
             'client_id.exists' => '選択された会員が存在しません。',
             'file.required' => '音声ファイルを選択してください。',
             'file.file' => '有効なファイルをアップロードしてください。',
-            'file.max' => 'ファイルサイズは500MB以下にしてください。',
+            'file.max' => 'ファイルサイズは100MB以下にしてください。',
             'file.uploaded' => 'ファイルのアップロードに失敗しました。ファイルサイズが大きすぎる可能性があります。',
         ]);
 
@@ -132,7 +132,7 @@ class AudioRecordController extends Controller
             'client_id.exists' => '選択された会員が存在しません。',
             'file.required' => '音声ファイルを選択してください。',
             'file.file' => '有効なファイルをアップロードしてください。',
-            'file.max' => 'ファイルサイズは500MB以下にしてください。',
+            'file.max' => 'ファイルサイズは100MB以下にしてください。',
             'file.uploaded' => 'ファイルのアップロードに失敗しました。ファイルサイズが大きすぎる可能性があります。',
         ]);
 
