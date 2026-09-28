@@ -501,7 +501,12 @@
 
                 console.log('選択されたmimeType:', mimeType);
 
-                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: mimeType,
+                    // 音声ビットレート（64 kbps）。話し声の聞き取りと文字起こしに十分な音質を維持しつつ、
+                    // 60 分の録音を約 29MB に抑える。ブラウザによっては指定どおりにならない場合がある。
+                    audioBitsPerSecond: 64000,
+                });
 
                 mediaRecorder.ondataavailable = function(e) {
                     if (e.data.size > 0) {
