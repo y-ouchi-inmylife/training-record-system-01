@@ -152,6 +152,7 @@ flowchart TD
 | 項目 | 技術 | 説明（選定理由など） |
 |------|------|---------|
 | 文字起こし | openai-php/client 0.19.0 + openai-php/laravel 0.19.0（Whisper API） | OpenAI APIクライアントとLaravel統合パッケージ |
+| 文字起こし前処理 | FFmpeg（`config('media.ffmpeg_path')`） | Whisper API の 1 リクエスト上限（25MB）に収めるため、24MB を超える音声ファイルはサーバー側で送信前にダウンコンバートする（モノラル・16kHz・Opus 24 kbps の Ogg）。元の録音ファイルは変更・削除しない |
 | 要約 | anthropic-ai/sdk 0.6.0（Claude API） | Claude APIクライアント |
 | 実行方式 | 同期実行（QUEUE_CONNECTION=sync） | 文字起こし・要約はブラウザで待機する同期実行方式。ブラウザで待機できる処理時間内に収まることから採用。Job クラス（SummarizeJob、TranscribeAudioJob）は非同期化できる構造として実装済み。現在のクラウド IaaS 環境ではワーカー常駐が可能なため、将来 QUEUE_CONNECTION の切替とワーカー常駐により非同期化する余地がある（現状は同期実行のまま）|
 
