@@ -1,6 +1,6 @@
-# 開発環境の起動手順および停止手順
+# 開発環境の起動手順および停止手順【Windows 11】
 
-トレーニング記録管理システムの開発環境起動手順です。
+トレーニング記録管理システムの開発環境起動手順（Windows 11）です。
 
 ## 前提条件
 
@@ -19,103 +19,69 @@
 2. Docker Desktop が完全に起動するまで待つ（タスクトレイのアイコンが安定するまで）
 3. Docker Desktop のダッシュボードが開いたら、左下の「Engine running」が表示されていることを確認
 
-### 2. MySQLコンテナを起動
+### 2. 最新を取り込む（機械を移った直後・ブランチ切り替え時）
 
-PowerShell を開いて以下のコマンドを実行：
-```powershell
-# MySQLコンテナを起動
-docker start training-mysql
+```
+cd ~\workspace\dev\training-record-system-01
+git pull
+cd src
+
+# 新しいマイグレーションがある時のみ
+php artisan migrate
+
+# route/view/config キャッシュを破棄
+php artisan optimize:clear
+```
+
+依存やフロント資産が変わっている場合は追加で：
+
+- composer.json / composer.lock が変わった時 → `composer install`
+- resources/ を変更した時 → `npm run build`
+
+同じ機械で続けて作業する場合、pull していなければ本セクションは不要です。
+
+### 3. 作業ディレクトリへ移動
+
+```
+cd ~\workspace\dev\training-record-system-01\src
+```
+
+### 4. MySQLコンテナを起動
+
+```
+# MySQLコンテナを起動（compose 経由）
+docker compose up -d
 
 # 起動確認
-docker ps
+docker compose ps
 ```
 
 **確認ポイント**:
-- `training-mysql` が `Up` 状態になっているか
+- `training-mysql ` が `Up`（または `running`）状態になっているか
 - `0.0.0.0:3308->3306/tcp` が表示されているか
 
-**エラーが出た場合**:
-```powershell
-# コンテナが存在しない場合は、再作成
-docker run --name training-mysql `
-  -e MYSQL_ROOT_PASSWORD=root `
-  -e MYSQL_DATABASE=training_record `
-  -e MYSQL_USER=laravel `
-  -e MYSQL_PASSWORD=laravel `
-  -p 3308:3306 `
-  -v training-mysql-data:/var/lib/mysql `
-  -d mysql:8.0 `
-  --character-set-server=utf8mb4 `
-  --collation-server=utf8mb4_unicode_ci
+**補足**:
+- コンテナの設定（コンテナ名・DB名・ポート・文字セットなど）はすべて `compose.yml` が持っているため、再作成が必要な場合も `docker compose up -d` でよい（長い `docker run` コマンドを手で打つ必要はない）。
+- 何らかの理由でコンテナを作り直したい場合は `docker compose down`（※ボリュームは残る）→ `docker compose up -d`。データごと消す場合のみ `docker compose down -v`（**DBデータが消えるので注意**）。
+
+### 5. 開発サーバーを起動
 ```
-
-### 3. JavaScript・CSSのビルド（初回および resources/ 変更時のみ）
-```powershell
-cd ~\workspace\dev\training-record-system-01\src
-npm install
-npm run build
-```
-
-**補足**: ビルド成果物 `public/build/` は `.gitignore` に含まれているため、ローカル環境では必ずビルドが必要。`@vite()` ディレクティブを含むBladeテンプレートを表示するには `public/build/manifest.json` が必要で、未生成の場合500エラーになる。
-
-### 4. 開発サーバーを起動
-```powershell
-cd ~\workspace\dev\training-record-system-01\src
-php -S 127.0.0.1:8080 -t public
+php -S 127.0.0.1:8081 -t public
 ```
 
 **表示されるメッセージ**:
 ```
-[Sat Mar 15 12:00:00 2026] PHP 8.4.16 Development Server (http://127.0.0.1:8080) started
+[Sat Mar 15 12:00:00 2026] PHP 8.4.16 Development Server (http://127.0.0.1:8081) started
 ```
 
 ### 5. ブラウザでアクセス
 
 ブラウザで以下のURLを開く：
 ```
-http://localhost:8080
+http://localhost:8081
 ```
-
-ログイン画面が表示されればOK！
-
-#### ログインアカウント
-
-##### システム管理者アカウント
-
-- **ユーザーID**: `system_admin`
-- **パスワード**: `InMyLife1965!`
-- **権限**: システム管理者（設定のみアクセス可能）
-
-##### 管理者アカウント
-
-- **ユーザーID**: `admin`
-- **パスワード**: `InMyLife1965!`
-- **権限**: 管理者（全機能アクセス可能）
-
-##### 一般アカウント
-
-- **ユーザーID**: `staff`
-- **パスワード**: `InMyLife1965!`
-- **権限**: 一般（基本機能のみ）
 
 ---
-
-## 停止手順
-
-### 1. 開発サーバーを停止
-
-開発サーバーの PowerShell で `Ctrl + C` を押す
-
-### 2. MySQLコンテナを停止（オプション）
-```powershell
-docker stop training-mysql
-```
-
-**注意**: コンテナを停止しなくても問題ありませんが、PCのリソースを節約したい場合は停止してください。
-
-### 3. Docker Desktop を停止（オプション）
-
-タスクトレイの Docker Desktop アイコンを右クリック → 「Quit Docker Desktop」
 
 ## トラブルシューティング
 
@@ -151,34 +117,6 @@ docker stop training-mysql
 1. Docker Desktop を起動
 2. 完全に起動するまで待つ
 3. 再度コマンドを実行
-
----
-
-## バッチ実行手順
-
-
-
-
-
----
-
-## 参考情報
-
-- **プロジェクトディレクトリ**: `C:\Users\y-ouchi\workspace\dev\training-record-system-01\src`
-- **データベース名**: `training_record`
-- **データベースユーザー**: `laravel`
-- **データベースパスワード**: `laravel`
-- **MySQLポート**: `3308`
-- **開発サーバーURL**: `http://localhost:8080`
-
----
-
-## まとめ：起動に必要なターミナル
-
-| ターミナル | コマンド | 必須 |
-|-----------|---------|------|
-| 1（Docker） | `docker start training-mysql` | 必須 |
-| 2（開発サーバー） | `php -S 127.0.0.1:8080 -t public` | 必須 |
 
 ---
 

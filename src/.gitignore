@@ -15,3 +15,4 @@
 /vendor
 Homestead.json
 Homestead.yaml
+backup.sql
