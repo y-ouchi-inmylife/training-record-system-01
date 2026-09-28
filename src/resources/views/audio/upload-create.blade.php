@@ -101,8 +101,6 @@ $(document).ready(function() {
     // サーバ側の上限を SSoT として渡す。JS 側に数値を直接書かない。
     const MAX_FILE_SIZE = @json(\App\Models\AudioRecord::MAX_FILE_SIZE);
     const MAX_FILE_SIZE_MB = MAX_FILE_SIZE / 1024 / 1024;
-    // エラー文言はサーバ側の file.max メッセージと同じにそろえる
-    const FILE_SIZE_ERROR_MESSAGE = 'ファイルサイズは' + MAX_FILE_SIZE_MB + 'MB以下にしてください。';
 
     const fileInput = document.getElementById('file');
     const fileErrorEl = document.getElementById('file-client-error');
@@ -112,8 +110,12 @@ $(document).ready(function() {
     function checkFileSize() {
         const file = fileInput.files[0];
         if (file && file.size > MAX_FILE_SIZE) {
+            // 大きさは 1MB = 1024 × 1024 バイトで計算し、小数点以下1桁で切り上げる。
+            // 四捨五入や切り捨てだと、上限をわずかに超えたファイル（例：100.04MB）が
+            // 「100.0MB」と表示され、「100MBを超えている」という文と矛盾するため。
+            const fileSizeMB = (Math.ceil(file.size / 1024 / 1024 * 10) / 10).toFixed(1);
             fileInput.classList.add('is-invalid');
-            fileErrorEl.textContent = FILE_SIZE_ERROR_MESSAGE;
+            fileErrorEl.textContent = '選択したファイル（' + fileSizeMB + 'MB）は' + MAX_FILE_SIZE_MB + 'MBを超えているため、登録できません。';
             fileErrorEl.classList.remove('d-none');
             return false;
         }
