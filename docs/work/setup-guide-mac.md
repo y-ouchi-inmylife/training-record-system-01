@@ -65,7 +65,7 @@ mysql -u root -p -e "CREATE USER 'trs01_user'@'localhost' IDENTIFIED BY 'YOUR_PA
 
 | キー | Mac での値 |
 | --- | --- |
-| `APP_URL` | Windows 側の `.env` と**同じ値**にする（後述） |
+| `APP_URL` | Windows 側の `.env` と**同じ値**にする |
 | `DB_HOST` | `127.0.0.1` |
 | `DB_PORT` | **`3306`** |
 | `DB_DATABASE` | `training_record` |
@@ -75,14 +75,17 @@ mysql -u root -p -e "CREATE USER 'trs01_user'@'localhost' IDENTIFIED BY 'YOUR_PA
 | `CLIENT_HOST` | **行ごと削除する** |
 | `MAGICK_PATH` | `/opt/homebrew/bin/magick` |
 | `FFMPEG_PATH` | `/opt/homebrew/bin/ffmpeg` |
-| `MYSQLDUMP_PATH` | `` |
-| `MYSQL_PATH` | `` |
-| `OPENSSL_PATH` | `` |
-| `MEDIA_STORAGE_BUCKET` | **Mac 開発用バケット名**（Windows・本番とは別バケット） |
-| `MEDIA_STORAGE_ENDPOINT` | Windows と同じ（同一アカウント） |
-| `MEDIA_STORAGE_ACCESS_KEY_ID` | Mac 用バケットへの書き込み権限を持つトークンの値 |
-| `MEDIA_STORAGE_ACCESS_KEY_ID` | Mac 用バケットへの書き込み権限を持つトークンの値 |
-| `BACKUP_STORAGE_*` | さくらのクラウドオブジェクトストレージの値をそのまま移送 |
+| `MYSQLDUMP_PATH` | `/opt/homebrew/opt/mysql@8.0/bin/mysqldump` |
+| `MYSQL_PATH` | `/opt/homebrew/opt/mysql@8.0/bin/mysql` |
+| `OPENSSL_PATH` | `/opt/homebrew/opt/openssl@3/bin/openssl` |
+| `MEDIA_STORAGE_BUCKET` | `trs01-media-dev-mac` |
+| `MEDIA_STORAGE_ENDPOINT` | 書き込み権限を持つトークンの値 |
+| `MEDIA_STORAGE_ACCESS_KEY_ID` | 書き込み権限を持つトークンの値 |
+| `MEDIA_STORAGE_ACCESS_KEY_ID` | 書き込み権限を持つトークンの値 |
+| `BACKUP_STORAGE_BUCKET` | `shared-backup-dev` |
+| `BACKUP_STORAGE_ENDPOINT` | 書き込み権限を持つトークンの値 |
+| `BACKUP_STORAGE_ACCESS_KEY_ID` | 書き込み権限を持つトークンの値 |
+| `BACKUP_STORAGE_ACCESS_KEY_ID` | 書き込み権限を持つトークンの値 |
 | `MAIL_MAILER` | `log` |
 | `MAIL_LOG_CHANNEL` | `mail` |
 | `MAIL_SCHEME` | `null` |
