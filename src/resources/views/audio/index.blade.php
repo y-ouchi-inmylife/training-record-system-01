@@ -89,6 +89,11 @@
                                                 data-has-transcription="{{ !empty($audio->transcription_text) ? '1' : '0' }}">
                                             文字起こし
                                         </button>
+                                        @if($audio->isStalledTranscribing())
+                                            <div class="small text-warning mt-1">
+                                                処理が中断された可能性があります。もう一度実行してください。
+                                            </div>
+                                        @endif
                                     @endif
                                 </td>
                                 {{-- 要約 --}}
@@ -97,9 +102,14 @@
                                         <button type="button" class="btn btn-sm btn-primary btn-summarize"
                                                 data-audio-id="{{ $audio->id }}"
                                                 data-has-summary="{{ !empty($audio->summary_text) ? '1' : '0' }}"
-                                                {{ $audio->status === \App\Models\AudioRecord::STATUS_SUMMARIZING ? 'disabled' : '' }}>
+                                                {{ $audio->status === \App\Models\AudioRecord::STATUS_SUMMARIZING && !$audio->isStalled() ? 'disabled' : '' }}>
                                             要約
                                         </button>
+                                        @if($audio->isStalledSummarizing())
+                                            <div class="small text-warning mt-1">
+                                                処理が中断された可能性があります。もう一度実行してください。
+                                            </div>
+                                        @endif
                                     @endif
                                 </td>
                                 {{-- 状態 --}}

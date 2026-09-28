@@ -287,6 +287,14 @@ class AudioRecordController extends Controller
      */
     public function update(Request $request, AudioRecord $audioRecord): RedirectResponse
     {
+        // 生きている処理中（文字起こし中／要約中）は編集を拒否する。
+        // updated_at を上書きすると停滞判定に使う「処理中になった時刻」の代用が狂うため。
+        // 止まったとみなす記録（15 分経過）は編集可能（判定は既に済んでいるため）。
+        if ($audioRecord->isProcessing() && !$audioRecord->isStalled()) {
+            return redirect()->route('audio-records.index')
+                ->with('error', '処理中の音声記録は編集できません。処理が完了してから編集してください。');
+        }
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'transcription_text' => 'nullable|string',
@@ -313,8 +321,16 @@ class AudioRecordController extends Controller
     {
 
         if (!$audioRecord->canTranscribe()) {
+            // 生きている処理中の場合、実行中の処理の種類に合わせたメッセージにする
+            if ($audioRecord->status === AudioRecord::STATUS_TRANSCRIBING) {
+                $message = '現在、文字起こしが実行中です。しばらくお待ちください。';
+            } elseif ($audioRecord->status === AudioRecord::STATUS_SUMMARIZING) {
+                $message = '現在、要約が実行中です。しばらくお待ちください。';
+            } else {
+                $message = 'この音声ファイルは現在処理できません。ステータス: ' . $audioRecord->status_label;
+            }
             return response()->json([
-                'error' => ['message' => 'この音声ファイルは現在処理できません。ステータス: ' . $audioRecord->status_label],
+                'error' => ['message' => $message],
             ], 409);
         }
 
@@ -326,7 +342,18 @@ class AudioRecordController extends Controller
         }
 
         try {
+            if ($audioRecord->isStalledTranscribing()) {
+                Log::info(sprintf(
+                    'AudioRecordController::transcribe: 中断された文字起こしをやり直し (ID: %d, 前回更新: %s, 経過: %d 分)',
+                    $audioRecord->id,
+                    $audioRecord->updated_at->toIso8601String(),
+                    (int) $audioRecord->updated_at->diffInMinutes(now()),
+                ));
+            }
             $audioRecord->update(['status' => AudioRecord::STATUS_TRANSCRIBING]);
+            // status が既に transcribing のままの場合、update() は値の変更がないため updated_at を触らない。
+            // 停滞判定に使う updated_at を必ず現在時刻に進めるため touch() を呼ぶ（やり直しの二重判定を防ぐ）。
+            $audioRecord->touch();
 
             // 同期実行: dispatch完了時点で文字起こし処理が完了している
             TranscribeAudioJob::dispatch($audioRecord->id);
@@ -372,8 +399,16 @@ class AudioRecordController extends Controller
     {
 
         if (!$audioRecord->canSummarize()) {
+            // 生きている処理中の場合、実行中の処理の種類に合わせたメッセージにする
+            if ($audioRecord->status === AudioRecord::STATUS_SUMMARIZING) {
+                $message = '現在、要約が実行中です。しばらくお待ちください。';
+            } elseif ($audioRecord->status === AudioRecord::STATUS_TRANSCRIBING) {
+                $message = '現在、文字起こしが実行中です。しばらくお待ちください。';
+            } else {
+                $message = 'この音声ファイルは要約できません。ステータス: ' . $audioRecord->status_label;
+            }
             return response()->json([
-                'error' => ['message' => 'この音声ファイルは要約できません。ステータス: ' . $audioRecord->status_label],
+                'error' => ['message' => $message],
             ], 409);
         }
 
@@ -385,7 +420,18 @@ class AudioRecordController extends Controller
         }
 
         try {
+            if ($audioRecord->isStalledSummarizing()) {
+                Log::info(sprintf(
+                    'AudioRecordController::summarize: 中断された要約をやり直し (ID: %d, 前回更新: %s, 経過: %d 分)',
+                    $audioRecord->id,
+                    $audioRecord->updated_at->toIso8601String(),
+                    (int) $audioRecord->updated_at->diffInMinutes(now()),
+                ));
+            }
             $audioRecord->update(['status' => AudioRecord::STATUS_SUMMARIZING]);
+            // status が既に summarizing のままの場合、update() は値の変更がないため updated_at を触らない。
+            // 停滞判定に使う updated_at を必ず現在時刻に進めるため touch() を呼ぶ（やり直しの二重判定を防ぐ）。
+            $audioRecord->touch();
 
             // 同期実行: dispatch完了時点で要約処理が完了している
             SummarizeJob::dispatch($audioRecord->id);

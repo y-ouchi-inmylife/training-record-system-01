@@ -40,6 +40,12 @@ class AudioRecord extends Model
     // 最大ファイルサイズ（100MB）
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
+    // 「文字起こし中」「要約中」のまま何分たったら処理が中断されたとみなすか。
+    // 根拠：FFmpeg のタイムアウト（600 秒）+ OPENAI_REQUEST_TIMEOUT（300 秒）= 900 秒 = 15 分。
+    // これを超えて終わっていなければ確実に止まっている。
+    // まだ処理中の記録を誤って「止まった」と判定し、二重実行が走ることを防ぐため、これより短くしない。
+    const PROCESSING_STALL_MINUTES = 15;
+
     protected $fillable = [
         'trainer_id',
         'client_id',
@@ -106,6 +112,35 @@ class AudioRecord extends Model
     }
 
     /**
+     * 処理中（文字起こし中／要約中）のまま停滞していると判断できるかどうか。
+     * updated_at を「処理中になった時刻」の代用にする（生きている処理中の間は
+     * update() を拒否して updated_at を触らないため、代用が成り立つ）。
+     */
+    public function isStalled(): bool
+    {
+        if (!$this->isProcessing() || $this->updated_at === null) {
+            return false;
+        }
+        return $this->updated_at->lt(now()->subMinutes(self::PROCESSING_STALL_MINUTES));
+    }
+
+    /**
+     * 中断された文字起こしのやり直しの案内を出すべき状態かどうか（Blade 用）
+     */
+    public function isStalledTranscribing(): bool
+    {
+        return $this->status === self::STATUS_TRANSCRIBING && $this->isStalled();
+    }
+
+    /**
+     * 中断された要約のやり直しの案内を出すべき状態かどうか（Blade 用）
+     */
+    public function isStalledSummarizing(): bool
+    {
+        return $this->status === self::STATUS_SUMMARIZING && $this->isStalled();
+    }
+
+    /**
      * 文字起こし済みかどうか
      */
     public function isTranscribed(): bool
@@ -131,24 +166,36 @@ class AudioRecord extends Model
 
     /**
      * 文字起こしを実行可能かどうか
-     * 音声ファイルが存在していれば実行可能（再実行も含む）
-     * ただし文字起こし処理中は重複実行を防ぐ
+     * 音声ファイルが存在していれば実行可能（再実行も含む）。
+     * 生きている処理中（文字起こし中／要約中どちらも）は二重実行を防ぐため不可。
+     * ただし止まったとみなす場合（15 分経過）はやり直しを許可する。
      */
     public function canTranscribe(): bool
     {
-        return !empty($this->file_path)
-            && $this->status !== self::STATUS_TRANSCRIBING;
+        if (empty($this->file_path)) {
+            return false;
+        }
+        if ($this->isProcessing() && !$this->isStalled()) {
+            return false;
+        }
+        return true;
     }
 
     /**
      * 要約を実行可能かどうか
-     * 文字起こしテキストが存在していれば実行可能（再実行も含む）
-     * ただし要約処理中は重複実行を防ぐ
+     * 文字起こしテキストが存在していれば実行可能（再実行も含む）。
+     * 生きている処理中（文字起こし中／要約中どちらも）は二重実行を防ぐため不可。
+     * ただし止まったとみなす場合（15 分経過）はやり直しを許可する。
      */
     public function canSummarize(): bool
     {
-        return !empty($this->transcription_text)
-            && $this->status !== self::STATUS_SUMMARIZING;
+        if (empty($this->transcription_text)) {
+            return false;
+        }
+        if ($this->isProcessing() && !$this->isStalled()) {
+            return false;
+        }
+        return true;
     }
 
     /**
