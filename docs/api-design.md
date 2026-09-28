@@ -729,7 +729,7 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | client_id | integer | ● | required, exists:clients,id | 紐付けるクライアントID |
-| file | file | ● | required, file, max:512000 | 録音した音声 |
+| file | file | ● | required, file, max:102400 | 録音した音声（最大100MB） |
 
 **処理**:
 - タイトルを `YYYYMMDD_HHMM_{ログインユーザーのlogin_id}` で自動生成
@@ -794,7 +794,7 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | client_id | integer | ● | required, exists:clients,id | 紐付けるクライアントID |
-| file | file | ● | required, file, max:512000 | 音声ファイル（最大500MB） |
+| file | file | ● | required, file, max:102400 | 音声ファイル（最大100MB） |
 許可拡張子：mp3, m4a, wav, mp4, webm
 
 **処理**:
