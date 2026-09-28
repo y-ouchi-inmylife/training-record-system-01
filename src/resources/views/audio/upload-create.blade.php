@@ -36,8 +36,10 @@
                    class="form-control @error('file') is-invalid @enderror"
                    accept=".mp3,.m4a,.wav,.mp4,.webm" required>
             @error('file')
-                <div class="invalid-feedback">{{ $message }}</div>
+                <div class="invalid-feedback" id="file-server-error">{{ $message }}</div>
             @enderror
+            {{-- 送信前のブラウザ側バリデーション用エラー枠（JS から表示） --}}
+            <div class="invalid-feedback d-none" id="file-client-error"></div>
             <div class="form-text">
                 対応形式: MP3, M4A, WAV, MP4, WebM（最大100MB）
             </div>
@@ -95,6 +97,47 @@ $(document).ready(function() {
         }
     });
     @endif
+
+    // サーバ側の上限を SSoT として渡す。JS 側に数値を直接書かない。
+    const MAX_FILE_SIZE = @json(\App\Models\AudioRecord::MAX_FILE_SIZE);
+    const MAX_FILE_SIZE_MB = MAX_FILE_SIZE / 1024 / 1024;
+    // エラー文言はサーバ側の file.max メッセージと同じにそろえる
+    const FILE_SIZE_ERROR_MESSAGE = 'ファイルサイズは' + MAX_FILE_SIZE_MB + 'MB以下にしてください。';
+
+    const fileInput = document.getElementById('file');
+    const fileErrorEl = document.getElementById('file-client-error');
+    const uploadForm = document.getElementById('uploadForm');
+
+    // 選択・送信時にファイルの大きさを確かめる。上限内なら true。
+    function checkFileSize() {
+        const file = fileInput.files[0];
+        if (file && file.size > MAX_FILE_SIZE) {
+            fileInput.classList.add('is-invalid');
+            fileErrorEl.textContent = FILE_SIZE_ERROR_MESSAGE;
+            fileErrorEl.classList.remove('d-none');
+            return false;
+        }
+        // 上限内、またはファイル未選択なら、JS 側のエラー表示は消す。
+        fileInput.classList.remove('is-invalid');
+        fileErrorEl.textContent = '';
+        fileErrorEl.classList.add('d-none');
+        return true;
+    }
+
+    fileInput.addEventListener('change', function() {
+        // 前回の送信で表示されているサーバー側のエラーは、ファイルを選び直した時点で
+        // 消して、ブラウザ側のチェック結果だけを表示する（二重表示の防止）。
+        const serverErrorEl = document.getElementById('file-server-error');
+        if (serverErrorEl) {
+            serverErrorEl.classList.add('d-none');
+        }
+        checkFileSize();
+    });
+    uploadForm.addEventListener('submit', function(e) {
+        if (!checkFileSize()) {
+            e.preventDefault();
+        }
+    });
 });
 </script>
 @endpush
