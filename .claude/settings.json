@@ -8,5 +8,19 @@
       "C:\\Users\\y-ouchi\\.config\\herd",
       "C:\\Users\\y-ouchi\\AppData\\Local\\Programs"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/git-sync-check.mjs"],
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

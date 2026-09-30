@@ -155,3 +155,12 @@ npm run build
 - 読み込みは `[System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)` を使う（`Get-Content` は改行の扱いが変わるため、全文置換には使わない）。
 - 書き込み後は、先頭 3 バイトが `EF BB BF` でないことを確認する。
 - 経緯：2026-09 に、この副作用で設計書 3 件（`docs/requirements.md` / `docs/screen-design.md` / `docs/client-portal-design-plan.md`）・`src/resources/sass/client.scss`・`src/database/seeders/TrainingRecordDemoSeeder.php` に BOM が混入した（`TrainingRecordDemoSeeder.php` は構文エラーになった）。
+
+## セッション開始時の git 同期状態の確認
+
+開発は Mac と Windows の 2 台で行っている。push 忘れ・pull 忘れに作業を始めるときに気づくため、セッションの開始時に SessionStart フック（`.claude/settings.json` → `.claude/hooks/git-sync-check.mjs`）が `git fetch` をしてから、`【git の同期状態（セッション開始時の自動確認）】` という見出しで同期状態を出す。これを見て、次のように対応すること：
+
+- **behind（遅れ）が 1 件以上なら、どんな依頼でも作業を始める前に、大内さんに「origin より N 件遅れています。先に pull してください」と伝えて止まる。** 自分で `git pull` はしない。
+- ahead（未 push）が 1 件以上なら、最初の返答の冒頭で「未 push のコミットが N 件あります」と伝える（作業は続けてよい）。
+- 未コミットの変更がある場合も、最初の返答の冒頭で伝える。
+- 「origin の確認に失敗しました」と出た場合は、その旨を伝える（behind の数は古い情報に基づくため、当てにならない）。
