@@ -115,9 +115,6 @@
                     <span>音声記録編集</span>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    {{-- 要約：パネルで開いている記録に対して実行する。表示・押せる条件は行の data-* から切り替える
-                         （文字起こしは音声ファイルの段に置く） --}}
-                    <button type="button" id="detail-summarize-btn" class="btn btn-primary" style="display: none;">要約</button>
                     <button type="submit" form="audio-update-form" id="save-audio-btn" class="btn btn-success">更新</button>
                     {{-- 音声ファイルのみ削除のフォーム。ボタンは音声ファイルの段（#audio-update-form の内側）に置き、
                          form 属性でこのフォームを送信する（フォームの入れ子を避けるため、フォーム自体はここに残す） --}}
@@ -179,14 +176,23 @@
 
                     {{-- 文字起こし・要約：見比べながら編集できるよう左右に並べる（lg 未満では上下に積む）。
                          md で 2 等分すると 1 つあたりが狭く編集しにくいため col-lg-6 にする（設計書 S-0505 設計方針参照） --}}
+                    {{-- ラベルの行：左は「文字起こし [要約]」（要約はこの文字起こしに対する操作なのでラベルの横に置く）。
+                         要約ボタンの有無にかかわらず左右のテキストエリアの上端を揃えるため、左右のラベルの行に
+                         通常サイズのボタン・入力欄と同じ最小の高さ（Bootstrap の $input-height と同じ式）を持たせる --}}
                     <div class="row g-3">
                         <div class="col-lg-6">
-                            <label for="transcription-text" class="form-label">文字起こし</label>
+                            <div class="d-flex align-items-center gap-2 mb-2" style="min-height: calc(1.5em + .75rem + calc(var(--bs-border-width) * 2));">
+                                <label for="transcription-text" class="form-label mb-0">文字起こし</label>
+                                {{-- 要約：パネルで開いている記録に対して実行する。表示・押せる条件は行の data-* から切り替える --}}
+                                <button type="button" id="detail-summarize-btn" class="btn btn-primary" style="display: none;">要約</button>
+                            </div>
                             <textarea class="form-control" id="transcription-text" name="transcription_text"
                                       rows="10" placeholder="文字起こしテキストがここに表示されます"></textarea>
                         </div>
                         <div class="col-lg-6">
-                            <label for="summary-text" class="form-label">要約</label>
+                            <div class="d-flex align-items-center gap-2 mb-2" style="min-height: calc(1.5em + .75rem + calc(var(--bs-border-width) * 2));">
+                                <label for="summary-text" class="form-label mb-0">要約</label>
+                            </div>
                             <textarea class="form-control" id="summary-text" name="summary_text"
                                       rows="10" placeholder="要約テキストがここに表示されます"></textarea>
                         </div>
