@@ -115,15 +115,16 @@
                     <span>音声記録編集</span>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    {{-- 文字起こし・要約：パネルで開いている記録に対して実行する。表示・押せる条件は行の data-* から切り替える --}}
-                    <button type="button" id="detail-transcribe-btn" class="btn btn-primary" style="display: none;">文字起こし</button>
+                    {{-- 要約：パネルで開いている記録に対して実行する。表示・押せる条件は行の data-* から切り替える
+                         （文字起こしは音声ファイルの段に置く） --}}
                     <button type="button" id="detail-summarize-btn" class="btn btn-primary" style="display: none;">要約</button>
                     <button type="submit" form="audio-update-form" id="save-audio-btn" class="btn btn-success">更新</button>
+                    {{-- 音声ファイルのみ削除のフォーム。ボタンは音声ファイルの段（#audio-update-form の内側）に置き、
+                         form 属性でこのフォームを送信する（フォームの入れ子を避けるため、フォーム自体はここに残す） --}}
                     <form id="delete-audio-form" method="POST" style="display: none;"
                           onsubmit="if (!this.action) { alert('削除対象が不明です。'); return false; } return confirm('音声ファイルのみ削除します。文字起こし・要約は残ります。よろしいですか?')">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger">音声ファイルのみ削除</button>
                     </form>
                     <form id="delete-record-form" method="POST" style="display: none;"
                           onsubmit="if (!this.action) { alert('削除対象が不明です。'); return false; } return confirm('この音声記録（音声ファイル + 文字起こし + 要約）を完全に削除します。よろしいですか?')">
@@ -158,13 +159,19 @@
                     </div>
 
                     {{-- 音声ファイルの有無：表示のみ（送信しない）。§4-5 の水平レイアウトで、表示だけの項目は
-                         会員編集のメールアドレスと同じく form-control-plaintext にする。値はパネルを開くたびに JS で設定する --}}
+                         会員編集のメールアドレスと同じく form-control-plaintext にする。値はパネルを開くたびに JS で設定する。
+                         値の右に、音声ファイルに関わる操作（文字起こし・音声ファイルのみ削除）を並べる --}}
                     <div class="row g-3 mb-2">
                         <div class="col-12">
                             <div class="row g-2 align-items-center">
                                 <label class="col-md-auto col-form-label text-md-end form-label-fixed">音声ファイル</label>
                                 <div class="col-12 col-md">
-                                    <div id="detail-has-audio" class="form-control-plaintext"></div>
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        {{-- w-auto：form-control-plaintext の幅 100% を内容に合わせ、ボタンを同じ行に置く --}}
+                                        <div id="detail-has-audio" class="form-control-plaintext w-auto"></div>
+                                        <button type="button" id="detail-transcribe-btn" class="btn btn-primary" style="display: none;">文字起こし</button>
+                                        <button type="submit" form="delete-audio-form" id="detail-delete-audio-btn" class="btn btn-outline-danger" style="display: none;">音声ファイルのみ削除</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -303,14 +310,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 // フォームのアクションURLを設定
                 audioUpdateForm.action = '/audio-records/' + audioId;
 
-                // 音声ファイル削除ボタンの表示制御
+                // 音声ファイル削除ボタンの表示制御（フォームは送信先の保持だけに使い、表示はボタン側で切り替える）
                 const deleteAudioForm = document.getElementById('delete-audio-form');
+                const deleteAudioBtn = document.getElementById('detail-delete-audio-btn');
                 if (data.has_audio_file && data.can_delete && data.delete_audio_url) {
                     deleteAudioForm.action = data.delete_audio_url;
-                    deleteAudioForm.style.display = 'inline';
+                    deleteAudioBtn.style.display = 'inline-block';
                 } else {
                     deleteAudioForm.action = '';
-                    deleteAudioForm.style.display = 'none';
+                    deleteAudioBtn.style.display = 'none';
                 }
 
                 // 音声記録（完全）削除ボタンの表示制御
@@ -334,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // エラー時は削除ボタンをリセット
                 const deleteAudioForm = document.getElementById('delete-audio-form');
                 deleteAudioForm.action = '';
-                deleteAudioForm.style.display = 'none';
+                document.getElementById('detail-delete-audio-btn').style.display = 'none';
                 const deleteRecordForm = document.getElementById('delete-record-form');
                 deleteRecordForm.action = '';
                 deleteRecordForm.style.display = 'none';
@@ -360,8 +368,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 実行中は、パネルの他のボタン・行の選択・登録者の絞り込みを操作できなくし、行のバッジを処理中にする
     function lockForAction(audioId, clickedBtn, status) {
         isRunningAction = true;
-        [detailTranscribeBtn, detailSummarizeBtn, document.getElementById('save-audio-btn')]
-            .concat(Array.from(document.querySelectorAll('#delete-audio-form button, #delete-record-form button')))
+        // 音声ファイルのみ削除のボタンはフォームの外（音声ファイルの段）にあるため id で指定する
+        [detailTranscribeBtn, detailSummarizeBtn, document.getElementById('save-audio-btn'), document.getElementById('detail-delete-audio-btn')]
+            .concat(Array.from(document.querySelectorAll('#delete-record-form button')))
             .forEach(function(el) { el.disabled = true; });
         clickedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
 
