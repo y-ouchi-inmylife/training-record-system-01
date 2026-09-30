@@ -226,6 +226,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const detailStalledNotice = document.getElementById('detail-stalled-notice');
     const detailDoneMessage = document.getElementById('detail-done-message');
     // 処理後の完了メッセージ（URL の done の値 → 文言）。文言はコントローラーの応答を使わず画面側で持つ
+    // 完了メッセージを 5 秒後に自動で閉じるタイマー（新しく出すとき・消すときに取り消す）
+    let doneMessageTimer = null;
+    const DONE_MESSAGE_AUTO_DISMISS_MS = 5000; // レイアウトの「更新」の保存メッセージ（data-auto-dismiss）と同じ秒数
     const DONE_MESSAGES = {
         transcription: '文字起こしが完了し、保存しました。',
         summary: '要約が完了し、保存しました。',
@@ -486,11 +489,29 @@ document.addEventListener('DOMContentLoaded', function() {
         closeBtn.className = 'btn-close';
         closeBtn.setAttribute('data-bs-dismiss', 'alert');
         alertEl.appendChild(closeBtn);
+        cancelDoneMessageTimer(); // 前のタイマーが新しいメッセージを閉じないように取り消す
         detailDoneMessage.textContent = '';
         detailDoneMessage.appendChild(alertEl);
+
+        // 「更新」の保存メッセージと同じく、5 秒後に bootstrap.Alert の close() で閉じる（フェードして消える）。
+        // その時点で要素がすでに消えている（× で閉じた・別の行を選んだ）ときは何もしない
+        doneMessageTimer = setTimeout(function () {
+            doneMessageTimer = null;
+            if (alertEl.isConnected) {
+                bootstrap.Alert.getOrCreateInstance(alertEl).close();
+            }
+        }, DONE_MESSAGE_AUTO_DISMISS_MS);
+    }
+
+    function cancelDoneMessageTimer() {
+        if (doneMessageTimer !== null) {
+            clearTimeout(doneMessageTimer);
+            doneMessageTimer = null;
+        }
     }
 
     function clearDoneMessage() {
+        cancelDoneMessageTimer();
         if (detailDoneMessage) detailDoneMessage.textContent = '';
     }
 
