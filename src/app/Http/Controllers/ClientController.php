@@ -81,17 +81,19 @@ class ClientController extends Controller
 
         // ソート
         // 既定は初回日の新しい順（設計書 S-0304 設計方針「並び順」参照）
-        $sortBy = $request->input('sort', 'initial_consultation_date');
-        $sortDir = $request->input('direction', 'desc');
+        $sortBy = $request->input('sort');
         // かな列は 2026-09 に UI から撤去したため、ソートキーからも除外する。
         // created_at も 2026-09 に既定を初回日へ変えた際に除外した。
-        // 古いブックマーク（?sort=last_name_kana / ?sort=created_at）は allowedSorts 判定で
-        // 既定値（initial_consultation_date）にフォールバックし、エラーにはならない。
+        // sort が未指定、または古いブックマーク（?sort=last_name_kana / ?sort=created_at）などの
+        // 不正な値のときは、direction の指定にかかわらず昇降も含めて既定（初回日の新しい順）に戻す。
+        // エラーにはしない（設計書 S-0304 設計方針「並び順」参照）。
         $allowedSorts = ['internal_id', 'last_name', 'initial_consultation_date'];
-        if (! in_array($sortBy, $allowedSorts)) {
+        if (in_array($sortBy, $allowedSorts, true)) {
+            $sortDir = $request->input('direction') === 'asc' ? 'asc' : 'desc';
+        } else {
             $sortBy = 'initial_consultation_date';
+            $sortDir = 'desc';
         }
-        $sortDir = $sortDir === 'asc' ? 'asc' : 'desc';
         // internal_id は文字列型だが数値のみを格納するため、数値として比較する
         if ($sortBy === 'internal_id') {
             $query->orderByRaw('CAST(internal_id AS UNSIGNED) '.$sortDir);
