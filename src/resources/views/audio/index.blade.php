@@ -38,6 +38,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>日時</th>
+                            <th>内部ID</th>
                             <th>会員</th>
                             <th>表示名</th>
                             <th>登録者</th>
@@ -58,8 +59,10 @@
                                 style="cursor: pointer;">
                                 {{-- 日時 --}}
                                 <td>{{ $audio->created_at->format('m/d H:i') }}</td>
-                                {{-- クライアント --}}
-                                <td>{{ $audio->client->internal_id }} {{ $audio->client->display_name }}</td>
+                                {{-- 内部ID・会員：他の一覧画面（S-0304・S-0402）と同じく内部ID を独立した列にする。
+                                     会員が取れない場合は §2-4 に従い空欄（トレーニング記録一覧と同じ書き方） --}}
+                                <td>{{ $audio->client->internal_id ?? '' }}</td>
+                                <td>{{ $audio->client->display_name ?? '' }}</td>
                                 {{-- タイトル --}}
                                 <td>{{ $audio->title ?? $audio->file_name }}</td>
                                 {{-- 担当トレーナー --}}
