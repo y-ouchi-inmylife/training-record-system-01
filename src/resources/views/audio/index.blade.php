@@ -6,8 +6,9 @@
 <div class="container">
     <h2 class="mb-3">音声記録一覧</h2>
 
-    {{-- 登録者フィルタ --}}
-    <div class="d-flex align-items-center gap-2 mb-4">
+    {{-- 登録者フィルタ＋登録ボタン（2026-09 にナビから移した。設計書 S-0505 設計方針参照）。
+         メディア一覧と同じく右端にボタンを置き、幅が狭いときはボタンのまとまりが下の行に折り返す --}}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
         <label for="trainer-filter" class="form-label mb-0 text-nowrap">登録者:</label>
         <select id="trainer-filter" class="form-select" style="width: auto;">
             <option value="all" {{ $selectedTrainerId == 'all' ? 'selected' : '' }}>全員</option>
@@ -17,12 +18,18 @@
                 </option>
             @endforeach
         </select>
+        <div class="ms-auto d-flex flex-wrap gap-2">
+            <a href="{{ route('recording-v2.index') }}" class="btn btn-primary">録音</a>
+            <a href="{{ route('audio-records.upload.create') }}" class="btn btn-primary">音声ファイル</a>
+            <a href="{{ route('audio-records.text-paste.create') }}" class="btn btn-primary">文字起こしテキスト</a>
+        </div>
     </div>
 
     {{-- 音声ファイル一覧 --}}
     @if($audioRecords->isEmpty())
         <div class="alert alert-info">
-            データがありません。録音画面、アップロード、またはテキストから要約を追加してください。
+            {{-- スマホ幅ではボタンが右上に来ないため、位置を表す言葉は使わない --}}
+            データがありません。「録音」「音声ファイル」「文字起こしテキスト」のボタンから登録してください。
         </div>
     @else
         <div class="card">
