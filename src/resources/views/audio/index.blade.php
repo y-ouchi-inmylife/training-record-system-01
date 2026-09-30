@@ -310,8 +310,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 detailTitle.value = data.title || '';
                 transcriptionText.value = data.transcription_text || '';
                 summaryText.value = data.summary_text || '';
-                // 音声ファイルの有無（「音声ファイルのみ削除」ボタンの判定と同じ has_audio_file を使う）
-                detailHasAudio.textContent = data.has_audio_file ? 'あり' : 'なし';
+                // 音声ファイルの有無（「音声ファイルのみ削除」ボタンの判定と同じ has_audio_file を使う）。
+                // §2-5 の配色に沿い、あり＝緑（bg-success）、なし＝グレー（bg-secondary）の標準バッジで表示する
+                const hasAudioBadge = document.createElement('span');
+                hasAudioBadge.className = data.has_audio_file ? 'badge bg-success' : 'badge bg-secondary';
+                hasAudioBadge.textContent = data.has_audio_file ? 'あり' : 'なし';
+                detailHasAudio.textContent = '';
+                detailHasAudio.appendChild(hasAudioBadge);
 
                 // フォームのアクションURLを設定
                 audioUpdateForm.action = '/audio-records/' + audioId;
