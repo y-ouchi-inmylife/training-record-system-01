@@ -132,6 +132,9 @@
                 </div>
             </div>
             <div class="card-body">
+                {{-- 文字起こし・要約が成功した後に読み込み直したときだけ出す完了メッセージ（中身は JS で作る）。
+                     処理後は該当の行が画面の中央に来るため、画面上部のフラッシュではなく編集欄の中に出す --}}
+                <div id="detail-done-message"></div>
                 {{-- 処理中のまま止まった記録を開いたときだけ表示する中断の案内 --}}
                 <div id="detail-stalled-notice" class="small text-warning mb-2" style="display: none;">
                     <i class="bi bi-exclamation-triangle"></i> 処理が中断された可能性があります。もう一度実行してください。
@@ -221,6 +224,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const detailTranscribeBtn = document.getElementById('detail-transcribe-btn');
     const detailSummarizeBtn = document.getElementById('detail-summarize-btn');
     const detailStalledNotice = document.getElementById('detail-stalled-notice');
+    const detailDoneMessage = document.getElementById('detail-done-message');
+    // 処理後の完了メッセージ（URL の done の値 → 文言）。文言はコントローラーの応答を使わず画面側で持つ
+    const DONE_MESSAGES = {
+        transcription: '文字起こしが完了し、保存しました。',
+        summary: '要約が完了し、保存しました。',
+    };
     // 処理中のバッジの文言・色は、サーバーが描画するときと同じ対応表を使う
     const STATUS_LABELS = @json(\App\Models\AudioRecord::statusLabels());
     const STATUS_BADGE_CLASSES = @json(\App\Models\AudioRecord::statusBadgeClasses());
@@ -275,6 +284,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (hasUnsavedChanges && !confirm(UNSAVED_CONFIRM_MESSAGE)) {
                 return;
             }
+
+            // ここで選択が変わることが確定する（閉じる／別の行を開く）ので、完了メッセージを消す
+            clearDoneMessage();
 
             // 同じ行を再度クリックしたら閉じる
             if (currentAudioId === audioId && detailArea.style.display !== 'none') {
@@ -379,6 +391,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 実行中は、パネルの他のボタン・行の選択・登録者の絞り込みを操作できなくし、行のバッジを処理中にする
     function lockForAction(audioId, clickedBtn, status) {
         isRunningAction = true;
+        clearDoneMessage();
         // 音声ファイルのみ削除のボタンはフォームの外（音声ファイルの段）にあるため id で指定する
         [detailTranscribeBtn, detailSummarizeBtn, document.getElementById('save-audio-btn'), document.getElementById('detail-delete-audio-btn')]
             .concat(Array.from(document.querySelectorAll('#delete-record-form button')))
@@ -428,7 +441,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(result => {
-            navigateWithHighlight(audioId);
+            // 成功したときだけ、読み込み直した後に完了メッセージを出すため処理の種類を渡す
+            navigateWithHighlight(audioId, kind);
         })
         .catch(error => {
             console.error(isTranscribe ? '文字起こしエラー:' : '要約エラー:', error);
@@ -445,10 +459,37 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- highlight付きURLに遷移するヘルパー（読み込み直した後、その記録の編集パネルを開く） ---
-    function navigateWithHighlight(audioId) {
+    // done（'transcription' | 'summary'）は成功したときだけ渡し、読み込み直した後の完了メッセージに使う
+    function navigateWithHighlight(audioId, done) {
         const url = new URL(window.location.href);
         url.searchParams.set('highlight', audioId);
+        if (done) {
+            url.searchParams.set('done', done);
+        } else {
+            url.searchParams.delete('done');
+        }
         window.location.href = url.toString();
+    }
+
+    // --- 完了メッセージ ---
+    // 見た目は「更新」の保存メッセージ（レイアウトのフラッシュ）に揃える。閉じるボタンで要素ごと消えても
+    // 次に出すときに作り直せるよう、外側の #detail-done-message の中に毎回作る
+    function showDoneMessage(text) {
+        const alertEl = document.createElement('div');
+        alertEl.className = 'alert alert-success alert-dismissible fade show';
+        alertEl.setAttribute('role', 'alert');
+        alertEl.textContent = text;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close';
+        closeBtn.setAttribute('data-bs-dismiss', 'alert');
+        alertEl.appendChild(closeBtn);
+        detailDoneMessage.textContent = '';
+        detailDoneMessage.appendChild(alertEl);
+    }
+
+    function clearDoneMessage() {
+        if (detailDoneMessage) detailDoneMessage.textContent = '';
     }
 
     // --- ページ読み込み時の自動展開 ---
@@ -459,11 +500,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (targetRow) {
             targetRow.click();
             targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // 自動のクリック（その中で完了メッセージを消す）の後に表示する。done が想定外の値なら何も出さない
+            // （constructor などの組み込みのキーを拾わないよう、自前で定義したキーだけを見る）
+            const done = params.get('done');
+            if (Object.prototype.hasOwnProperty.call(DONE_MESSAGES, done)) showDoneMessage(DONE_MESSAGES[done]);
         }
-        // URLからhighlight・tabパラメータを除去（履歴を汚さない。tab は以前のタブ切り替え用の名残で、古い URL に付いていても消す）
+        // URLからhighlight・tab・doneパラメータを除去（履歴を汚さない。再読み込みやブックマークで完了メッセージを再表示しない。
+        // tab は以前のタブ切り替え用の名残で、古い URL に付いていても消す）
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('highlight');
         cleanUrl.searchParams.delete('tab');
+        cleanUrl.searchParams.delete('done');
         history.replaceState(null, '', cleanUrl.toString());
     }
 
