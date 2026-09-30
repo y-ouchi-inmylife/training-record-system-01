@@ -284,15 +284,26 @@ class AudioRecordController extends Controller
 
     /**
      * 音声記録の保存（表示名・文字起こし・要約をまとめて更新）
+     *
+     * 通常のフォーム送信（「更新」ボタン）はリダイレクトで応答する。
+     * JSON を求める呼び出し（音声記録一覧で要約の前に保存する場合）は、成功 200・処理中 409 を JSON で返す
+     * （入力エラーは Laravel 標準の 422）。エラーの形は要約の API に揃える。
      */
-    public function update(Request $request, AudioRecord $audioRecord): RedirectResponse
+    public function update(Request $request, AudioRecord $audioRecord): RedirectResponse|JsonResponse
     {
         // 生きている処理中（文字起こし中／要約中）は編集を拒否する。
         // updated_at を上書きすると停滞判定に使う「処理中になった時刻」の代用が狂うため。
         // 止まったとみなす記録（15 分経過）は編集可能（判定は既に済んでいるため）。
         if ($audioRecord->isProcessing() && !$audioRecord->isStalled()) {
+            $message = '処理中の音声記録は編集できません。処理が完了してから編集してください。';
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => ['message' => $message],
+                ], 409);
+            }
+
             return redirect()->route('audio-records.index')
-                ->with('error', '処理中の音声記録は編集できません。処理が完了してから編集してください。');
+                ->with('error', $message);
         }
 
         $validated = $request->validate([
@@ -310,8 +321,18 @@ class AudioRecordController extends Controller
             'summary_text' => $validated['summary_text'] ?? null,
         ]);
 
+        $message = '音声記録を保存しました。';
+        if ($request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $audioRecord->id,
+                    'message' => $message,
+                ],
+            ]);
+        }
+
         return redirect()->route('audio-records.index')
-            ->with('success', '音声記録を保存しました。');
+            ->with('success', $message);
     }
 
     /**
