@@ -53,7 +53,6 @@
                             <tr class="audio-row"
                                 data-audio-id="{{ $audio->id }}"
                                 data-can-transcribe="{{ $audio->canTranscribe() ? '1' : '0' }}"
-                                data-has-transcription="{{ !empty($audio->transcription_text) ? '1' : '0' }}"
                                 data-summarize-locked="{{ $audio->isProcessing() && !$audio->isStalled() ? '1' : '0' }}"
                                 data-stalled="{{ $audio->isStalled() ? '1' : '0' }}"
                                 style="cursor: pointer;">
@@ -384,7 +383,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function applyDetailActions(row) {
         const d = row.dataset;
         detailTranscribeBtn.style.display = d.canTranscribe === '1' ? 'inline-block' : 'none';
-        detailSummarizeBtn.style.display = d.hasTranscription === '1' ? 'inline-block' : 'none';
+        // 要約は常に表示する（手入力した文字起こしでも要約できるように。空かどうかは押したときに判定する）
+        detailSummarizeBtn.style.display = 'inline-block';
         // 文字起こし中・要約中（止まっていないもの）は要約を押せなくする
         detailSummarizeBtn.disabled = d.summarizeLocked === '1';
         detailStalledNotice.style.display = d.stalled === '1' ? 'block' : 'none';
