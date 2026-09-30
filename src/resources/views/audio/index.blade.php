@@ -50,8 +50,15 @@
                     </thead>
                     <tbody>
                         @foreach($audioRecords as $audio)
+                            {{-- data-* は編集パネルの「文字起こし」「要約」ボタンの表示・押せる条件と、中断の案内に使う
+                                 （パネルを開いたときに JS が読む。設計書 S-0505 音声記録編集の画面項目参照） --}}
                             <tr class="audio-row"
                                 data-audio-id="{{ $audio->id }}"
+                                data-can-transcribe="{{ $audio->canTranscribe() ? '1' : '0' }}"
+                                data-has-transcription="{{ !empty($audio->transcription_text) ? '1' : '0' }}"
+                                data-summarize-locked="{{ $audio->isProcessing() && !$audio->isStalled() ? '1' : '0' }}"
+                                data-has-summary="{{ !empty($audio->summary_text) ? '1' : '0' }}"
+                                data-stalled="{{ $audio->isStalled() ? '1' : '0' }}"
                                 style="cursor: pointer;">
                                 {{-- 日時 --}}
                                 <td>{{ $audio->created_at->format('m/d H:i') }}</td>
@@ -121,7 +128,7 @@
                                 </td>
                                 {{-- 状態 --}}
                                 <td>
-                                    <span class="badge {{ $audio->status_badge_class }}">{{ $audio->status_label }}</span>
+                                    <span class="badge audio-status-badge {{ $audio->status_badge_class }}">{{ $audio->status_label }}</span>
                                 </td>
                             </tr>
                         @endforeach
@@ -136,11 +143,14 @@
 
         {{-- 詳細エリア --}}
         <div id="detail-area" class="card mt-4" style="display: none;">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2">
                     <span>音声記録編集</span>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex flex-wrap gap-2">
+                    {{-- 文字起こし・要約：パネルで開いている記録に対して実行する。表示・押せる条件は行の data-* から切り替える --}}
+                    <button type="button" id="detail-transcribe-btn" class="btn btn-primary" style="display: none;">文字起こし</button>
+                    <button type="button" id="detail-summarize-btn" class="btn btn-primary" style="display: none;">要約</button>
                     <button type="submit" form="audio-update-form" id="save-audio-btn" class="btn btn-success">更新</button>
                     <form id="delete-audio-form" method="POST" style="display: none;"
                           onsubmit="if (!this.action) { alert('削除対象が不明です。'); return false; } return confirm('音声ファイルのみ削除します。文字起こし・要約は残ります。よろしいですか?')">
@@ -157,6 +167,10 @@
                 </div>
             </div>
             <div class="card-body">
+                {{-- 処理中のまま止まった記録を開いたときだけ表示する中断の案内 --}}
+                <div id="detail-stalled-notice" class="small text-warning mb-2" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i> 処理が中断された可能性があります。もう一度実行してください。
+                </div>
                 <form id="audio-update-form" method="POST" action="">
                     @csrf
                     @method('PUT')
@@ -216,6 +230,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentAudioId = null;
     let pendingTab = null; // 自動展開時に開くタブ（'transcription' or 'summary'）
     let hasUnsavedChanges = false; // 表示名・文字起こし・要約テキストの未保存変更フラグ
+    let isRunningAction = false; // 編集パネルから文字起こし・要約を実行中か（応答後にページを読み込み直すまで true）
+    const detailTranscribeBtn = document.getElementById('detail-transcribe-btn');
+    const detailSummarizeBtn = document.getElementById('detail-summarize-btn');
+    const detailStalledNotice = document.getElementById('detail-stalled-notice');
+    // 処理中のバッジの文言・色は、サーバーが描画するときと同じ対応表を使う
+    const STATUS_LABELS = @json(\App\Models\AudioRecord::statusLabels());
+    const STATUS_BADGE_CLASSES = @json(\App\Models\AudioRecord::statusBadgeClasses());
+    const STATUS_TRANSCRIBING = @json(\App\Models\AudioRecord::STATUS_TRANSCRIBING);
+    const STATUS_SUMMARIZING = @json(\App\Models\AudioRecord::STATUS_SUMMARIZING);
     const UNSAVED_CONFIRM_MESSAGE = '保存されていない変更があります。移動しますか？';
 
     // 入力欄・テキストエリアの変更検知
@@ -268,6 +291,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // ボタン・フォーム・音声プレイヤークリック時は無視
             if (e.target.closest('form') || e.target.closest('button.btn-transcribe') || e.target.closest('button.btn-summarize') || e.target.closest('audio')) return;
 
+            // 文字起こし・要約の実行中は、別の記録を選べないようにする（処理後にページを読み込み直すため）
+            if (isRunningAction) return;
+
             const audioId = this.dataset.audioId;
 
             // 未保存の変更がある場合に確認
@@ -289,6 +315,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // 行のハイライト
             document.querySelectorAll('.audio-row').forEach(r => r.classList.remove('table-active'));
             this.classList.add('table-active');
+
+            // 編集パネルの文字起こし・要約ボタンと中断の案内を、この行の状態に合わせる
+            applyDetailActions(this);
 
             // Ajax で詳細を取得
             fetch('/audio-records/' + audioId, {
@@ -438,6 +467,85 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // --- 編集パネルの文字起こし・要約ボタン ---
+
+    // 選んだ行の data-* から、ボタンの表示・押せる条件と中断の案内を切り替える
+    function applyDetailActions(row) {
+        const d = row.dataset;
+        detailTranscribeBtn.style.display = d.canTranscribe === '1' ? 'inline-block' : 'none';
+        detailSummarizeBtn.style.display = d.hasTranscription === '1' ? 'inline-block' : 'none';
+        // 文字起こし中・要約中（止まっていないもの）は要約を押せなくする
+        detailSummarizeBtn.disabled = d.summarizeLocked === '1';
+        detailStalledNotice.style.display = d.stalled === '1' ? 'block' : 'none';
+    }
+
+    // 実行中は、パネルの他のボタン・行の選択・登録者の絞り込みを操作できなくし、行のバッジを処理中にする
+    function lockForAction(audioId, clickedBtn, status) {
+        isRunningAction = true;
+        [detailTranscribeBtn, detailSummarizeBtn, document.getElementById('save-audio-btn')]
+            .concat(Array.from(document.querySelectorAll('#delete-audio-form button, #delete-record-form button')))
+            .forEach(function(el) { el.disabled = true; });
+        clickedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
+
+        const filter = document.getElementById('trainer-filter');
+        if (filter) filter.disabled = true;
+
+        const row = document.querySelector('.audio-row[data-audio-id="' + audioId + '"]');
+        const badge = row ? row.querySelector('.audio-status-badge') : null;
+        if (badge) {
+            badge.className = 'badge audio-status-badge ' + (STATUS_BADGE_CLASSES[status] || 'bg-secondary');
+            badge.textContent = STATUS_LABELS[status] || '';
+        }
+    }
+
+    // パネルで開いている記録（currentAudioId）に対して文字起こし・要約を実行する
+    function runDetailAction(kind) {
+        if (isRunningAction || !currentAudioId) return;
+        const audioId = currentAudioId;
+        const row = document.querySelector('.audio-row[data-audio-id="' + audioId + '"]');
+        if (!row) return;
+
+        const isTranscribe = kind === 'transcription';
+        const hasExisting = isTranscribe ? row.dataset.hasTranscription === '1' : row.dataset.hasSummary === '1';
+        const confirmMessage = isTranscribe
+            ? (hasExisting ? '文字起こしを再実行しますか？既存の文字起こしは上書きされます。' : '文字起こしを実行しますか？')
+            : (hasExisting ? '要約を再実行しますか？既存の要約は上書きされます。' : '要約を実行しますか？');
+        if (!confirm(confirmMessage)) return;
+
+        lockForAction(audioId, isTranscribe ? detailTranscribeBtn : detailSummarizeBtn,
+            isTranscribe ? STATUS_TRANSCRIBING : STATUS_SUMMARIZING);
+
+        fetch('/api/audio-records/' + audioId + (isTranscribe ? '/transcribe' : '/summarize'), {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => { throw data; });
+            }
+            return response.json();
+        })
+        .then(result => {
+            navigateWithHighlight(audioId, kind);
+        })
+        .catch(error => {
+            console.error(isTranscribe ? '文字起こしエラー:' : '要約エラー:', error);
+            alert(error?.error?.message || (isTranscribe ? '文字起こしに失敗しました。' : '要約に失敗しました。'));
+            navigateWithHighlight(audioId, kind);
+        });
+    }
+
+    if (detailTranscribeBtn) {
+        detailTranscribeBtn.addEventListener('click', function() { runDetailAction('transcription'); });
+    }
+    if (detailSummarizeBtn) {
+        detailSummarizeBtn.addEventListener('click', function() { runDetailAction('summary'); });
+    }
 
     // --- highlight付きURLに遷移するヘルパー ---
     function navigateWithHighlight(audioId, tab) {
