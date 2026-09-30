@@ -98,19 +98,21 @@
         <table class="table table-hover">
             <thead class="table-light">
                 <tr>
+                    {{-- ▲▼ と切り替え先は、リクエストの値ではなくコントローラーで確定した並び順（$sortBy / $sortDir）で判定する。
+                         既定（sort 未指定）でも実際に効いている並び順を見出しに示すため（設計書 S-0304 設計方針「並び順」参照）。 --}}
                     <th>
-                        <a href="{{ route('clients.index', array_merge(request()->query(), ['sort' => 'internal_id', 'direction' => request('sort') === 'internal_id' && request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-decoration-none text-dark">
+                        <a href="{{ route('clients.index', array_merge(request()->query(), ['sort' => 'internal_id', 'direction' => $sortBy === 'internal_id' && $sortDir === 'asc' ? 'desc' : 'asc'])) }}" class="text-decoration-none text-dark">
                             内部ID
-                            @if(request('sort') === 'internal_id')
-                                {{ request('direction') === 'asc' ? '▲' : '▼' }}
+                            @if($sortBy === 'internal_id')
+                                {{ $sortDir === 'asc' ? '▲' : '▼' }}
                             @endif
                         </a>
                     </th>
                     <th>
-                        <a href="{{ route('clients.index', array_merge(request()->query(), ['sort' => 'last_name', 'direction' => request('sort') === 'last_name' && request('direction') === 'asc' ? 'desc' : 'asc'])) }}" class="text-decoration-none text-dark">
+                        <a href="{{ route('clients.index', array_merge(request()->query(), ['sort' => 'last_name', 'direction' => $sortBy === 'last_name' && $sortDir === 'asc' ? 'desc' : 'asc'])) }}" class="text-decoration-none text-dark">
                             名前
-                            @if(request('sort') === 'last_name')
-                                {{ request('direction') === 'asc' ? '▲' : '▼' }}
+                            @if($sortBy === 'last_name')
+                                {{ $sortDir === 'asc' ? '▲' : '▼' }}
                             @endif
                         </a>
                     </th>
@@ -118,9 +120,16 @@
                          複合値のためソート対象外。表示文字列は Client::trainees_label アクセサで組み立てる
                          （犬種・性別の省略ルールと「／」区切りは Blade に条件式を書き散らかないためモデル側に集約）。 --}}
                     <th>トレーニー</th>
-                    {{-- 初回日列（2026-09 追加、設計書 S-0304 設計方針「列の並べ替えと『初回日』の追加」参照）。
-                         列見出しでの並べ替えは付けない。未設定は空欄（§2-4 参照）。 --}}
-                    <th>初回日</th>
+                    {{-- 初回日列（2026-09 追加、設計書 S-0304 設計方針「列の並べ替えと『初回日』の追加」参照）。未設定は空欄（§2-4 参照）。
+                         既定の並び順のキー。別の列から切り替えたときは新しい順（desc）から始める（設計書 S-0304 設計方針「並び順」参照）。 --}}
+                    <th>
+                        <a href="{{ route('clients.index', array_merge(request()->query(), ['sort' => 'initial_consultation_date', 'direction' => $sortBy === 'initial_consultation_date' && $sortDir === 'desc' ? 'asc' : 'desc'])) }}" class="text-decoration-none text-dark">
+                            初回日
+                            @if($sortBy === 'initial_consultation_date')
+                                {{ $sortDir === 'asc' ? '▲' : '▼' }}
+                            @endif
+                        </a>
+                    </th>
                     <th>主担当</th>
                     {{-- メールアドレス列：状態バッジのみ表示（値は出さない）。カラムを持たない導出値のためソート不可（設計書 §S-0304）--}}
                     <th>メールアドレス</th>
