@@ -127,7 +127,7 @@
                           onsubmit="if (!this.action) { alert('削除対象が不明です。'); return false; } return confirm('この音声記録（音声ファイル + 文字起こし + 要約）を完全に削除します。よろしいですか?')">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-danger">音声記録を削除</button>
+                        <button type="submit" class="btn btn-danger">削除</button>
                     </form>
                 </div>
             </div>
