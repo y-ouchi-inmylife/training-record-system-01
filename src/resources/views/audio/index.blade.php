@@ -414,11 +414,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // パネルで開いている記録（currentAudioId）に対して文字起こし・要約を実行する
     function runDetailAction(kind) {
         if (isRunningAction || !currentAudioId) return;
+        // 対象の id は押した時点の currentAudioId を取っておき、以後はそれを使う
         const audioId = currentAudioId;
         const row = document.querySelector('.audio-row[data-audio-id="' + audioId + '"]');
         if (!row) return;
 
         const isTranscribe = kind === 'transcription';
+
+        // 要約：文字起こし欄が空なら実行しない（確認ダイアログより先）。サーバーは前後の空白を除いて
+        // 空を null にするので trim して揃える。要約の API の 409 の文言は空であることを伝えないため画面側で判定する
+        if (!isTranscribe && transcriptionText.value.trim() === '') {
+            alert('文字起こしが空のため、要約できません。');
+            return;
+        }
+
         // 初回・再実行で分けず、常に同じ 3 行の文言にする（ユーザーの判断。設計書 S-0505 参照）。
         // 最後の行で、手で保存する「更新」との違い（結果は自動で保存される）を押す前に伝える
         const confirmMessage = isTranscribe
@@ -426,6 +435,75 @@ document.addEventListener('DOMContentLoaded', function() {
             : '要約を実行しますか？\n既存の要約は上書きされます。\n結果は自動で保存されます。';
         if (!confirm(confirmMessage)) return;
 
+        // 要約は DB に保存済みの文字起こしを使うため、未保存の変更があれば先に保存してから要約する
+        // （未保存の変更がなければ保存は飛ばす）。保存に失敗したら要約せず、編集内容を残して終わる
+        if (!isTranscribe && hasUnsavedChanges) {
+            saveBeforeSummarize().then(function (saved) {
+                if (saved) startDetailAction(audioId, kind);
+            });
+            return;
+        }
+
+        startDetailAction(audioId, kind);
+    }
+
+    // 要約の前の保存（PUT /audio-records/{id} を JSON で呼ぶ）。保存できたら true を返す。
+    // 保存中は別の行を選べなくし、「要約」ボタンを「保存中...」にする。失敗したら元に戻し、ページは読み込み直さない
+    function saveBeforeSummarize() {
+        isRunningAction = true;
+        const originalHtml = detailSummarizeBtn.innerHTML;
+        const originalDisabled = detailSummarizeBtn.disabled;
+        detailSummarizeBtn.disabled = true;
+        detailSummarizeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+        const restore = function () {
+            detailSummarizeBtn.innerHTML = originalHtml;
+            detailSummarizeBtn.disabled = originalDisabled;
+            isRunningAction = false;
+        };
+
+        // FormData には _token・_method=PUT・表示名・文字起こし・要約が入る（フォームの送信と同じ内容）
+        return fetch(audioUpdateForm.action, {
+            method: 'POST',
+            body: new FormData(audioUpdateForm),
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(function (response) {
+            if (response.status === 200) {
+                hasUnsavedChanges = false;
+                return true;
+            }
+            if (response.status === 422 || response.status === 409) {
+                return response.json().then(function (data) {
+                    // 422：入力エラーの最初のメッセージ／409：処理中で断られたときのメッセージ
+                    const firstError = data && data.errors ? Object.values(data.errors)[0] : null;
+                    const message = response.status === 422
+                        ? (firstError && firstError[0])
+                        : (data && data.error && data.error.message);
+                    alert(message || '保存に失敗しました。');
+                    restore();
+                    return false;
+                });
+            }
+            alert('保存に失敗しました。');
+            restore();
+            return false;
+        })
+        .catch(function (error) {
+            console.error('要約前の保存エラー:', error);
+            alert('保存に失敗しました。');
+            restore();
+            return false;
+        });
+    }
+
+    // 文字起こし・要約の API を呼ぶ（処理中のロック → 呼び出し → 成功・失敗後に読み込み直し）
+    function startDetailAction(audioId, kind) {
+        const isTranscribe = kind === 'transcription';
         lockForAction(audioId, isTranscribe ? detailTranscribeBtn : detailSummarizeBtn,
             isTranscribe ? STATUS_TRANSCRIBING : STATUS_SUMMARIZING);
 
