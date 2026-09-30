@@ -69,18 +69,12 @@
                                 メディア
                             </a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle {{ request()->is('audio-records*') || request()->is('recording*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
+                        {{-- 音声記録：音声記録一覧への直接リンク。登録（録音・音声ファイル・文字起こしテキスト）は一覧の画面上部から入る。
+                             登録画面（/recording-v2・/audio-records/…/create）にいるときも強調する（設計書 §2-1「音声記録」参照） --}}
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('audio-records*') || request()->is('recording*') ? 'active' : '' }}" href="{{ route('audio-records.index') }}">
                                 音声記録
                             </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ route('audio-records.index') }}">音声記録一覧</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><h6 class="dropdown-header">音声記録登録</h6></li>
-                                <li><a class="dropdown-item" href="{{ route('recording-v2.index') }}">録音</a></li>
-                                <li><a class="dropdown-item" href="{{ route('audio-records.upload.create') }}">音声ファイル</a></li>
-                                <li><a class="dropdown-item" href="{{ route('audio-records.text-paste.create') }}">文字起こしテキスト</a></li>
-                            </ul>
                         </li>
                     @endif
                     @if(Auth::user()->isPractitioner())
