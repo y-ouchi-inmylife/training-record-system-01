@@ -43,8 +43,6 @@
                             <th>登録者</th>
                             <th>再生</th>
                             <th>再生時間</th>
-                            <th></th>
-                            <th></th>
                             <th>状態</th>
                         </tr>
                     </thead>
@@ -95,37 +93,6 @@
                                 </td>
                                 {{-- 時間 --}}
                                 <td>{{ $audio->formatted_duration ?? '-' }}</td>
-                                {{-- 文字起こし --}}
-                                <td>
-                                    @if($audio->canTranscribe())
-                                        <button type="button" class="btn btn-sm btn-primary btn-transcribe"
-                                                data-audio-id="{{ $audio->id }}"
-                                                data-has-transcription="{{ !empty($audio->transcription_text) ? '1' : '0' }}">
-                                            文字起こし
-                                        </button>
-                                        @if($audio->isStalledTranscribing())
-                                            <div class="small text-warning mt-1">
-                                                処理が中断された可能性があります。もう一度実行してください。
-                                            </div>
-                                        @endif
-                                    @endif
-                                </td>
-                                {{-- 要約 --}}
-                                <td>
-                                    @if(!empty($audio->transcription_text))
-                                        <button type="button" class="btn btn-sm btn-primary btn-summarize"
-                                                data-audio-id="{{ $audio->id }}"
-                                                data-has-summary="{{ !empty($audio->summary_text) ? '1' : '0' }}"
-                                                {{ $audio->status === \App\Models\AudioRecord::STATUS_SUMMARIZING && !$audio->isStalled() ? 'disabled' : '' }}>
-                                            要約
-                                        </button>
-                                        @if($audio->isStalledSummarizing())
-                                            <div class="small text-warning mt-1">
-                                                処理が中断された可能性があります。もう一度実行してください。
-                                            </div>
-                                        @endif
-                                    @endif
-                                </td>
                                 {{-- 状態 --}}
                                 <td>
                                     <span class="badge audio-status-badge {{ $audio->status_badge_class }}">{{ $audio->status_label }}</span>
@@ -288,8 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 行クリックで詳細エリアを展開
     document.querySelectorAll('.audio-row').forEach(function(row) {
         row.addEventListener('click', function(e) {
-            // ボタン・フォーム・音声プレイヤークリック時は無視
-            if (e.target.closest('form') || e.target.closest('button.btn-transcribe') || e.target.closest('button.btn-summarize') || e.target.closest('audio')) return;
+            // フォーム・音声プレイヤークリック時は無視
+            if (e.target.closest('form') || e.target.closest('audio')) return;
 
             // 文字起こし・要約の実行中は、別の記録を選べないようにする（処理後にページを読み込み直すため）
             if (isRunningAction) return;
@@ -383,90 +350,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // --- 文字起こしボタン ---
+    // CSRF トークン（編集パネルの文字起こし・要約の呼び出しで使う）
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    document.querySelectorAll('.btn-transcribe').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const audioId = this.dataset.audioId;
-            const hasTranscription = this.dataset.hasTranscription === '1';
-
-            const confirmMessage = hasTranscription
-                ? '文字起こしを再実行しますか？既存の文字起こしは上書きされます。'
-                : '文字起こしを実行しますか？';
-            if (!confirm(confirmMessage)) return;
-
-            // 文字起こし列を「処理中...」に更新
-            const cell = this.closest('td');
-            cell.innerHTML = '<span class="text-warning"><span class="spinner-border spinner-border-sm me-1" role="status"></span>処理中...</span>';
-
-            fetch('/api/audio-records/' + audioId + '/transcribe', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => { throw data; });
-                }
-                return response.json();
-            })
-            .then(result => {
-                navigateWithHighlight(audioId, 'transcription');
-            })
-            .catch(error => {
-                console.error('文字起こしエラー:', error);
-                alert(error?.error?.message || '文字起こしに失敗しました。');
-                navigateWithHighlight(audioId, 'transcription');
-            });
-        });
-    });
-
-    // --- 要約ボタン ---
-    document.querySelectorAll('.btn-summarize').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const audioId = this.dataset.audioId;
-            const hasSummary = this.dataset.hasSummary === '1';
-
-            // 確認ダイアログ
-            const confirmMessage = hasSummary
-                ? '要約を再実行しますか？既存の要約は上書きされます。'
-                : '要約を実行しますか？';
-            if (!confirm(confirmMessage)) return;
-
-            // ボタンを無効化してローディング表示
-            this.disabled = true;
-            this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
-
-            fetch('/api/audio-records/' + audioId + '/summarize', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => { throw data; });
-                }
-                return response.json();
-            })
-            .then(result => {
-                navigateWithHighlight(audioId, 'summary');
-            })
-            .catch(error => {
-                console.error('要約エラー:', error);
-                alert(error?.error?.message || '要約に失敗しました。');
-                navigateWithHighlight(audioId, 'summary');
-            });
-        });
-    });
 
     // --- 編集パネルの文字起こし・要約ボタン ---
 
