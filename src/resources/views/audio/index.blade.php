@@ -55,7 +55,6 @@
                                 data-can-transcribe="{{ $audio->canTranscribe() ? '1' : '0' }}"
                                 data-has-transcription="{{ !empty($audio->transcription_text) ? '1' : '0' }}"
                                 data-summarize-locked="{{ $audio->isProcessing() && !$audio->isStalled() ? '1' : '0' }}"
-                                data-has-summary="{{ !empty($audio->summary_text) ? '1' : '0' }}"
                                 data-stalled="{{ $audio->isStalled() ? '1' : '0' }}"
                                 style="cursor: pointer;">
                                 {{-- 日時 --}}
@@ -420,12 +419,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!row) return;
 
         const isTranscribe = kind === 'transcription';
-        const hasExisting = isTranscribe ? row.dataset.hasTranscription === '1' : row.dataset.hasSummary === '1';
-        // 末尾に「結果は自動で保存されます。」を添え、手で保存する「更新」との違いを押す前に伝える
-        const confirmMessage = (isTranscribe
-            ? (hasExisting ? '文字起こしを再実行しますか？既存の文字起こしは上書きされます。' : '文字起こしを実行しますか？')
-            : (hasExisting ? '要約を再実行しますか？既存の要約は上書きされます。' : '要約を実行しますか？'))
-            + '\n結果は自動で保存されます。';
+        // 初回・再実行で分けず、常に同じ 3 行の文言にする（ユーザーの判断。設計書 S-0505 参照）。
+        // 最後の行で、手で保存する「更新」との違い（結果は自動で保存される）を押す前に伝える
+        const confirmMessage = isTranscribe
+            ? '文字起こしを実行しますか？\n既存の文字起こしは上書きされます。\n結果は自動で保存されます。'
+            : '要約を実行しますか？\n既存の要約は上書きされます。\n結果は自動で保存されます。';
         if (!confirm(confirmMessage)) return;
 
         lockForAction(audioId, isTranscribe ? detailTranscribeBtn : detailSummarizeBtn,
