@@ -199,3 +199,13 @@ Mac 開発機は**専用のバケット**を使います（本番・Windows 開�
 ```
 
 > ブラウザから署名付き URL で直接 PUT するため、`PUT` と `AllowedHeaders` の両方が必須です。新規作成時のテンプレート（`GET` のみ）のままではプリフライトで拒否されます。
+
+
+### 8. 最新を取り込む
+
+```
+git pull
+composer install
+npm ci
+php artisan migrate:fresh --seed
+```
