@@ -99,11 +99,14 @@ class ClientController extends Controller
         } else {
             $query->orderBy($sortBy, $sortDir);
         }
+        // 第2キー：同値時の並びを固定し、ページをまたいだ重複・欠落を防ぐ（設計書 S-0304 設計方針「並び順」参照）
+        $query->orderBy('clients.id', $sortDir);
 
         $clients = $query->paginate(20)->withQueryString();
         $trainers = Trainer::practitioners()->orderBy('display_order')->orderBy('name')->get();
 
-        return view('clients.index', compact('clients', 'trainers'));
+        // 確定した並び順（実効値）をビューに渡す。検索フォームの hidden で並び順を保持するために使う
+        return view('clients.index', compact('clients', 'trainers', 'sortBy', 'sortDir'));
     }
 
     /**

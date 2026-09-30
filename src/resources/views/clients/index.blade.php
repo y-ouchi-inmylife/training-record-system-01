@@ -11,6 +11,9 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="GET" action="{{ route('clients.index') }}">
+                {{-- 検索時も並び順を維持するため、コントローラーで確定した並び順（実効値）を持たせる（設計書 S-0304 設計方針「並び順」参照） --}}
+                <input type="hidden" name="sort" value="{{ $sortBy }}">
+                <input type="hidden" name="direction" value="{{ $sortDir }}">
                 @if ($errors->has('date_to') || $errors->has('date_from'))
                     <div class="alert alert-danger">{{ $errors->first('date_to') ?: $errors->first('date_from') }}</div>
                 @endif
