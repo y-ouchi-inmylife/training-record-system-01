@@ -266,9 +266,9 @@ erDiagram
 |---------------|--------|------|------|
 | PRIMARY | id | PRIMARY KEY | 主キー |
 | clients_internal_id_unique | internal_id | UNIQUE | 内部IDの重複を防ぐ。内部IDによる検索にも使用 |
-| clients_initial_date_idx | initial_consultation_date | INDEX | 初回日によるソート・検索 |
+| clients_initial_date_idx | initial_consultation_date | INDEX | 初回日によるソート・検索。一覧画面のデフォルトソートで使用 |
 | clients_primary_trainer_idx | primary_trainer_id | INDEX | 主担当による検索 |
-| clients_created_at_idx | created_at | INDEX | 登録日時によるソート。一覧画面のデフォルトソートで使用 |
+| clients_created_at_idx | created_at | INDEX | 登録日時によるソート |
 | clients_updated_by_foreign | updated_by | INDEX | 最終更新者による検索。外部キー制約に伴い自動付与 |
 | clients_email_unique | email | UNIQUE | メールアドレスの重複を防ぐ。クライアント閲覧機能のログインIDとして使用。未登録（NULL）は複数許容 |
 
