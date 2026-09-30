@@ -157,6 +157,19 @@
                         </div>
                     </div>
 
+                    {{-- 音声ファイルの有無：表示のみ（送信しない）。§4-5 の水平レイアウトで、表示だけの項目は
+                         会員編集のメールアドレスと同じく form-control-plaintext にする。値はパネルを開くたびに JS で設定する --}}
+                    <div class="row g-3 mb-2">
+                        <div class="col-12">
+                            <div class="row g-2 align-items-center">
+                                <label class="col-md-auto col-form-label text-md-end form-label-fixed">音声ファイル</label>
+                                <div class="col-12 col-md">
+                                    <div id="detail-has-audio" class="form-control-plaintext"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- 文字起こし・要約：見比べながら編集できるよう左右に並べる（lg 未満では上下に積む）。
                          md で 2 等分すると 1 つあたりが狭く編集しにくいため col-lg-6 にする（設計書 S-0505 設計方針参照） --}}
                     <div class="row g-3">
@@ -185,6 +198,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const detailArea = document.getElementById('detail-area');
     const detailTitle = document.getElementById('detail-title');
+    const detailHasAudio = document.getElementById('detail-has-audio');
     const transcriptionText = document.getElementById('transcription-text');
     const summaryText = document.getElementById('summary-text');
     const audioUpdateForm = document.getElementById('audio-update-form');
@@ -267,6 +281,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // 編集パネルの文字起こし・要約ボタンと中断の案内を、この行の状態に合わせる
             applyDetailActions(this);
 
+            // 詳細を取得するまでは音声ファイルの有無を空にする（前の記録の値を残さない）
+            detailHasAudio.textContent = '';
+
             // Ajax で詳細を取得
             fetch('/audio-records/' + audioId, {
                 headers: {
@@ -280,6 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 detailTitle.value = data.title || '';
                 transcriptionText.value = data.transcription_text || '';
                 summaryText.value = data.summary_text || '';
+                // 音声ファイルの有無（「音声ファイルのみ削除」ボタンの判定と同じ has_audio_file を使う）
+                detailHasAudio.textContent = data.has_audio_file ? 'あり' : 'なし';
 
                 // フォームのアクションURLを設定
                 audioUpdateForm.action = '/audio-records/' + audioId;
