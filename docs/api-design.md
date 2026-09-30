@@ -853,8 +853,16 @@ POST /training-records に以下を追加する。
 | transcription_text | string | | nullable, string | 文字起こしテキスト |
 | summary_text | string | | nullable, string | 要約テキスト |
 
+**処理**:
+- 処理中（止まっていない文字起こし中・要約中）の記録は編集を受け付けない（停滞判定に使う `updated_at` を上書きしないため。15 分以上経過して止まったとみなす記録は受け付ける）
+- 表示名・文字起こしテキスト・要約テキストを保存する（`status` は変えない）
+
 **レスポンス**:
-- `redirect('/audio-records')`
+- 通常のフォーム送信：`redirect('/audio-records')`（成功時は success、処理中で断ったときは error のフラッシュメッセージ）。入力エラーは Laravel 標準の戻り
+- `Accept: application/json` のとき（**2026-09 追加**。音声記録一覧で要約の前に保存するため）：
+  - 成功：HTTP 200 `{ "data": { "id": 音声記録ID, "message": "音声記録を保存しました。" } }`
+  - 処理中：HTTP 409 `{ "error": { "message": "処理中の音声記録は編集できません。処理が完了してから編集してください。" } }`
+  - 入力エラー：HTTP 422（Laravel 標準の `{ "message", "errors" }`）
 
 
 ###### DELETE /audio-records/{id}
@@ -1975,6 +1983,7 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - 文字起こしテキストを要約する（同期実行）
+- 要約の元は、DB に保存済みの文字起こしテキスト（リクエストで本文は受け取らない。画面で未保存の変更がある場合は、先に `PUT /audio-records/{id}` で保存してから呼ぶ）
 
 **レスポンス**（JSON）:
 - 成功：`{ "data": { ... } }`
