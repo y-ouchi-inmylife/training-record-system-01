@@ -157,31 +157,16 @@
                         </div>
                     </div>
 
-                    {{-- タブ --}}
-                    <ul class="nav nav-tabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="transcription-tab" data-bs-toggle="tab"
-                                    data-bs-target="#transcription-pane" type="button" role="tab">
-                                文字起こし
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="summary-tab" data-bs-toggle="tab"
-                                    data-bs-target="#summary-pane" type="button" role="tab">
-                                要約
-                            </button>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content mt-3">
-                        {{-- 文字起こしタブ --}}
-                        <div class="tab-pane fade show active" id="transcription-pane" role="tabpanel">
+                    {{-- 文字起こし・要約：見比べながら編集できるよう左右に並べる（lg 未満では上下に積む）。
+                         md で 2 等分すると 1 つあたりが狭く編集しにくいため col-lg-6 にする（設計書 S-0505 設計方針参照） --}}
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <label for="transcription-text" class="form-label">文字起こし</label>
                             <textarea class="form-control" id="transcription-text" name="transcription_text"
                                       rows="10" placeholder="文字起こしテキストがここに表示されます"></textarea>
                         </div>
-
-                        {{-- 要約タブ --}}
-                        <div class="tab-pane fade" id="summary-pane" role="tabpanel">
+                        <div class="col-lg-6">
+                            <label for="summary-text" class="form-label">要約</label>
                             <textarea class="form-control" id="summary-text" name="summary_text"
                                       rows="10" placeholder="要約テキストがここに表示されます"></textarea>
                         </div>
@@ -204,7 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const summaryText = document.getElementById('summary-text');
     const audioUpdateForm = document.getElementById('audio-update-form');
     let currentAudioId = null;
-    let pendingTab = null; // 自動展開時に開くタブ（'transcription' or 'summary'）
     let hasUnsavedChanges = false; // 表示名・文字起こし・要約テキストの未保存変更フラグ
     let isRunningAction = false; // 編集パネルから文字起こし・要約を実行中か（応答後にページを読み込み直すまで true）
     const detailTranscribeBtn = document.getElementById('detail-transcribe-btn');
@@ -247,18 +231,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             e.returnValue = ''; // Chrome/Edge用
         }
-    });
-
-    // タブ切り替え時の未保存変更確認（Bootstrap 5のshow.bs.tabイベント）
-    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function(tabEl) {
-        tabEl.addEventListener('show.bs.tab', function(e) {
-            if (hasUnsavedChanges && !confirm(UNSAVED_CONFIRM_MESSAGE)) {
-                e.preventDefault();
-                return;
-            }
-            // 切替を許可した場合はフラグをリセット（新タブのテキストを基準値とする）
-            hasUnsavedChanges = false;
-        });
     });
 
     // 行クリックで詳細エリアを展開
@@ -337,14 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // 新しい行のデータをロードしたので未保存フラグをリセット
                 hasUnsavedChanges = false;
-
-                // 自動展開時のタブ切り替え
-                if (pendingTab) {
-                    const tabId = pendingTab === 'summary' ? 'summary-tab' : 'transcription-tab';
-                    const tabEl = document.getElementById(tabId);
-                    if (tabEl) new bootstrap.Tab(tabEl).show();
-                    pendingTab = null;
-                }
             })
             .catch(error => {
                 console.error('詳細の取得に失敗しました:', error);
@@ -425,12 +389,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(result => {
-            navigateWithHighlight(audioId, kind);
+            navigateWithHighlight(audioId);
         })
         .catch(error => {
             console.error(isTranscribe ? '文字起こしエラー:' : '要約エラー:', error);
             alert(error?.error?.message || (isTranscribe ? '文字起こしに失敗しました。' : '要約に失敗しました。'));
-            navigateWithHighlight(audioId, kind);
+            navigateWithHighlight(audioId);
         });
     }
 
@@ -441,11 +405,10 @@ document.addEventListener('DOMContentLoaded', function() {
         detailSummarizeBtn.addEventListener('click', function() { runDetailAction('summary'); });
     }
 
-    // --- highlight付きURLに遷移するヘルパー ---
-    function navigateWithHighlight(audioId, tab) {
+    // --- highlight付きURLに遷移するヘルパー（読み込み直した後、その記録の編集パネルを開く） ---
+    function navigateWithHighlight(audioId) {
         const url = new URL(window.location.href);
         url.searchParams.set('highlight', audioId);
-        if (tab) url.searchParams.set('tab', tab);
         window.location.href = url.toString();
     }
 
@@ -453,13 +416,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const params = new URLSearchParams(window.location.search);
     const highlightId = params.get('highlight');
     if (highlightId) {
-        pendingTab = params.get('tab') || null;
         const targetRow = document.querySelector('.audio-row[data-audio-id="' + highlightId + '"]');
         if (targetRow) {
             targetRow.click();
             targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-        // URLからhighlight・tabパラメータを除去（履歴を汚さない）
+        // URLからhighlight・tabパラメータを除去（履歴を汚さない。tab は以前のタブ切り替え用の名残で、古い URL に付いていても消す）
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('highlight');
         cleanUrl.searchParams.delete('tab');
