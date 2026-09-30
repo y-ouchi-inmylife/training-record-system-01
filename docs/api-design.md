@@ -362,7 +362,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 | date_from | date | 最終トレーニング日（開始日）。呼び方は screen-design.md §2-6 参照 |
 | date_to | date | 最終トレーニング日（終了日） |
 | sort | string | ソートカラム（internal_id, last_name, initial_consultation_date）。未指定時・不正値は initial_consultation_date。internal_idは数値順、last_nameは画面表示上の氏名で五十音順。第2キーとして id を第1キーと同じ方向で付け、同値時の並びを固定する |
-| direction | string | ソート方向（asc, desc）。asc以外はdesc（未指定時は desc） |
+| direction | string | ソート方向（asc, desc）。asc以外はdesc（未指定時は desc）。**sort が未指定・不正な値のときは、direction の指定にかかわらず desc**（既定の初回日の新しい順に戻す） |
 | page | integer | ページ番号 |
 
 **処理**:
