@@ -142,10 +142,19 @@
                     @csrf
                     @method('PUT')
 
-                    {{-- 表示名 --}}
-                    <div class="mb-3">
-                        <label for="detail-title" class="form-label">表示名 <span class="text-danger">*</span></label>
-                        <input type="text" id="detail-title" name="title" class="form-control" maxlength="255" required>
+                    {{-- 表示名：§4-5 の水平レイアウト（会員の登録・編集と同じ組み方。項目が 1 つなので外側の列は全幅） --}}
+                    <div class="row g-3 mb-2">
+                        <div class="col-12">
+                            <div class="row g-2 align-items-center">
+                                <label for="detail-title" class="col-md-auto col-form-label text-md-end form-label-fixed">
+                                    表示名 <span class="text-danger">*</span>
+                                </label>
+                                <div class="col-12 col-md">
+                                    <input type="text" id="detail-title" name="title" class="form-control" maxlength="255" required
+                                           autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {{-- タブ --}}
