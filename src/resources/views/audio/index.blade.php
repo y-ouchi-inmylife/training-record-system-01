@@ -418,9 +418,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const isTranscribe = kind === 'transcription';
         const hasExisting = isTranscribe ? row.dataset.hasTranscription === '1' : row.dataset.hasSummary === '1';
-        const confirmMessage = isTranscribe
+        // 末尾に「結果は自動で保存されます。」を添え、手で保存する「更新」との違いを押す前に伝える
+        const confirmMessage = (isTranscribe
             ? (hasExisting ? '文字起こしを再実行しますか？既存の文字起こしは上書きされます。' : '文字起こしを実行しますか？')
-            : (hasExisting ? '要約を再実行しますか？既存の要約は上書きされます。' : '要約を実行しますか？');
+            : (hasExisting ? '要約を再実行しますか？既存の要約は上書きされます。' : '要約を実行しますか？'))
+            + '\n結果は自動で保存されます。';
         if (!confirm(confirmMessage)) return;
 
         lockForAction(audioId, isTranscribe ? detailTranscribeBtn : detailSummarizeBtn,
