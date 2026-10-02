@@ -143,8 +143,20 @@ class TrainingRecordController extends Controller
 
         $audioRecordId = $request->input('audio_record_id');
 
+        // メディアセクションの初期データ：
+        // サーバー検証エラーで戻ったとき（セッションに古い入力があるとき）は、
+        // 送られてきた media_record_ids の順にメディアを並べ直して渡す。初めて
+        // 開いたとき（古い入力なし）は空。判定を old('media_record_ids') の有無で
+        // はなく hasOldInput() で行う理由は、メディアを全部外して送った場合に
+        // media_record_ids が送信されず old() が null になるため（全部外した状態
+        // として空で戻す必要がある。設計書 S-0401「エラーで戻ったときの入力値の
+        // 保持」参照）。
+        $mediaInitial = $request->session()->hasOldInput()
+            ? $this->buildMediaInitial((array) old('media_record_ids', []))
+            : [];
+
         return view('training-records.create', compact(
-            'trainers', 'selectedClientId', 'selectedClient', 'audioRecordId'
+            'trainers', 'selectedClientId', 'selectedClient', 'audioRecordId', 'mediaInitial'
         ));
     }
 
@@ -233,31 +245,21 @@ class TrainingRecordController extends Controller
     /**
      * トレーニング記録編集画面（S-0404 編集モード）
      */
-    public function edit(TrainingRecord $trainingRecord): View
+    public function edit(Request $request, TrainingRecord $trainingRecord): View
     {
         // mediaRecords は belongsToMany 側で orderByPivot('sort_order') 済みのため、
         // sort_order 昇順で取得される（編集画面メディアセクションの初期表示用）
         $trainingRecord->load(['client', 'mediaRecords']);
 
-        // メディアセクションの初期データ（presigned サムネイル URL を含む）。
-        // 5c-2 でモーダルから add 追加されるアイテムと同じ形を返す。
-        $thumbnailExpiresAt = now()->addMinutes(MediaRecordController::PLAY_URL_EXPIRES_MINUTES);
-        // displayTitle も typeLabel も渡さない。編集画面グリッドの buildCard は
-        // 種別ラベル（写真／動画）を type から JS 側で組み立てて img.alt に載せる
-        // （設計書 S-0401 / S-0404 セクション2 メディア参照）。
-        // typeLabel をここに含めない理由：$mediaInitial は JS の mediaSelection.items
-        // に流し込まれる。items はアップロード完了経路（_upload-modal.blade.php から
-        // 流入する registeredMedia）と追加モーダル経路（buildModalCard 側の確定処理）
-        // からも add される。前者の生成元は変更禁止ファイルで typeLabel を含められ
-        // ないため、items 全体で type から組み立てる形に揃える。
-        $mediaInitial = $trainingRecord->mediaRecords->map(function ($m) use ($thumbnailExpiresAt) {
-            return [
-                'id' => $m->id,
-                'type' => $m->type,
-                'thumbnailUrl' => $m->temporaryThumbnailUrl($thumbnailExpiresAt),
-                'conversionStatus' => $m->conversion_status,
-            ];
-        })->values()->all();
+        // メディアセクションの初期データ：
+        // サーバー検証エラーで戻ったとき（セッションに古い入力があるとき）は、
+        // 送られてきた media_record_ids の順にメディアを並べ直して渡す（利用者が
+        // 編集画面で追加・削除した状態を保つため）。初めて開いたとき（古い入力なし）
+        // は既存の紐づけから作る。判定を hasOldInput() で行う理由と、$mediaInitial
+        // の 1 件ずつの形（キー）は buildMediaInitial() のコメントを参照。
+        $mediaInitial = $request->session()->hasOldInput()
+            ? $this->buildMediaInitial((array) old('media_record_ids', []))
+            : $this->buildMediaInitial($trainingRecord->mediaRecords->pluck('id')->all());
 
         $trainers = Trainer::practitioners()->orderBy('display_order')->orderBy('name')->get();
 
@@ -440,6 +442,47 @@ class TrainingRecordController extends Controller
                 'total'        => $paginator->total(),
             ],
         ]);
+    }
+
+    /**
+     * メディアセクションの初期データ（mediaSelection.items と同形）を作る。
+     *
+     * $ids に入っていない ID は除き、$ids の順に並べる（利用者がドラッグで並べた
+     * 順を保つ）。送られた ID は書き換えられる可能性があるため、`whereIn` で DB に
+     * 実在するメディアだけに絞る（存在しない ID は黙って除く）。候補の絞り込み
+     * 条件は、本クラスの `availableMedia()` と同じく「登録者フィルタのみ・会員で
+     * の絞り込みは行わない」方針に揃える（候補として出せる最大の集合＝全件）。
+     *
+     * 返す要素のキーは `mediaSelection.items` に流し込める形：
+     *   `{id, type, thumbnailUrl, conversionStatus}`
+     * （Blade の `@json($mediaInitial ?? [])` に渡し、JS が camelCase を期待する
+     * ため、availableMedia の snake_case 系とは別の形）。
+     *
+     * create()・edit() の両方から呼び、エラーで戻ったとき（session->hasOldInput）
+     * と初回表示を同じヘルパで組み立てる。
+     */
+    private function buildMediaInitial(array $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        $thumbnailExpiresAt = now()->addMinutes(MediaRecordController::PLAY_URL_EXPIRES_MINUTES);
+        $media = MediaRecord::whereIn('id', $ids)->get()->keyBy('id');
+
+        return collect($ids)
+            ->map(fn ($id) => $media[(int) $id] ?? null)
+            ->filter()
+            ->map(function (MediaRecord $m) use ($thumbnailExpiresAt) {
+                return [
+                    'id' => $m->id,
+                    'type' => $m->type,
+                    'thumbnailUrl' => $m->temporaryThumbnailUrl($thumbnailExpiresAt),
+                    'conversionStatus' => $m->conversion_status,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
