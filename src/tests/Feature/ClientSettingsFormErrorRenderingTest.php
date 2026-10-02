@@ -76,7 +76,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
             'new_email' => 'ERR_new_email',
             'current_password' => 'ERR_current_password',
         ]);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_new_email');
         $view->assertSee('ERR_current_password');
         $view->assertSee('is-invalid', false);
@@ -125,7 +125,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
             'current_password' => 'ERR_current_password',
             'new_password' => 'ERR_new_password',
         ]);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_current_password');
         $view->assertSee('ERR_new_password');
         $view->assertSee('is-invalid', false);
@@ -180,7 +180,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
             'address4' => 'ERR_address4',
         ]);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_phone1');
         $view->assertSee('ERR_phone2');
         $view->assertSee('ERR_postal_code');

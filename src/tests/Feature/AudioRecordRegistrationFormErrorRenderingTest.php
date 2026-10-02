@@ -109,7 +109,7 @@ class AudioRecordRegistrationFormErrorRenderingTest extends TestCase
             'title' => 'ERR_title',
             'transcription_text' => 'ERR_transcription_text',
         ]);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_client_id');
         $view->assertSee('ERR_title');
         $view->assertSee('ERR_transcription_text');

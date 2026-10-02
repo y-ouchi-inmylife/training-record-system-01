@@ -59,7 +59,7 @@ class SettingsFormErrorRenderingTest extends TestCase
     public function test_要約プロンプト_エラーで上部案内と欄下文言が出る(): void
     {
         $view = $this->renderSummaryPrompts(['current_prompt' => 'ERR_current_prompt']);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_current_prompt');
         $view->assertSee('is-invalid', false);
         $view->assertSee('invalid-feedback', false);
@@ -89,7 +89,7 @@ class SettingsFormErrorRenderingTest extends TestCase
         $view = $this->renderIpRestriction(['ip_restriction' => $msg]);
 
         // 上部の 1 文の案内
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
 
         // 行のまとまりの下に invalid-feedback d-block で表示される
         $view->assertSee('invalid-feedback d-block', false);

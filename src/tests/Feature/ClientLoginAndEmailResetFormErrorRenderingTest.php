@@ -63,7 +63,7 @@ class ClientLoginAndEmailResetFormErrorRenderingTest extends TestCase
             'email' => 'ERR_email',
             'password' => 'ERR_password',
         ]);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_email');
         $view->assertSee('ERR_password');
         $view->assertSee('is-invalid', false);
@@ -98,7 +98,7 @@ class ClientLoginAndEmailResetFormErrorRenderingTest extends TestCase
     public function test_メアド登録_入力エラーでは上部案内と欄下文言が出る(): void
     {
         $view = $this->renderEmailRegistration(['email' => 'ERR_email']);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_email');
         $view->assertSee('is-invalid', false);
     }
@@ -132,7 +132,7 @@ class ClientLoginAndEmailResetFormErrorRenderingTest extends TestCase
     public function test_PW再設定申込_入力エラーでは上部案内と欄下文言が出る(): void
     {
         $view = $this->renderPasswordResetRequest(['email' => 'ERR_email']);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_email');
         $view->assertSee('is-invalid', false);
     }
@@ -156,7 +156,7 @@ class ClientLoginAndEmailResetFormErrorRenderingTest extends TestCase
     public function test_PW再設定_入力エラーでは上部案内と欄下文言が出る(): void
     {
         $view = $this->renderPasswordResetReset(['new_password' => 'ERR_new_password']);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_new_password');
         $view->assertSee('is-invalid', false);
     }

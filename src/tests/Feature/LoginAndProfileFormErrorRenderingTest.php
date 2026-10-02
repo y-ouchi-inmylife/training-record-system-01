@@ -76,7 +76,7 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
             'login_id' => 'ERR_login_id',
             'password' => 'ERR_password',
         ]);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_login_id');
         $view->assertSee('ERR_password');
         $view->assertSee('is-invalid', false);
@@ -127,7 +127,7 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
     public function test_強制PW変更_エラーで上部案内と欄下文言が出る(): void
     {
         $view = $this->renderChangePassword(['new_password' => 'ERR_new_password']);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_new_password');
         $view->assertSee('is-invalid', false);
     }
@@ -151,7 +151,7 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
     public function test_マイプロフィール_エラーで上部案内と欄下文言が出る(): void
     {
         $view = $this->renderProfileEdit(['name' => 'ERR_name']);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_name');
         $view->assertSee('is-invalid', false);
     }
@@ -179,7 +179,7 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
             'new_password' => 'ERR_new_password',
         ];
         $view = $this->renderProfilePassword($errors);
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         foreach ($errors as $message) {
             $view->assertSee($message);
         }

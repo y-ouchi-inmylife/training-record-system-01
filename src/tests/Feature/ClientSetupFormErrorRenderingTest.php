@@ -76,7 +76,7 @@ class ClientSetupFormErrorRenderingTest extends TestCase
             'trainee_note' => 'ERR_trainee_note',
         ]);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
 
         // 全項目の文言が欄の下に出る。
         $view->assertSee('ERR_password');

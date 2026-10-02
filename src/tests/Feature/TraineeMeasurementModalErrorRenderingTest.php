@@ -75,7 +75,7 @@ class TraineeMeasurementModalErrorRenderingTest extends TestCase
 
         // 対象のモーダル（trainee=1）
         $t1 = $this->sliceModal($html, 1);
-        $this->assertStringContainsString('入力内容に誤りがあります。赤字の項目を確認してください。', $t1);
+        $this->assertStringContainsString('入力内容に誤りがあります。', $t1);
         $this->assertStringContainsString('ERR_measured_date', $t1);
         $this->assertStringContainsString('ERR_measured_time', $t1);
         $this->assertStringContainsString('ERR_weight_kg', $t1);

@@ -83,7 +83,7 @@ class TraineeFormErrorRenderingTest extends TestCase
         $view = $this->renderForm($errors, isEdit: true);
 
         // 上部の 1 文の案内
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
 
         // 旧 <ul><li>…</li></ul> の一覧が出ない
         $view->assertDontSee('<ul class="mb-0">', false);

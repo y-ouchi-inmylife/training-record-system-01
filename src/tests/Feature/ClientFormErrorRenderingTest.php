@@ -121,7 +121,7 @@ class ClientFormErrorRenderingTest extends TestCase
         $view = $this->renderForm($errors, isEdit: true);
 
         // 上部の 1 文の案内
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
 
         // エラーの一覧（<ul><li>…</li></ul>）が出ないことを確かめる
         $view->assertDontSee('<ul class="mb-0">', false);

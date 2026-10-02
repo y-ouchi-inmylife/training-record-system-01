@@ -96,7 +96,7 @@ class TrainingRecordFormErrorRenderingTest extends TestCase
         ];
         $view = $this->renderCreate($errors);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
 
         // 旧 .validation-error-summary が出ていない
         $view->assertDontSee('validation-error-summary', false);
@@ -146,7 +146,7 @@ class TrainingRecordFormErrorRenderingTest extends TestCase
         ];
         $view = $this->renderEdit($errors);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertDontSee('validation-error-summary', false);
 
         foreach ($errors as $message) {

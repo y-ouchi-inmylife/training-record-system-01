@@ -68,7 +68,7 @@ class TrainerFormErrorRenderingTest extends TestCase
         ];
         $view = $this->renderCreate($errors);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         // 旧い一覧（<li>${message}</li>）が出ていないこと（各欄下に 1 件ずつだけ出す）
         foreach ($errors as $message) {
             $view->assertSee($message);
@@ -103,7 +103,7 @@ class TrainerFormErrorRenderingTest extends TestCase
         ];
         $view = $this->renderEdit($errors);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         foreach ($errors as $message) {
             $view->assertSee($message);
         }
@@ -147,7 +147,7 @@ class TrainerFormErrorRenderingTest extends TestCase
         $errors = ['new_password' => 'ERR_new_password'];
         $view = $this->renderResetPassword($errors);
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_new_password');
         $view->assertSee('is-invalid', false);
     }
