@@ -41,7 +41,14 @@
                     <input type="file" id="mediaUploadFileInput" multiple
                            class="form-control"
                            accept=".jpg,.jpeg,.png,.heic,.heif,.mp4,.mov">
-                    <div id="mediaUploadFileError" class="text-danger small mt-1 d-none"></div>
+                    {{-- 送信前のブラウザ側確認（§2-7 の例外「大きなファイルを送る前の確認」）と
+                         サーバー 422（ファイルが未選択の場合など、個別ファイル処理の前の違反）の文言は、
+                         ここに invalid-feedback d-block で出す（JS が `showFileError` で class を付与する）。
+                         静的な HTML では class を持たない：
+                           - `invalid-feedback` を静的に残すと、入力エラーなしで画面を開いただけでも
+                             「`invalid-feedback` が描画される」状態になり、他画面の描画テストで誤検知する
+                           - エラーが出ているあいだだけ JS が class を付け、消えたら JS が class を外す --}}
+                    <div id="mediaUploadFileError"></div>
                     <div class="form-text">
                         対応形式: 【写真】 jpeg, png, heic（最大20MB）、【動画】 mp4, mov（最大1GB）
                     </div>
@@ -126,16 +133,33 @@
         return null;
     }
 
+    // 送信前のチェック（§2-7 の例外「大きなファイルを送る前の確認」。段階 5-3b で文言を整え、
+    // サーバーの文言と食い違わない形に揃えた。音声ファイル〔段階 5-2〕と同じ流儀で、
+    // ファイル名と大きさを添えて、後半はサーバーの文言と同じ）。
     function validateFile(file) {
         const type = classifyFile(file);
         if (type === null) {
-            return { ok: false, message: '対応形式は写真(jpeg/png/heic)・動画(mp4/mov)のみです。' };
+            return {
+                ok: false,
+                message: '選択したファイル「' + file.name + '」は対応形式ではありません。写真(jpeg/png/heic)・動画(mp4/mov)のみ登録できます。',
+            };
         }
+        // 大きさは 1MB = 1024 × 1024 バイトで計算し、小数点以下 1 桁で切り上げる
+        // （四捨五入・切り捨てだと、上限をわずかに超えたファイルが「20.0MB」と表示されて
+        //  「20MB 以下にしてください」の文と矛盾するため）。
         if (type === 'photo' && file.size > MAX_PHOTO_SIZE) {
-            return { ok: false, message: '写真は20MB以下にしてください。' };
+            const sizeMb = (Math.ceil(file.size / 1024 / 1024 * 10) / 10).toFixed(1);
+            return {
+                ok: false,
+                message: '選択したファイル（' + file.name + '、' + sizeMb + 'MB）は 20MB 以下にしてください。',
+            };
         }
         if (type === 'video' && file.size > MAX_VIDEO_SIZE) {
-            return { ok: false, message: '動画は1GB以下にしてください。' };
+            const sizeMb = (Math.ceil(file.size / 1024 / 1024 * 10) / 10).toFixed(1);
+            return {
+                ok: false,
+                message: '選択したファイル（' + file.name + '、' + sizeMb + 'MB）は 1GB 以下にしてください。',
+            };
         }
         return { ok: true };
     }
@@ -143,7 +167,7 @@
     function validateAllFiles(files) {
         for (let i = 0; i < files.length; i++) {
             const r = validateFile(files[i]);
-            if (!r.ok) return { ok: false, message: '[' + files[i].name + '] ' + r.message };
+            if (!r.ok) return r;
         }
         return { ok: true };
     }
@@ -268,14 +292,15 @@
         }
     }
 
+    // サーバーのエラーレスポンスから利用者向けの文言を取り出す。
+    // 段階 5-3b で、サーバー側（MediaRecordController::uploadUrl / store）が独自の
+    // `{"error": {...}}` 形式をやめて Laravel 標準の 422（`{message, errors: {キー: [文言…]}}`）に
+    // 揃えたため、`body.errors` と `body.message` だけを読む。
     async function readErrorMessage(res, fallback) {
         try {
             const body = await res.json();
             if (body && body.errors) {
                 return Object.values(body.errors).flat().join('\n');
-            }
-            if (body && body.error) {
-                return Object.values(body.error).flat().join('\n');
             }
             if (body && body.message) return body.message;
         } catch (e) { /* ignore */ }
@@ -394,7 +419,8 @@
         selectedFiles = [];
         fileRowMap.clear();
         if (fileInput) fileInput.value = '';
-        if (fileErrorEl) { fileErrorEl.classList.add('d-none'); fileErrorEl.textContent = ''; }
+        // ファイルの選択の欄の下のエラーを消す（showFileError で付けた class・text を外す）
+        if (fileErrorEl) { fileErrorEl.className = ''; fileErrorEl.textContent = ''; }
         if (fileInput) fileInput.classList.remove('is-invalid');
         if (fileListEl) fileListEl.classList.add('d-none');
         if (fileListItemsEl) fileListItemsEl.innerHTML = '';
@@ -438,11 +464,24 @@
         summaryFailureEl = document.getElementById('mediaUploadSummaryFailure');
         summaryFailureListEl = document.getElementById('mediaUploadSummaryFailureList');
 
-        // ファイル選択：選択ファイル配列の更新・一覧描画・事前バリデーション
-        fileInput.addEventListener('change', function () {
-            fileErrorEl.classList.add('d-none');
+        // ファイルの選択の欄の下のエラーの出し方を 1 か所に集める（§2-7「欄の下」の見た目に揃える）。
+        // 静的な HTML には `invalid-feedback` を残さず、エラーがあるあいだだけ JS が class を付与する
+        // （他画面の描画テストで `invalid-feedback` が無関係に拾われないよう）。
+        function showFileError(message) {
+            fileErrorEl.className = 'invalid-feedback d-block';
+            fileErrorEl.textContent = message;
+            fileInput.classList.add('is-invalid');
+        }
+        function clearFileError() {
+            fileErrorEl.className = '';
             fileErrorEl.textContent = '';
             fileInput.classList.remove('is-invalid');
+        }
+
+        // ファイル選択：選択ファイル配列の更新・一覧描画・事前バリデーション
+        fileInput.addEventListener('change', function () {
+            // ファイルを選び直したときは、前のエラーの表示を消す（§2-7。段階 5-3b）
+            clearFileError();
             // 前回登録結果のサマリは新たな選択で隠す
             resultSummaryEl.classList.add('d-none');
 
@@ -452,18 +491,25 @@
 
             const result = validateAllFiles(selectedFiles);
             if (!result.ok) {
-                fileErrorEl.textContent = result.message;
-                fileErrorEl.classList.remove('d-none');
-                fileInput.classList.add('is-invalid');
+                showFileError(result.message);
             }
         });
 
         // 登録ボタン
         submitBtn.addEventListener('click', async function () {
             const files = selectedFiles;
-            if (files.length === 0) { alert('ファイルを選択してください。'); return; }
+            // alert をやめ、ファイルの選択の欄の下に invalid-feedback で出す（§2-7。段階 5-3b）
+            if (files.length === 0) {
+                showFileError('ファイルを選択してください。');
+                return;
+            }
             const v = validateAllFiles(files);
-            if (!v.ok) { alert(v.message); return; }
+            if (!v.ok) {
+                showFileError(v.message);
+                return;
+            }
+            // 新しいアップロードを始めるので、前のエラーの表示を消す
+            clearFileError();
 
             resultSummaryEl.classList.add('d-none');
             files.forEach(function (f) { setRowStatus(f, 'pending'); });
