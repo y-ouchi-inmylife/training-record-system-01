@@ -46,16 +46,18 @@
                         <div class="c-session-content">
                             <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['name'] }}ちゃん</h2>
 
-                            {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7）。
-                                 入力項目（photo）のエラーがあるときだけ、上部に 1 文の案内を出す。
-                                 どちらも「このトレーニーのフォームで起きたエラー」のときだけ表示する。 --}}
+                            {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7
+                                 「入力エラー以外の失敗を入力の項目のキーで返さないルール」）。
+                                 入力項目（photo）のエラーに対する上部の 1 文の案内は、本画面が小さなフォーム
+                                 （写真 1 枚の登録・エラーになりうる項目は photo のみ）のため §2-7「画面上部の
+                                 短い案内」の例外として出さない（段階 5-1）。欄の下の文言（写真枠の下の
+                                 <x-form-error field="photo" block />）だけで足りる。
+                                 form キーの alert-danger は上記例外とは別のルールのため、残す。
+                                 「このトレーニーのフォームで起きたエラー」のときだけ表示する。 --}}
                             @if($shouldShowPhotoError)
                                 @error('form')
                                     <div class="alert alert-danger" role="alert">{{ $message }}</div>
                                 @enderror
-                                @if($errors->hasAny(['photo']))
-                                    <x-form-error-summary />
-                                @endif
                             @endif
 
                             {{-- 写真とグラフの横並びラッパー（2026-09 追加、要件定義書 6-15-15）。
