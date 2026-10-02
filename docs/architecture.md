@@ -116,13 +116,13 @@ flowchart TD
 | 項目 | 技術 | 説明（選定理由など） |
 |------|------|---------|
 | テンプレートエンジン | Blade（Laravel標準） | Laravelと統合されており、追加設定なしで使える。サーバーサイドで画面を生成するため、SEOや初期表示速度の心配がない |
-| CSSフレームワーク | Bootstrap 5.3.8（npm経由） | 業務アプリケーションに適したUIコンポーネントが豊富。レスポンシブ対応済み |
+| CSSフレームワーク | Bootstrap 5.3.8（npm、ビルドに含める。**バージョンを完全固定**） | 業務アプリケーションに適したUIコンポーネントが豊富。レスポンシブ対応済み。トレーナー側の共通レイアウトは `resources/sass/app.scss` から `@import 'bootstrap/scss/bootstrap'` で取り込み、`resources/js/bootstrap.js` が `import * as bootstrap from 'bootstrap'` で `window.bootstrap` に載せる。録音実行の画面（`recording-v2/session.blade.php`、`layouts.app` を使わない独立 HTML）は共通の `app.scss`・`app.js` を載せると見た目が変わるため、専用の入口 `resources/js/recording-session.js` から素の Bootstrap の CSS・JS を読み込む。**外部 CDN からは読み込まない**（面談中にネット接続が不安定でも、録音のあとのモーダルが動くようにするため） |
 | CSSプリプロセッサ | sass 1.98.0 | Bootstrap の SCSS ソースをコンパイルするために使用 |
 | CSS依存ライブラリ | @popperjs/core 2.11.8 | Bootstrapのドロップダウン等で必要 |
 | JavaScript（npm） | axios 1.11.0 | HTTP通信用。resources/js/bootstrap.js でグローバル登録 |
-| JavaScript（CDN） | jQuery 3.7.1 | Select2の依存として必須。それ以外の用途では使用しない |
+| オートコンプリート | Select2 4.1.0-rc.0 + select2-bootstrap-5-theme 1.3.0 + jQuery 3.7.1（npm、ビルドに含める。**いずれもバージョンを完全固定**） | 会員・登録者の選択欄の検索・候補表示に使用（録音準備・音声アップロード・文字起こしテキスト・メディア一覧）。Bootstrap 5 テーマで見た目を統一。jQuery は Select2 の依存としてだけ使い、ほかの用途では使わない。入口は `resources/js/select2.js` に集約し、`window.$`・`window.jQuery` に jQuery を載せ、Select2 を jQuery に組み込み、Select2 の CSS とテーマの CSS もこの入口から取り込む。使う画面でだけ `@vite(['resources/js/select2.js'])` して読み込む（共通の `app.js` には載せない）。**外部 CDN からは読み込まない** |
+| ドラッグ&ドロップ並べ替え | sortablejs 1.15.7（npm、ビルドに含める。**バージョンを完全固定**） | トレーニング記録の登録・編集画面のメディアセクションの並べ替えに使用。入口 `resources/js/sortable.js` で `import Sortable from 'sortablejs'` し `window.Sortable` に載せる。使う画面でだけ `@vite(['resources/js/sortable.js'])` して読み込む（共通の `app.js` には載せない）。**外部 CDN からは読み込まない** |
 | アイコン・UIライブラリ | 該当なし（Bootstrap標準のみ） | 専用アイコンライブラリは未導入。必要に応じて将来導入を検討 |
-| オートコンプリート | Select2 4.1.0-rc.0 + select2-bootstrap-5-theme 1.3.0（CDN） | クライアント選択時の検索・候補表示に使用。Bootstrap 5テーマで見た目を統一 |
 | QR コード生成 | qrcode 1.5.4（npm、ビルドに含める） | メールアドレス登録用 URL の QR コード表示（S-0307 印刷ページ）で使用。**外部 CDN からは読み込まない**（面談中にネット接続が不安定でも QR を表示できるようにするため） |
 | グラフ描画 | Chart.js 4.5.1（npm、ビルドに含める） | 会員ダッシュボード（S-1402）のトレーニー体重推移グラフで使用。**外部 CDN からは読み込まない**（qrcode と同じ方針。既存プロジェクトが npm 統一のためそれに合わせる）。バンドルサイズ抑制のため必要なコンポーネントだけを `Chart.register()` で登録するツリーシェイク前提の import 形式を採る |
 | 日付選択 | flatpickr 4.6.13（npm、ビルドに含める） | トレーナー側のフォーム・検索・計測値モーダルの `.datepicker` 入力欄で使用。**外部 CDN からは読み込まない**（qrcode・Chart.js と同じ方針）。**バージョンは `package.json` で完全固定**（範囲指定の `^` を使わない）。`resources/js/app.js` で `import` し、`localize(Japanese)` で日本語化。CSS は `resources/sass/app.scss` から `@import 'flatpickr/dist/flatpickr.css'` で読み込む。インラインの script 側は `window.flatpickr` で参照する（会員側のログイン前のレイアウトでは使わず、`<input type="date">` を使う） |
