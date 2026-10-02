@@ -125,6 +125,7 @@ flowchart TD
 | オートコンプリート | Select2 4.1.0-rc.0 + select2-bootstrap-5-theme 1.3.0（CDN） | クライアント選択時の検索・候補表示に使用。Bootstrap 5テーマで見た目を統一 |
 | QR コード生成 | qrcode 1.5.4（npm、ビルドに含める） | メールアドレス登録用 URL の QR コード表示（S-0307 印刷ページ）で使用。**外部 CDN からは読み込まない**（面談中にネット接続が不安定でも QR を表示できるようにするため） |
 | グラフ描画 | Chart.js 4.5.1（npm、ビルドに含める） | 会員ダッシュボード（S-1402）のトレーニー体重推移グラフで使用。**外部 CDN からは読み込まない**（qrcode と同じ方針。既存プロジェクトが npm 統一のためそれに合わせる）。バンドルサイズ抑制のため必要なコンポーネントだけを `Chart.register()` で登録するツリーシェイク前提の import 形式を採る |
+| 日付選択 | flatpickr 4.6.13（npm、ビルドに含める） | トレーナー側のフォーム・検索・計測値モーダルの `.datepicker` 入力欄で使用。**外部 CDN からは読み込まない**（qrcode・Chart.js と同じ方針）。**バージョンは `package.json` で完全固定**（範囲指定の `^` を使わない）。`resources/js/app.js` で `import` し、`localize(Japanese)` で日本語化。CSS は `resources/sass/app.scss` から `@import 'flatpickr/dist/flatpickr.css'` で読み込む。インラインの script 側は `window.flatpickr` で参照する（会員側のログイン前のレイアウトでは使わず、`<input type="date">` を使う） |
 | ビルドツール | Vite 7.0.7 + laravel-vite-plugin 2.0.0 | Laravel標準のビルドツール。高速な開発サーバーとビルドを提供 |
 
 ### 2-2. バックエンド
