@@ -17,23 +17,17 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ $action }}" id="traineeForm"
+    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+         required・maxlength・type・pattern などの属性は残す。 --}}
+    <form method="POST" action="{{ $action }}" id="traineeForm" novalidate
           onkeydown="if(event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); }">
         @csrf
         @if($method === 'PUT')
             @method('PUT')
         @endif
 
-        {{-- バリデーションエラー表示 --}}
-        @if($errors->any())
-            <div class="alert alert-danger">
-                <ul class="mb-0">
-                    @foreach($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+        {{-- 画面上部の 1 文の案内（設計書 §2-7）。個々のエラーは各欄の下に出す --}}
+        <x-form-error-summary />
 
         <div class="card mb-4">
             <div class="card-header"><h6 class="mb-0">基本情報</h6></div>
@@ -66,7 +60,7 @@
                                 <input type="text" class="form-control @error('name') is-invalid @enderror"
                                        id="name" name="name" maxlength="50" required
                                        value="{{ old('name', $trainee?->name) }}" autocomplete="off">
-                                @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="name" />
                             </div>
                         </div>
                     </div>
@@ -85,7 +79,7 @@
                                 <input type="text" class="form-control @error('breed') is-invalid @enderror"
                                        id="breed" name="breed" maxlength="100"
                                        value="{{ old('breed', $trainee?->breed) }}" autocomplete="off">
-                                @error('breed') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="breed" />
                             </div>
                         </div>
                     </div>
@@ -102,7 +96,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                @error('sex') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="sex" />
                             </div>
                         </div>
                     </div>
@@ -110,12 +104,15 @@
                         <div class="row g-2 align-items-center">
                             <label for="birth_date" class="col-md-auto col-form-label text-md-end form-label-fixed">誕生日</label>
                             <div class="col-12 col-md">
+                                {{-- Flatpickr（.datepicker）は altInput を使っていないため、
+                                     オリジナルの input がそのまま残る → is-invalid の兄弟セレクタで
+                                     invalid-feedback が自動表示されるため block は付けない（3-1 と同じ）。 --}}
                                 <input type="text" class="form-control datepicker @error('birth_date') is-invalid @enderror"
                                        id="birth_date" name="birth_date"
                                        value="{{ old('birth_date', $trainee?->birth_date?->format('Y-m-d')) }}"
                                        placeholder="例: 2020-05-01" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
                                        autocomplete="off">
-                                @error('birth_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="birth_date" />
                             </div>
                         </div>
                     </div>
@@ -129,7 +126,7 @@
                             <div class="col-12 col-md">
                                 <textarea class="form-control @error('note') is-invalid @enderror"
                                           id="note" name="note" rows="3">{{ old('note', $trainee?->note) }}</textarea>
-                                @error('note') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="note" />
                             </div>
                         </div>
                     </div>
