@@ -1102,8 +1102,8 @@ POST /training-records に以下を追加する。
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
-| password | string | ● | required, string, confirmed, StrongPassword | 新しいパスワード |
-| password_confirmation | string | ● | — | パスワード（確認） |
+| new_password | string | ● | required, string, confirmed, StrongPassword | 新しいパスワード |
+| new_password_confirmation | string | ● | — | 新しいパスワード（確認） |
 
 **処理**:
 - パスワードを更新し、次回ログイン時にパスワード変更を必須とする
