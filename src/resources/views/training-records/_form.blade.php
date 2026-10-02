@@ -9,6 +9,10 @@
         @method('PUT')
     @endif
 
+    {{-- 画面上部の 1 文の案内（設計書 §2-7）。novalidate は 2026-09 以前から付いており、
+         入力の検証はサーバーに任せる（JS の独自チェックは段階 3-3 のリファクタで削除）。 --}}
+    <x-form-error-summary />
+
     {{-- 基本情報 --}}
     <div class="card mb-3">
         <div class="card-header">
@@ -23,11 +27,17 @@
                         <label class="col-md-auto col-form-label text-md-end form-label-fixed">会員 <span class="text-danger">*</span></label>
                         <div class="col-12 col-md">
                             @php $fixedClient = $selectedClient ?? $record->client; @endphp
-                            <input type="text" class="form-control bg-light"
+                            {{-- 読み取り専用の表示 input に is-invalid を付ける。hidden の client_id の
+                                 サーバーエラー（通常は出ない）が出たとき、他の欄と同じ赤枠になる。
+                                 invalid-feedback は readonly input の兄弟に置いても Bootstrap のセレクタで
+                                 自動表示されるが、hidden input がその間に挟まるため念のため block を付ける
+                                 （設計書 §2-7「兄弟の位置に置けないとき」）。 --}}
+                            <input type="text" class="form-control bg-light @error('client_id') is-invalid @enderror"
                                    value="{{ $fixedClient->internal_id }} {{ $fixedClient->display_name }}"
                                    data-client-display-name="{{ $fixedClient->display_name }}"
                                    readonly>
                             <input type="hidden" name="client_id" value="{{ $fixedClient->id }}">
+                            <x-form-error field="client_id" block />
                         </div>
                     </div>
                 </div>
@@ -37,13 +47,14 @@
                     <div class="row g-2 align-items-center">
                         <label for="training_date" class="col-md-auto col-form-label text-md-end form-label-fixed">トレーニング日 <span class="text-danger">*</span></label>
                         <div class="col-12 col-md">
+                            {{-- Flatpickr（.datepicker）は altInput を使っていないためオリジナルの input が
+                                 残り、兄弟セレクタで invalid-feedback が自動表示される。block は付けない
+                                 （3-1 と同じ扱い）。 --}}
                             <input type="text" name="training_date" id="training_date"
                                 class="form-control datepicker @error('training_date') is-invalid @enderror"
                                 value="{{ old('training_date', $record?->training_date?->format('Y-m-d') ?? date('Y-m-d')) }}"
                                 placeholder="例: 2026-04-01" pattern="\d{4}-\d{2}-\d{2}" maxlength="10" required>
-                            @error('training_date')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            <x-form-error field="training_date" />
                         </div>
                     </div>
                 </div>
@@ -56,9 +67,7 @@
                             <input type="time" name="training_time" id="training_time"
                                 class="form-control @error('training_time') is-invalid @enderror"
                                 value="{{ old('training_time', $record?->training_time ? substr($record->training_time, 0, 5) : '') }}">
-                            @error('training_time')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            <x-form-error field="training_time" />
                         </div>
                     </div>
                 </div>
@@ -83,9 +92,7 @@
                                             </option>
                                         @endforeach
                                     </select>
-                                    @error('trainer1_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <x-form-error field="trainer1_id" />
                                 </div>
                                 <div class="col-6">
                                     <select name="trainer2_id" id="trainer2_id" class="form-select @error('trainer2_id') is-invalid @enderror">
@@ -97,9 +104,7 @@
                                             </option>
                                         @endforeach
                                     </select>
-                                    @error('trainer2_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <x-form-error field="trainer2_id" />
                                 </div>
                             </div>
                         </div>
@@ -142,9 +147,7 @@
             <textarea name="record_content" id="record_content" rows="8"
                 class="form-control @error('record_content') is-invalid @enderror"
                 inputmode="text">{{ old('record_content', $record?->record_content) }}</textarea>
-            @error('record_content')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+            <x-form-error field="record_content" />
         </div>
     </div>
 
@@ -157,9 +160,7 @@
             <textarea name="impression" id="impression" rows="4"
                 class="form-control @error('impression') is-invalid @enderror"
                 inputmode="text">{{ old('impression', $record?->impression) }}</textarea>
-            @error('impression')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+            <x-form-error field="impression" />
         </div>
     </div>
 
