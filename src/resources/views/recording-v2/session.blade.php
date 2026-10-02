@@ -10,14 +10,12 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <title>録音実行</title>
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    {{-- 非同期の保存の入力エラー・入力エラー以外の失敗を欄の下・まとまりの上部に出す共通 JS
-         （設計書 §2-7「非同期の保存（fetch）」。window.FormErrors に関数が載る。段階 5 で追加）。
-         本画面は layouts.app を使わない独立 HTML のため、ここで直接 @vite する。type="module" で
-         defer 相当に遅延読み込みされるが、使うのは「作成する」のユーザー操作時なので間に合う。 --}}
-    @vite(['resources/js/form-errors.js'])
+    {{-- Bootstrap（CSS・JS）と、非同期の保存のエラー表示（§2-7）の共通 JS を同じ @vite から
+         まとめて読み込む。本画面は layouts.app を使わない独立 HTML のため、ここで直接
+         @vite する。recording-session.js は Bootstrap の CSS を取り込み、window.bootstrap に
+         Bootstrap を載せる（下のスクリプトが `new bootstrap.Modal(...)` の形で使っている）。
+         module 読み込みは defer 相当で遅延するが、使うのは「作成する」などユーザー操作時なので間に合う。 --}}
+    @vite(['resources/js/recording-session.js', 'resources/js/form-errors.js'])
 
     <style>
         /* 基本スタイル */
@@ -316,8 +314,7 @@
         @csrf
     </form>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {{-- Bootstrap の JS は head の @vite(['resources/js/recording-session.js', ...]) から window.bootstrap に載せている。 --}}
 
     <script>
         // ブラウザの戻るボタンを無効化

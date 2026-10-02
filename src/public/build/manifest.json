@@ -3,6 +3,10 @@
     "file": "assets/_commonjsHelpers-CqkleIqs.js",
     "name": "_commonjsHelpers"
   },
+  "_bootstrap.esm-CiZvvyki.js": {
+    "file": "assets/bootstrap.esm-CiZvvyki.js",
+    "name": "bootstrap.esm"
+  },
   "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff": {
     "file": "assets/bootstrap-icons-BeopsB42.woff",
     "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff"
@@ -18,10 +22,13 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-D4qejdUp.js",
+    "file": "assets/app-XsqZlmOk.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_bootstrap.esm-CiZvvyki.js"
+    ]
   },
   "resources/js/copy-registration-message.js": {
     "file": "assets/copy-registration-message-CSHlc8sk.js",
@@ -48,6 +55,18 @@
     "isEntry": true,
     "imports": [
       "__commonjsHelpers-CqkleIqs.js"
+    ]
+  },
+  "resources/js/recording-session.js": {
+    "file": "assets/recording-session-BfpxS5Bl.js",
+    "name": "recording-session",
+    "src": "resources/js/recording-session.js",
+    "isEntry": true,
+    "imports": [
+      "_bootstrap.esm-CiZvvyki.js"
+    ],
+    "css": [
+      "assets/recording-session-DBkz-poX.css"
     ]
   },
   "resources/js/select2.js": {
