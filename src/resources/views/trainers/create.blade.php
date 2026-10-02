@@ -14,8 +14,13 @@
                 </div>
             </div>
 
-            <form id="trainer-create-form" method="POST" action="{{ route('trainers.store') }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                 required / minlength / maxlength などの属性は残す。 --}}
+            <form id="trainer-create-form" method="POST" action="{{ route('trainers.store') }}" novalidate>
                 @csrf
+
+                {{-- 画面上部の 1 文の案内（設計書 §2-7）。個々のエラーは各欄の下に出す --}}
+                <x-form-error-summary />
 
                 <div class="mb-3">
                     <label for="login_id" class="form-label">
@@ -26,9 +31,7 @@
                            class="form-control @error('login_id') is-invalid @enderror"
                            value="{{ old('login_id') }}" maxlength="50" required
                            style="max-width: 700px;">
-                    @error('login_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="login_id" />
                 </div>
 
                 <div class="mb-3">
@@ -37,9 +40,7 @@
                            class="form-control @error('name') is-invalid @enderror"
                            inputmode="text" value="{{ old('name') }}" maxlength="100" required
                            style="max-width: 700px;">
-                    @error('name')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="name" />
                 </div>
 
 
@@ -52,13 +53,13 @@
                            class="form-control @error('password') is-invalid @enderror"
                            minlength="8" required
                            style="max-width: 700px;">
-                    @error('password')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="password" />
                 </div>
 
                 <div class="mb-3">
                     <label for="password_confirmation" class="form-label">パスワード（確認） <span class="text-danger">*</span></label>
+                    {{-- 確認用の欄に対するエラー文言は confirmed ルールが password 側に出すため、
+                         ここは is-invalid・<x-form-error> とも置かない（他画面と同じ扱い）。 --}}
                     <input type="password" name="password_confirmation" id="password_confirmation"
                            class="form-control" minlength="8" required
                            style="max-width: 700px;">
@@ -82,9 +83,7 @@
                         <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>一般</option>
                         <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>管理者</option>
                     </select>
-                    @error('role')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="role" />
                 </div>
             </form>
         </div>

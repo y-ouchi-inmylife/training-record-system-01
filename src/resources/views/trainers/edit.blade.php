@@ -14,9 +14,13 @@
                 </div>
             </div>
 
-            <form id="trainer-edit-form" method="POST" action="{{ route('trainers.update', $trainer) }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。 --}}
+            <form id="trainer-edit-form" method="POST" action="{{ route('trainers.update', $trainer) }}" novalidate>
                 @csrf
                 @method('PUT')
+
+                {{-- 画面上部の 1 文の案内（設計書 §2-7） --}}
+                <x-form-error-summary />
 
                 <div class="mb-3">
                     <label for="login_id" class="form-label">
@@ -27,9 +31,7 @@
                            class="form-control @error('login_id') is-invalid @enderror"
                            value="{{ old('login_id', $trainer->login_id) }}" maxlength="50" required
                            style="max-width: 700px;">
-                    @error('login_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="login_id" />
                 </div>
 
                 <div class="mb-3">
@@ -39,9 +41,7 @@
                            inputmode="text"
                            value="{{ old('name', $trainer->name) }}" maxlength="100" required
                            style="max-width: 700px;">
-                    @error('name')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="name" />
                 </div>
 
                 <div class="mb-4">
@@ -51,9 +51,7 @@
                         <option value="staff" {{ old('role', $trainer->role) === 'staff' ? 'selected' : '' }}>一般</option>
                         <option value="admin" {{ old('role', $trainer->role) === 'admin' ? 'selected' : '' }}>管理者</option>
                     </select>
-                    @error('role')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="role" />
                 </div>
             </form>
         </div>
