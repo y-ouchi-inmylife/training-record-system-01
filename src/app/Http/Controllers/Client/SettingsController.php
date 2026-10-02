@@ -114,13 +114,32 @@ class SettingsController extends Controller
         // 判断できるようにする（設計書 client-portal-design-plan.md §6-2）
         $changedAt = now();
 
-        DB::transaction(function () use ($client, $request, $changedAt) {
-            $client->update([
-                'password' => $request->validated()['new_password'],
+        // 検証はこの時点で終わっている（ClientPasswordChangeRequest）。トランザクション内の
+        // 例外のみ catch する（検証の失敗は FormRequest 側で先に落ちる位置関係）。
+        try {
+            DB::transaction(function () use ($client, $request, $changedAt) {
+                $client->update([
+                    'password' => $request->validated()['new_password'],
+                ]);
+                // 登録アドレスに通知メール。失敗時は全ロールバック（**パスワードも巻き戻る**）
+                Mail::to($client->email)->send(new ClientPasswordChangedMail($changedAt));
+            });
+        } catch (\Throwable $e) {
+            // 全ロールバック済み（パスワードは変わっていない）。送信の失敗が会員側からは
+            // 「変更できたのか分からない」状態になるため、原因追跡のためのログを残す。
+            // パスワードそのものはログに残さず、client_id で追えるようにする（初回設定の
+            // 受け止め方に揃える）。
+            Log::error('[ClientPasswordChangedMail] 通知メールの送信に失敗し、パスワード変更を全ロールバックしました: ' . $e->getMessage(), [
+                'client_id' => $client->id,
+                'exception' => $e,
             ]);
-            // 登録アドレスに通知メール。失敗時は全ロールバック
-            Mail::to($client->email)->send(new ClientPasswordChangedMail($changedAt));
-        });
+
+            // 入力エラー以外の失敗はフォームの上に出す（設計書 §2-7）。文言は「変わっていない」
+            // ことが伝わる形にする（会員が「パスワードが変わったのか変わっていないのか」で迷わないため）。
+            return back()
+                ->withInput()
+                ->withErrors(['form' => 'パスワードを変更できませんでした。時間を置いて再度お試しください。']);
+        }
 
         return redirect()
             ->route('client-portal.settings.password.edit')

@@ -17,9 +17,14 @@
 
         <div class="card mb-4">
             <div class="card-body p-4">
+                {{-- 入力エラー以外の失敗（通知メールの送信失敗で全ロールバックしたときなど）は、
+                     入力項目のキーではなく専用のキー `form` でフォームの上に出す（設計書 §2-7。段階 4-3 追補）。 --}}
+                @error('form')
+                    <div class="alert alert-danger" role="alert">{{ $message }}</div>
+                @enderror
+
                 {{-- 入力エラーの上部案内（現在のパスワード不一致・強度・一致違反などの入力エラー。設計書 §2-7）。
-                     本画面はコントローラーで入力エラー以外の失敗（送信失敗など）を withErrors で返していないため、
-                     現状は入力項目のキーだけが来る。将来追加した場合に備えて hasAny で絞る。 --}}
+                     専用のキー `form` だけのときは出さないよう、入力項目のキーがあるときだけ表示する。 --}}
                 @if ($errors->hasAny(['current_password', 'new_password']))
                     <x-form-error-summary />
                 @endif
