@@ -36,14 +36,12 @@ class TraineeRequest extends FormRequest
     /**
      * 属性名の日本語ラベル。
      *
-     * `name` はグローバル定義（`lang/ja/validation.php`）で「氏名」となっているが、
-     * トレーニーの文脈では「名前」を使いたいため本 Request 内で上書きする
-     * （グローバル定義を書き換えると他画面のトレーナー氏名等に影響するため）。
+     * `name` は段階 2 で lang/ja/validation.php の attributes 側を「名前」に揃えたため、
+     * ここでは重複定義しない。lang 側に未登録のトレーニー固有の項目名だけを定義する。
      */
     public function attributes(): array
     {
         return [
-            'name' => '名前',
             'breed' => '犬種',
             'sex' => '性別',
             'birth_date' => '誕生日',

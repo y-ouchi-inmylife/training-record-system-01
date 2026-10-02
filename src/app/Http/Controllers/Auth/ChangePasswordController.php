@@ -26,11 +26,9 @@ class ChangePasswordController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8）
         $request->validate([
             'new_password' => ['required', 'string', 'confirmed', new StrongPassword()],
-        ], [
-            'new_password.required' => '新しいパスワードを入力してください。',
-            'new_password.confirmed' => '新しいパスワード（確認）が一致しません。',
         ]);
 
         $user = auth()->user();

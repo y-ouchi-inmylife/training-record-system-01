@@ -61,22 +61,13 @@ class TrainerController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8。login_id.regex は
+        // custom.login_id.regex で、具体文言「ログインIDに使用できない文字が含まれています。」）。
         $validated = $request->validate([
             'login_id' => 'required|string|max:50|regex:/^[a-zA-Z0-9_]+$/|unique:trainers,login_id',
             'name' => 'required|string|max:100',
             'password' => ['required', 'string', 'confirmed', new StrongPassword()],
             'role' => 'required|in:admin,staff',
-        ], [
-            'login_id.required' => 'ログインIDは必須です。',
-            'login_id.unique' => 'このログインIDは既に使用されています。',
-            'login_id.regex' => 'ログインIDに使用できない文字が含まれています。',
-            'login_id.max' => 'ログインIDは50文字以内で入力してください。',
-            'name.required' => '名前を入力してください。',
-            'name.max' => '名前は100文字以内で入力してください。',
-            'password.required' => 'パスワードは必須です。',
-            'password.confirmed' => 'パスワード（確認）が一致しません。',
-            'role.required' => '権限は必須です。',
-            'role.in' => '権限は管理者または一般を選択してください。',
         ]);
 
         $validated['must_change_password'] = true;
@@ -122,6 +113,7 @@ class TrainerController extends Controller
                 ->with('error', '自分自身を編集することはできません。');
         }
 
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8）
         $validated = $request->validate([
             'login_id' => [
                 'required',
@@ -132,15 +124,6 @@ class TrainerController extends Controller
             ],
             'name' => 'required|string|max:100',
             'role' => 'required|in:admin,staff',
-        ], [
-            'login_id.required' => 'ログインIDは必須です。',
-            'login_id.unique' => 'このログインIDは既に使用されています。',
-            'login_id.regex' => 'ログインIDに使用できない文字が含まれています。',
-            'login_id.max' => 'ログインIDは50文字以内で入力してください。',
-            'name.required' => '名前を入力してください。',
-            'name.max' => '名前は100文字以内で入力してください。',
-            'role.required' => '権限は必須です。',
-            'role.in' => '権限は管理者または一般を選択してください。',
         ]);
 
         // 最後の管理者を一般に変更することを防止

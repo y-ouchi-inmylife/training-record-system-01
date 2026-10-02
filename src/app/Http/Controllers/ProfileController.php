@@ -29,11 +29,9 @@ class ProfileController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8）
         $validated = $request->validate([
             'name' => 'required|string|max:100',
-        ], [
-            'name.required' => '名前を入力してください。',
-            'name.max' => '名前は100文字以内で入力してください。',
         ]);
 
         Auth::user()->update($validated);
@@ -55,13 +53,14 @@ class ProfileController extends Controller
      */
     public function updatePassword(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8。
+        // confirmed の新案「:attribute（確認）が一致しません。」で、
+        // 画面ラベルと一致する「新しいパスワード（確認）が一致しません。」が出る。
+        // current_password の照合は本メソッド末尾の Hash::check で自前で行う（本コミットでは
+        // 変更しない。Laravel 標準の current_password ルールへの置き換えは段階 3 で検討）。
         $validated = $request->validate([
             'current_password' => 'required|string',
             'new_password' => ['required', 'string', 'confirmed', new StrongPassword()],
-        ], [
-            'current_password.required' => '現在のパスワードを入力してください。',
-            'new_password.required' => '新しいパスワードを入力してください。',
-            'new_password.confirmed' => '新しいパスワードと一致しません。',
         ]);
 
         // 現在のパスワードを照合

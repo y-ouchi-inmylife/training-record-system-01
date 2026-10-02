@@ -21,15 +21,12 @@ class ClientController extends Controller
     public function index(Request $request): View
     {
         // 日付フィルタの相関チェック（開始日 ≦ 終了日）
-        $request->validate(
-            [
-                'date_from' => 'nullable|date',
-                'date_to' => 'nullable|date|after_or_equal:date_from',
-            ],
-            [
-                'date_to.after_or_equal' => '開始日は終了日以前の日付を指定してください',
-            ]
-        );
+        // 文言は lang/ja/validation.php の custom.date_to.after_or_equal に集約
+        // （設計書 §2-8。「終了日は開始日以降の日付で入力してください。」）
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
 
         // trainees は一覧の「トレーニー」列の表示（Client::trainees_label アクセサ）で使う。
         // paginate(20) の 20 行分をまとめて 1 クエリで取ることで N+1 を回避（設計書
@@ -191,10 +188,9 @@ class ClientController extends Controller
     {
         // ClientRequest が基本項目を先に自動検証。
         // internal_id は update 固有の追加ルールなのでコントローラ側で個別に検証する。
-        $request->validate(
-            ['internal_id' => 'required|numeric|unique:clients,internal_id,'.$client->id],
-            $this->internalIdMessages()
-        );
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8。attributes.internal_id = '内部ID'
+        // と標準の required / numeric / unique から生成される）。
+        $request->validate(['internal_id' => 'required|numeric|unique:clients,internal_id,'.$client->id]);
 
         $validated = $request->validated();
         $validated['internal_id'] = $request->input('internal_id');
@@ -238,9 +234,6 @@ class ClientController extends Controller
     }
 
     /**
-     * バリデーションルール
-     */
-    /**
      * クライアント検索API（Select2用）
      */
     public function apiSearch(Request $request): JsonResponse
@@ -280,15 +273,4 @@ class ClientController extends Controller
         ]);
     }
 
-    /**
-     * 内部IDのバリデーションメッセージ
-     */
-    private function internalIdMessages(): array
-    {
-        return [
-            'internal_id.required' => '内部IDを入力してください。',
-            'internal_id.numeric' => '内部IDは数値で入力してください。',
-            'internal_id.unique' => 'この内部IDは既に使用されています。',
-        ];
-    }
 }

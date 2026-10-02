@@ -30,11 +30,9 @@ class SummaryPromptController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8。attributes.current_prompt = '要約プロンプト'）
         $validated = $request->validate([
             'current_prompt' => 'required|string|max:5000',
-        ], [
-            'current_prompt.required' => '要約プロンプトを入力してください。',
-            'current_prompt.max' => '要約プロンプトは5000文字以内で入力してください。',
         ]);
 
         SystemSetting::updateOrCreate(

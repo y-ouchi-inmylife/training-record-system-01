@@ -28,15 +28,13 @@ class DateRangeFilterValidationTest extends TestCase
         'S-0805 操作履歴'         => 'access-logs.index',
     ];
 
-    private const EXPECTED_MESSAGE = '開始日は終了日以前の日付を指定してください';
+    private const EXPECTED_MESSAGE = '終了日は開始日以降の日付で入力してください。';
 
-    /** コントローラ index() と同一のルール・メッセージ定義 */
+    /** コントローラ index() と同一のルール定義。文言は lang/ja/validation.php の
+     * custom.date_to.after_or_equal に集約（設計書 §2-8）。 */
     private const RULES = [
         'date_from' => 'nullable|date',
         'date_to'   => 'nullable|date|after_or_equal:date_from',
-    ];
-    private const MESSAGES = [
-        'date_to.after_or_equal' => self::EXPECTED_MESSAGE,
     ];
 
     protected function setUp(): void
@@ -84,8 +82,7 @@ class DateRangeFilterValidationTest extends TestCase
     {
         $v = Validator::make(
             ['date_from' => '2026-04-01', 'date_to' => '2026-05-01'],
-            self::RULES,
-            self::MESSAGES
+            self::RULES
         );
         $this->assertFalse($v->fails(), '正常な日付範囲でエラーになってはいけない');
     }
@@ -93,17 +90,17 @@ class DateRangeFilterValidationTest extends TestCase
     /** シナリオ3: 片方のみ入力 → ルールを通過する（after_or_equal は date_from が無ければ評価されない） */
     public function test_片方のみ入力はルールを通過する(): void
     {
-        $fromOnly = Validator::make(['date_from' => '2026-04-01'], self::RULES, self::MESSAGES);
+        $fromOnly = Validator::make(['date_from' => '2026-04-01'], self::RULES);
         $this->assertFalse($fromOnly->fails(), '開始のみでエラーになってはいけない');
 
-        $toOnly = Validator::make(['date_to' => '2026-04-01'], self::RULES, self::MESSAGES);
+        $toOnly = Validator::make(['date_to' => '2026-04-01'], self::RULES);
         $this->assertFalse($toOnly->fails(), '終了のみでエラーになってはいけない');
     }
 
     /** シナリオ4: 両方空 → ルールを通過する（nullable） */
     public function test_日付未指定はルールを通過する(): void
     {
-        $v = Validator::make([], self::RULES, self::MESSAGES);
+        $v = Validator::make([], self::RULES);
         $this->assertFalse($v->fails(), '日付未指定でエラーになってはいけない');
     }
 
@@ -112,8 +109,7 @@ class DateRangeFilterValidationTest extends TestCase
     {
         $v = Validator::make(
             ['date_from' => '2026-05-01', 'date_to' => '2026-04-01'],
-            self::RULES,
-            self::MESSAGES
+            self::RULES
         );
         $this->assertTrue($v->fails());
         $this->assertSame(self::EXPECTED_MESSAGE, $v->errors()->first('date_to'));

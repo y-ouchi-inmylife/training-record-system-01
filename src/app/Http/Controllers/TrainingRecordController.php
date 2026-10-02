@@ -23,15 +23,11 @@ class TrainingRecordController extends Controller
     public function index(Request $request): View
     {
         // 日付フィルタの相関チェック（開始日 ≦ 終了日）
-        $request->validate(
-            [
-                'date_from' => 'nullable|date',
-                'date_to'   => 'nullable|date|after_or_equal:date_from',
-            ],
-            [
-                'date_to.after_or_equal' => '開始日は終了日以前の日付を指定してください',
-            ]
-        );
+        // 文言は lang/ja/validation.php の custom.date_to.after_or_equal に集約（設計書 §2-8）
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to'   => 'nullable|date|after_or_equal:date_from',
+        ]);
 
         // client.trainees は S-0402 のトレーニー列の表示（Client::trainees_label アクセサ）で使う。
         // paginate(20) の 20 行分をまとめて 1 クエリで取ることで N+1 を回避（設計書

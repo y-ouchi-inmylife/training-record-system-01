@@ -81,13 +81,6 @@ class TraineeMeasurementRequest extends FormRequest
         ];
     }
 
-    /**
-     * 重複時の分かりやすい文言。
-     */
-    public function messages(): array
-    {
-        return [
-            'measured_time.unique' => 'この日時の計測値はすでに登録されています。',
-        ];
-    }
+    // measured_time.unique は lang/ja/validation.php の custom.measured_time.unique
+    // 「この日時の計測値はすでに登録されています。」に集約（設計書 §2-8）
 }
