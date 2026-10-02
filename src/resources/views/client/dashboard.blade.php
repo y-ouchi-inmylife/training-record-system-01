@@ -34,10 +34,29 @@
              aria-labelledby の参照先が失われるため、aria-label に切り替えた）。 --}}
         <section class="c-section" aria-label="体重">
             @foreach($weightCharts as $chart)
+                @php
+                    // 当該トレーニーのフォームからの送信でエラーが戻ってきたかの判定。
+                    // old('_trainee_id') と $chart['id'] を比較する（計測値モーダル S-0309 と同じ流儀）。
+                    // 共通の部品 <x-form-error> は共有のエラーバッグを見るため、ここで囲まないと
+                    // 他のトレーニーのカードにもエラーが出てしまう（設計書 S-1402「バリデーションチェック」）。
+                    $shouldShowPhotoError = $errors->any() && (int) old('_trainee_id') === (int) $chart['id'];
+                @endphp
                 <article class="c-session" style="margin-bottom: 1rem;">
                     <div class="c-session-body">
                         <div class="c-session-content">
                             <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['name'] }}ちゃん</h2>
+
+                            {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7）。
+                                 入力項目（photo）のエラーがあるときだけ、上部に 1 文の案内を出す。
+                                 どちらも「このトレーニーのフォームで起きたエラー」のときだけ表示する。 --}}
+                            @if($shouldShowPhotoError)
+                                @error('form')
+                                    <div class="alert alert-danger" role="alert">{{ $message }}</div>
+                                @enderror
+                                @if($errors->hasAny(['photo']))
+                                    <x-form-error-summary />
+                                @endif
+                            @endif
 
                             {{-- 写真とグラフの横並びラッパー（2026-09 追加、要件定義書 6-15-15）。
                                  モバイル（<576px）は縦積み（flex-column）、sm 以上は横並び（flex-sm-row）。
@@ -58,12 +77,21 @@
                                          写真ありの場合はモーダル内「変更」ボタンから、写真なしの場合は
                                          <label for="..."> から <input> をクリックさせる。form は
                                          見た目の <label>/<button> の外側に置き、CSRF・enctype を保つ。 --}}
+                                    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                                         accept 属性は残す（ブラウザのファイル選択ダイアログで形式を絞るための属性）。 --}}
                                     <form action="{{ route('client-portal.trainee-photo.store', $chart['id']) }}"
                                           method="POST"
                                           enctype="multipart/form-data"
                                           id="trainee-photo-form-{{ $chart['id'] }}"
-                                          style="margin: 0; display: contents;">
+                                          style="margin: 0; display: contents;"
+                                          novalidate>
                                         @csrf
+                                        {{-- どのトレーニーのフォームからの送信かを判別する hidden。
+                                             バリデーションエラー・変換失敗で戻ったとき、old('_trainee_id') と
+                                             各カードの $chart['id'] を比較して該当トレーニーのカードだけに
+                                             エラーを出す。TraineePhotoController の validate() のルールに
+                                             入れないため validated() に混入しない（計測値モーダル S-0309 と同じ流儀）。 --}}
+                                        <input type="hidden" name="_trainee_id" value="{{ $chart['id'] }}">
                                         {{-- 非表示のファイル入力。選択即送信（JavaScript で form.submit()）。
                                              accept は MIME と拡張子の両方を列挙（HEIC は iOS 側で MIME が空に
                                              なるケースがあるため拡張子も入れる。既存メディア機能と同じ考え方）。 --}}
@@ -103,6 +131,16 @@
                                                aria-label="{{ $chart['name'] }}ちゃんの写真を登録する">
                                             <span class="text-muted" style="font-size: 0.875rem;">写真を登録</span>
                                         </label>
+                                    @endif
+
+                                    {{-- 写真枠（ファイル選択のまとまり）の下の文言（設計書 §2-7）。
+                                         ファイル入力自体は display: none なので、Bootstrap の
+                                         .is-invalid ~ .invalid-feedback の兄弟セレクタでは出せない。
+                                         block で独立して描画する。幅は写真枠と同じ 180px に収める
+                                         （折り返しは発生するが、カード幅ではなく枠の下に紐づく位置に
+                                         出すことで、どの入力に対するエラーかを明確にする）。 --}}
+                                    @if($shouldShowPhotoError)
+                                        <x-form-error field="photo" block />
                                     @endif
                                 </div>
 
