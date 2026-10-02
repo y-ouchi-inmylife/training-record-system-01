@@ -25,6 +25,12 @@
     "src": "resources/js/copy-registration-message.js",
     "isEntry": true
   },
+  "resources/js/form-errors.js": {
+    "file": "assets/form-errors-CyNqwsPL.js",
+    "name": "form-errors",
+    "src": "resources/js/form-errors.js",
+    "isEntry": true
+  },
   "resources/js/measurement-chart.js": {
     "file": "assets/measurement-chart-D8e4ygbS.js",
     "name": "measurement-chart",
