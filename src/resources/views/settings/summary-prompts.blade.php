@@ -19,9 +19,15 @@
                 <p class="mb-0">【要約項目】や【出力形式】などの見出しは、AI に分かりやすく指示するための文章です（システムが認識する特別なキーワードではありません）。項目を消してもシステムは止まりませんが、その観点は要約に反映されなくなります。要約してほしい観点は項目として残す・追加するのがコツです。</p>
             </div>
 
-            <form id="summaryPromptForm" method="POST" action="{{ route('settings.summary-prompts.update') }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                 required 属性を足す（サーバーで必須のため。3-2 の姓と同じ扱い、支援技術への伝達）。
+                 maxlength は付けない（文字数カウンタで上限表示するが、入力は止めない方針のため）。 --}}
+            <form id="summaryPromptForm" method="POST" action="{{ route('settings.summary-prompts.update') }}" novalidate>
                 @csrf
                 @method('PUT')
+
+                {{-- 画面上部の 1 文の案内（設計書 §2-7） --}}
+                <x-form-error-summary />
 
                 <div class="mb-3">
                     <textarea class="form-control @error('current_prompt') is-invalid @enderror"
@@ -29,11 +35,14 @@
                               name="current_prompt"
                               inputmode="text"
                               rows="12"
+                              required
                               style="font-family: monospace; max-width: 700px;">{{ old('current_prompt', $currentPrompt) }}</textarea>
 
-                    @error('current_prompt')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    {{-- 欄下のエラー表示（is-invalid の兄弟セレクタで自動表示される。文字数
+                         カウンタはこの下にあるが、Bootstrap のセレクタは直後の兄弟セレクタ
+                         ではなく「以後の兄弟」セレクタ（~）で invalid-feedback を見つける
+                         ため、カウンタが挟まっても表示される。block は付けない）。 --}}
+                    <x-form-error field="current_prompt" />
 
                     {{-- 文字数カウンタ（上限超過時は赤表示。入力自体はブロックしない） --}}
                     <div class="form-text text-muted" id="prompt-char-counter" style="max-width: 700px;"></div>
