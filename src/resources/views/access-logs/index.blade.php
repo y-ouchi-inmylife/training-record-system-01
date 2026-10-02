@@ -9,10 +9,11 @@
     {{-- 検索フォーム --}}
     <div class="card mb-4">
         <div class="card-body">
-            <form method="GET" action="{{ route('access-logs.index') }}">
-                @if ($errors->has('date_to') || $errors->has('date_from'))
-                    <div class="alert alert-danger">{{ $errors->first('date_to') ?: $errors->first('date_from') }}</div>
-                @endif
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                 日付の欄に pattern があるため、novalidate を付けないとブラウザの吹き出しが出うる。
+                 本画面は小さなフォーム（日付の 2 欄だけがエラー対象）のため、上部の案内
+                 （<x-form-error-summary />）は置かない（§2-7「画面上部の短い案内」の例外）。 --}}
+            <form method="GET" action="{{ route('access-logs.index') }}" novalidate>
                 {{-- 行1: トレーナー + 操作 --}}
                 <div class="row g-3 mb-2">
                     <div class="col-md-4">
@@ -51,19 +52,21 @@
                         <div class="row g-2 align-items-center">
                             <label class="col-md-auto col-form-label text-md-end form-label-fixed">日付</label>
                             <div class="col">
-                                <input type="text" class="form-control datepicker" id="date_from" name="date_from"
+                                <input type="text" class="form-control datepicker @error('date_from') is-invalid @enderror" id="date_from" name="date_from"
                                        value="{{ old('date_from', request('date_from')) }}"
                                        placeholder="例: 2026-04-01"
                                        pattern="\d{4}-\d{2}-\d{2}"
                                        maxlength="10">
+                                <x-form-error field="date_from" />
                             </div>
                             <div class="col-md-auto px-1">～</div>
                             <div class="col">
-                                <input type="text" class="form-control datepicker" id="date_to" name="date_to"
+                                <input type="text" class="form-control datepicker @error('date_to') is-invalid @enderror" id="date_to" name="date_to"
                                        value="{{ old('date_to', request('date_to')) }}"
                                        placeholder="例: 2026-04-01"
                                        pattern="\d{4}-\d{2}-\d{2}"
                                        maxlength="10">
+                                <x-form-error field="date_to" />
                             </div>
                         </div>
                     </div>
