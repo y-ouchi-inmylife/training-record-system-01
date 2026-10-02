@@ -1407,7 +1407,8 @@ POST /training-records に以下を追加する。
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
-| photo | file | ● | required, file, image, mimes:jpg,jpeg,png,heic,heif, max:20480 | 画像ファイル。JPEG / PNG / HEIC / HEIF を受け付け、サーバ側で JPEG に変換して保存する。上限 20MB（既存メディアの写真上限 `MediaRecord::MAX_PHOTO_SIZE` に揃える） |
+| photo | file | ● | required, file, mimes:jpg,jpeg,png,heic,heif, max:20480 | 画像ファイル。JPEG / PNG / HEIC / HEIF を受け付け、サーバ側で JPEG に変換して保存する。上限 20MB（既存メディアの写真上限 `MediaRecord::MAX_PHOTO_SIZE` に揃える）。`image` ルールは使わない（HEIC を弾く可能性があるため、拡張子ベースの `mimes` にフォールバックさせる） |
+| _trainee_id | integer |  | — | 送信元のトレーニー ID。バリデーションエラー・変換失敗で入力画面に戻ったとき、どのトレーニーのフォームでエラーかを識別するためのヒント。`TraineePhotoController` の `validate()` では規則に入れないため `validated()` に混入しない。計測値モーダル（S-0309）と同じ流儀 |
 
 **処理**:
 - 経路の `{trainee}` の所有権を検証する（`$trainee->client_id === auth('client')->id()` でなければ 403）
@@ -1422,9 +1423,9 @@ POST /training-records に以下を追加する。
 - 一時ファイルは finally で必ず削除する（成功時・失敗時とも）
 
 **レスポンス**:
-- 成功：S-1402 ダッシュボードへリダイレクト＋完了メッセージ（またはページ内非同期更新で写真差し替え）
-- バリデーションエラー：エラーメッセージを付けてリダイレクトバック（画像でない・上限超え等）
-- 変換失敗：500 相当、ログにサーバ側で `magick` の stderr を UTF-8 化して残す（既存 `MediaThumbnailService::toUtf8` と同型）
+- 成功：S-1402 ダッシュボードへリダイレクト＋完了メッセージ（`session('success')` に「写真を登録しました。」）
+- バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ（screen-design.md §2-7 の規約で返す。該当トレーニーのカードにだけ上部の案内と欄下の文言を出す。`photo.file`〔アップロードそのものの失敗〕も `photo` キーで同じ欄下に出す）
+- 変換・保存失敗（magick 実行失敗、ストレージ書き込み失敗など）：ログに記録し（既存 `MediaThumbnailService::toUtf8` と同型で stderr を UTF-8 化）、`back()` ＋ 入力項目ではなく専用のキー `form` で `withErrors(['form' => '…'])` で返す（画面設計書 §2-7「入力エラー以外の失敗を入力の項目のキーで返さないルール」。段階 4-4 で `photo` キーから `form` キーに移した）：「写真の登録に失敗しました。時間をおいて試してみてください。」。該当トレーニーのカードにだけ表示する
 
 ---
 
