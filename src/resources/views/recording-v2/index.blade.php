@@ -2,11 +2,6 @@
 
 @section('title', '録音準備')
 
-@push('styles')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-@endpush
-
 @section('content')
 <div class="container">
     <div class="row justify-content-center">
@@ -53,12 +48,14 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{{-- jQuery・Select2・テーマは npm で入れた入口から読み込む（CSS もこの入口に含める）。
+     module 読み込みは defer されるので、下のインラインスクリプトは
+     DOMContentLoaded の中で呼ぶ形にそろえる。 --}}
+@vite(['resources/js/select2.js'])
 <script>
 // 送信前の JS の独自のチェックは行わない（設計書 §2-7）。会員の未選択はサーバーの検証に任せる
 // （段階 5-2 で削除。以前はここで submit を preventDefault して .client-id-error を表示していた）。
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     var $clientSelect = $('#client-select');
 
     $clientSelect.select2({

@@ -1,4 +1,8 @@
 {
+  "__commonjsHelpers-CqkleIqs.js": {
+    "file": "assets/_commonjsHelpers-CqkleIqs.js",
+    "name": "_commonjsHelpers"
+  },
   "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff": {
     "file": "assets/bootstrap-icons-BeopsB42.woff",
     "src": "node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff"
@@ -38,10 +42,25 @@
     "isEntry": true
   },
   "resources/js/qr-code.js": {
-    "file": "assets/qr-code-BgIumkyX.js",
+    "file": "assets/qr-code-mKjIfV8q.js",
     "name": "qr-code",
     "src": "resources/js/qr-code.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "__commonjsHelpers-CqkleIqs.js"
+    ]
+  },
+  "resources/js/select2.js": {
+    "file": "assets/select2-DKNczb5n.js",
+    "name": "select2",
+    "src": "resources/js/select2.js",
+    "isEntry": true,
+    "imports": [
+      "__commonjsHelpers-CqkleIqs.js"
+    ],
+    "css": [
+      "assets/select2-TWkcnuBu.css"
+    ]
   },
   "resources/js/sortable.js": {
     "file": "assets/sortable-CCvm0IG8.js",

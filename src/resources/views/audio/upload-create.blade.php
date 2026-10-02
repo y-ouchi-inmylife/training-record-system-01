@@ -56,16 +56,13 @@
 </div>
 @endsection
 
-@push('styles')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-@endpush
-
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{{-- jQuery・Select2・テーマは npm で入れた入口から読み込む（CSS もこの入口に含める）。
+     module 読み込みは defer されるので、下のインラインスクリプトは
+     DOMContentLoaded の中で呼ぶ形にそろえる。 --}}
+@vite(['resources/js/select2.js'])
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     $('.select2-client-upload').select2({
         theme: 'bootstrap-5',
         placeholder: '会員を検索（内部ID、名前、かな）',

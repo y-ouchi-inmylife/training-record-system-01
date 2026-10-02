@@ -149,8 +149,6 @@
 @endsection
 
 @push('styles')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <style>
     /* 詳細モーダルの画像/動画の高さを制限。
        縦長メディアでも右カラムの情報・ボタンが画面外に追い出されないようにする。 */
@@ -270,8 +268,8 @@
 @endpush
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{{-- jQuery・Select2・テーマは npm で入れた入口から読み込む（CSS もこの入口に含める）。 --}}
+@vite(['resources/js/select2.js'])
 {{-- 非同期の保存の入力エラー・入力エラー以外の失敗を欄の下・モーダルの先頭に出す共通 JS
      （設計書 §2-7「非同期の保存（fetch）」。window.FormErrors に関数が載る） --}}
 @vite(['resources/js/form-errors.js'])
