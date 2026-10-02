@@ -92,6 +92,17 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
+    public function test_メアド変更_確認メールの送信失敗はフォームの上に出て欄下にも上部案内にも出ない(): void
+    {
+        $view = $this->renderEmail([
+            'form' => '確認メールを送信できませんでした。時間を置いて再度お試しください。',
+        ]);
+        $view->assertSee('確認メールを送信できませんでした。時間を置いて再度お試しください。');
+        $view->assertDontSee('入力内容に誤りがあります');
+        $view->assertDontSee('is-invalid', false);
+        $view->assertDontSee('invalid-feedback', false);
+    }
+
     // ---- S-1410 パスワードの変更 ----
 
     public function test_PW変更_formにnovalidateが付く(): void
@@ -125,6 +136,17 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $view = $this->renderPassword([
             'form' => '送信に失敗しました。',
         ]);
+        $view->assertDontSee('入力内容に誤りがあります');
+        $view->assertDontSee('is-invalid', false);
+        $view->assertDontSee('invalid-feedback', false);
+    }
+
+    public function test_PW変更_通知メールの送信失敗はフォームの上に出て欄下にも上部案内にも出ない(): void
+    {
+        $view = $this->renderPassword([
+            'form' => 'パスワードを変更できませんでした。時間を置いて再度お試しください。',
+        ]);
+        $view->assertSee('パスワードを変更できませんでした。時間を置いて再度お試しください。');
         $view->assertDontSee('入力内容に誤りがあります');
         $view->assertDontSee('is-invalid', false);
         $view->assertDontSee('invalid-feedback', false);
