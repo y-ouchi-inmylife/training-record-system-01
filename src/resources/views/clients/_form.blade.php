@@ -99,11 +99,12 @@
                             <div class="col-12 col-md">
                                 <div class="row g-2">
                                     <div class="col-6">
-                                        {{-- 姓は required 属性なし（JS で検証していた名残）。段階 3-1 で
-                                             novalidate を付けたので、サーバーの検証に一本化した結果、
-                                             required 属性があってもなくても挙動は同じ。属性は現状維持。 --}}
+                                        {{-- 姓はサーバーで必須の項目のため required 属性を付ける。
+                                             novalidate が付いているので送信の動きは変わらないが、
+                                             支援技術への必須の伝達と、画面での視覚（ラベルの *）と
+                                             属性の整合のため付ける（設計書 §2-7「属性は残す」）。 --}}
                                         <input type="text" class="form-control @error('last_name') is-invalid @enderror"
-                                               id="last_name" name="last_name" inputmode="text"
+                                               id="last_name" name="last_name" inputmode="text" required
                                                value="{{ old('last_name', $client?->last_name) }}" placeholder="姓"
                                                autocomplete="off">
                                         <x-form-error field="last_name" />

@@ -73,6 +73,20 @@ class ClientFormErrorRenderingTest extends TestCase
         $view->assertSee('novalidate', false);
     }
 
+    /** 姓の入力欄に required 属性が付く（サーバーで必須のため。支援技術への伝達） */
+    public function test_姓にrequired属性が付く(): void
+    {
+        $view = $this->renderForm([]);
+        // name="last_name" を含む <input> に required が付いていることを確かめる。
+        // 他の入力欄にも required は含まれるので、属性単独ではなく last_name と一緒に検索する。
+        $html = $view->__toString();
+        $this->assertMatchesRegularExpression(
+            '/<input[^>]*\bname="last_name"[^>]*\brequired\b|<input[^>]*\brequired\b[^>]*\bname="last_name"/',
+            $html,
+            '姓の input に required 属性が付いていること'
+        );
+    }
+
     /** エラーがないときは、上部の案内も欄の下の文言も出ない */
     public function test_エラーがないときは上部案内も欄の下の文言も出ない(): void
     {
