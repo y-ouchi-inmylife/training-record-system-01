@@ -74,7 +74,9 @@
                              ラベルが上に積まれて開始日が全幅になるため空きは不要）。
                              エラーがないときは行ごと出さない（空の余白を作らない）。 --}}
                         @if($errors->hasAny(['date_from', 'date_to']))
-                            <div class="row g-2 mt-1">
+                            {{-- 横ガターだけの gx-2 にし、縦ガターと mt-1 を足さないことで、
+                                 入力欄との間隔を invalid-feedback の標準 0.25rem だけに揃える。 --}}
+                            <div class="row gx-2">
                                 <div class="col-md-auto form-label-fixed d-none d-md-block"></div>
                                 <div class="col">
                                     <x-form-error field="date_from" block />
