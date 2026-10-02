@@ -83,14 +83,38 @@ class ValidationMessagesTest extends TestCase
     }
 
     /** パスワードの強度：項目名「パスワード」（§2-8「例外・強度」）
-     * 文字数不足のケースで、文言に「パスワード」が入ることを確かめる。
-     * `new_password` 側（項目名「新しいパスワード」で可変）のテストはコミット 6
-     * （StrongPassword 可変化）で追加する。 */
+     * 文字数不足のケースで、文言に「パスワード」が入ることを確かめる。 */
     public function test_パスワードの強度の文言に項目名パスワードが入る(): void
     {
         $v = Validator::make(['password' => 'a'], ['password' => [new StrongPassword()]]);
         $this->assertTrue($v->fails());
         $this->assertSame('パスワードは8文字以上で入力してください。', $v->errors()->first('password'));
+    }
+
+    /** パスワードの強度：項目名「新しいパスワード」
+     * キーが new_password のとき、attributes.new_password から「新しいパスワード」が
+     * 入ることを確かめる（StrongPassword 可変化）。 */
+    public function test_新しいパスワードの強度の文言に項目名新しいパスワードが入る(): void
+    {
+        $v = Validator::make(['new_password' => 'a'], ['new_password' => [new StrongPassword()]]);
+        $this->assertTrue($v->fails());
+        $this->assertSame('新しいパスワードは8文字以上で入力してください。', $v->errors()->first('new_password'));
+    }
+
+    /** パスワードの強度：大文字が無い → 項目名入りの「〜に大文字を1文字以上含めてください。」 */
+    public function test_パスワードの大文字不足の文言に項目名が入る(): void
+    {
+        $v = Validator::make(['new_password' => 'abcdefgh1!'], ['new_password' => [new StrongPassword()]]);
+        $this->assertTrue($v->fails());
+        $this->assertSame('新しいパスワードに大文字を1文字以上含めてください。', $v->errors()->first('new_password'));
+    }
+
+    /** パスワードの強度：よく使われるパスワード → 項目名を含まない固定文言 */
+    public function test_よく使われるパスワードの文言は項目名を含まない固定文言である(): void
+    {
+        $v = Validator::make(['new_password' => 'Password1!'], ['new_password' => [new StrongPassword()]]);
+        $this->assertTrue($v->fails());
+        $this->assertSame('よく使われるパスワードは使用できません。', $v->errors()->first('new_password'));
     }
 
     /** ログインID の使えない文字（§2-8「例外・具体文言の優先」） */
