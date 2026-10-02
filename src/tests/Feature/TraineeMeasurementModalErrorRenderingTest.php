@@ -10,8 +10,10 @@ use Tests\TestCase;
  * 「2 つ以上のトレーニーが並ぶ状態」で ViewErrorBag と old('_trainee_id') を
  * 使って描画し、§2-7「モーダルの中のフォーム」の規約に合うかを確かめる。
  *
- * - エラーで戻ったときに、対象のモーダル（$shouldReopen）にだけ 1 文の案内と
- *   各欄の is-invalid・<x-form-error> が出る
+ * - エラーで戻ったときに、対象のモーダル（$shouldReopen）にだけ 各欄の
+ *   is-invalid・<x-form-error> が出る
+ * - 上部の案内（「入力内容に誤りがあります。」）はモーダルでは出さない
+ *   （§2-7「モーダルの中のフォーム」。2026-10 変更）
  * - 他のモーダルには何も出ない
  * - エラーなしでは、どのモーダルにも何も出ない
  *
@@ -63,8 +65,9 @@ class TraineeMeasurementModalErrorRenderingTest extends TestCase
         $this->assertStringNotContainsString('is-invalid', $html);
     }
 
-    /** 2 つ以上並んでいて片方（trainee=1）のエラーで戻ったとき：対象だけに案内と欄下が出る */
-    public function test_対象のモーダルにだけ案内と欄下の文言が出る(): void
+    /** 2 つ以上並んでいて片方（trainee=1）のエラーで戻ったとき：
+     *  対象のモーダルには欄下と is-invalid が出て、上部の案内はどちらにも出ない */
+    public function test_対象のモーダルにだけ欄下の文言が出て上部案内はどちらにも出ない(): void
     {
         $errors = [
             'measured_date' => 'ERR_measured_date',
@@ -73,17 +76,18 @@ class TraineeMeasurementModalErrorRenderingTest extends TestCase
         ];
         $html = $this->renderTwoModals(1, $errors);
 
-        // 対象のモーダル（trainee=1）
+        // モーダル全体で、上部の案内は出ない（§2-7「モーダルの中のフォーム」。2026-10 変更）
+        $this->assertStringNotContainsString('入力内容に誤りがあります', $html);
+
+        // 対象のモーダル（trainee=1）には欄下文言と is-invalid が出る
         $t1 = $this->sliceModal($html, 1);
-        $this->assertStringContainsString('入力内容に誤りがあります。', $t1);
         $this->assertStringContainsString('ERR_measured_date', $t1);
         $this->assertStringContainsString('ERR_measured_time', $t1);
         $this->assertStringContainsString('ERR_weight_kg', $t1);
         $this->assertStringContainsString('is-invalid', $t1);
 
-        // 対象外のモーダル（trainee=2）には案内も欄下も is-invalid も出ない
+        // 対象外のモーダル（trainee=2）には欄下も is-invalid も出ない
         $t2 = $this->sliceModal($html, 2);
-        $this->assertStringNotContainsString('入力内容に誤りがあります', $t2);
         $this->assertStringNotContainsString('ERR_measured_date', $t2);
         $this->assertStringNotContainsString('ERR_measured_time', $t2);
         $this->assertStringNotContainsString('ERR_weight_kg', $t2);

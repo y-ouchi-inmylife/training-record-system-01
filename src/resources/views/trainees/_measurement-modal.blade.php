@@ -91,14 +91,10 @@
                 </div>
 
                 <div class="modal-body">
-                    {{-- モーダル本文の先頭の 1 文の案内（設計書 §2-7「モーダルの中のフォーム」）。
-                         @error は共有セッションのエラーバッグを見るため、$shouldReopen で
-                         囲まないと他のトレーニーのモーダルにも出てしまう（共通の部品は
-                         「エラーがあれば出す」作りで、条件はモーダルの側で持つ方針）。 --}}
-                    @if($shouldReopen)
-                        <x-form-error-summary />
-                    @endif
-
+                    {{-- 上部の案内（<x-form-error-summary />）は出さない。モーダルは画面に収まり、
+                         欄がすべて一度に見えるため（設計書 §2-7「モーダルの中のフォーム」）。
+                         欄の赤枠と欄の下の文言は、$shouldReopen の条件で該当トレーニーの
+                         モーダルにだけ出す。 --}}
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="measured_date-{{ $trainee->id }}" class="form-label">計測日 <span class="text-danger">*</span></label>
