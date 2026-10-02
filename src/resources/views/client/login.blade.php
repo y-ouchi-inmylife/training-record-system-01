@@ -15,15 +15,21 @@
 <div class="c-login">
     <div class="card c-login-card">
         <div class="card-body p-4">
-            @if($errors->any())
-                <div class="alert alert-danger" role="alert">
-                    @foreach($errors->all() as $error)
-                        <p class="mb-0">{{ $error }}</p>
-                    @endforeach
-                </div>
+            {{-- 認証の失敗は専用のキー login でフォームの上に出す（設計書 §2-7
+                 「ログインの認証の失敗・アカウントの無効化・ロックの出し方」）。
+                 入力欄の is-invalid や欄下文言、上部の案内（入力エラー用）は付かない。 --}}
+            @error('login')
+                <div class="alert alert-danger" role="alert">{{ $message }}</div>
+            @enderror
+
+            {{-- 入力エラーの上部案内（email・password の必須・形式などの本当の入力エラー）。
+                 認証失敗（キー login）は上部に別で出すため、ここでは入力項目のキーに絞る。 --}}
+            @if($errors->hasAny(['email', 'password']))
+                <x-form-error-summary />
             @endif
 
-            <form method="POST" action="{{ route('client-portal.login') }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
+            <form method="POST" action="{{ route('client-portal.login') }}" novalidate>
                 @csrf
 
                 <div class="mb-3">
@@ -38,6 +44,7 @@
                         autofocus
                         autocomplete="username"
                     >
+                    <x-form-error field="email" />
                 </div>
 
                 <div class="mb-3">
@@ -50,6 +57,7 @@
                         required
                         autocomplete="current-password"
                     >
+                    <x-form-error field="password" />
                 </div>
 
                 <div class="d-grid">

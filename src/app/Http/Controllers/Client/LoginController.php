@@ -47,8 +47,11 @@ class LoginController extends Controller
             return redirect()->intended(route('client-portal.dashboard'));
         }
 
+        // 認証の失敗は、入力項目のキー（email / password）ではなく専用のキー login で返す
+        // （設計書 §2-7「ログインの認証の失敗・アカウントの無効化・ロックの出し方」）。
+        // 欄の下に出さず、ビュー側で @error('login') の alert-danger としてフォームの上に出す。
         return back()
             ->withInput($request->only('email'))
-            ->withErrors(['email' => 'メールアドレスまたはパスワードが正しくありません。']);
+            ->withErrors(['login' => 'メールアドレスまたはパスワードが正しくありません。']);
     }
 }
