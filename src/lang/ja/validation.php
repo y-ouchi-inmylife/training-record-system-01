@@ -16,8 +16,8 @@ return [
     'accepted' => ':attributeを承認してください。',
     'accepted_if' => ':otherが:valueのとき、:attributeを承認してください。',
     'active_url' => ':attributeは有効なURLではありません。',
-    'after' => ':attributeには:date以降の日付を指定してください。',
-    'after_or_equal' => ':attributeには:date以降の日付を指定してください。',
+    'after' => ':attributeは:date以降の日付で入力してください。',
+    'after_or_equal' => ':attributeは:date以降の日付で入力してください。',
     'alpha' => ':attributeはアルファベットのみ使用できます。',
     'alpha_dash' => ':attributeはアルファベット、ハイフン、アンダースコア、数字が使用できます。',
     'alpha_num' => ':attributeはアルファベットと数字のみ使用できます。',
@@ -25,7 +25,7 @@ return [
     'array' => ':attributeは配列でなければなりません。',
     'ascii' => ':attributeは半角英数字と記号のみ使用できます。',
     'before' => ':attributeには:date以前の日付を指定してください。',
-    'before_or_equal' => ':attributeには:date以前の日付を指定してください。',
+    'before_or_equal' => ':attributeは:date以前の日付で入力してください。',
     'between' => [
         'array' => ':attributeの項目は:min〜:max個にしてください。',
         'file' => ':attributeは:min〜:maxキロバイトのファイルにしてください。',
@@ -34,33 +34,33 @@ return [
     ],
     'boolean' => ':attributeはtrueかfalseを指定してください。',
     'can' => ':attributeには許可されていない値が含まれています。',
-    'confirmed' => ':attributeと確認用フィールドが一致しません。',
+    'confirmed' => ':attribute（確認）が一致しません。',
     'contains' => ':attributeに必要な値が含まれていません。',
-    'current_password' => 'パスワードが違います。',
-    'date' => ':attributeは正しい日付ではありません。',
+    'current_password' => '現在のパスワードが正しくありません。',
+    'date' => ':attributeの形式が正しくありません。',
     'date_equals' => ':attributeは:dateと同じ日付にしてください。',
-    'date_format' => ':attributeは:format形式で指定してください。',
-    'decimal' => ':attributeは:decimal桁の小数にしてください。',
+    'date_format' => ':attributeの形式が正しくありません。',
+    'decimal' => ':attributeは小数点以下:decimal桁までで入力してください。',
     'declined' => ':attributeは拒否されなければなりません。',
     'declined_if' => ':otherが:valueのとき、:attributeは拒否されなければなりません。',
-    'different' => ':attributeと:otherには異なる値を指定してください。',
+    'different' => ':attributeは:otherと別のものを選択してください。',
     'digits' => ':attributeは:digits桁で指定してください。',
     'digits_between' => ':attributeは:min〜:max桁で指定してください。',
     'dimensions' => ':attributeの画像サイズが無効です。',
     'distinct' => ':attributeには異なる値を指定してください。',
     'doesnt_end_with' => ':attributeは次のいずれかで終わってはいけません。:values',
     'doesnt_start_with' => ':attributeは次のいずれかで始まってはいけません。:values',
-    'email' => ':attributeは有効なメールアドレス形式で指定してください。',
+    'email' => ':attributeの形式が正しくありません。',
     'ends_with' => ':attributeは:valuesのいずれかで終わる必要があります。',
     'enum' => '選択された:attributeは有効ではありません。',
-    'exists' => '選択された:attributeは有効ではありません。',
+    'exists' => '選択された:attributeが存在しません。',
     'extensions' => ':attributeは次の拡張子のいずれかである必要があります。:values',
-    'file' => ':attributeはファイルを指定してください。',
+    'file' => ':attributeを選択し直してください。',
     'filled' => ':attributeを指定してください。',
     'gt' => [
         'array' => ':attributeの項目は:value個より多く指定してください。',
         'file' => ':attributeは:valueキロバイトより大きくしてください。',
-        'numeric' => ':attributeは:valueより大きい値を指定してください。',
+        'numeric' => ':attributeは:valueより大きい値で入力してください。',
         'string' => ':attributeは:valueより大きい文字数で指定してください。',
     ],
     'gte' => [
@@ -74,7 +74,7 @@ return [
     'in' => '選択された:attributeは有効ではありません。',
     'in_array' => ':attributeには:otherに含まれる値を指定してください。',
     'in_array_keys' => ':attributeには次のキーのいずれかを含める必要があります。:values',
-    'integer' => ':attributeは整数で指定してください。',
+    'integer' => ':attributeは整数で入力してください。',
     'ip' => ':attributeは有効なIPアドレス形式で指定してください。',
     'ipv4' => ':attributeは有効なIPv4アドレス形式で指定してください。',
     'ipv6' => ':attributeは有効なIPv6アドレス形式で指定してください。',
@@ -97,16 +97,16 @@ return [
     'max' => [
         'array' => ':attributeの項目は:max個以下にしてください。',
         'file' => ':attributeは:maxキロバイト以下にしてください。',
-        'numeric' => ':attributeは:max以下で指定してください。',
+        'numeric' => ':attributeは:max以下で入力してください。',
         'string' => ':attributeは:max文字以内で入力してください。',
     ],
     'max_digits' => ':attributeの桁数は:max桁以下にしてください。',
-    'mimes' => ':attributeは:valuesタイプのファイルにしてください。',
+    'mimes' => ':attributeの形式が正しくありません。',
     'mimetypes' => ':attributeは:valuesタイプのファイルにしてください。',
     'min' => [
         'array' => ':attributeは:min個以上指定してください。',
         'file' => ':attributeは:minキロバイト以上にしてください。',
-        'numeric' => ':attributeは:min以上で指定してください。',
+        'numeric' => ':attributeは:min以上で入力してください。',
         'string' => ':attributeは:min文字以上で入力してください。',
     ],
     'min_digits' => ':attributeの桁数は:min桁以上にしてください。',
@@ -118,7 +118,7 @@ return [
     'multiple_of' => ':attributeは:valueの倍数でなければなりません。',
     'not_in' => '選択された:attributeは有効ではありません。',
     'not_regex' => ':attributeの形式が無効です。',
-    'numeric' => ':attributeは数字で指定してください。',
+    'numeric' => ':attributeは数値で入力してください。',
     'password' => [
         'letters' => ':attributeには英字を含める必要があります。',
         'mixed' => ':attributeには大文字と小文字を含める必要があります。',
@@ -156,9 +156,9 @@ return [
         'string' => ':attributeは:size文字で指定してください。',
     ],
     'starts_with' => ':attributeは:valuesのいずれかで始まる必要があります。',
-    'string' => ':attributeは文字列を指定してください。',
+    'string' => ':attributeは文字列で入力してください。',
     'timezone' => ':attributeは有効なタイムゾーンで指定してください。',
-    'unique' => ':attributeは既に使用されています。',
+    'unique' => 'この:attributeはすでに使われています。',
     'uploaded' => ':attributeのアップロードに失敗しました。',
     'uppercase' => ':attributeは大文字で指定してください。',
     'url' => ':attributeは有効なURLを指定してください。',
@@ -185,6 +185,46 @@ return [
         'trainer2_id' => [
             'different' => '担当2は担当1と異なるトレーナーを選択してください。',
         ],
+        // 選択式項目の必須（§2-8「必須（選択）」）
+        'address1' => [
+            'required' => '都道府県を選択してください。',
+        ],
+        'role' => [
+            'required' => '権限を選択してください。',
+            // 画面の選択肢（「管理者」「一般」）を具体的に示す文言は in の既定より分かりやすい（§2-8「例外」）
+            'in' => '権限は管理者または一般を選択してください。',
+        ],
+        'trainer1_id' => [
+            'required' => '担当1を選択してください。',
+        ],
+        'client_id' => [
+            'required' => '会員を選択してください。',
+        ],
+        // 項目どうしの関係（§2-8「項目どうしの関係」）
+        'date_to' => [
+            'after_or_equal' => '終了日は開始日以降の日付で入力してください。',
+        ],
+        // 複合キーの重複（trainee_id × measured_date × measured_time）。§2-8「項目どうしの関係」の派生
+        'measured_time' => [
+            'unique' => 'この日時の計測値はすでに登録されています。',
+        ],
+        // 具体的に何を直せばよいかが分かる文言（§2-8「例外」）：半角英数字とアンダースコアだけが使える仕様
+        'login_id' => [
+            'regex' => 'ログインIDに使用できない文字が含まれています。',
+        ],
+        // 会員側のメールアドレスの重複は、他人の登録の有無を分からせない文言にする（§2-8「例外」）
+        'email' => [
+            'unique' => 'このメールアドレスは登録できません。',
+        ],
+        'new_email' => [
+            'unique' => 'このメールアドレスは登録できません。',
+        ],
+        // 会員側のトレーニー写真（画面ラベル「写真」）。file.mimes / file.max は固定値を含むため個別文言
+        'photo' => [
+            'required' => '写真を選択してください。',
+            'mimes' => '写真は JPEG / PNG / HEIC / HEIF 形式のみ登録できます。',
+            'max' => '写真のサイズは 20MB 以下にしてください。',
+        ],
     ],
 
     /*
@@ -207,14 +247,21 @@ return [
         'phone1' => '電話番号',
         'phone2' => '電話番号（予備）',
         'email' => 'メールアドレス',
+        'new_email' => '新しいメールアドレス',
         'postal_code' => '郵便番号',
         'address1' => '都道府県',
         'address2' => '市区町村',
         'address3' => '町名・番地',
-        'address4' => '建物名',
+        // 画面のラベル（§2-8「項目名は、画面のラベルと同じにする」）
+        'address4' => '建物名・部屋番号',
         'login_id' => 'ログインID',
-        'name' => '氏名',
+        // 画面のラベル（画面ラベル「名前」。トレーナー氏名・トレーニー名の両方で「名前」）
+        'name' => '名前',
         'password' => 'パスワード',
+        'password_confirmation' => 'パスワード（確認）',
+        'current_password' => '現在のパスワード',
+        'new_password' => '新しいパスワード',
+        'new_password_confirmation' => '新しいパスワード（確認）',
         'role' => '権限',
         'primary_trainer_id' => '主担当',
         'trainer1_id' => '担当1',
@@ -222,6 +269,16 @@ return [
         'training_date' => 'トレーニング日',
         'training_time' => '時刻',
         'internal_id' => '内部ID',
+        'date_from' => '開始日',
+        'date_to' => '終了日',
+        'photo' => '写真',
+        'current_prompt' => '要約プロンプト',
+        // 音声記録のコントローラーでも使うキーだが、そちらは個別の文言を持つため、ここでの追加では表示は変わらない
+        // （段階 5 で音声記録・メディアの文言を扱うときに整合させる）
+        'client_id' => '会員',
+        'title' => '表示名',
+        'transcription_text' => '文字起こしテキスト',
+        'summary_text' => '要約',
     ],
 
 ];
