@@ -70,14 +70,16 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
-    public function test_photo入力エラーで上部案内と欄下文言が出る(): void
+    public function test_photo入力エラーで上部案内は出ず欄下文言だけが出る(): void
     {
+        // 段階 5-1：本画面は小さなフォーム（photo 1 項目のみ）のため、§2-7「画面上部の
+        // 短い案内」の例外として上部の案内（<x-form-error-summary />）は出さない。
         $view = $this->renderDashboard(
             errors: ['photo' => 'ERR_photo'],
             old: ['_trainee_id' => 1],
         );
 
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertDontSee('入力内容に誤りがあります');
         $view->assertSee('ERR_photo');
         $view->assertSee('invalid-feedback', false);
     }
@@ -94,7 +96,7 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
-    public function test_2頭並ぶとき片方のエラーはもう片方のカードに出ない(): void
+    public function test_2頭並ぶとき片方のphotoエラーはもう片方のカードに出ない(): void
     {
         // トレーニー 1 でエラーが起きた想定
         $view = $this->renderDashboard(
@@ -103,14 +105,13 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
             weightCharts: $this->dummyWeightCharts([1, 2]),
         );
 
-        // トレーニー 1 のカードにはエラーが出る
+        // トレーニー 1 のカードにはエラーが出る（上部案内は出ない。小さなフォームの例外）
         $view->assertSee('ERR_photo_for_trainee_1');
-        $view->assertSee('入力内容に誤りがあります。赤字の項目を確認してください。');
+        $view->assertDontSee('入力内容に誤りがあります');
 
         // トレーニー 2 のカードにエラーが出ないことは、画面全体で「ERR_...」が
         // 1 回しか出ないことから裏付ける（カードごとに重複表示されない）
         $this->assertSame(1, substr_count($view->__toString(), 'ERR_photo_for_trainee_1'));
-        $this->assertSame(1, substr_count($view->__toString(), '入力内容に誤りがあります'));
     }
 
     public function test_formキーで2頭並ぶとき該当トレーニーのカードだけに出る(): void
