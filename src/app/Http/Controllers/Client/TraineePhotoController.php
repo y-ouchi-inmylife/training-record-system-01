@@ -165,9 +165,14 @@ class TraineePhotoController extends Controller
                 'trainee_id' => $trainee->id,
                 'error' => $e->getMessage(),
             ]);
+            // 入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7。
+            // 段階 4-4 で photo キーから専用の form キーに移した）。該当トレーニーのカードに
+            // だけエラーを出すため、_trainee_id を old() 経由で復元できるよう withInput() を付ける
+            // （ビュー側で old('_trainee_id') === $chart['id'] を見て絞り込む）。
             return redirect()
                 ->route('client-portal.dashboard')
-                ->withErrors(['photo' => '写真の登録に失敗しました。時間をおいて試してみてください。']);
+                ->withInput()
+                ->withErrors(['form' => '写真の登録に失敗しました。時間をおいて試してみてください。']);
         } finally {
             // 一時ファイルは成功・失敗どちらでも必ず削除
             FileFacade::delete([$tmpIn, $tmpOut]);
