@@ -239,6 +239,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let doneMessageTimer = null;
     const DONE_MESSAGE_AUTO_DISMISS_MS = 5000; // レイアウトの「更新」の保存メッセージ（data-auto-dismiss）と同じ秒数
     const DONE_MESSAGES = {
+        // 「更新」の保存のとき（段階 5-3a 追補。fetch 化で消えたサーバーのフラッシュと同じ文言）
+        saved: '音声記録を保存しました。',
         transcription: '文字起こしが完了し、保存しました。',
         summary: '要約が完了し、保存しました。',
     };
@@ -501,10 +503,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(function(response) {
             if (response.status === 200) {
                 // 成功：画面を読み込み直し、該当の行の編集パネルを開き直す（文字起こし・要約の成功時と同じ
-                // navigateWithHighlight を使う。done は付けないので完了メッセージは出さない）。
-                // サーバー側は JSON 応答で success フラッシュを立てないため、画面側でメッセージは出さない。
+                // navigateWithHighlight を使う）。done=saved を付けて、読み込み直した後に完了メッセージ
+                // 「音声記録を保存しました。」を文字起こし・要約と同じ仕組みで表示する（段階 5-3a 追補。
+                // fetch 化で消えたサーバーのフラッシュを画面側で持ち直す）。
                 hasUnsavedChanges = false;
-                navigateWithHighlight(currentAudioId);
+                navigateWithHighlight(currentAudioId, 'saved');
                 return;
             }
             if (response.status === 422) {
@@ -689,7 +692,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- highlight付きURLに遷移するヘルパー（読み込み直した後、その記録の編集パネルを開く） ---
-    // done（'transcription' | 'summary'）は成功したときだけ渡し、読み込み直した後の完了メッセージに使う
+    // done（'saved' | 'transcription' | 'summary'）は成功したときだけ渡し、読み込み直した後の完了メッセージに使う
     function navigateWithHighlight(audioId, done) {
         const url = new URL(window.location.href);
         url.searchParams.set('highlight', audioId);
