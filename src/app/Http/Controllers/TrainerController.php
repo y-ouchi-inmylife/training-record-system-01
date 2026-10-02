@@ -274,11 +274,12 @@ class TrainerController extends Controller
                 ->with('error', 'システム管理者アカウントはパスワードをリセットできません。');
         }
 
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8）。
+        // 画面ラベルは「新しいパスワード」だがキーは password（attributes.password = 'パスワード'）
+        // のため「パスワードを…」になる。画面ラベルとのずれは段階 3（トレーナー側画面への
+        // 適用）で、キー名または attributes の調整で揃える。
         $validated = $request->validate([
             'password' => ['required', 'string', 'confirmed', new StrongPassword()],
-        ], [
-            'password.required' => '新しいパスワードは必須です。',
-            'password.confirmed' => 'パスワード（確認）が一致しません。',
         ]);
 
         $trainer->update([
