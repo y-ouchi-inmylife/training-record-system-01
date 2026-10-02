@@ -19,12 +19,9 @@
 
     {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
          required・maxlength・type・pattern・inputmode などの属性は残す（入力制限・
-         スマホのキーボード・支援技術への必須の伝達のため）。
-         onsubmit の validateBeforeSubmit は段階 3-1 のコミット 3（JS の入力チェックを
-         削除）で外す。 --}}
+         スマホのキーボード・支援技術への必須の伝達のため）。 --}}
     <form method="POST" action="{{ $action }}" id="clientForm" novalidate
-          onkeydown="if(event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); }"
-          onsubmit="return validateBeforeSubmit()">
+          onkeydown="if(event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); }">
         @csrf
         @if($method === 'PUT')
             @method('PUT')
@@ -286,62 +283,18 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // 未保存変更警告
+        // 未保存変更警告（入力の検証とは別。入力の検証はサーバーに任せる方針で、
+        // JS の showFieldError / clearFieldError / validateBeforeSubmit は段階 3-1 で廃止した）
         new window.UnsavedChangesGuard({
             formSelector: '#clientForm',
             leaveLinkSelector: '.js-leave-link'
         }).init();
     });
 
-    // フィールドエラー表示
-    function showFieldError(fieldId, message) {
-        var field = document.getElementById(fieldId);
-        field.classList.add('is-invalid');
-        var errorDiv = field.parentElement.querySelector('.invalid-feedback');
-        if (!errorDiv) {
-            errorDiv = document.createElement('div');
-            errorDiv.className = 'invalid-feedback';
-            field.parentElement.appendChild(errorDiv);
-        }
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-    }
-
-    function clearFieldError(fieldId) {
-        var field = document.getElementById(fieldId);
-        field.classList.remove('is-invalid');
-        var errorDiv = field.parentElement.querySelector('.invalid-feedback');
-        if (errorDiv) errorDiv.style.display = 'none';
-    }
-
-    // 送信時バリデーション（姓必須・ふりがなのひらがなチェック・メール形式）
-    function validateBeforeSubmit() {
-        let valid = true;
-
-        // 姓必須
-        clearFieldError('last_name');
-        if (!document.getElementById('last_name').value.trim()) {
-            showFieldError('last_name', '姓は必須です。');
-            valid = false;
-        }
-
-        // ふりがな（ひらがな）
-        const hiraganaRegex = /^[ぁ-んー\s　]*$/;
-        [{id: 'last_name_kana', label: 'せい'}, {id: 'first_name_kana', label: 'めい'}].forEach(function (f) {
-            clearFieldError(f.id);
-            const v = document.getElementById(f.id).value.trim();
-            if (v !== '' && !hiraganaRegex.test(v)) {
-                showFieldError(f.id, f.label + 'はひらがなで入力してください。');
-                valid = false;
-            }
-        });
-
-        return valid;
-    }
-
     // 住所検索（郵便番号→zipcloud）は resources/js/address-search.js に切り出し。
     // ページに読み込むと window.searchAddress が定義され、
     // <button onclick="searchAddress()"> から呼び出せる。
+    // 住所検索は入力の検証ではないため、段階 3-1 でも残す。
 </script>
 @vite(['resources/js/address-search.js'])
 @endpush
