@@ -63,7 +63,6 @@
                                        placeholder="例: 2026-04-01"
                                        pattern="\d{4}-\d{2}-\d{2}"
                                        maxlength="10">
-                                <x-form-error field="date_from" />
                             </div>
                             <div class="col-md-auto px-1">～</div>
                             <div class="col">
@@ -72,9 +71,23 @@
                                        placeholder="例: 2026-04-01"
                                        pattern="\d{4}-\d{2}-\d{2}"
                                        maxlength="10">
-                                <x-form-error field="date_to" />
                             </div>
                         </div>
+                        {{-- 日付の範囲のエラーの文言（§2-7「項目どうしの関係のチェック」の但し書き）。
+                             各欄のすぐ下に出すと、狭い列で文言が折り返して入力欄の位置がずれるため、
+                             範囲のまとまり（日付行）の下に 1 行で出す。左端は開始日の入力欄の左端に
+                             揃える（md 以上はラベル分 .form-label-fixed = 140px を空ける、md 未満は
+                             ラベルが上に積まれて開始日が全幅になるため空きは不要）。
+                             エラーがないときは行ごと出さない（空の余白を作らない）。 --}}
+                        @if($errors->hasAny(['date_from', 'date_to']))
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-auto form-label-fixed d-none d-md-block"></div>
+                                <div class="col">
+                                    <x-form-error field="date_from" block />
+                                    <x-form-error field="date_to" block />
+                                </div>
+                            </div>
+                        @endif
                     </div>
                     <div class="col-md-7">
                         <div class="row g-2 align-items-center">
