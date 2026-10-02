@@ -296,13 +296,13 @@ class AudioRecordController extends Controller
                 ->with('error', $message);
         }
 
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-3a）：
+        //   title.required → 標準 ＋ attributes.title「表示名を入力してください。」
+        //   title.max      → 標準 ＋ attributes.title「表示名は255文字以内で入力してください。」
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'transcription_text' => 'nullable|string',
             'summary_text' => 'nullable|string',
-        ], [
-            'title.required' => '表示名を入力してください。',
-            'title.max' => '表示名は255文字以内で入力してください。',
         ]);
 
         $audioRecord->update([
@@ -492,11 +492,12 @@ class AudioRecordController extends Controller
      */
     public function summaries(Request $request): JsonResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-3a）：
+        //   client_id.required → custom.client_id.required「会員を選択してください。」
+        //     （「指定」は §2-8 の禁止形。「選択」に合わせた）
+        //   client_id.exists   → 標準 ＋ attributes.client_id「選択された会員が存在しません。」
         $request->validate([
             'client_id' => 'required|exists:clients,id',
-        ], [
-            'client_id.required' => '会員を指定してください。',
-            'client_id.exists' => '選択された会員が存在しません。',
         ]);
 
         $query = AudioRecord::where('trainer_id', Auth::id())

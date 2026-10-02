@@ -238,10 +238,10 @@ class MediaRecordController extends Controller
      */
     public function update(Request $request, MediaRecord $mediaRecord): JsonResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-3a）：
+        //   title.max → 標準 ＋ attributes.title「表示名は255文字以内で入力してください。」
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
-        ], [
-            'title.max' => '表示名は255文字以内で入力してください。',
         ]);
 
         $mediaRecord->update([
