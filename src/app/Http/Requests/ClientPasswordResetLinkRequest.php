@@ -30,11 +30,5 @@ class ClientPasswordResetLinkRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
-    {
-        return [
-            'email.required' => 'メールアドレスを入力してください。',
-            'email.email' => 'メールアドレスの形式が正しくありません。',
-        ];
-    }
+    // messages() は段階 2 で削除。文言は lang/ja/validation.php に集約（設計書 §2-8）。
 }

@@ -27,13 +27,5 @@ class ClientPasswordChangeRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
-    {
-        return [
-            'current_password.required' => '現在のパスワードを入力してください。',
-            'current_password.current_password' => '現在のパスワードが正しくありません。',
-            'new_password.required' => '新しいパスワードを入力してください。',
-            'new_password.confirmed' => '新しいパスワード（確認）が一致しません。',
-        ];
-    }
+    // messages() は段階 2 で削除。文言は lang/ja/validation.php に集約（設計書 §2-8）。
 }

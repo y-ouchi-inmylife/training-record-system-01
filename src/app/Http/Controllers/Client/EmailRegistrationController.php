@@ -74,20 +74,16 @@ class EmailRegistrationController extends Controller
 
         // バリデーション：他クライアントで使用中のアドレスは重複エラー
         // 自クライアントは対象外（同じアドレスの再入力も許容する）
-        $validated = $request->validate(
-            [
-                'email' => [
-                    'required',
-                    'email',
-                    Rule::unique('clients', 'email')->ignore($tokenRecord->client_id),
-                ],
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8。重複は
+        // custom.email.unique「このメールアドレスは登録できません。」で、
+        // 他人の登録の有無を分からせない例外）。
+        $validated = $request->validate([
+            'email' => [
+                'required',
+                'email',
+                Rule::unique('clients', 'email')->ignore($tokenRecord->client_id),
             ],
-            [
-                'email.required' => 'メールアドレスを入力してください。',
-                'email.email' => 'メールアドレスの形式が正しくありません。',
-                'email.unique' => 'このメールアドレスは登録できません。担当トレーナーにご連絡ください。',
-            ]
-        );
+        ]);
 
         try {
             DB::transaction(function () use ($tokenRecord, $validated) {

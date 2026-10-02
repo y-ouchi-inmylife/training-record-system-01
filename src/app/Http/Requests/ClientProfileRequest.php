@@ -31,16 +31,5 @@ class ClientProfileRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
-    {
-        return [
-            'phone1.required' => '電話番号を入力してください。',
-            'phone1.regex' => '電話番号の形式が正しくありません。',
-            'phone2.regex' => '電話番号（予備）の形式が正しくありません。',
-            'postal_code.regex' => '郵便番号の形式が正しくありません。',
-            'address1.required' => '都道府県を選択してください。',
-            'address2.required' => '市区町村を入力してください。',
-            'address3.required' => '町名・番地を入力してください。',
-        ];
-    }
+    // messages() は段階 2 で削除。文言は lang/ja/validation.php に集約（設計書 §2-8）。
 }

@@ -55,29 +55,11 @@ class ClientInitialSetupRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
-    {
-        return [
-            'password.required' => 'パスワードを入力してください。',
-            'password.confirmed' => 'パスワード（確認）が一致しません。',
-            'last_name.required' => '姓を入力してください。',
-            'last_name_kana.regex' => 'せいはひらがなで入力してください。',
-            'first_name_kana.regex' => 'めいはひらがなで入力してください。',
-            'phone1.required' => '電話番号を入力してください。',
-            'phone1.regex' => '電話番号の形式が正しくありません。',
-            'phone2.regex' => '電話番号（予備）の形式が正しくありません。',
-            'postal_code.regex' => '郵便番号の形式が正しくありません。',
-            'address1.required' => '都道府県を選択してください。',
-            'address2.required' => '市区町村を入力してください。',
-            'address3.required' => '町名・番地を入力してください。',
-            'trainee_name.required' => '愛犬の名前を入力してください。',
-        ];
-    }
-
     /**
-     * 属性名の日本語ラベル。既存の messages() で個別文言を書いている項目には
-     * ここは効かないが、`in` / `date` / `before_or_equal` などの汎用ルールで
+     * 属性名の日本語ラベル。`in` / `date` / `before_or_equal` などの汎用ルールで
      * 自動生成されるメッセージ内の `:attribute` を日本語にするために定義する。
+     * 他の規則の文言は lang/ja/validation.php に集約する（段階 2 で messages() を
+     * 削除した。設計書 §2-8「文言の置き場所」）。
      */
     public function attributes(): array
     {

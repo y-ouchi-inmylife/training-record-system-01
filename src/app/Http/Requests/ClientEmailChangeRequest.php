@@ -42,14 +42,6 @@ class ClientEmailChangeRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
-    {
-        return [
-            'new_email.required' => 'メールアドレスを入力してください。',
-            'new_email.email' => 'メールアドレスの形式が正しくありません。',
-            'new_email.unique' => 'このメールアドレスは登録できません。担当トレーナーにご連絡ください。',
-            'current_password.required' => '現在のパスワードを入力してください。',
-            'current_password.current_password' => '現在のパスワードが正しくありません。',
-        ];
-    }
+    // messages() は段階 2 で削除。文言は lang/ja/validation.php に集約
+    // （設計書 §2-8。重複は custom.new_email.unique「このメールアドレスは登録できません。」で例外）。
 }

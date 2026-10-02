@@ -58,6 +58,10 @@ class TraineePhotoController extends Controller
             abort(403);
         }
 
+        // required / mimes / max の文言は lang/ja/validation.php に集約
+        // （設計書 §2-8。custom.photo.required / custom.photo.mimes / custom.photo.max）。
+        // photo.file は「アップロードそのものの失敗」で入力エラーの範囲外（§2-7「対象外」）
+        // のため、本コントローラ内に残す。
         $validated = $request->validate([
             'photo' => [
                 'required',
@@ -66,10 +70,7 @@ class TraineePhotoController extends Controller
                 'max:' . self::MAX_SIZE_KB,
             ],
         ], [
-            'photo.required' => '写真ファイルを選択してください。',
             'photo.file' => '写真ファイルの取得に失敗しました。もう一度お試しください。',
-            'photo.mimes' => '写真は JPEG / PNG / HEIC / HEIF 形式のみ登録できます。',
-            'photo.max' => '写真のサイズは 20MB 以下にしてください。',
         ]);
 
         $tmpDir = storage_path('app/' . self::TMP_DIR);
