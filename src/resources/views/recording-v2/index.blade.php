@@ -56,6 +56,8 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+// 送信前の JS の独自のチェックは行わない（設計書 §2-7）。会員の未選択はサーバーの検証に任せる
+// （段階 5-2 で削除。以前はここで submit を preventDefault して .client-id-error を表示していた）。
 $(document).ready(function() {
     var $clientSelect = $('#client-select');
 
@@ -81,24 +83,6 @@ $(document).ready(function() {
             inputTooShort: function () { return '1文字以上入力してください'; },
             noResults: function () { return '該当する会員が見つかりません'; },
             searching: function () { return '検索中...'; }
-        }
-    });
-
-    // クライアント選択時にバリデーションエラー表示を解除
-    $clientSelect.on('change', function() {
-        if ($(this).val()) {
-            $(this).removeClass('is-invalid');
-            $(this).siblings('.invalid-feedback.client-id-error').hide();
-        }
-    });
-
-    // フォーム submit 時のクライアント側バリデーション
-    $clientSelect.closest('form').on('submit', function(e) {
-        if (!$clientSelect.val()) {
-            e.preventDefault();
-            $clientSelect.addClass('is-invalid');
-            $clientSelect.siblings('.invalid-feedback.client-id-error').show();
-            return false;
         }
     });
 });

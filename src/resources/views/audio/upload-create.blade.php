@@ -106,6 +106,11 @@ $(document).ready(function() {
     });
     @endif
 
+    // 送信前のサイズ確認（§2-7 の例外「大きなファイルを送る前のサイズの確認」）。
+    // 100MB の上限を超えたファイルをアップロードしないで止める。見た目はサーバーの
+    // 欄下文言と揃える（invalid-feedback）。文言は custom.file.max「音声ファイルの
+    // サイズは 100MB 以下にしてください。」と食い違わない形にする（選んだファイルの
+    // 大きさを添える差分だけ）。
     // サーバ側の上限を SSoT として渡す。JS 側に数値を直接書かない。
     const MAX_FILE_SIZE = @json(\App\Models\AudioRecord::MAX_FILE_SIZE);
     const MAX_FILE_SIZE_MB = MAX_FILE_SIZE / 1024 / 1024;
@@ -123,7 +128,9 @@ $(document).ready(function() {
             // 「100.0MB」と表示され、「100MBを超えている」という文と矛盾するため。
             const fileSizeMB = (Math.ceil(file.size / 1024 / 1024 * 10) / 10).toFixed(1);
             fileInput.classList.add('is-invalid');
-            fileErrorEl.textContent = '選択したファイル（' + fileSizeMB + 'MB）は' + MAX_FILE_SIZE_MB + 'MBを超えているため、登録できません。';
+            // サーバーの文言（custom.file.max「音声ファイルのサイズは 100MB 以下にしてください。」）
+            // と食い違わない言い回し。選んだ音声ファイルの大きさを括弧で添える。
+            fileErrorEl.textContent = '選択した音声ファイル（' + fileSizeMB + 'MB）は ' + MAX_FILE_SIZE_MB + 'MB 以下にしてください。';
             fileErrorEl.classList.remove('d-none');
             return false;
         }
@@ -135,7 +142,8 @@ $(document).ready(function() {
     }
 
     fileInput.addEventListener('change', function() {
-        // 前回の送信で表示されているサーバー側のエラーは、ファイルを選び直した時点で
+        // 前回の送信で表示されているサーバー側のエラー（#file-server-error、
+        // Blade で invalid-feedback d-block で描画）は、ファイルを選び直した時点で
         // 消して、ブラウザ側のチェック結果だけを表示する（二重表示の防止）。
         const serverErrorEl = document.getElementById('file-server-error');
         if (serverErrorEl) {
