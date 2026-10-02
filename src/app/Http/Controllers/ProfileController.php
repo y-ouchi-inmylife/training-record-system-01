@@ -6,7 +6,6 @@ use App\Rules\StrongPassword;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 /**
@@ -53,22 +52,16 @@ class ProfileController extends Controller
      */
     public function updatePassword(Request $request): RedirectResponse
     {
-        // 文言は lang/ja/validation.php に集約（設計書 §2-8。
-        // confirmed の新案「:attribute（確認）が一致しません。」で、
-        // 画面ラベルと一致する「新しいパスワード（確認）が一致しません。」が出る。
-        // current_password の照合は本メソッド末尾の Hash::check で自前で行う（本コミットでは
-        // 変更しない。Laravel 標準の current_password ルールへの置き換えは段階 3 で検討）。
+        // 文言は lang/ja/validation.php に集約（設計書 §2-8）。
+        // current_password の照合は Laravel 標準の current_password ルールに任せる
+        // （段階 3-5 で Hash::check の自前実装から置き換えた。失敗の文言は
+        //  lang/ja/validation.php の current_password「現在のパスワードが正しくありません。」）。
+        // defaults.guard は web（config/auth.php）で、トレーナーの認証も web ガードを使うため、
+        // ルールにガード名を付けない（current_password:web でも等価）。
         $validated = $request->validate([
-            'current_password' => 'required|string',
+            'current_password' => ['required', 'string', 'current_password'],
             'new_password' => ['required', 'string', 'confirmed', new StrongPassword()],
         ]);
-
-        // 現在のパスワードを照合
-        if (!Hash::check($validated['current_password'], Auth::user()->password)) {
-            return redirect()->route('profile.password.edit')
-                ->withErrors(['current_password' => '現在のパスワードが正しくありません。'])
-                ->withInput();
-        }
 
         Auth::user()->update([
             'password' => $validated['new_password'],
