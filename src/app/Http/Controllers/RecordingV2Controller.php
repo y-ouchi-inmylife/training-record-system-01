@@ -25,11 +25,11 @@ class RecordingV2Controller extends Controller
     {
         // クライアントIDのバリデーション（必須）
         // 業務方針: 音声記録は必ずクライアントに紐付ける（飛び込みケース未想定）
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-2）：
+        //   client_id.required → custom.client_id.required「会員を選択してください。」
+        //   client_id.exists   → 標準の exists ＋ attributes.client_id「選択された会員が存在しません。」
         $request->validate([
             'client_id' => 'required|exists:clients,id',
-        ], [
-            'client_id.required' => '会員を選択してください',
-            'client_id.exists' => '選択された会員は存在しません',
         ]);
 
         // セッションに client_id を保存して /session にリダイレクト（PRG パターン）

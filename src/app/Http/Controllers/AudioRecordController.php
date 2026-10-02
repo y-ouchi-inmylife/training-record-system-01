@@ -63,6 +63,11 @@ class AudioRecordController extends Controller
      */
     public function uploadStore(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-2）：
+        //   client_id.required → custom.client_id.required
+        //   client_id.exists   → 標準 ＋ attributes.client_id
+        //   file.required / file.max / file.uploaded → custom.file.*
+        //   file.file          → 標準 ＋ attributes.file
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'file' => [
@@ -70,13 +75,6 @@ class AudioRecordController extends Controller
                 'file',
                 'max:' . (AudioRecord::MAX_FILE_SIZE / 1024), // KB単位
             ],
-        ], [
-            'client_id.required' => '会員を選択してください。',
-            'client_id.exists' => '選択された会員が存在しません。',
-            'file.required' => '音声ファイルを選択してください。',
-            'file.file' => '有効なファイルをアップロードしてください。',
-            'file.max' => '100MBを超えるファイルは登録できません。',
-            'file.uploaded' => 'ファイルのアップロードに失敗しました。ファイルサイズが大きすぎる可能性があります。',
         ]);
 
         $uploadedFile = $request->file('file');
@@ -121,6 +119,7 @@ class AudioRecordController extends Controller
      */
     public function recordingStore(Request $request): JsonResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-2。uploadStore と同じ規則・同じ文言）。
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'file' => [
@@ -128,13 +127,6 @@ class AudioRecordController extends Controller
                 'file',
                 'max:' . (AudioRecord::MAX_FILE_SIZE / 1024), // KB単位
             ],
-        ], [
-            'client_id.required' => '会員を選択してください。',
-            'client_id.exists' => '選択された会員が存在しません。',
-            'file.required' => '音声ファイルを選択してください。',
-            'file.file' => '有効なファイルをアップロードしてください。',
-            'file.max' => '100MBを超えるファイルは登録できません。',
-            'file.uploaded' => 'ファイルのアップロードに失敗しました。ファイルサイズが大きすぎる可能性があります。',
         ]);
 
         $uploadedFile = $request->file('file');
@@ -193,16 +185,14 @@ class AudioRecordController extends Controller
      */
     public function textPasteStore(Request $request): RedirectResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-2）：
+        //   client_id.required → custom.client_id.required
+        //   client_id.exists   → 標準 ＋ attributes.client_id
+        //   title.required / max / transcription_text.required → 標準 ＋ attributes.*
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'title' => 'required|string|max:255',
             'transcription_text' => 'required|string',
-        ], [
-            'client_id.required' => '会員を選択してください。',
-            'client_id.exists' => '選択された会員が存在しません。',
-            'title.required' => '表示名を入力してください。',
-            'title.max' => '表示名は255文字以内で入力してください。',
-            'transcription_text.required' => '文字起こしテキストを入力してください。',
         ]);
 
         AudioRecord::create([

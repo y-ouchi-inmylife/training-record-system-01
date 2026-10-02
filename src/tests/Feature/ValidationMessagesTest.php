@@ -173,4 +173,38 @@ class ValidationMessagesTest extends TestCase
             __('validation.custom.new_email.unique')
         );
     }
+
+    /** 会員選択の必須（§2-8「必須（選択）」。段階 5-2 で音声記録の登録のコントローラーから集約） */
+    public function test_会員の必須は選択してくださいになる(): void
+    {
+        $v = Validator::make([], ['client_id' => 'required']);
+        $this->assertTrue($v->fails());
+        $this->assertSame('会員を選択してください。', $v->errors()->first('client_id'));
+    }
+
+    /** 音声ファイルの必須（段階 5-2 で集約。選ぶ欄なので custom を持つ） */
+    public function test_音声ファイルの必須は選択してくださいになる(): void
+    {
+        $v = Validator::make([], ['file' => 'required']);
+        $this->assertTrue($v->fails());
+        $this->assertSame('音声ファイルを選択してください。', $v->errors()->first('file'));
+    }
+
+    /** 音声ファイルのサイズ上限（固定値 100MB を含むため custom。段階 5-2 で集約） */
+    public function test_音声ファイルのサイズ上限は100MB以下にしてくださいになる(): void
+    {
+        $this->assertSame(
+            '音声ファイルのサイズは 100MB 以下にしてください。',
+            __('validation.custom.file.max')
+        );
+    }
+
+    /** 音声ファイルのアップロード失敗（原因候補の案内を含むため custom。段階 5-2 で集約） */
+    public function test_音声ファイルのアップロード失敗の文言は項目名入りになる(): void
+    {
+        $this->assertSame(
+            '音声ファイルのアップロードに失敗しました。ファイルのサイズが大きすぎる可能性があります。',
+            __('validation.custom.file.uploaded')
+        );
+    }
 }
