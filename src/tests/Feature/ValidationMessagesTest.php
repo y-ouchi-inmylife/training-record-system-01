@@ -117,6 +117,24 @@ class ValidationMessagesTest extends TestCase
         $this->assertSame('よく使われるパスワードは使用できません。', $v->errors()->first('new_password'));
     }
 
+    /** パスワードの強度：Validator::make の第 4 引数で項目名を上書きしたとき、
+     * 上書きしたラベルが文言に入る（StrongPassword 内で attributes を自分で引く
+     * のではなく、Laravel 標準の :attribute 置換に任せていることの根拠）。 */
+    public function test_パスワードの強度の項目名はValidatorのattributes上書きで差し替わる(): void
+    {
+        $v = Validator::make(
+            ['password' => 'a'],
+            ['password' => [new StrongPassword()]],
+            [],
+            ['password' => 'リセット用パスワード']
+        );
+        $this->assertTrue($v->fails());
+        $this->assertSame(
+            'リセット用パスワードは8文字以上で入力してください。',
+            $v->errors()->first('password')
+        );
+    }
+
     /** ログインID の使えない文字（§2-8「例外・具体文言の優先」） */
     public function test_ログインIDの正規表現違反は具体文言になる(): void
     {
