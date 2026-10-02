@@ -74,7 +74,11 @@
                                      という個別要望のため、この要素だけ align-self でオーバーライドする
                                      （align-self は align-items より個別指定として優先される。Bootstrap
                                      の align-self-* は !important 付きで確実に上書きされる）。 --}}
-                                <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
+                                {{-- 写真の列の幅を写真枠と同じ 180px に固定する（flex-shrink: 0 で縮まず、width: 180px で
+                                     伸びもしない）。エラーの文言は写真の列の中で 180px の幅で折り返し、グラフ側の列の
+                                     幅はエラーの有無で変わらない（flex-column のときは cross 軸の水平幅 180px、
+                                     flex-sm-row のときは main 軸の水平幅 180px）。 --}}
+                                <div class="align-self-center align-self-sm-start" style="flex-shrink: 0; width: 180px;">
                                     {{-- アップロード用フォーム：隠しファイル入力のみを持つ。
                                          写真ありの場合はモーダル内「変更」ボタンから、写真なしの場合は
                                          <label for="..."> から <input> をクリックさせる。form は
