@@ -13,6 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -138,26 +139,43 @@ class SettingsController extends Controller
         $client = Auth::guard('client')->user();
         $newEmail = $request->validated()['new_email'];
 
-        DB::transaction(function () use ($client, $newEmail) {
-            // それまで送信済みだった未使用の確認リンクを無効化（物理削除）
-            $client->emailChangeTokens()
-                ->where('is_used', false)
-                ->delete();
+        // 検証はこの時点で終わっている（ClientEmailChangeRequest）。トランザクション内の
+        // 例外のみ catch する（検証の失敗は FormRequest 側で先に落ちる位置関係）。
+        try {
+            DB::transaction(function () use ($client, $newEmail) {
+                // それまで送信済みだった未使用の確認リンクを無効化（物理削除）
+                $client->emailChangeTokens()
+                    ->where('is_used', false)
+                    ->delete();
 
-            // 新しい確認リンクを 1 件作成。期限は独立（他トークンとは無関係）
-            $token = ClientEmailChangeToken::create([
-                'token' => Str::random(32),
+                // 新しい確認リンクを 1 件作成。期限は独立（他トークンとは無関係）
+                $token = ClientEmailChangeToken::create([
+                    'token' => Str::random(32),
+                    'client_id' => $client->id,
+                    'new_email' => $newEmail,
+                    'expires_at' => now()->addDays(
+                        (int) config('client_tokens.email_change_confirm_expires_days')
+                    ),
+                    'is_used' => false,
+                ]);
+
+                // 新しいメールアドレス宛に確認リンクを送る。失敗時は全ロールバック
+                Mail::to($newEmail)->send(new ClientEmailChangeConfirmMail($token));
+            });
+        } catch (\Throwable $e) {
+            // 全ロールバック済み。送信の失敗が会員側からは「変更の申込みが失敗した」
+            // としか見えないため、原因追跡のためのログを残す。メールアドレスは個人情報の
+            // ためログに残さず、client_id で追えるようにする（初回設定の受け止め方に揃える）。
+            Log::error('[ClientEmailChangeConfirmMail] 確認メールの送信に失敗し、変更の申込みを全ロールバックしました: ' . $e->getMessage(), [
                 'client_id' => $client->id,
-                'new_email' => $newEmail,
-                'expires_at' => now()->addDays(
-                    (int) config('client_tokens.email_change_confirm_expires_days')
-                ),
-                'is_used' => false,
+                'exception' => $e,
             ]);
 
-            // 新しいメールアドレス宛に確認リンクを送る。失敗時は全ロールバック
-            Mail::to($newEmail)->send(new ClientEmailChangeConfirmMail($token));
-        });
+            // 入力エラー以外の失敗はフォームの上に出す（設計書 §2-7）。
+            return back()
+                ->withInput()
+                ->withErrors(['form' => '確認メールを送信できませんでした。時間を置いて再度お試しください。']);
+        }
 
         return redirect()
             ->route('client-portal.settings.email.edit')
