@@ -175,72 +175,9 @@
     </div>
 </form>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // フォーム送信時に必須チェックを実行（上部・下部ボタン共通）
-    const form = document.getElementById('trainingRecordForm');
-    form.addEventListener('submit', function(e) {
-        var errors = [];
-        var firstInvalidElement = null;
-
-        // 既存のエラーサマリーを削除
-        var existingSummary = form.querySelector('.validation-error-summary');
-        if (existingSummary) existingSummary.remove();
-
-        // フォームの入力欄順にバリデーション実行するためのヘルパー
-        function checkRequired(fieldId, errorMessage) {
-            var field = document.getElementById(fieldId);
-            if (field && !field.value) {
-                field.classList.add('is-invalid');
-                errors.push(errorMessage);
-                if (!firstInvalidElement) firstInvalidElement = field;
-            } else if (field) {
-                field.classList.remove('is-invalid');
-            }
-        }
-
-        // 1. クライアント（Select2で非表示のため個別に処理）
-        var clientSelect = form.querySelector('select[name="client_id"]');
-        var clientHidden = form.querySelector('input[type="hidden"][name="client_id"]');
-        if (clientSelect) {
-            var clientErrorDiv = form.querySelector('.client-id-error');
-            if (!clientSelect.value) {
-                if (clientErrorDiv) clientErrorDiv.style.display = 'block';
-                errors.push('会員を選択してください。');
-                if (!firstInvalidElement) firstInvalidElement = clientSelect.closest('.col-md-6');
-            } else {
-                if (clientErrorDiv) clientErrorDiv.style.display = 'none';
-            }
-        } else if (!clientHidden) {
-            errors.push('会員を選択してください。');
-        }
-
-        // 2. トレーニング日
-        checkRequired('training_date', 'トレーニング日を入力してください。');
-
-        // 4. 担当1
-        checkRequired('trainer1_id', '担当1を選択してください。');
-
-        // 5. 参加状況
-
-        // 6. 参加形態
-
-        // エラーがある場合はフォーム送信をブロックし、エラーサマリーを表示
-        if (errors.length > 0) {
-            e.preventDefault();
-
-            var summary = document.createElement('div');
-            summary.className = 'alert alert-danger validation-error-summary';
-            summary.innerHTML = '<strong>入力内容にエラーがあります。</strong><ul class="mb-0 mt-1">' +
-                errors.map(function(err) { return '<li>' + err + '</li>'; }).join('') + '</ul>';
-            form.insertBefore(summary, form.firstChild);
-
-            // エラーサマリーにスクロール
-            summary.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    });
-});
-</script>
+{{-- 送信前の JS 独自のチェック（必須の判定・.validation-error-summary の動的
+     生成・is-invalid の付け外し・「〜を選択してください。」などの文言）は
+     段階 3-3 で削除し、サーバーの検証に一本化した（設計書 §2-7）。 --}}
 
 {{-- メディア登録モーダル（S-1302-M02）。登録・編集の両画面から呼ぶ。 --}}
 @include('media-records._upload-modal')
