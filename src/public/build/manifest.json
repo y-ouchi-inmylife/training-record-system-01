@@ -43,6 +43,12 @@
     "src": "resources/js/qr-code.js",
     "isEntry": true
   },
+  "resources/js/sortable.js": {
+    "file": "assets/sortable-CCvm0IG8.js",
+    "name": "sortable",
+    "src": "resources/js/sortable.js",
+    "isEntry": true
+  },
   "resources/sass/app.scss": {
     "file": "assets/app-BZhsnIzX.css",
     "src": "resources/sass/app.scss",

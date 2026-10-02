@@ -263,8 +263,9 @@
 
 @push('scripts')
 {{-- Sortable.js: メディアセクションのドラッグ&ドロップ並べ替え用。
-     登録・編集の両画面で使うため、_form 側に集約して読み込む。 --}}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.7/Sortable.min.js"></script>
+     登録・編集の両画面で使うため、_form 側に集約して読み込む。
+     ビルドされた入口から window.Sortable に載せる（CDN は使わない）。 --}}
+@vite(['resources/js/sortable.js'])
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
