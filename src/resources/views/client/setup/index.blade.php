@@ -21,12 +21,22 @@
 
     <div class="card c-login-card">
         <div class="card-body p-4">
-            @if ($errors->any())
-                <div class="alert alert-danger" role="alert">
-                    @foreach ($errors->all() as $error)
-                        <p class="mb-0">{{ $error }}</p>
-                    @endforeach
-                </div>
+            {{-- 入力エラー以外の失敗（登録完了メールの送信失敗で全ロールバックしたときなど）は、
+                 入力項目のキーではなく専用のキー `form` でフォームの上に出す（設計書 §2-7）。 --}}
+            @error('form')
+                <div class="alert alert-danger" role="alert">{{ $message }}</div>
+            @enderror
+
+            {{-- 入力エラーの上部案内（必須・形式などの本当の入力エラー。設計書 §2-7）。
+                 専用のキー `form` だけのときは出さないよう、入力項目のキーがあるときだけ表示する。 --}}
+            @if ($errors->hasAny([
+                'password',
+                'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
+                'phone1', 'phone2',
+                'postal_code', 'address1', 'address2', 'address3', 'address4',
+                'trainee_name', 'trainee_breed', 'trainee_sex', 'trainee_birth_date', 'trainee_note',
+            ]))
+                <x-form-error-summary />
             @endif
 
             {{-- 「ログイン情報」小見出し（2026-09 追加、4 か所の 1 番目）。
@@ -49,7 +59,9 @@
                 <div>{{ $client->email }}</div>
             </div>
 
-            <form method="POST" action="{{ route('client-portal.setup.store', ['token' => $token]) }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                 required・type・inputmode・autocomplete などの属性は残す。 --}}
+            <form method="POST" action="{{ route('client-portal.setup.store', ['token' => $token]) }}" novalidate>
                 @csrf
 
                 {{-- パスワードマネージャー向け username（保存パスワードの紐付け先を明示）--}}
@@ -76,6 +88,10 @@
                         autocomplete="new-password"
                         aria-describedby="password-help"
                     >
+                    {{-- 強度要件のヘルプ文は <x-form-error> の下に置くと、エラー時に欄との間にヘルプ文が
+                         挟まる。Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで
+                         ヘルプ文を挟んでも表示される。block は付けない。 --}}
+                    <x-form-error field="password" />
                     <div id="password-help" class="form-text">
                         8 文字以上で、大文字・小文字・数字・記号をそれぞれ 1 つ以上入れてください。
                     </div>
@@ -117,12 +133,14 @@
                         <input type="text" class="form-control @error('last_name') is-invalid @enderror"
                                id="last_name" name="last_name" required maxlength="50"
                                value="{{ old('last_name', $client->last_name) }}">
+                        <x-form-error field="last_name" />
                     </div>
                     <div class="col-sm-6">
                         <label for="first_name" class="form-label">名</label>
                         <input type="text" class="form-control @error('first_name') is-invalid @enderror"
                                id="first_name" name="first_name" maxlength="50"
                                value="{{ old('first_name', $client->first_name) }}">
+                        <x-form-error field="first_name" />
                     </div>
                 </div>
                 {{-- せい・めい行の下にまとまりの区切り線を引く（4 まとまりの境目の 3 本目、氏名まとまりの下）。
@@ -134,12 +152,14 @@
                         <input type="text" class="form-control @error('last_name_kana') is-invalid @enderror"
                                id="last_name_kana" name="last_name_kana" maxlength="50"
                                value="{{ old('last_name_kana', $client->last_name_kana) }}">
+                        <x-form-error field="last_name_kana" />
                     </div>
                     <div class="col-sm-6">
                         <label for="first_name_kana" class="form-label">めい</label>
                         <input type="text" class="form-control @error('first_name_kana') is-invalid @enderror"
                                id="first_name_kana" name="first_name_kana" maxlength="50"
                                value="{{ old('first_name_kana', $client->first_name_kana) }}">
+                        <x-form-error field="first_name_kana" />
                     </div>
                 </div>
 
@@ -151,12 +171,14 @@
                     <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
                            id="phone1" name="phone1" required maxlength="20"
                            value="{{ old('phone1', $client->phone1) }}">
+                    <x-form-error field="phone1" />
                 </div>
                 <div class="mb-3">
                     <label for="phone2" class="form-label">電話番号（予備）</label>
                     <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
                            id="phone2" name="phone2" maxlength="20"
                            value="{{ old('phone2', $client->phone2) }}">
+                    <x-form-error field="phone2" />
                 </div>
 
                 <div class="mb-2">
@@ -164,13 +186,18 @@
                          都道府県以下が入っていれば住所として成立する。設計書 S-1403 備考参照）。
                          入力された場合の形式チェック（7 桁）は FormRequest で維持している。 --}}
                     <label for="postal_code" class="form-label">郵便番号</label>
-                    <div class="input-group">
+                    {{-- input-group 内で .invalid-feedback を効かせるには .has-validation を付ける
+                         （Bootstrap 5 の仕様）。<x-form-error> は input-group の末尾（検索ボタンの後）に
+                         置く。住所検索の結果メッセージ（#address-search-message）は input-group の
+                         外（下の兄弟）に置き、欄下エラーと重ならないようにする。 --}}
+                    <div class="input-group has-validation">
                         <input type="text" class="form-control @error('postal_code') is-invalid @enderror"
                                id="postal_code" name="postal_code"
                                value="{{ old('postal_code', $client->postal_code) }}"
                                placeholder="123-4567">
                         <button type="button" class="btn btn-outline-secondary"
                                 id="btn-search-address" onclick="searchAddress()">検索</button>
+                        <x-form-error field="postal_code" />
                     </div>
                     {{-- address-search.js がここに検索の結果メッセージを書き込む（alert 非使用）--}}
                     <div id="address-search-message" class="form-text" role="status"></div>
@@ -185,18 +212,21 @@
                             <option value="{{ $pref }}" @selected(old('address1', $client->address1) === $pref)>{{ $pref }}</option>
                         @endforeach
                     </select>
+                    <x-form-error field="address1" />
                 </div>
                 <div class="mb-2">
                     <label for="address2" class="form-label">市区町村 <span class="text-danger">*</span></label>
                     <input type="text" class="form-control @error('address2') is-invalid @enderror"
                            id="address2" name="address2" required maxlength="50"
                            value="{{ old('address2', $client->address2) }}">
+                    <x-form-error field="address2" />
                 </div>
                 <div class="mb-2">
                     <label for="address3" class="form-label">町名・番地 <span class="text-danger">*</span></label>
                     <input type="text" class="form-control @error('address3') is-invalid @enderror"
                            id="address3" name="address3" required maxlength="100"
                            value="{{ old('address3', $client->address3) }}">
+                    <x-form-error field="address3" />
                 </div>
                 {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素。次の「愛犬の情報」まとまりとの
                      境目に区切り線③を引く（設計書 S-1403 / client-portal-design-plan.md §4-7 参照）。
@@ -206,6 +236,7 @@
                     <input type="text" class="form-control @error('address4') is-invalid @enderror"
                            id="address4" name="address4" maxlength="100"
                            value="{{ old('address4', $client->address4) }}">
+                    <x-form-error field="address4" />
                 </div>
 
                 {{-- 「愛犬の情報」小見出し。位置と装飾の考え方は「お名前」「ご連絡先」小見出しと同じ
@@ -216,14 +247,14 @@
                     <input type="text" class="form-control @error('trainee_name') is-invalid @enderror"
                            id="trainee_name" name="trainee_name" required maxlength="50"
                            value="{{ old('trainee_name', $existingTrainee?->name) }}">
-                    @error('trainee_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <x-form-error field="trainee_name" />
                 </div>
                 <div class="mb-2">
                     <label for="trainee_breed" class="form-label">犬種</label>
                     <input type="text" class="form-control @error('trainee_breed') is-invalid @enderror"
                            id="trainee_breed" name="trainee_breed" maxlength="100"
                            value="{{ old('trainee_breed', $existingTrainee?->breed) }}">
-                    @error('trainee_breed') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <x-form-error field="trainee_breed" />
                 </div>
                 <div class="mb-2">
                     <label for="trainee_sex" class="form-label">性別</label>
@@ -234,7 +265,7 @@
                             <option value="{{ $value }}" @selected(old('trainee_sex', $existingTrainee?->sex) === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
-                    @error('trainee_sex') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <x-form-error field="trainee_sex" />
                 </div>
                 {{-- 誕生日は type="date"（ブラウザ標準の日付入力）を使う。会員側レイアウト
                      （layouts.client-public）には Flatpickr の CSS が読み込まれていないため、
@@ -248,17 +279,20 @@
                            id="trainee_birth_date" name="trainee_birth_date"
                            value="{{ old('trainee_birth_date', $existingTrainee?->birth_date?->format('Y-m-d')) }}"
                            autocomplete="off">
-                    @error('trainee_birth_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <x-form-error field="trainee_birth_date" />
                 </div>
                 {{-- 備考：ラベル下（.form-text）に多頭飼い向けの案内を出す。
                      設計書 S-1403 の「多頭飼いの運用」参照。備考の下には区切り線を引かない
-                     （愛犬の情報が最終まとまりで、カード枠が外周を担当するため）。 --}}
+                     （愛犬の情報が最終まとまりで、カード枠が外周を担当するため）。
+                     多頭飼いの案内（.form-text）は <x-form-error> の下に置くと、エラー時に欄との
+                     間に案内文が挟まるが、Bootstrap の .is-invalid ~ .invalid-feedback の
+                     「以後の兄弟」セレクタで案内文を挟んでも表示される（パスワードと同じ扱い）。 --}}
                 <div class="mb-3">
                     <label for="trainee_note" class="form-label">備考</label>
                     <textarea class="form-control @error('trainee_note') is-invalid @enderror"
                               id="trainee_note" name="trainee_note" rows="3">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
+                    <x-form-error field="trainee_note" />
                     <div class="form-text">2頭目以降がいらっしゃる場合は、こちらにご記入ください。</div>
-                    @error('trainee_note') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
                 @include('layouts.partials.privacy-consent')
