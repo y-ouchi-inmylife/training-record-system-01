@@ -12,7 +12,13 @@
         </div>
     </div>
 
-    <form id="textPasteForm" method="POST" action="{{ route('audio-records.text-paste.store') }}">
+    {{-- 入力エラーの上部案内（必須・形式などの入力エラー。設計書 §2-7）。本画面は入力項目が
+         3 つ（会員・表示名・文字起こしテキスト）あるため、「小さなフォーム」の例外には当たらない。 --}}
+    <x-form-error-summary />
+
+    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+         required・maxlength などの属性は残す。 --}}
+    <form id="textPasteForm" method="POST" action="{{ route('audio-records.text-paste.store') }}" novalidate>
         @csrf
 
         {{-- クライアント --}}
@@ -20,12 +26,11 @@
             <label for="client_id" class="form-label">
                 会員 <span class="text-danger">*</span>
             </label>
-            <select name="client_id" id="client_id" class="form-select select2-client @error('client_id') is-invalid @enderror">
+            <select name="client_id" id="client_id" class="form-select select2-client @error('client_id') is-invalid @enderror" required>
                 <option value="">会員を検索...</option>
             </select>
-            @error('client_id')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+            {{-- Select2 は <select> を隠すため兄弟セレクタで欄下文言が出ない。block を付ける。 --}}
+            <x-form-error field="client_id" block />
         </div>
 
         {{-- タイトル --}}
@@ -34,10 +39,8 @@
             <input type="text" name="title" id="title"
                    class="form-control @error('title') is-invalid @enderror"
                    value="{{ old('title', $defaultTitle) }}"
-                   maxlength="255">
-            @error('title')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+                   maxlength="255" required>
+            <x-form-error field="title" />
         </div>
 
         {{-- 文字起こしテキスト --}}
@@ -46,10 +49,8 @@
             <textarea name="transcription_text" id="transcription_text" rows="15"
                       class="form-control @error('transcription_text') is-invalid @enderror"
                       inputmode="text"
-                      placeholder="外部で文字起こしした内容を貼り付けてください">{{ old('transcription_text') }}</textarea>
-            @error('transcription_text')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+                      placeholder="外部で文字起こしした内容を貼り付けてください" required>{{ old('transcription_text') }}</textarea>
+            <x-form-error field="transcription_text" />
         </div>
     </form>
 </div>

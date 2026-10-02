@@ -16,19 +16,22 @@
                     <h4 class="mb-0">録音準備</h4>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('recording-v2.start') }}" method="POST">
+                    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                         本画面は小さなフォーム（入力は会員だけ）のため、§2-7「画面上部の短い案内」の
+                         例外として <x-form-error-summary /> は置かない。 --}}
+                    <form action="{{ route('recording-v2.start') }}" method="POST" novalidate>
                         @csrf
 
                         <!-- クライアント選択（Select2） -->
                         <div class="mb-3">
-                            <label class="form-label">会員 <span class="text-danger">*</span></label>
-                            <select name="client_id" class="form-select select2-client @error('client_id') is-invalid @enderror" id="client-select">
+                            <label class="form-label" for="client-select">会員 <span class="text-danger">*</span></label>
+                            <select name="client_id" class="form-select select2-client @error('client_id') is-invalid @enderror" id="client-select" required>
                                 <option value="">会員を検索...</option>
                             </select>
-                            <div class="invalid-feedback client-id-error">会員を選択してください。</div>
-                            @error('client_id')
-                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                            @enderror
+                            {{-- Select2 は <select> を隠して .select2-container を描画するため、
+                                 .form-control.is-invalid ~ .invalid-feedback の兄弟セレクタが効かない。
+                                 block を付けて invalid-feedback d-block で確実に表示する（§2-7）。 --}}
+                            <x-form-error field="client_id" block />
                         </div>
 
                         <div class="alert alert-info">

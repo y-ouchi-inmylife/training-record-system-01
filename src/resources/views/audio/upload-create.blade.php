@@ -12,7 +12,11 @@
         </div>
     </div>
 
-    <form id="uploadForm" method="POST" action="{{ route('audio-records.upload.store') }}" enctype="multipart/form-data">
+    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+         本画面は小さなフォーム（入力は会員とファイルだけ）のため、§2-7「画面上部の短い案内」の
+         例外として <x-form-error-summary /> は置かない。
+         required・accept などの属性は残す。 --}}
+    <form id="uploadForm" method="POST" action="{{ route('audio-records.upload.store') }}" enctype="multipart/form-data" novalidate>
         @csrf
 
         {{-- クライアント --}}
@@ -21,12 +25,11 @@
                 会員 <span class="text-danger">*</span>
             </label>
             <select name="client_id" id="upload_client_id"
-                    class="form-select select2-client-upload @error('client_id') is-invalid @enderror">
+                    class="form-select select2-client-upload @error('client_id') is-invalid @enderror" required>
                 <option value="">会員を検索...</option>
             </select>
-            @error('client_id')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+            {{-- Select2 は <select> を隠すため兄弟セレクタで欄下文言が出ない。block を付ける。 --}}
+            <x-form-error field="client_id" block />
         </div>
 
         {{-- 音声ファイル --}}
@@ -35,10 +38,15 @@
             <input type="file" name="file" id="file"
                    class="form-control @error('file') is-invalid @enderror"
                    accept=".mp3,.m4a,.wav,.mp4,.webm" required>
+            {{-- サーバー側のエラーの表示（§2-7「欄の下」）。block を付けて invalid-feedback d-block で
+                 表示する。送信前の JS のサイズ確認（#file-client-error）とは別の要素のまま残し、
+                 JS 側（下の inline script）で選び直し時に #file-server-error を非表示にして
+                 二重表示を防ぐため、ID を保つ。<x-form-error> は id 属性を受け取らないので直書き。 --}}
             @error('file')
-                <div class="invalid-feedback" id="file-server-error">{{ $message }}</div>
+                <div class="invalid-feedback d-block" id="file-server-error">{{ $message }}</div>
             @enderror
-            {{-- 送信前のブラウザ側バリデーション用エラー枠（JS から表示） --}}
+            {{-- 送信前のブラウザ側バリデーション（サイズの確認。§2-7 の例外）用エラー枠。
+                 JS から文言を書き込んで表示する。見た目は欄の下と揃える（invalid-feedback d-block）。 --}}
             <div class="invalid-feedback d-none" id="file-client-error"></div>
             <div class="form-text">
                 対応形式: MP3, M4A, WAV, MP4, WebM（最大100MB）
