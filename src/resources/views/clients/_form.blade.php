@@ -17,7 +17,12 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ $action }}" id="clientForm"
+    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+         required・maxlength・type・pattern・inputmode などの属性は残す（入力制限・
+         スマホのキーボード・支援技術への必須の伝達のため）。
+         onsubmit の validateBeforeSubmit は段階 3-1 のコミット 3（JS の入力チェックを
+         削除）で外す。 --}}
+    <form method="POST" action="{{ $action }}" id="clientForm" novalidate
           onkeydown="if(event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); }"
           onsubmit="return validateBeforeSubmit()">
         @csrf
@@ -25,16 +30,8 @@
             @method('PUT')
         @endif
 
-        {{-- バリデーションエラー表示 --}}
-        @if($errors->any())
-            <div class="alert alert-danger">
-                <ul class="mb-0">
-                    @foreach($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+        {{-- 画面上部の 1 文の案内（設計書 §2-7）。個々のエラーは各欄の下に出す --}}
+        <x-form-error-summary />
 
         {{-- カテゴリー1: 基本情報 --}}
         <div class="card mb-4">
@@ -53,7 +50,7 @@
                                            id="internal_id" name="internal_id"
                                            value="{{ old('internal_id', $client->internal_id) }}" maxlength="10" required
                                            autocomplete="off">
-                                    @error('internal_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                    <x-form-error field="internal_id" />
                                 </div>
                             </div>
                         </div>
@@ -64,12 +61,15 @@
                                 初回日 <span class="text-danger">*</span>
                             </label>
                             <div class="col-12 col-md">
+                                {{-- Flatpickr（.datepicker）は altInput を使っていないため、
+                                     オリジナルの input がそのまま残る → is-invalid の兄弟セレクタで
+                                     invalid-feedback が自動表示されるため block は付けない。 --}}
                                 <input type="text" class="form-control datepicker @error('initial_consultation_date') is-invalid @enderror"
                                        id="initial_consultation_date" name="initial_consultation_date"
                                        value="{{ old('initial_consultation_date', $client?->initial_consultation_date?->format('Y-m-d')) }}" required
                                        placeholder="例: 2000-01-15" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
                                        autocomplete="off">
-                                @error('initial_consultation_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="initial_consultation_date" />
                             </div>
                         </div>
                     </div>
@@ -77,7 +77,8 @@
                         <div class="row g-2 align-items-center">
                             <label for="primary_trainer_id" class="col-md-auto col-form-label text-md-end form-label-fixed">主担当</label>
                             <div class="col-12 col-md">
-                                <select class="form-select" id="primary_trainer_id" name="primary_trainer_id" autocomplete="off">
+                                <select class="form-select @error('primary_trainer_id') is-invalid @enderror"
+                                        id="primary_trainer_id" name="primary_trainer_id" autocomplete="off">
                                     <option value=""></option>
                                     @foreach($trainers as $trainer)
                                         <option value="{{ $trainer->id }}" {{ old('primary_trainer_id', $client?->primary_trainer_id) == $trainer->id ? 'selected' : '' }}>
@@ -85,6 +86,7 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <x-form-error field="primary_trainer_id" />
                             </div>
                         </div>
                     </div>
@@ -100,18 +102,21 @@
                             <div class="col-12 col-md">
                                 <div class="row g-2">
                                     <div class="col-6">
+                                        {{-- 姓は required 属性なし（JS で検証していた名残）。段階 3-1 で
+                                             novalidate を付けたので、サーバーの検証に一本化した結果、
+                                             required 属性があってもなくても挙動は同じ。属性は現状維持。 --}}
                                         <input type="text" class="form-control @error('last_name') is-invalid @enderror"
                                                id="last_name" name="last_name" inputmode="text"
                                                value="{{ old('last_name', $client?->last_name) }}" placeholder="姓"
                                                autocomplete="off">
-                                        @error('last_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        <x-form-error field="last_name" />
                                     </div>
                                     <div class="col-6">
                                         <input type="text" class="form-control @error('first_name') is-invalid @enderror"
                                                id="first_name" name="first_name" inputmode="text"
                                                value="{{ old('first_name', $client?->first_name) }}" placeholder="名"
                                                autocomplete="off">
-                                        @error('first_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        <x-form-error field="first_name" />
                                     </div>
                                 </div>
                             </div>
@@ -127,14 +132,14 @@
                                                id="last_name_kana" name="last_name_kana" inputmode="hiragana"
                                                value="{{ old('last_name_kana', $client?->last_name_kana) }}" placeholder="せい"
                                                autocomplete="off">
-                                        @error('last_name_kana') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        <x-form-error field="last_name_kana" />
                                     </div>
                                     <div class="col-6">
                                         <input type="text" class="form-control @error('first_name_kana') is-invalid @enderror"
                                                id="first_name_kana" name="first_name_kana" inputmode="hiragana"
                                                value="{{ old('first_name_kana', $client?->first_name_kana) }}" placeholder="めい"
                                                autocomplete="off">
-                                        @error('first_name_kana') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        <x-form-error field="first_name_kana" />
                                     </div>
                                 </div>
                             </div>
@@ -155,12 +160,16 @@
                         <div class="row g-2 align-items-center">
                             <label for="postal_code" class="col-md-auto col-form-label text-md-end form-label-fixed">郵便番号</label>
                             <div class="col-12 col-md">
-                                <div class="input-group">
+                                {{-- input-group の最後の子に invalid-feedback を置き、親に has-validation
+                                     を付けると、Bootstrap 5 のセレクタ
+                                     `.input-group.has-validation > .form-control.is-invalid:nth-last-child(n+3) ~ .invalid-feedback`
+                                     で表示される。block は付けない。 --}}
+                                <div class="input-group has-validation">
                                     <input type="text" class="form-control @error('postal_code') is-invalid @enderror"
                                            id="postal_code" name="postal_code" value="{{ old('postal_code', $client?->postal_code) }}"
                                            autocomplete="off">
                                     <button type="button" class="btn btn-outline-secondary" id="btn-search-address" onclick="searchAddress()">検索</button>
-                                    @error('postal_code') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                    <x-form-error field="postal_code" />
                                 </div>
                             </div>
                         </div>
@@ -169,12 +178,14 @@
                         <div class="row g-2 align-items-center">
                             <label for="address1" class="col-md-auto col-form-label text-md-end form-label-fixed">都道府県</label>
                             <div class="col-12 col-md">
-                                <select class="form-select" id="address1" name="address1" autocomplete="off">
+                                <select class="form-select @error('address1') is-invalid @enderror"
+                                        id="address1" name="address1" autocomplete="off">
                                     <option value=""></option>
                                     @foreach(config('prefectures') as $pref)
                                         <option value="{{ $pref }}" {{ old('address1', $client?->address1) == $pref ? 'selected' : '' }}>{{ $pref }}</option>
                                     @endforeach
                                 </select>
+                                <x-form-error field="address1" />
                             </div>
                         </div>
                     </div>
@@ -182,7 +193,10 @@
                         <div class="row g-2 align-items-center">
                             <label for="address2" class="col-md-auto col-form-label text-md-end form-label-fixed">市区町村</label>
                             <div class="col-12 col-md">
-                                <input type="text" class="form-control" id="address2" name="address2" inputmode="text" value="{{ old('address2', $client?->address2) }}" autocomplete="off">
+                                <input type="text" class="form-control @error('address2') is-invalid @enderror"
+                                       id="address2" name="address2" inputmode="text"
+                                       value="{{ old('address2', $client?->address2) }}" autocomplete="off">
+                                <x-form-error field="address2" />
                             </div>
                         </div>
                     </div>
@@ -194,7 +208,10 @@
                         <div class="row g-2 align-items-center">
                             <label for="address3" class="col-md-auto col-form-label text-md-end form-label-fixed">町名・番地</label>
                             <div class="col-12 col-md">
-                                <input type="text" class="form-control" id="address3" name="address3" inputmode="text" value="{{ old('address3', $client?->address3) }}" autocomplete="off">
+                                <input type="text" class="form-control @error('address3') is-invalid @enderror"
+                                       id="address3" name="address3" inputmode="text"
+                                       value="{{ old('address3', $client?->address3) }}" autocomplete="off">
+                                <x-form-error field="address3" />
                             </div>
                         </div>
                     </div>
@@ -202,7 +219,10 @@
                         <div class="row g-2 align-items-center">
                             <label for="address4" class="col-md-auto col-form-label text-md-end form-label-fixed">建物名・部屋番号</label>
                             <div class="col-12 col-md">
-                                <input type="text" class="form-control" id="address4" name="address4" inputmode="text" value="{{ old('address4', $client?->address4) }}" autocomplete="off">
+                                <input type="text" class="form-control @error('address4') is-invalid @enderror"
+                                       id="address4" name="address4" inputmode="text"
+                                       value="{{ old('address4', $client?->address4) }}" autocomplete="off">
+                                <x-form-error field="address4" />
                             </div>
                         </div>
                     </div>
@@ -217,7 +237,7 @@
                                 <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
                                        id="phone1" name="phone1" value="{{ old('phone1', $client?->phone1) }}" placeholder="例: 090-1234-5678"
                                        autocomplete="off">
-                                @error('phone1') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="phone1" />
                             </div>
                         </div>
                     </div>
@@ -228,7 +248,7 @@
                                 <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
                                        id="phone2" name="phone2" value="{{ old('phone2', $client?->phone2) }}" placeholder="例: 090-1234-5678"
                                        autocomplete="off">
-                                @error('phone2') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="phone2" />
                             </div>
                         </div>
                     </div>
