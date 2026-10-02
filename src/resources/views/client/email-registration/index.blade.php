@@ -43,15 +43,21 @@
                     マイページのご登録のため、ご自身のメールアドレスを入力してください。
                 </p>
 
-                @if ($errors->any())
-                    <div class="alert alert-danger" role="alert">
-                        @foreach ($errors->all() as $error)
-                            <p class="mb-0">{{ $error }}</p>
-                        @endforeach
-                    </div>
+                {{-- メール送信の失敗は専用のキー form でフォームの上に出す（設計書 §2-7
+                     「入力エラー以外の失敗を入力の項目のキーで返さないルール」）。
+                     入力欄の is-invalid や欄下文言、上部の案内（入力エラー用）は付かない。 --}}
+                @error('form')
+                    <div class="alert alert-danger" role="alert">{{ $message }}</div>
+                @enderror
+
+                {{-- 入力エラーの上部案内（email の必須・形式・unique などの本当の入力エラー）。
+                     form キーの失敗は上部に別で出すため、ここでは入力項目のキーに絞る。 --}}
+                @if ($errors->hasAny(['email']))
+                    <x-form-error-summary />
                 @endif
 
-                <form method="POST" action="{{ route('client-portal.email-registration.store', ['token' => $token]) }}">
+                {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
+                <form method="POST" action="{{ route('client-portal.email-registration.store', ['token' => $token]) }}" novalidate>
                     @csrf
 
                     <div class="mb-3">
@@ -66,6 +72,7 @@
                             autofocus
                             autocomplete="email"
                         >
+                        <x-form-error field="email" />
                     </div>
 
                     @include('layouts.partials.privacy-consent')

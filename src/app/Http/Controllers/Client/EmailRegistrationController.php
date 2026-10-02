@@ -112,10 +112,12 @@ class EmailRegistrationController extends Controller
                 Mail::to($validated['email'])->send(new ClientLoginLinkMail($loginLink));
             });
         } catch (\Throwable $e) {
-            // 全ロールバック済み。エラーメッセージを添えて入力状態に戻す
+            // 全ロールバック済み。メール送信の失敗は入力項目のキーではなく専用のキー form で返す
+            // （設計書 §2-7「入力エラー以外の失敗を入力の項目のキーで返さないルール」。段階 4-1 で
+            //  email キーから form キーに移した）。
             return back()
                 ->withInput()
-                ->withErrors(['email' => 'メールの送信に失敗しました。時間を置いて再度お試しください。']);
+                ->withErrors(['form' => 'メールの送信に失敗しました。時間を置いて再度お試しください。']);
         }
 
         // 完了状態：同画面に送信済みメールアドレスを表示

@@ -37,15 +37,13 @@
                     ご登録のメールアドレスを入力してください。
                 </p>
 
-                @if ($errors->any())
-                    <div class="alert alert-danger" role="alert">
-                        @foreach ($errors->all() as $error)
-                            <p class="mb-0">{{ $error }}</p>
-                        @endforeach
-                    </div>
+                {{-- 入力エラーの上部案内（email の必須・形式などの本当の入力エラー。設計書 §2-7）--}}
+                @if ($errors->hasAny(['email']))
+                    <x-form-error-summary />
                 @endif
 
-                <form method="POST" action="{{ route('client-portal.password-reset.request.send') }}">
+                {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
+                <form method="POST" action="{{ route('client-portal.password-reset.request.send') }}" novalidate>
                     @csrf
 
                     <div class="mb-3">
@@ -60,6 +58,7 @@
                             autofocus
                             autocomplete="email"
                         >
+                        <x-form-error field="email" />
                     </div>
 
                     <div class="d-grid mb-3">

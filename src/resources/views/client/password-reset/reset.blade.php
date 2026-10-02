@@ -18,15 +18,11 @@
                 新しいパスワードを設定してください。
             </p>
 
-            @if ($errors->any())
-                <div class="alert alert-danger" role="alert">
-                    @foreach ($errors->all() as $error)
-                        <p class="mb-0">{{ $error }}</p>
-                    @endforeach
-                </div>
-            @endif
+            {{-- 入力エラーの上部案内（必須・強度・一致の違反などの本当の入力エラー。設計書 §2-7）--}}
+            <x-form-error-summary />
 
-            <form method="POST" action="{{ route('client-portal.password-reset.reset.save', ['token' => $token]) }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
+            <form method="POST" action="{{ route('client-portal.password-reset.reset.save', ['token' => $token]) }}" novalidate>
                 @csrf
 
                 <div class="mb-3">
@@ -41,6 +37,11 @@
                         autocomplete="new-password"
                         aria-describedby="new_password_help"
                     >
+                    {{-- 強度要件のヘルプ文は <x-form-error> の下に置くと、エラーが出たとき欄との
+                         間にヘルプ文が挟まる。Bootstrap の .is-invalid ~ .invalid-feedback の
+                         セレクタは「以後の兄弟」なので、ヘルプ文が間に挟まっても表示される。
+                         block は付けない。 --}}
+                    <x-form-error field="new_password" />
                     {{-- 強度要件のヘルプ文（S-1403 初回設定と同じ文言）--}}
                     <div id="new_password_help" class="form-text">
                         8 文字以上で、大文字・小文字・数字・記号をそれぞれ 1 つ以上入れてください。
@@ -49,6 +50,7 @@
 
                 <div class="mb-3">
                     <label for="new_password_confirmation" class="form-label">新しいパスワード（確認）</label>
+                    {{-- 確認用の欄に対する confirmed の文言は new_password 側に出る（他画面と同じ扱い）--}}
                     <input
                         type="password"
                         class="form-control"
