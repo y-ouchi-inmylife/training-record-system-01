@@ -2098,7 +2098,7 @@ POST /training-records に以下を追加する。
 | upload_url | string | 署名付きPUT URL（このURLへブラウザから直接アップロードする） |
 | storage_key | string | 採番された保存キー。レコード作成時に渡す |
 
-- 形式・サイズが不適合：エラーを返す（HTTP 422）
+- 入力エラー・形式／サイズの不適合：Laravel 標準の HTTP 422（`{message, errors: {キー: [文言…]}}`、キーは `original_filename` / `file_size` など。段階 5-3b で `{"error": ...}` の独自形式から揃えた）。文言は `lang/ja/validation.php` の `custom.original_filename.format`・`custom.file_size.max`（`:limit` プレースホルダ）など
 
 ##### POST /api/media-records
 
@@ -2126,6 +2126,7 @@ POST /training-records に以下を追加する。
   
 **レスポンス**（JSON）:
 - 成功：`{ "data": <メディア> }`（201）
+- 入力エラー・形式／保存キー不適合：Laravel 標準の HTTP 422（`{message, errors: {キー: [文言…]}}`、キーは `storage_key` / `original_filename` / `file_size` / `title` など。段階 5-3b で `{"error": ...}` の独自形式から揃えた）。文言は `lang/ja/validation.php` の `custom.original_filename.format`・`custom.storage_key.format` など
 
 ##### GET /api/media-records/{id}/play
 
