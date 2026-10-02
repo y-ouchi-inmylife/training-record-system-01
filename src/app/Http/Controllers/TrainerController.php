@@ -275,15 +275,16 @@ class TrainerController extends Controller
         }
 
         // 文言は lang/ja/validation.php に集約（設計書 §2-8）。
-        // 画面ラベルは「新しいパスワード」だがキーは password（attributes.password = 'パスワード'）
-        // のため「パスワードを…」になる。画面ラベルとのずれは段階 3（トレーナー側画面への
-        // 適用）で、キー名または attributes の調整で揃える。
+        // 送信項目の名前を new_password / new_password_confirmation にして、他のパスワード変更
+        // 画面（プロフィール・強制パスワード変更・会員側）と揃える（段階 3-4、設計書 S-0804）。
+        // これで attributes.new_password = '新しいパスワード' が引かれ、画面ラベル「新しい
+        // パスワード」と文言が揃う。
         $validated = $request->validate([
-            'password' => ['required', 'string', 'confirmed', new StrongPassword()],
+            'new_password' => ['required', 'string', 'confirmed', new StrongPassword()],
         ]);
 
         $trainer->update([
-            'password' => $validated['password'],
+            'password' => $validated['new_password'],
             'must_change_password' => true,
         ]);
 
