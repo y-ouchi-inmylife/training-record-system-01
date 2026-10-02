@@ -65,7 +65,9 @@
 <div class="modal fade" id="measurementModal-{{ $trainee->id }}" tabindex="-1" aria-labelledby="measurementModalLabel-{{ $trainee->id }}" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="measurementForm-{{ $trainee->id }}" method="POST" action="{{ $storeUrl }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                 required・type・step・min・max・pattern などの属性は残す。 --}}
+            <form id="measurementForm-{{ $trainee->id }}" method="POST" action="{{ $storeUrl }}" novalidate>
                 @csrf
                 {{-- _method は JavaScript で「（空）」と 'PUT' を切り替える。
                      `@method('PUT')` の代わりに hidden input を JS で操作する。 --}}
@@ -89,32 +91,27 @@
                 </div>
 
                 <div class="modal-body">
-                    {{-- エラーサマリ：バリデーションエラーの内容を上部に一覧表示。
-                         複数モーダルが並ぶ場合、@error は共有セッションのエラーバッグを
-                         見るため全モーダルに同じエラーが表示されうるが、実際に開き直す
-                         のは該当トレーニーのモーダルのみ（下の $shouldReopen 参照）。 --}}
+                    {{-- モーダル本文の先頭の 1 文の案内（設計書 §2-7「モーダルの中のフォーム」）。
+                         @error は共有セッションのエラーバッグを見るため、$shouldReopen で
+                         囲まないと他のトレーニーのモーダルにも出てしまう（共通の部品は
+                         「エラーがあれば出す」作りで、条件はモーダルの側で持つ方針）。 --}}
                     @if($shouldReopen)
-                        <div class="alert alert-danger">
-                            <ul class="mb-0">
-                                @foreach($measurementFieldNames as $field)
-                                    @error($field)
-                                        <li>{{ $message }}</li>
-                                    @enderror
-                                @endforeach
-                            </ul>
-                        </div>
+                        <x-form-error-summary />
                     @endif
 
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="measured_date-{{ $trainee->id }}" class="form-label">計測日 <span class="text-danger">*</span></label>
+                            {{-- Flatpickr（.datepicker）は altInput を使っていないためオリジナルの
+                                 input が残り、兄弟セレクタで invalid-feedback が自動表示される。
+                                 block は付けない（3-1 と同じ扱い）。 --}}
                             <input type="text" class="form-control datepicker @if($shouldReopen) @error('measured_date') is-invalid @enderror @endif"
                                    id="measured_date-{{ $trainee->id }}" name="measured_date"
                                    value="{{ $shouldReopen ? old('measured_date') : '' }}"
                                    placeholder="例: 2026-09-15" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
                                    required autocomplete="off">
                             @if($shouldReopen)
-                                @error('measured_date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="measured_date" />
                             @endif
                         </div>
                         <div class="col-md-6">
@@ -124,11 +121,14 @@
                                    value="{{ $shouldReopen ? old('measured_time') : '' }}"
                                    required autocomplete="off">
                             @if($shouldReopen)
-                                @error('measured_time') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="measured_time" />
                             @endif
                         </div>
                         <div class="col-md-6">
                             <label for="weight_kg-{{ $trainee->id }}" class="form-label">体重（kg） <span class="text-danger">*</span></label>
+                            {{-- 単位（kg）はラベルの括弧で示している（input-group では
+                                 ないため has-validation は不要）。is-invalid の兄弟セレクタで
+                                 invalid-feedback が自動表示される。block は付けない。 --}}
                             <input type="number" step="0.01" min="0.01" max="999.99"
                                    class="form-control @if($shouldReopen) @error('weight_kg') is-invalid @enderror @endif"
                                    id="weight_kg-{{ $trainee->id }}" name="weight_kg"
@@ -136,7 +136,7 @@
                                    placeholder="例: 12.35"
                                    required autocomplete="off">
                             @if($shouldReopen)
-                                @error('weight_kg') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-form-error field="weight_kg" />
                             @endif
                         </div>
                     </div>
