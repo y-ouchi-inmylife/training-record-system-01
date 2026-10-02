@@ -96,6 +96,9 @@
                 </div>
             </div>
             <div class="modal-body">
+                {{-- 非同期の保存の入力エラー以外の失敗（500・通信の失敗など）を alert alert-danger で出す枠。
+                     中身は共通 JS `FormErrors.showFormMessage` が作る（設計書 §2-7「非同期の保存（fetch）」） --}}
+                <div id="mediaDetailFormError"></div>
                 {{-- 左右2カラム（md 未満では Bootstrap の挙動で自動的に縦積み） --}}
                 <div class="row g-3">
                     {{-- 左カラム：メディア表示エリア（JSで img / video / 非対応メッセージを差し込む） --}}
@@ -113,7 +116,10 @@
 
                             <dt class="col-sm-3">表示名</dt>
                             <dd class="col-sm-9">
-                                <input type="text" id="mediaEditTitle" class="form-control form-control-sm" maxlength="255" placeholder="未入力時は元ファイル名を表示">
+                                {{-- name="title" は共通 JS FormErrors が [name="title"] で欄を見つけるため
+                                     （詳細モーダルは fetch 送信のため name 属性は送信に使わないが、エラーの
+                                     対象を特定する手がかりとして付ける。§2-7「非同期の保存（fetch）」） --}}
+                                <input type="text" id="mediaEditTitle" name="title" class="form-control form-control-sm" maxlength="255" placeholder="未入力時は元ファイル名を表示">
                             </dd>
 
                             <dt class="col-sm-3">元ファイル名</dt>
@@ -266,6 +272,9 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{{-- 非同期の保存の入力エラー・入力エラー以外の失敗を欄の下・モーダルの先頭に出す共通 JS
+     （設計書 §2-7「非同期の保存（fetch）」。window.FormErrors に関数が載る） --}}
+@vite(['resources/js/form-errors.js'])
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 登録者フィルタの変更で trainer_id クエリを差し替えて再読み込み（ページはリセット）
@@ -418,7 +427,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // モーダルclose時にクリーンアップ（動画停止・次回ちらつき防止・編集状態クリア）
+    // モーダルの詳細エリアと表示名の入力欄にエラー表示を出すときの container（§2-7「非同期の保存（fetch）」）
+    const detailModalBody = modalEl.querySelector('.modal-body');
+    const detailFormErrorEl = document.getElementById('mediaDetailFormError');
+
+    function clearModalErrors() {
+        if (window.FormErrors) {
+            window.FormErrors.clearFieldErrors(detailModalBody);
+            window.FormErrors.clearFormMessage(detailFormErrorEl);
+        }
+    }
+
+    // モーダルclose時にクリーンアップ（動画停止・次回ちらつき防止・編集状態クリア）。
+    // 開き直したときに前のエラーの表示が残らないよう、エラー表示も消す（§2-7。段階 5-3a）
     modalEl.addEventListener('hidden.bs.modal', function() {
         const video = displayArea.querySelector('video');
         if (video) {
@@ -429,25 +450,16 @@ document.addEventListener('DOMContentLoaded', function() {
         displayArea.innerHTML = '';
         currentMediaId = null;
         editTitle.value = '';
+        clearModalErrors();
     });
 
-    // 422等のエラーレスポンスからユーザー向けメッセージを組み立てる
-    async function readErrorMessage(res, fallback) {
-        try {
-            const body = await res.json();
-            if (body && body.errors) {
-                return Object.values(body.errors).flat().join('\n');
-            }
-            if (body && body.message) { return body.message; }
-        } catch (e) { /* ignore */ }
-        return fallback;
-    }
-
-    // 更新ボタン: title を PUT
+    // 更新ボタン: title を PUT（§2-7「非同期の保存（fetch）」。段階 5-3a で alert を欄の下・モーダル先頭に移した）
     updateBtn.addEventListener('click', async function() {
         if (!currentMediaId) return;
         const title = editTitle.value.trim();
 
+        // 新しい保存を始めるので、前のエラーの表示を消す
+        clearModalErrors();
         updateBtn.disabled = true;
         try {
             const res = await fetch('/media-records/' + encodeURIComponent(currentMediaId), {
@@ -461,14 +473,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     title: title || null,
                 }),
             });
-            if (!res.ok) {
-                throw new Error(await readErrorMessage(res, '更新に失敗しました。'));
+            if (res.ok) {
+                modal.hide();
+                window.location.reload();
+                return;
             }
-            modal.hide();
-            window.location.reload();
+            if (res.status === 422) {
+                const body = await res.json();
+                // 入力エラーは欄の下に出す（表示名の欄）。欄が見つからないキーはモーダル先頭に回す
+                const orphans = window.FormErrors.showFieldErrors(detailModalBody, body && body.errors ? body.errors : {});
+                if (orphans.length > 0) {
+                    window.FormErrors.showFormMessage(detailFormErrorEl, orphans.join('\n'));
+                }
+                return;
+            }
+            // 500・その他：JSON が読めるときは中身を使い、読めないときは固定文言
+            let message = '更新に失敗しました。';
+            try {
+                const body = await res.json();
+                if (body && body.message) message = body.message;
+                else if (body && body.error && body.error.message) message = body.error.message;
+            } catch (e) { /* ignore */ }
+            window.FormErrors.showFormMessage(detailFormErrorEl, message);
         } catch (e) {
             console.error(e);
-            alert(e.message || '更新に失敗しました。');
+            // 通信の失敗など
+            window.FormErrors.showFormMessage(detailFormErrorEl, '更新に失敗しました。');
         } finally {
             updateBtn.disabled = false;
         }
@@ -572,6 +602,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!confirm('このメディアを削除します。レコードとストレージ上のファイルがともに削除され、元に戻せません。よろしいですか?')) {
             return;
         }
+        // 新しい削除を始めるので、前のエラーの表示を消す
+        clearModalErrors();
         deleteBtn.disabled = true;
         try {
             const res = await fetch('/media-records/' + encodeURIComponent(currentMediaId), {
@@ -581,14 +613,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Accept': 'application/json',
                 },
             });
-            if (!res.ok) {
-                throw new Error(await readErrorMessage(res, '削除に失敗しました。'));
+            if (res.ok) {
+                modal.hide();
+                window.location.reload();
+                return;
             }
-            modal.hide();
-            window.location.reload();
+            // 削除の失敗は入力エラーではないため、モーダルの先頭に出す（§2-7「非同期の保存（fetch）」。段階 5-3a）
+            let message = '削除に失敗しました。';
+            try {
+                const body = await res.json();
+                if (body && body.message) message = body.message;
+                else if (body && body.error && body.error.message) message = body.error.message;
+            } catch (e) { /* ignore */ }
+            window.FormErrors.showFormMessage(detailFormErrorEl, message);
         } catch (e) {
             console.error(e);
-            alert(e.message || '削除に失敗しました。');
+            window.FormErrors.showFormMessage(detailFormErrorEl, '削除に失敗しました。');
         } finally {
             deleteBtn.disabled = false;
         }
