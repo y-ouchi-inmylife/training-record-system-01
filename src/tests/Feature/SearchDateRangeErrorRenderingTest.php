@@ -73,19 +73,33 @@ class SearchDateRangeErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
-    public function test_会員一覧_dateToエラーで上部案内は出ず欄下文言だけが出る(): void
+    public function test_会員一覧_dateToエラーで上部案内は出ず範囲の下に文言が出る(): void
     {
+        // 段階 5-1 の追補：各欄のすぐ下ではなく、日付の行（範囲）のまとまりの下に出す
         $view = $this->renderClients([
             'date_to' => 'ERR_date_to',
         ]);
         // 上部の案内は出ない（小さなフォームの例外）
         $view->assertDontSee('入力内容に誤りがあります');
-        // 旧い単独の alert-danger（検索フォーム上部のもの）も出ない
-        // 文言は欄の下にだけ出る（1 回のみ）
+        // 文言は範囲の下にだけ 1 回出る。block 付きの <x-form-error> は
+        // invalid-feedback d-block を描画する。
         $view->assertSee('ERR_date_to');
         $this->assertSame(1, substr_count($view->__toString(), 'ERR_date_to'));
+        $view->assertSee('invalid-feedback d-block', false);
+        // 終了日の欄には赤枠が付く
         $view->assertSee('is-invalid', false);
-        $view->assertSee('invalid-feedback', false);
+    }
+
+    public function test_会員一覧_dateFromエラーで範囲の下に文言が出る(): void
+    {
+        $view = $this->renderClients([
+            'date_from' => 'ERR_date_from',
+        ]);
+        $view->assertDontSee('入力内容に誤りがあります');
+        $view->assertSee('ERR_date_from');
+        $this->assertSame(1, substr_count($view->__toString(), 'ERR_date_from'));
+        $view->assertSee('invalid-feedback d-block', false);
+        $view->assertSee('is-invalid', false);
     }
 
     // ---- S-0402 トレーニング記録一覧 ----
@@ -114,7 +128,7 @@ class SearchDateRangeErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
-    public function test_トレーニング記録一覧_dateToエラーで上部案内は出ず欄下文言だけが出る(): void
+    public function test_トレーニング記録一覧_dateToエラーで上部案内は出ず範囲の下に文言が出る(): void
     {
         $view = $this->renderTrainingRecords([
             'date_to' => 'ERR_date_to_tr',
@@ -122,6 +136,19 @@ class SearchDateRangeErrorRenderingTest extends TestCase
         $view->assertDontSee('入力内容に誤りがあります');
         $view->assertSee('ERR_date_to_tr');
         $this->assertSame(1, substr_count($view->__toString(), 'ERR_date_to_tr'));
+        $view->assertSee('invalid-feedback d-block', false);
+        $view->assertSee('is-invalid', false);
+    }
+
+    public function test_トレーニング記録一覧_dateFromエラーで範囲の下に文言が出る(): void
+    {
+        $view = $this->renderTrainingRecords([
+            'date_from' => 'ERR_date_from_tr',
+        ]);
+        $view->assertDontSee('入力内容に誤りがあります');
+        $view->assertSee('ERR_date_from_tr');
+        $this->assertSame(1, substr_count($view->__toString(), 'ERR_date_from_tr'));
+        $view->assertSee('invalid-feedback d-block', false);
         $view->assertSee('is-invalid', false);
     }
 
@@ -151,7 +178,7 @@ class SearchDateRangeErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
-    public function test_操作履歴_dateToエラーで上部案内は出ず欄下文言だけが出る(): void
+    public function test_操作履歴_dateToエラーで上部案内は出ず範囲の下に文言が出る(): void
     {
         $view = $this->renderAccessLogs([
             'date_to' => 'ERR_date_to_al',
@@ -159,6 +186,19 @@ class SearchDateRangeErrorRenderingTest extends TestCase
         $view->assertDontSee('入力内容に誤りがあります');
         $view->assertSee('ERR_date_to_al');
         $this->assertSame(1, substr_count($view->__toString(), 'ERR_date_to_al'));
+        $view->assertSee('invalid-feedback d-block', false);
+        $view->assertSee('is-invalid', false);
+    }
+
+    public function test_操作履歴_dateFromエラーで範囲の下に文言が出る(): void
+    {
+        $view = $this->renderAccessLogs([
+            'date_from' => 'ERR_date_from_al',
+        ]);
+        $view->assertDontSee('入力内容に誤りがあります');
+        $view->assertSee('ERR_date_from_al');
+        $this->assertSame(1, substr_count($view->__toString(), 'ERR_date_from_al'));
+        $view->assertSee('invalid-feedback d-block', false);
         $view->assertSee('is-invalid', false);
     }
 }
