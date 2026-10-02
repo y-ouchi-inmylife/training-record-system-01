@@ -136,6 +136,9 @@
                 {{-- 文字起こし・要約が成功した後に読み込み直したときだけ出す完了メッセージ（中身は JS で作る）。
                      処理後は該当の行が画面の中央に来るため、画面上部のフラッシュではなく編集欄の中に出す --}}
                 <div id="detail-done-message"></div>
+                {{-- 非同期の保存・実行の入力エラー以外の失敗（409・500・通信の失敗など）を alert alert-danger で出す
+                     ための枠。中身は共通 JS `FormErrors.showFormMessage` が作る（設計書 §2-7「非同期の保存（fetch）」） --}}
+                <div id="detail-form-error"></div>
                 {{-- 処理中のまま止まった記録を開いたときだけ表示する中断の案内 --}}
                 <div id="detail-stalled-notice" class="small text-warning mb-2" style="display: none;">
                     <i class="bi bi-exclamation-triangle"></i> 処理が中断された可能性があります。もう一度実行してください。
@@ -211,6 +214,9 @@
 @endsection
 
 @push('scripts')
+{{-- 非同期の保存の入力エラー・入力エラー以外の失敗を欄の下・パネルの上部に出す共通 JS
+     （設計書 §2-7「非同期の保存（fetch）」。window.FormErrors に関数が載る） --}}
+@vite(['resources/js/form-errors.js'])
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const detailArea = document.getElementById('detail-area');
@@ -226,6 +232,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const detailSummarizeBtn = document.getElementById('detail-summarize-btn');
     const detailStalledNotice = document.getElementById('detail-stalled-notice');
     const detailDoneMessage = document.getElementById('detail-done-message');
+    // 非同期の保存・実行の入力エラー以外の失敗の文言を出す枠（§2-7「非同期の保存（fetch）」。共通 JS が中身を作る）
+    const detailFormError = document.getElementById('detail-form-error');
     // 処理後の完了メッセージ（URL の done の値 → 文言）。文言はコントローラーの応答を使わず画面側で持つ
     // 完了メッセージを 5 秒後に自動で閉じるタイマー（新しく出すとき・消すときに取り消す）
     let doneMessageTimer = null;
@@ -258,10 +266,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 保存ボタン（フォームsubmit）でフラグクリア。beforeunload確認を抑制
+    // 保存ボタン（フォーム submit）は非同期の保存に差し替える（§2-7「非同期の保存（fetch）」。段階 5-3a）。
+    // ネイティブの画面遷移をやめ、fetch で PUT し、成功時は navigateWithHighlight でページ読み込み直し、
+    // 失敗時は欄の下（422）または編集パネルの上部（409・500・通信の失敗）に表示する。
     if (audioUpdateForm) {
-        audioUpdateForm.addEventListener('submit', function() {
-            hasUnsavedChanges = false;
+        audioUpdateForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!currentAudioId) return;
+            saveAudioRecord();
         });
     }
 
@@ -289,8 +301,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // ここで選択が変わることが確定する（閉じる／別の行を開く）ので、完了メッセージを消す
+            // ここで選択が変わることが確定する（閉じる／別の行を開く）ので、完了メッセージを消す。
+            // あわせて、前のエラーの表示（欄の下・パネルの上部）も消す（§2-7「新しく保存するとき・別の行を選んだ
+            // とき・パネルを閉じたときは、前のエラーの表示を消す」。段階 5-3a）
             clearDoneMessage();
+            clearPanelErrors();
 
             // 同じ行を再度クリックしたら閉じる
             if (currentAudioId === audioId && detailArea.style.display !== 'none') {
@@ -393,25 +408,138 @@ document.addEventListener('DOMContentLoaded', function() {
         detailStalledNotice.style.display = d.stalled === '1' ? 'block' : 'none';
     }
 
-    // 実行中は、パネルの他のボタン・行の選択・登録者の絞り込みを操作できなくし、行のバッジを処理中にする
+    // ロック時に変えた前の状態を保存して、失敗時に戻せるようにする（§2-7「失敗したら処理中のロックを
+    // 解除して入力を直せる状態に戻す」）。null のときはロックしていない状態。
+    let lockedState = null;
+
+    // 実行中は、パネルの他のボタン・行の選択・登録者の絞り込みを操作できなくし、行のバッジを処理中にする。
+    // status を null にすると、バッジは変えない（保存ボタンから呼ぶときに使う。進行中の表示はボタンの
+    // スピナーで示す）。
     function lockForAction(audioId, clickedBtn, status) {
         isRunningAction = true;
         clearDoneMessage();
+        clearPanelErrors(); // 新しい実行を始めるので、前のエラーの表示を消す（§2-7）
         // 音声ファイルのみ削除のボタンはフォームの外（音声ファイルの段）にあるため id で指定する
-        [detailTranscribeBtn, detailSummarizeBtn, document.getElementById('save-audio-btn'), document.getElementById('detail-delete-audio-btn')]
-            .concat(Array.from(document.querySelectorAll('#delete-record-form button')))
-            .forEach(function(el) { el.disabled = true; });
+        const buttons = [detailTranscribeBtn, detailSummarizeBtn,
+            document.getElementById('save-audio-btn'),
+            document.getElementById('detail-delete-audio-btn')]
+            .concat(Array.from(document.querySelectorAll('#delete-record-form button')));
+        const originalBtnHtml = clickedBtn.innerHTML;
+        buttons.forEach(function(el) { el.disabled = true; });
         clickedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
 
         const filter = document.getElementById('trainer-filter');
         if (filter) filter.disabled = true;
 
-        const row = document.querySelector('.audio-row[data-audio-id="' + audioId + '"]');
-        const badge = row ? row.querySelector('.audio-status-badge') : null;
-        if (badge) {
-            badge.className = 'badge audio-status-badge ' + (STATUS_BADGE_CLASSES[status] || 'bg-secondary');
-            badge.textContent = STATUS_LABELS[status] || '';
+        let originalBadgeClass = null;
+        let originalBadgeText = null;
+        if (status !== null) {
+            const row = document.querySelector('.audio-row[data-audio-id="' + audioId + '"]');
+            const badge = row ? row.querySelector('.audio-status-badge') : null;
+            if (badge) {
+                originalBadgeClass = badge.className;
+                originalBadgeText = badge.textContent;
+                badge.className = 'badge audio-status-badge ' + (STATUS_BADGE_CLASSES[status] || 'bg-secondary');
+                badge.textContent = STATUS_LABELS[status] || '';
+            }
         }
+
+        lockedState = {
+            audioId: audioId,
+            clickedBtn: clickedBtn,
+            originalBtnHtml: originalBtnHtml,
+            buttons: buttons,
+            originalBadgeClass: originalBadgeClass,
+            originalBadgeText: originalBadgeText,
+        };
+    }
+
+    // 失敗時に lockForAction で変えたものをすべて元に戻す（入力した値は消さない）
+    function unlockAfterAction() {
+        if (!lockedState) return;
+        lockedState.clickedBtn.innerHTML = lockedState.originalBtnHtml;
+        lockedState.buttons.forEach(function(el) { el.disabled = false; });
+        const filter = document.getElementById('trainer-filter');
+        if (filter) filter.disabled = false;
+        if (lockedState.originalBadgeClass !== null) {
+            const row = document.querySelector('.audio-row[data-audio-id="' + lockedState.audioId + '"]');
+            const badge = row ? row.querySelector('.audio-status-badge') : null;
+            if (badge) {
+                badge.className = lockedState.originalBadgeClass;
+                badge.textContent = lockedState.originalBadgeText;
+            }
+        }
+        isRunningAction = false;
+        lockedState = null;
+    }
+
+    // 編集パネルのエラーの表示（欄の下の is-invalid・入力エラー以外の失敗の alert）を消す
+    function clearPanelErrors() {
+        if (window.FormErrors) {
+            window.FormErrors.clearFieldErrors(audioUpdateForm);
+            window.FormErrors.clearFormMessage(detailFormError);
+        }
+    }
+
+    // 保存ボタン・フォーム submit から呼ぶ：PUT /audio-records/{id} を fetch で呼ぶ
+    function saveAudioRecord() {
+        if (!currentAudioId) return;
+        const saveBtn = document.getElementById('save-audio-btn');
+        // 保存は実行中のロックに加える（文字起こし・要約と同じく他のボタン・絞り込みを無効化）。
+        // 進行中はボタンのスピナーで示し、行のバッジは触らない（status=null）
+        lockForAction(currentAudioId, saveBtn, null);
+
+        fetch(audioUpdateForm.action, {
+            method: 'POST', // _method=PUT を FormData に含めるため POST で送る（saveBeforeSummarize と同じ）
+            body: new FormData(audioUpdateForm),
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(function(response) {
+            if (response.status === 200) {
+                // 成功：画面を読み込み直し、該当の行の編集パネルを開き直す（文字起こし・要約の成功時と同じ
+                // navigateWithHighlight を使う。done は付けないので完了メッセージは出さない）。
+                // サーバー側は JSON 応答で success フラッシュを立てないため、画面側でメッセージは出さない。
+                hasUnsavedChanges = false;
+                navigateWithHighlight(currentAudioId);
+                return;
+            }
+            if (response.status === 422) {
+                return response.json().then(function(data) {
+                    unlockAfterAction();
+                    // 422 のエラーは欄の下に出す。欄が見つからないキーは入力エラー以外の失敗として
+                    // パネルの上部に回す（取りこぼし防止）
+                    const orphans = window.FormErrors.showFieldErrors(audioUpdateForm, data && data.errors ? data.errors : {});
+                    if (orphans.length > 0) {
+                        window.FormErrors.showFormMessage(detailFormError, orphans.join('\n'));
+                    }
+                });
+            }
+            if (response.status === 409) {
+                return response.json().then(function(data) {
+                    unlockAfterAction();
+                    const message = (data && data.error && data.error.message) || '保存に失敗しました。';
+                    window.FormErrors.showFormMessage(detailFormError, message);
+                });
+            }
+            // 500・その他：JSON が読めるときは中身を使い、読めないときは固定文言
+            return response.json().then(function(data) {
+                unlockAfterAction();
+                const message = (data && data.error && data.error.message) || '保存に失敗しました。';
+                window.FormErrors.showFormMessage(detailFormError, message);
+            }).catch(function() {
+                unlockAfterAction();
+                window.FormErrors.showFormMessage(detailFormError, '保存に失敗しました。');
+            });
+        })
+        .catch(function(error) {
+            console.error('保存エラー:', error);
+            unlockAfterAction();
+            window.FormErrors.showFormMessage(detailFormError, '保存に失敗しました。');
+        });
     }
 
     // パネルで開いている記録（currentAudioId）に対して文字起こし・要約を実行する
@@ -425,9 +553,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const isTranscribe = kind === 'transcription';
 
         // 要約：文字起こし欄が空なら実行しない（確認ダイアログより先）。サーバーは前後の空白を除いて
-        // 空を null にするので trim して揃える。要約の API の 409 の文言は空であることを伝えないため画面側で判定する
+        // 空を null にするので trim して揃える。要約の API の 409 の文言は空であることを伝えないため画面側で判定する。
+        // 何を直せばよいかが文字起こしの欄にあるので、文字起こしの欄の下に出す（§2-7。段階 5-3a）
         if (!isTranscribe && transcriptionText.value.trim() === '') {
-            alert('文字起こしが空のため、要約できません。');
+            if (window.FormErrors) {
+                window.FormErrors.clearFormMessage(detailFormError);
+                window.FormErrors.showFieldErrors(audioUpdateForm, {
+                    transcription_text: ['文字起こしが空のため、要約できません。'],
+                });
+            }
             return;
         }
 
@@ -451,9 +585,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 要約の前の保存（PUT /audio-records/{id} を JSON で呼ぶ）。保存できたら true を返す。
-    // 保存中は別の行を選べなくし、「要約」ボタンを「保存中...」にする。失敗したら元に戻し、ページは読み込み直さない
+    // 保存中は別の行を選べなくし、「要約」ボタンを「保存中...」にする。失敗したら元に戻し、ページは読み込み直さない。
+    // 入力エラーは欄の下、入力エラー以外の失敗は編集パネルの上部に出す（§2-7「非同期の保存（fetch）」。段階 5-3a）
     function saveBeforeSummarize() {
         isRunningAction = true;
+        clearPanelErrors(); // 新しい保存を始めるので前のエラーの表示を消す
         const originalHtml = detailSummarizeBtn.innerHTML;
         const originalDisabled = detailSummarizeBtn.disabled;
         detailSummarizeBtn.disabled = true;
@@ -480,26 +616,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 hasUnsavedChanges = false;
                 return true;
             }
-            if (response.status === 422 || response.status === 409) {
+            if (response.status === 422) {
                 return response.json().then(function (data) {
-                    // 422：入力エラーの最初のメッセージ／409：処理中で断られたときのメッセージ
-                    const firstError = data && data.errors ? Object.values(data.errors)[0] : null;
-                    const message = response.status === 422
-                        ? (firstError && firstError[0])
-                        : (data && data.error && data.error.message);
-                    alert(message || '保存に失敗しました。');
                     restore();
+                    const orphans = window.FormErrors.showFieldErrors(audioUpdateForm, data && data.errors ? data.errors : {});
+                    if (orphans.length > 0) {
+                        window.FormErrors.showFormMessage(detailFormError, orphans.join('\n'));
+                    }
                     return false;
                 });
             }
-            alert('保存に失敗しました。');
+            if (response.status === 409) {
+                return response.json().then(function (data) {
+                    restore();
+                    const message = (data && data.error && data.error.message) || '保存に失敗しました。';
+                    window.FormErrors.showFormMessage(detailFormError, message);
+                    return false;
+                });
+            }
             restore();
+            window.FormErrors.showFormMessage(detailFormError, '保存に失敗しました。');
             return false;
         })
         .catch(function (error) {
             console.error('要約前の保存エラー:', error);
-            alert('保存に失敗しました。');
             restore();
+            window.FormErrors.showFormMessage(detailFormError, '保存に失敗しました。');
             return false;
         });
     }
@@ -530,8 +672,12 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error(isTranscribe ? '文字起こしエラー:' : '要約エラー:', error);
-            alert(error?.error?.message || (isTranscribe ? '文字起こしに失敗しました。' : '要約に失敗しました。'));
-            navigateWithHighlight(audioId);
+            // 失敗時はページを読み込み直さず、処理中のロックを解除して入力を直せる状態に戻し、
+            // 入力エラー以外の失敗として編集パネルの上部に文言を出す（§2-7。段階 5-3a）
+            unlockAfterAction();
+            const fallback = isTranscribe ? '文字起こしに失敗しました。' : '要約に失敗しました。';
+            const message = (error && error.error && error.error.message) || fallback;
+            window.FormErrors.showFormMessage(detailFormError, message);
         });
     }
 
