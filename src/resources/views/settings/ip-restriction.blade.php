@@ -4,7 +4,9 @@
 
 @section('content')
 <div class="container">
-    <form method="POST" action="{{ route('settings.ip-restriction.update') }}">
+    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+         入力欄に required などの属性は今は無いが、他画面と揃えて付けておく。 --}}
+    <form method="POST" action="{{ route('settings.ip-restriction.update') }}" novalidate>
         @csrf
         @method('PUT')
 
@@ -17,6 +19,10 @@
             @if(session('success_ip'))
                 <div class="alert alert-success">{{ session('success_ip') }}</div>
             @endif
+
+            {{-- 画面上部の 1 文の案内（設計書 §2-7）。本画面はフォームが 1 つだけなので
+                 判定の工夫なしで出せる（他画面と同じ扱い）。 --}}
+            <x-form-error-summary />
 
             {{-- 有効/無効チェックボックス --}}
             <div class="mb-3">
@@ -80,11 +86,14 @@
                 </button>
             </div>
 
-            {{-- エラーメッセージ表示 --}}
+            {{-- まとめた 1 つの文言を、行のまとまり（行の一覧と「IPアドレスを追加」ボタン）の
+                 すぐ下に出す（設計書 §2-7「1 つの入力欄に収まらない項目（行を追加する形）」）。
+                 入力欄の兄弟に置けないため block を付ける。改行区切りの複数行を表示する
+                 ため、x-form-error ではなく専用の表示にする（部品は 1 件・1 行を想定）。
+                 どの行の問題かは、文言に含めた「行 N: 「xxx」…」で伝える（行ごとの
+                 is-invalid は付けない）。 --}}
             @error('ip_restriction')
-                <div class="alert alert-danger">
-                    {!! nl2br(e($message)) !!}
-                </div>
+                <div class="invalid-feedback d-block">{!! nl2br(e($message)) !!}</div>
             @enderror
 
             {{-- 注意事項 --}}
