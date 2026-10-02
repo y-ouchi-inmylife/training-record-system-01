@@ -48,7 +48,7 @@ class LoginController extends Controller
 
             return back()
                 ->withInput($request->only('login_id'))
-                ->withErrors(['login_id' => 'このアカウントは無効化されています。管理者にお問い合わせください。']);
+                ->withErrors(['login' => 'このアカウントは無効化されています。管理者にお問い合わせください。']);
         }
 
         // アカウントロック中かチェック
@@ -57,7 +57,7 @@ class LoginController extends Controller
 
             return back()
                 ->withInput($request->only('login_id'))
-                ->withErrors(['login_id' => 'アカウントがロックされています。管理者に連絡してください。']);
+                ->withErrors(['login' => 'アカウントがロックされています。管理者に連絡してください。']);
         }
 
         // 認証チェック
@@ -95,7 +95,7 @@ class LoginController extends Controller
 
         return back()
             ->withInput($request->only('login_id'))
-            ->withErrors(['login_id' => 'ログインIDまたはパスワードが正しくありません。']);
+            ->withErrors(['login' => 'ログインIDまたはパスワードが正しくありません。']);
     }
 
     /**

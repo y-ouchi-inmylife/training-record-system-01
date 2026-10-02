@@ -15,15 +15,21 @@
                         <h4 class="mb-0 fs-5">トレーニング記録管理システム</h4>
                     </div>
 
-                    @if ($errors->any())
-                    <div class="alert alert-danger">
-                        @foreach ($errors->all() as $error)
-                            <p class="mb-0">{{ $error }}</p>
-                        @endforeach
-                    </div>
+                    {{-- 認証の失敗・無効化・ロックは専用のキー login でフォームの上に出す
+                         （設計書 §2-7「ログインの認証の失敗・アカウントの無効化・ロックの出し方」）。
+                         入力欄の is-invalid や欄下文言、上部の案内（入力エラー用）は付かない。 --}}
+                    @error('login')
+                        <div class="alert alert-danger" role="alert">{{ $message }}</div>
+                    @enderror
+
+                    {{-- 入力エラーの上部の案内（login_id・password の必須などの本当の入力エラーがあるとき）。
+                         認証失敗（キー login）は上部に別で出すため、ここでは判定を login_id/password に絞る。 --}}
+                    @if($errors->hasAny(['login_id', 'password']))
+                        <x-form-error-summary />
                     @endif
 
-                    <form method="POST" action="{{ url('/login') }}">
+                    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
+                    <form method="POST" action="{{ url('/login') }}" novalidate>
                         @csrf
 
                         <div class="mb-3">
@@ -37,6 +43,7 @@
                                 required
                                 autofocus
                             >
+                            <x-form-error field="login_id" />
                         </div>
 
                         <div class="mb-3">
@@ -48,6 +55,7 @@
                                 name="password"
                                 required
                             >
+                            <x-form-error field="password" />
                         </div>
 
                         <div class="d-grid">
