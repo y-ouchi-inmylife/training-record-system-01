@@ -13,9 +13,14 @@
                 </div>
             </div>
 
-            <form id="profile-edit-form" method="POST" action="{{ route('profile.update') }}">
+            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                 本画面はこのフォーム 1 つだけ（パスワード変更は別画面 S-1202）。 --}}
+            <form id="profile-edit-form" method="POST" action="{{ route('profile.update') }}" novalidate>
                 @csrf
                 @method('PUT')
+
+                {{-- 画面上部の 1 文の案内（設計書 §2-7） --}}
+                <x-form-error-summary />
 
                 <div class="mb-3">
                     <label for="login_id" class="form-label">ログインID</label>
@@ -31,9 +36,7 @@
                            inputmode="text"
                            value="{{ old('name', $trainer->name) }}" maxlength="100" required
                            style="max-width: 700px;">
-                    @error('name')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                    <x-form-error field="name" />
                 </div>
 
                 <div class="mb-3">
