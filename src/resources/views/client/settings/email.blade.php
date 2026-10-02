@@ -22,15 +22,15 @@
                     新しいアドレスに確認メールを送ります。メールのリンクを開くと、メールアドレスが切り替わります。
                 </p>
 
-                @if($errors->any())
-                    <div class="alert alert-danger" role="alert">
-                        @foreach($errors->all() as $error)
-                            <p class="mb-0">{{ $error }}</p>
-                        @endforeach
-                    </div>
+                {{-- 入力エラーの上部案内（必須・形式・重複・現在のパスワード不一致などの入力エラー。設計書 §2-7）。
+                     本画面はコントローラーで入力エラー以外の失敗（送信失敗など）を withErrors で返していないため、
+                     現状は入力項目のキーだけが来る。将来追加した場合に備えて hasAny で絞る。 --}}
+                @if ($errors->hasAny(['new_email', 'current_password']))
+                    <x-form-error-summary />
                 @endif
 
-                <form method="POST" action="{{ route('client-portal.settings.email.request') }}">
+                {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
+                <form method="POST" action="{{ route('client-portal.settings.email.request') }}" novalidate>
                     @csrf
 
                     <div class="mb-3">
@@ -39,12 +39,14 @@
                                id="new_email" name="new_email" required maxlength="255"
                                value="{{ old('new_email') }}"
                                autocomplete="email">
+                        <x-form-error field="new_email" />
                     </div>
                     <div class="mb-3">
                         <label for="email_current_password" class="form-label">現在のパスワード <span class="text-danger">*</span></label>
                         <input type="password" class="form-control @error('current_password') is-invalid @enderror"
                                id="email_current_password" name="current_password" required
                                autocomplete="current-password">
+                        <x-form-error field="current_password" />
                     </div>
 
                     <div class="d-grid">
