@@ -13,6 +13,12 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
+    {{-- 非同期の保存の入力エラー・入力エラー以外の失敗を欄の下・まとまりの上部に出す共通 JS
+         （設計書 §2-7「非同期の保存（fetch）」。window.FormErrors に関数が載る。段階 5 で追加）。
+         本画面は layouts.app を使わない独立 HTML のため、ここで直接 @vite する。type="module" で
+         defer 相当に遅延読み込みされるが、使うのは「作成する」のユーザー操作時なので間に合う。 --}}
+    @vite(['resources/js/form-errors.js'])
+
     <style>
         /* 基本スタイル */
         body {
@@ -231,13 +237,16 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="trainer1_select" class="form-label">担当1 <span class="text-danger">*</span></label>
-                            <select class="form-select" id="trainer1_select" required>
+                            {{-- name 属性は共通 JS `FormErrors.showFieldErrors` が [name="…"] で欄を見つけるため
+                                 （送信は fetch で JS がキーごとに body を組み立てるので name は送信に使わないが、
+                                 エラーの対象を特定する手がかりとして付ける。§2-7「非同期の保存（fetch）」） --}}
+                            <select class="form-select" id="trainer1_select" name="trainer1_id" required>
                                 <option value=""></option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="trainer2_select" class="form-label">担当2</label>
-                            <select class="form-select" id="trainer2_select">
+                            <select class="form-select" id="trainer2_select" name="trainer2_id">
                                 <option value=""></option>
                             </select>
                         </div>
@@ -357,6 +366,11 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const currentUserId = {{ Auth::id() }};
         const currentDate = '{{ date("Y-m-d") }}';
+
+        // 担当1・担当2 の入力エラーの文言は、サーバーの文言（lang/ja/validation.php の custom.*）と
+        // 画面側で揃える。段階 5 で画面側の直書きをやめ、言語ファイルから取り出す形に変えた。
+        const TRAINER1_REQUIRED_MESSAGE = @json(__('validation.custom.trainer1_id.required'));
+        const TRAINER2_DIFFERENT_MESSAGE = @json(__('validation.custom.trainer2_id.different'));
 
         // ========================================
         // タイマー
@@ -697,7 +711,33 @@
             await loadTrainers();
 
             // 参加者の初期行を1つ追加
-            var modal = new bootstrap.Modal(document.getElementById('modal-create-record'));
+            var modalEl = document.getElementById('modal-create-record');
+            var modal = new bootstrap.Modal(modalEl);
+
+            // 担当1・担当2 の選択を変えたら、その欄のエラーの表示を消す（§2-7。段階 5）。
+            // FormErrors.clearFieldErrors はコンテナ全体をクリアするため、ここでは
+            // 変更された欄だけをピンポイントで消す（他方のエラー表示を残す）。
+            function clearFieldErrorByName(name) {
+                var sel = modalEl.querySelector('[name="' + name + '"]');
+                if (!sel) return;
+                sel.classList.remove('is-invalid');
+                // showFieldErrors が付けた [data-form-errors-field] の兄弟 div を取り除く
+                var next = sel.nextElementSibling;
+                while (next) {
+                    var toCheck = next;
+                    next = next.nextElementSibling;
+                    if (toCheck.hasAttribute && toCheck.hasAttribute('data-form-errors-field')) {
+                        toCheck.remove();
+                    }
+                }
+            }
+            document.getElementById('trainer1_select').addEventListener('change', function () { clearFieldErrorByName('trainer1_id'); });
+            document.getElementById('trainer2_select').addEventListener('change', function () { clearFieldErrorByName('trainer2_id'); });
+
+            // モーダルを開くときに、前のエラーの表示を消す（§2-7。段階 5。モーダルは
+            // この画面では 1 度だけ開くが、将来の再利用に備える）。
+            if (window.FormErrors) window.FormErrors.clearFieldErrors(modalEl);
+
             modal.show();
 
             // 「キャンセル」→ ログアウト
@@ -709,16 +749,21 @@
             // 「作成する」→ 処理開始
             var btnSubmit = document.getElementById('btn-submit-create-record');
             var submitHandler = async function() {
+                // 新しい保存を始めるので、前のエラーの表示を消す（§2-7。段階 5）
+                if (window.FormErrors) window.FormErrors.clearFieldErrors(modalEl);
+
                 var trainer1Id = document.getElementById('trainer1_select').value;
                 if (!trainer1Id) {
-                    alert('担当1を選択してください');
+                    // alert をやめ、担当1 の欄の下に出す（§2-7。段階 5。文言は言語ファイルから）
+                    window.FormErrors.showFieldErrors(modalEl, { trainer1_id: [TRAINER1_REQUIRED_MESSAGE] });
                     return;
                 }
 
                 var trainer2Id = document.getElementById('trainer2_select').value;
                 // 担当1=担当2 は文字起こし（高コスト処理）の前に弾く（無駄な外部APIコストを防ぐ）
                 if (trainer2Id && trainer2Id === trainer1Id) {
-                    alert('担当2は担当1と異なるトレーナーを選択してください。');
+                    // alert をやめ、担当2 の欄の下に出す（§2-7。段階 5。文言は言語ファイルから）
+                    window.FormErrors.showFieldErrors(modalEl, { trainer2_id: [TRAINER2_DIFFERENT_MESSAGE] });
                     return;
                 }
 
