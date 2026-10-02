@@ -11,6 +11,7 @@ use App\Models\ClientPasswordResetToken;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -53,29 +54,44 @@ class PasswordResetController extends Controller
         if ($client) {
             $client->loadStatusData();
             if ($client->status === Client::STATUS_IN_USE) {
-                DB::transaction(function () use ($client) {
-                    // 同時に有効な再設定リンクは 1 本のみ（決定事項 #4）：
-                    // 未使用のトークンを物理削除してから新規発行する。
-                    $client->passwordResetTokens()
-                        ->where('is_used', false)
-                        ->delete();
+                // 検証は FormRequest で終わっている。トランザクション内の例外のみ catch する。
+                // **登録の有無を画面に出さないため、送信の失敗も画面に出さない**（§2-7 の例外）。
+                // ログだけ残して、成功時と同じ完了状態を返す（下記）。もし 500 や失敗の文言を
+                // 画面に出すと、「500 が出るかどうか」で登録の有無が分かってしまう（決定事項 #2・
+                // 6-15-12 の備考。段階 4-3 追補）。
+                try {
+                    DB::transaction(function () use ($client) {
+                        // 同時に有効な再設定リンクは 1 本のみ（決定事項 #4）：
+                        // 未使用のトークンを物理削除してから新規発行する。
+                        $client->passwordResetTokens()
+                            ->where('is_used', false)
+                            ->delete();
 
-                    $token = ClientPasswordResetToken::create([
-                        'token' => Str::random(32),
+                        $token = ClientPasswordResetToken::create([
+                            'token' => Str::random(32),
+                            'client_id' => $client->id,
+                            'expires_at' => now()->addDays(
+                                (int) config('client_tokens.password_reset_expires_days')
+                            ),
+                            'is_used' => false,
+                        ]);
+
+                        // 登録アドレス宛に再設定リンクを送信。失敗時は全ロールバック
+                        Mail::to($client->email)->send(new ClientPasswordResetMail($token));
+                    });
+                } catch (\Throwable $e) {
+                    // 全ロールバック済み。メールアドレスは個人情報のためログに残さず、
+                    // client_id で追えるようにする（初回設定の受け止め方に揃える）。
+                    Log::error('[ClientPasswordResetMail] 再設定リンクの送信に失敗し、申込みを全ロールバックしました: ' . $e->getMessage(), [
                         'client_id' => $client->id,
-                        'expires_at' => now()->addDays(
-                            (int) config('client_tokens.password_reset_expires_days')
-                        ),
-                        'is_used' => false,
+                        'exception' => $e,
                     ]);
-
-                    // 登録アドレス宛に再設定リンクを送信。失敗時は全ロールバック
-                    Mail::to($client->email)->send(new ClientPasswordResetMail($token));
-                });
+                }
             }
         }
 
-        // 該当しても・しなくても、同じ完了状態を返す
+        // 該当しても・しなくても、送信が成功しても失敗しても、同じ完了状態を返す
+        // （登録の有無を露呈させないため）。会員はメールが届かなければ、もう一度申請できる。
         return view('client.password-reset.request', [
             'submitted' => true,
         ]);
