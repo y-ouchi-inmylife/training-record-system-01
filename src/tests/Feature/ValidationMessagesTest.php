@@ -207,4 +207,40 @@ class ValidationMessagesTest extends TestCase
             __('validation.custom.file.uploaded')
         );
     }
+
+    /** メディアの登録モーダル：形式の独自チェック（§2-8。段階 5-3b で集約） */
+    public function test_メディアの形式違反の文言は固定文言になる(): void
+    {
+        $this->assertSame(
+            '対応形式は写真(jpeg/png/heic)・動画(mp4/mov)のみです。',
+            __('validation.custom.original_filename.format')
+        );
+    }
+
+    /** メディアの登録モーダル：サイズの独自チェック（:limit プレースホルダに写真=20MB／動画=1GB が入る） */
+    public function test_メディアのサイズ上限の文言に写真の上限20MBが入る(): void
+    {
+        $this->assertSame(
+            'ファイルサイズは 20MB 以下にしてください。',
+            __('validation.custom.file_size.max', ['limit' => '20MB'])
+        );
+    }
+
+    /** メディアの登録モーダル：サイズの独自チェック（:limit に 1GB） */
+    public function test_メディアのサイズ上限の文言に動画の上限1GBが入る(): void
+    {
+        $this->assertSame(
+            'ファイルサイズは 1GB 以下にしてください。',
+            __('validation.custom.file_size.max', ['limit' => '1GB'])
+        );
+    }
+
+    /** メディアの登録モーダル：保存キーの独自チェック（§2-8。段階 5-3b で集約） */
+    public function test_メディアの保存キー形式違反の文言は固定文言になる(): void
+    {
+        $this->assertSame(
+            '保存キーの形式が不正です。',
+            __('validation.custom.storage_key.format')
+        );
+    }
 }

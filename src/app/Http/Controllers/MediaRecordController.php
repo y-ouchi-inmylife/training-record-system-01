@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * メディア管理コントローラー
@@ -107,26 +108,25 @@ class MediaRecordController extends Controller
      */
     public function uploadUrl(Request $request): JsonResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-3b）：
+        //   original_filename.required / max → 標準 ＋ attributes.original_filename
+        //   file_size.required / integer / min → 標準 ＋ attributes.file_size
         $validated = $request->validate([
             'original_filename' => 'required|string|max:255',
             // mime_type は受け取るが採用しない（ブラウザの file.type は heic 等で空文字や image/heif に
             // なるばらつきがあり信頼できないため、サーバは original_filename の拡張子から決定する）
             'mime_type' => 'nullable|string',
             'file_size' => 'required|integer|min:1',
-        ], [
-            'original_filename.required' => '元ファイル名を指定してください。',
-            'original_filename.max' => '元ファイル名は255文字以内で指定してください。',
-            'file_size.required' => 'ファイルサイズを指定してください。',
-            'file_size.integer' => 'ファイルサイズは整数で指定してください。',
-            'file_size.min' => 'ファイルサイズは1バイト以上で指定してください。',
         ]);
 
-        // 拡張子から正規の mime_type を決定（クライアントの mime_type は採用しない）
+        // 拡張子から正規の mime_type を決定（クライアントの mime_type は採用しない）。
+        // 独自チェックは Laravel 標準の 422 の形で返すため、ValidationException::withMessages
+        // を使う（段階 5-3b。以前は独自の `{"error": {...}}` を返していた）。
         $mimeType = MediaRecord::resolveMimeFromFilename($validated['original_filename']);
         if ($mimeType === null) {
-            return response()->json([
-                'error' => ['original_filename' => ['対応形式は写真(jpeg/png/heic)・動画(mp4/mov)のみです。']],
-            ], 422);
+            throw ValidationException::withMessages([
+                'original_filename' => [__('validation.custom.original_filename.format')],
+            ]);
         }
 
         // 形式 → 種別判定（決定した mime_type は EXTENSION_TO_MIME 由来なので常に許可リスト内）
@@ -136,9 +136,9 @@ class MediaRecordController extends Controller
         $maxSize = MediaRecord::maxSizeForType($type);
         if ($validated['file_size'] > $maxSize) {
             $limitLabel = $type === MediaRecord::TYPE_PHOTO ? '20MB' : '1GB';
-            return response()->json([
-                'error' => ['file_size' => ["ファイルサイズは{$limitLabel}以下にしてください。"]],
-            ], 422);
+            throw ValidationException::withMessages([
+                'file_size' => [__('validation.custom.file_size.max', ['limit' => $limitLabel])],
+            ]);
         }
 
         // storage_key 採番: media/YYYYMM/{uuid}.{ext}（拡張子は mime から正規化、.jpeg → jpg）
@@ -166,6 +166,10 @@ class MediaRecordController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // 文言は lang/ja/validation.php に集約（§2-8。段階 5-3b）：
+        //   storage_key.required / original_filename.required / max / file_size.required / integer / min
+        //     → 標準 ＋ attributes.*
+        //   title.max → 標準 ＋ attributes.title（表示名は255文字以内で入力してください。）
         $validated = $request->validate([
             'storage_key' => 'required|string',
             'original_filename' => 'required|string|max:255',
@@ -173,29 +177,22 @@ class MediaRecordController extends Controller
             'mime_type' => 'nullable|string',
             'file_size' => 'required|integer|min:1',
             'title' => 'nullable|string|max:255',
-        ], [
-            'storage_key.required' => '保存キーを指定してください。',
-            'original_filename.required' => '元ファイル名を指定してください。',
-            'original_filename.max' => '元ファイル名は255文字以内で指定してください。',
-            'file_size.required' => 'ファイルサイズを指定してください。',
-            'file_size.integer' => 'ファイルサイズは整数で指定してください。',
-            'file_size.min' => 'ファイルサイズは1バイト以上で指定してください。',
-            'title.max' => '表示名は255文字以内で入力してください。',
         ]);
 
-        // storage_key の形式検証（upload-url で発行した形式と一致するか）
+        // storage_key の形式検証（upload-url で発行した形式と一致するか）。独自チェックは
+        // Laravel 標準の 422 の形で返す（段階 5-3b。以前は独自の `{"error": {...}}` を返していた）。
         if (!preg_match(self::STORAGE_KEY_PATTERN, $validated['storage_key'])) {
-            return response()->json([
-                'error' => ['storage_key' => ['保存キーの形式が不正です。']],
-            ], 422);
+            throw ValidationException::withMessages([
+                'storage_key' => [__('validation.custom.storage_key.format')],
+            ]);
         }
 
         // 拡張子から正規の mime_type を決定（クライアントの mime_type は採用しない）
         $mimeType = MediaRecord::resolveMimeFromFilename($validated['original_filename']);
         if ($mimeType === null) {
-            return response()->json([
-                'error' => ['original_filename' => ['対応形式は写真(jpeg/png/heic)・動画(mp4/mov)のみです。']],
-            ], 422);
+            throw ValidationException::withMessages([
+                'original_filename' => [__('validation.custom.original_filename.format')],
+            ]);
         }
 
         // 種別確定（決定した mime_type は EXTENSION_TO_MIME 由来なので常に許可リスト内）
