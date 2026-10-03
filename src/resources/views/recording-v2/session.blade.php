@@ -342,12 +342,15 @@
             alert('録音セッション中は他の画面に移動できません。');
         });
 
-        // ページ離脱の警告（録音中のみ）
+        // ページ離脱の警告（録音中と、録音を止めてからアップロードに成功するまでの間）
         let allowLeave = false;
         let isRecording = false;
+        // 録音を止めてから、アップロードに成功するまで true。この間、音声はブラウザの
+        // メモリ（audioChunks）にしかなく、画面を離れると録音が失われるため警告を出す。
+        let uploadPending = false;
 
         window.addEventListener('beforeunload', function(e) {
-            if (isRecording && !allowLeave) {
+            if ((isRecording && !allowLeave) || uploadPending) {
                 e.preventDefault();
                 e.returnValue = '録音中です。本当にページを離れますか？';
             }
@@ -547,6 +550,7 @@
                     stopTimer();
                     stopLevelMeter();
                     isRecording = false;
+                    uploadPending = true;
 
                     stream.getTracks().forEach(track => track.stop());
 
@@ -555,7 +559,7 @@
                         audioContext = null;
                     }
 
-                    // ページ離脱警告を無効化
+                    // 録音中の離脱警告を無効化（アップロードに成功するまでは uploadPending で警告を出す）
                     allowLeave = true;
 
                     await uploadRecording();
@@ -642,6 +646,8 @@
                 if (response.ok) {
                     const data = await response.json();
                     uploadedAudioRecordId = data.data.id;
+                    // 音声はサーバーに保存できたので、離脱警告を外す（このあとの自動ログアウトで警告を出さない）
+                    uploadPending = false;
 
                     showRecordingCompleteModal();
                 } else {

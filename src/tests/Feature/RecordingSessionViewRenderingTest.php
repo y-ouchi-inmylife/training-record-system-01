@@ -130,6 +130,18 @@ class RecordingSessionViewRenderingTest extends TestCase
         $this->assertStringNotContainsString('btn-close', substr($html, $start, $end - $start));
     }
 
+    public function test_停止からアップロードの成功までの間も離脱警告を出すフラグがある(): void
+    {
+        $html = $this->renderSession()->__toString();
+        // フラグの宣言と、beforeunload の条件にフラグが入っていること
+        $this->assertStringContainsString('let uploadPending = false;', $html);
+        $this->assertStringContainsString('if ((isRecording && !allowLeave) || uploadPending) {', $html);
+        // 停止（onstop）で立て、アップロードの成功の経路で下ろす
+        $this->assertStringContainsString("isRecording = false;\n                    uploadPending = true;", $html);
+        $this->assertSame(1, substr_count($html, 'uploadPending = true;'));
+        $this->assertSame(1, substr_count($html, 'uploadPending = false;', strpos($html, 'uploadedAudioRecordId = data.data.id;')));
+    }
+
     public function test_アップロード失敗の_alert_が残っていない(): void
     {
         $view = $this->renderSession();
