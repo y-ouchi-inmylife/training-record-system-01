@@ -110,6 +110,50 @@ class TrainerFormErrorRenderingTest extends TestCase
         $view->assertSee('is-invalid', false);
     }
 
+    // ---- 登録・編集の横並び（§4-5。2026-10）----
+
+    public function test_登録_ラベルが横並びの固定幅になる(): void
+    {
+        $html = (string) $this->renderCreate([]);
+        foreach (['login_id', 'name', 'password', 'password_confirmation', 'role'] as $field) {
+            $this->assertMatchesRegularExpression(
+                '/<label for="' . $field . '" class="col-md-auto col-form-label text-md-end form-label-fixed">/',
+                $html,
+                $field
+            );
+        }
+        // 縦積みの form-label は残っていない
+        $this->assertStringNotContainsString('class="form-label"', $html);
+    }
+
+    public function test_登録_注意書きは入力欄の下でエラーの赤字より後に出る(): void
+    {
+        $html = (string) $this->renderCreate(['login_id' => 'ERR_login_id', 'password' => 'ERR_password']);
+
+        $this->assertLessThan(strpos($html, '※半角英数字とアンダースコア(_)のみ'), strpos($html, 'id="login_id"'));
+        $this->assertLessThan(strpos($html, '※半角英数字とアンダースコア(_)のみ'), strpos($html, 'ERR_login_id'));
+        $this->assertLessThan(strpos($html, '※初回ログイン時に変更が求められます。'), strpos($html, 'id="password"'));
+        $this->assertLessThan(strpos($html, '※初回ログイン時に変更が求められます。'), strpos($html, 'ERR_password'));
+        // パスワード要件は、パスワード（確認）の入力欄の下
+        $this->assertLessThan(strpos($html, 'パスワード要件：'), strpos($html, 'id="password_confirmation"'));
+        // 注意書きはラベルの中に置かない
+        $this->assertDoesNotMatchRegularExpression('/<label[^>]*>[^<]*(<span class="text-danger">\*<\/span>)?\s*<span class="form-text">/', $html);
+    }
+
+    public function test_編集_ラベルが横並びの固定幅で_注意書きは入力欄の下に出る(): void
+    {
+        $html = (string) $this->renderEdit(['login_id' => 'ERR_login_id']);
+        foreach (['login_id', 'name', 'role'] as $field) {
+            $this->assertMatchesRegularExpression(
+                '/<label for="' . $field . '" class="col-md-auto col-form-label text-md-end form-label-fixed">/',
+                $html,
+                $field
+            );
+        }
+        $this->assertStringNotContainsString('class="form-label"', $html);
+        $this->assertLessThan(strpos($html, '※半角英数字とアンダースコア(_)のみ'), strpos($html, 'ERR_login_id'));
+    }
+
     // ---- パスワードリセット（S-0804）----
 
     public function test_リセット_formにnovalidateが付く(): void
