@@ -103,9 +103,36 @@ class RecordingSessionViewRenderingTest extends TestCase
     public function test_残りの_alert_の数が変わっていない(): void
     {
         // 変更前は 8 件（画面移動の警告、マイク拒否 ×2、アップロード失敗 ×2、担当1、担当2、
-        // エラー）。段階 5 で担当1・担当2 の 2 つを欄の下に移したため、6 件に減る。
+        // エラー）。段階 5 で担当1・担当2 の 2 つを欄の下に移したため、6 件に減った。
+        // 2026-10 にアップロード失敗の 2 つをモーダル（もう一度送る）に替えたため、4 件に減る。
         $view = $this->renderSession();
         $html = $view->__toString();
-        $this->assertSame(6, substr_count($html, 'alert('));
+        $this->assertSame(4, substr_count($html, 'alert('));
+    }
+
+    public function test_アップロード失敗のモーダルと_もう一度送る_ボタンが描画される(): void
+    {
+        $view = $this->renderSession();
+        $view->assertSee('id="modal-upload-failed"', false);
+        $view->assertSee('アップロードに失敗しました');
+        $view->assertSee('音声ファイルのアップロードに失敗しました。通信の状態を確かめて、もう一度送ってください。');
+        $view->assertSee('id="btn-retry-upload"', false);
+        $view->assertSee('もう一度送る');
+
+        // ほかのモーダルと同じく、背景のクリック・Esc キーでは閉じない。閉じるボタン（×）も付けない
+        $html = $view->__toString();
+        $this->assertMatchesRegularExpression(
+            '/<div class="modal fade" id="modal-upload-failed" data-bs-backdrop="static" data-bs-keyboard="false"/',
+            $html
+        );
+        $start = strpos($html, 'id="modal-upload-failed"');
+        $end = strpos($html, 'id="modal-recording-complete"');
+        $this->assertStringNotContainsString('btn-close', substr($html, $start, $end - $start));
+    }
+
+    public function test_アップロード失敗の_alert_が残っていない(): void
+    {
+        $view = $this->renderSession();
+        $view->assertDontSee("alert('音声ファイルのアップロードに失敗しました。')", false);
     }
 }

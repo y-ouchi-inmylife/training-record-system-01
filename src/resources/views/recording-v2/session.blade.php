@@ -172,6 +172,24 @@
         </p>
     </div>
 
+    {{-- モーダル0: アップロード失敗（失敗した時点で音声はブラウザのメモリにしかないため、
+         閉じるボタンは付けず「もう一度送る」だけを置く） --}}
+    <div class="modal fade" id="modal-upload-failed" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">アップロードに失敗しました</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">音声ファイルのアップロードに失敗しました。通信の状態を確かめて、もう一度送ってください。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="btn-retry-upload">もう一度送る</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- モーダル1: 録音完了 --}}
     <div class="modal fade" id="modal-recording-complete" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -629,14 +647,48 @@
                 } else {
                     const errorData = await response.json();
                     console.error('アップロードエラー:', errorData);
-                    alert('音声ファイルのアップロードに失敗しました。');
+                    showUploadFailedModal();
                 }
 
             } catch (error) {
                 console.error('アップロードエラー:', error);
-                alert('音声ファイルのアップロードに失敗しました。');
+                showUploadFailedModal();
             }
         }
+
+        // ========================================
+        // モーダル0: アップロード失敗
+        // ========================================
+
+        // 失敗した時点では、録音した音声はブラウザのメモリ（audioChunks）にしかなく、
+        // 画面を離れると失われる。audioChunks は失敗の経路でも空にしないため、
+        // 「もう一度送る」で同じ uploadRecording を呼び直して、同じ音声を送り直す（何度でも可）。
+        let uploadFailedModal = null;
+        const btnRetryUpload = document.getElementById('btn-retry-upload');
+
+        function showUploadFailedModal() {
+            if (!uploadFailedModal) {
+                uploadFailedModal = new bootstrap.Modal(document.getElementById('modal-upload-failed'));
+            }
+            // 送り直しが失敗したときは、ボタンを押せる状態に戻す（モーダルは開いたまま）
+            btnRetryUpload.disabled = false;
+            btnRetryUpload.textContent = 'もう一度送る';
+            uploadFailedModal.show();
+        }
+
+        btnRetryUpload.addEventListener('click', async function() {
+            // 二重に押されないよう、送信中はボタンを押せなくする
+            btnRetryUpload.disabled = true;
+            btnRetryUpload.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>送信中...';
+
+            await uploadRecording();
+
+            // 成功したら（音声記録の ID が入る）、このモーダルを閉じる。
+            // 「録音完了」のモーダルは uploadRecording の成功の経路で開かれる。
+            if (uploadedAudioRecordId !== null) {
+                uploadFailedModal.hide();
+            }
+        });
 
         // ========================================
         // モーダル1: 録音完了
