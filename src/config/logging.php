@@ -58,11 +58,15 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        // tap に App\Logging\MaskSensitiveData を登録して、書き込む直前にメールアドレスを
+        // 伏せ字（***@domain）に置き換える。メール送信失敗の例外文言やスタックトレースに宛先の
+        // メアドが含まれるのを防ぐため（詳細は app/Logging/MaskSensitiveData.php のコメント）。
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'tap' => [App\Logging\MaskSensitiveData::class],
         ],
 
         'daily' => [
@@ -71,6 +75,7 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+            'tap' => [App\Logging\MaskSensitiveData::class],
         ],
 
         // メール本文の視認用チャンネル。log ドライバのメール送信は debug レベルで書かれるため、

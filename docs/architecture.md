@@ -202,6 +202,17 @@ flowchart TD
 | REPL | laravel/tinker 2.10.1 | 対話型シェル（Laravel標準同梱） |
 | 並列実行 | concurrently 9.0.1 | 複数プロセスの並列起動（npm script用） |
 
+### 2-6. ログと個人情報の扱い
+
+- **方針**：ログには、会員・トレーナーなどを **ID で記録**し、メールアドレス・氏名・電話番号・住所・トークン・トークンを含む URL は**直接書かない**。障害の調査は ID と `storage/logs/laravel-YYYY-MM-DD.log` を手掛かりに行う。
+- **メールアドレスの伏せ字（2026-10 追加）**：ログに書く直前に、メールアドレスを `***@ドメイン` に置き換える。
+  - 仕組みのクラス: `app/Logging/MaskSensitiveData.php`。Monolog の processor として LogRecord の `message`・`context`・`extra` をたどり、文字列中のメールアドレスを置換する。配列は入れ子を深くたどる。
+  - **例外（`Throwable`）** の扱い：`context` の中の例外は、そのままだと Monolog の `(string)$e` でスタックトレースと一緒にメアドが出てしまうので、`['class', 'message'（伏せ字後）, 'file', 'line', 'trace'（伏せ字後）]` の配列に置き換える。前の例外（`getPrevious()`）があれば `previous` キーに同じ形で添える。クラス名・ファイル・行は残すので、どこで何の例外が起きたかの調査には十分。
+  - 設定の場所：`config/logging.php` の `single`・`daily` チャンネルに `tap`（`App\Logging\MaskSensitiveData::class`）で登録。本番は `LOG_CHANNEL=stack` ＋ `LOG_STACK=daily` のため、`daily` に効けば本番の書き先（`storage/logs/laravel-YYYY-MM-DD.log`）が守られる。
+  - **`mail` チャンネルには適用しない**：`MAIL_MAILER=log` でローカル確認する場面では、メール本文（URL 等）・宛先をそのまま見たいため。ローカルでのメール確認の動線を保つ。
+  - 伏せ字の判定は、一般的なメール形式（`ローカル部@ドメイン.トップレベル`）を拾う正規表現で、過剰に拾いすぎない（URL のクエリ・SSH の `user@host`〔TLD なし〕・`@mention`〔ドットなし〕は対象外）。
+- **メールアドレス以外の個人情報・トークンは、現状のコードでは直接ログに書いていない**：各 `Log::…` の context は `client_id`／`trainee_id`／`media_record_id`／`audio_record_id` などの ID と、`$e->getMessage()`／`'exception' => $e`／ファイルパス（UUID）／`exit_code`／`stderr` などに限られる（調査時に全呼び出しを棚卸し。2026-10）。新規に `Log::…` を書くときも、この方針を守る。
+
 ## 3. 設定値
 
 コード中にハードコードしないアプリケーション設定値。すべて `config/` 配下の PHP 設定ファイルに定数として集約し、コントローラやサービスからは `config()` ヘルパー経由で参照する。
