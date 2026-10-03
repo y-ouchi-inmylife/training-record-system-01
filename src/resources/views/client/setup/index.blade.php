@@ -91,10 +91,12 @@
                         <x-form-error field="first_name" />
                     </div>
                 </div>
-                {{-- せい・めい行の下にまとまりの区切り線①を引く（お名前／ご連絡先の境目。
-                     2026-10 変更でログイン情報を末尾に移したため、お名前が先頭まとまりになり、
-                     ここが 1 本目の区切り線になった。設計書 S-1403 備考 / §4-7 参照）。 --}}
-                <div class="row g-2 mb-3 pb-3 border-bottom">
+                {{-- せい・めい行とご連絡先小見出しの間はまとまりの境目だが、区切り線は引かない
+                     （2026-10 変更）。各まとまりの小見出しで内容の区切りが伝わるため、線は
+                     「入力の性格が変わる境目」（お客様プロフィール／ログイン情報）だけに絞った。
+                     余白は mb-3（セクション内の mb-2 より少し広い）で、小見出しの前で詰まりすぎない。
+                     設計書 S-1403 備考 / §4-7 参照。 --}}
+                <div class="row g-2 mb-3">
                     <div class="col-sm-6">
                         <label for="last_name_kana" class="form-label">せい</label>
                         <input type="text" class="form-control @error('last_name_kana') is-invalid @enderror"
@@ -176,10 +178,11 @@
                            value="{{ old('address3', $client->address3) }}">
                     <x-form-error field="address3" />
                 </div>
-                {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素。次の「愛犬の情報」まとまりとの
-                     境目に区切り線②を引く（設計書 S-1403 / §4-7 参照）。
-                     pb-3 は罫線と入力欄下端の間隔、mb-3 は罫線と次のまとまりとの間隔。 --}}
-                <div class="mb-3 pb-3 border-bottom">
+                {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素だが、次の「愛犬の情報」との
+                     境目には区切り線を引かない（2026-10 変更。せい・めい行の下と同じ考え方で、
+                     小見出しで内容の区切りが伝わるため線を外した）。余白は mb-3 だけで、
+                     小見出しの前で詰まりすぎない。設計書 S-1403 / §4-7 参照。 --}}
+                <div class="mb-3">
                     <label for="address4" class="form-label">建物名・部屋番号</label>
                     <input type="text" class="form-control @error('address4') is-invalid @enderror"
                            id="address4" name="address4" maxlength="100"
@@ -229,20 +232,24 @@
                            autocomplete="off">
                     <x-form-error field="trainee_birth_date" />
                 </div>
-                {{-- 備考：ラベル下（.form-text）に多頭飼い向けの案内を出す。
-                     設計書 S-1403 の「多頭飼いの運用」参照。
-                     備考の下に区切り線③を引く（愛犬の情報／ログイン情報の境目。
-                     2026-10 変更でログイン情報を末尾に移したため、愛犬の情報が最終まとまりで
-                     なくなり、ここに境目の線が入るようになった）。
-                     多頭飼いの案内（.form-text）は <x-form-error> の下に置くと、エラー時に欄との
-                     間に案内文が挟まるが、Bootstrap の .is-invalid ~ .invalid-feedback の
-                     「以後の兄弟」セレクタで案内文を挟んでも表示される（パスワードと同じ扱い）。 --}}
+                {{-- 備考：多頭飼い向けの案内（.form-text）を「備考」ラベルの右に並べる
+                     （2026-10 変更。入力欄の下はエラー時の赤字〔invalid-feedback〕の場所として
+                     空け、注意書きは入力の前に読める位置に置くため）。スマホ幅では flex-wrap で
+                     自然に折り返す（ラベルの下に回り込む）。textarea とは aria-describedby で
+                     紐付けて読み上げでも案内が入力の説明として伝わるようにする。
+                     備考の下には区切り線③を引く（愛犬の情報／ログイン情報の境目。
+                     2026-10 変更でログイン情報を末尾に移したため、ここに境目の線が入る。
+                     他 2 本の区切り線は 2026-10 に削除した）。
+                     設計書 S-1403 の「多頭飼いの運用」参照。 --}}
                 <div class="mb-3 pb-3 border-bottom">
-                    <label for="trainee_note" class="form-label">備考</label>
+                    <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+                        <label for="trainee_note" class="form-label mb-0">備考</label>
+                        <span id="trainee_note-help" class="form-text">2頭目以降がいらっしゃる場合は、こちらにご記入ください。</span>
+                    </div>
                     <textarea class="form-control @error('trainee_note') is-invalid @enderror"
-                              id="trainee_note" name="trainee_note" rows="3">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
+                              id="trainee_note" name="trainee_note" rows="3"
+                              aria-describedby="trainee_note-help">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
                     <x-form-error field="trainee_note" />
-                    <div class="form-text">2頭目以降がいらっしゃる場合は、こちらにご記入ください。</div>
                 </div>
 
                 {{-- 「ログイン情報」小見出し（4 か所の最後、2026-10 に末尾へ移した）。

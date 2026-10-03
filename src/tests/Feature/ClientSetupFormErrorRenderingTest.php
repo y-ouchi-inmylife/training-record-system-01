@@ -188,4 +188,42 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         // 一言の案内は出ない（.form-text で区別）
         $view->assertDontSee('確認のため、パスワードをもう一度入力してください。');
     }
+
+    /**
+     * 2026-10 変更：まとまりの区切り線は 1 本（愛犬の情報／ログイン情報の境目）だけに絞った。
+     * 他 2 本（お名前／ご連絡先、ご連絡先／愛犬の情報）は、各まとまりの小見出しで内容の区切りが
+     * 伝わるため削除。
+     */
+    public function test_初回設定_区切り線は1本だけ描画される(): void
+    {
+        $html = $this->renderSetup([])->__toString();
+        $this->assertSame(1, substr_count($html, 'border-bottom'));
+    }
+
+    /**
+     * 2026-10 変更：備考の注意書きを「備考」ラベルの右（同じ行）に移した。
+     * 入力欄の下はエラー時の赤字の場所として空けるため。
+     */
+    public function test_初回設定_備考の注意書きがテキストエリアより前に描画される(): void
+    {
+        $html = $this->renderSetup([])->__toString();
+
+        $posHelp = mb_strpos($html, '2頭目以降がいらっしゃる場合は、こちらにご記入ください。');
+        $posTextarea = mb_strpos($html, 'id="trainee_note"');
+
+        $this->assertNotFalse($posHelp);
+        $this->assertNotFalse($posTextarea);
+        $this->assertLessThan($posTextarea, $posHelp);
+    }
+
+    /**
+     * 2026-10 追加：備考のテキストエリアと注意書きを aria-describedby で紐付け、
+     * 読み上げでも案内が入力の説明として伝わるようにする。
+     */
+    public function test_初回設定_備考のaria_describedbyが注意書きのidを指す(): void
+    {
+        $view = $this->renderSetup([]);
+        $view->assertSee('aria-describedby="trainee_note-help"', false);
+        $view->assertSee('id="trainee_note-help"', false);
+    }
 }
