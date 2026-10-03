@@ -294,14 +294,14 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
         $this->assertConfirmationLabelAndRequirements($html);
     }
 
-    public function test_マイプロフィール_横並びで_パスワード変更のリンクは入力欄の列にそろう(): void
+    public function test_マイプロフィール_横並びで_パスワード変更のリンクは置かない(): void
     {
         $html = (string) $this->renderProfileEdit([]);
         $this->assertHorizontalLabels($html, ['login_id', 'name', 'role']);
-        // リンクの前に、ラベルの幅の空きの列（スマホの幅では消す）がある
-        $this->assertMatchesRegularExpression(
-            '/<div class="col-md-auto form-label-fixed d-none d-md-block"><\/div>\s*<div class="col-12 col-md">\s*<a href="[^"]*\/profile\/password">パスワード変更<\/a>/',
-            $html
-        );
+        // 「パスワード変更」のリンクは削除した（2026-10。ナビのメニューから移る）。
+        // ログインしているときはナビのメニューに同じリンクがあるため、フォームより後の本文だけで確かめる
+        $main = substr($html, strpos($html, 'id="profile-edit-form"'));
+        $this->assertStringNotContainsString(route('profile.password.edit'), $main);
+        $this->assertStringNotContainsString('form-label-fixed d-none d-md-block', $html);
     }
 }

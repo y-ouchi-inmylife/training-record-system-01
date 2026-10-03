@@ -58,16 +58,8 @@
                 </div>
                 </div>{{-- 幅 700px のまとまりの終わり --}}
             </form>
-
-            {{-- 「パスワード変更」のリンクは、入力欄の列に左端をそろえる（ラベルの幅の空きを左に取る。
-                 スマホの幅では空きを消す。検索フォームの日付のエラーの行と同じ形）。
-                 縦の余白（mt-4）とぶつからないよう、横のガターだけの gx-2 にする --}}
-            <div class="row gx-2 mt-4" style="max-width: 700px;">
-                <div class="col-md-auto form-label-fixed d-none d-md-block"></div>
-                <div class="col-12 col-md">
-                    <a href="{{ route('profile.password.edit') }}">パスワード変更</a>
-                </div>
-            </div>
+            {{-- 「パスワード変更」のリンクは置かない（2026-10 に削除。この画面だけ浮いて見えたため。
+                 パスワード変更〔S-1202〕へは、ナビの右上のトレーナー名のメニューから移る） --}}
         </div>
     </div>
 </div>
