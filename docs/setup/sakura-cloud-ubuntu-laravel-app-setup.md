@@ -603,6 +603,7 @@ sudo -u trs01 php artisan migrate --force
 sudo -u trs01 php artisan config:clear
 sudo -u trs01 php artisan view:clear
 sudo -u trs01 php artisan route:clear
+sudo systemctl reload php8.4-fpm
 # キューワーカー導入後は、コードを読み直させるために再起動する
 # sudo supervisorctl restart training-record-system-01-worker
 ```
@@ -610,6 +611,8 @@ sudo -u trs01 php artisan route:clear
 - `npm run build` は不要（`public/build/` はコミット済み）。SCSS などを変更したときは、開発環境でビルドして、ハッシュ付きの CSS と `manifest.json` ごとコミットする。
 - `.env` だけを変更したときは `config:clear` を実行する。
 - `optimize:clear` は使わない。3つのキャッシュに加えてアプリケーションのキャッシュ（`cache` テーブル）まで消すため、キャッシュに記録されたデータ（ログインの連続失敗の回数など）がリセットされるおそれがある。
+- **`sudo systemctl reload php8.4-fpm` を最後に実行する**：OPcache（PHP のコンパイル済みコードのキャッシュ）はファイルの更新をそのままでは読み直さない。更新を検知するかどうかは `opcache.validate_timestamps`（と `revalidate_freq`）の設定しだいで、無効のまま運用しているなら、`composer install` でファイルが入れ替わっても、`config/` を変えても、古いままで動き続ける。`reload` は処理中のリクエストを切らずに、新しいコードで動く状態に PHP-FPM を入れ替える（`restart` と違って、動いているリクエストは最後まで完走させる）。**`composer install` のあと・`config/` を変えたあとは特に必要**。毎回実行してよい（害はない）。
+  - **`opcache.validate_permission` と `opcache.validate_root`** はファイルの更新の検知とは別の目的（同じサーバーに同居するアプリが、他のユーザーのファイルのキャッシュを使えないようにする権限・chroot チェック。サーバー構築手順書 2-2 の該当節参照）。これらが `On` でも、`validate_timestamps` が `Off` なら更新は反映されない。
 
 ---
 
