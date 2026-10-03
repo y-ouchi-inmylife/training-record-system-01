@@ -36,6 +36,7 @@
                         <input type="text" name="login_id" id="login_id"
                                class="form-control @error('login_id') is-invalid @enderror"
                                value="{{ old('login_id', $trainer->login_id) }}" maxlength="50" required
+                               autocomplete="off"
                                style="max-width: 700px;">
                         <x-form-error field="login_id" />
                         <div class="form-text">※半角英数字とアンダースコア(_)のみ</div>
@@ -49,6 +50,7 @@
                                class="form-control @error('name') is-invalid @enderror"
                                inputmode="text"
                                value="{{ old('name', $trainer->name) }}" maxlength="100" required
+                               autocomplete="off"
                                style="max-width: 700px;">
                         <x-form-error field="name" />
                     </div>
@@ -58,6 +60,7 @@
                     <label for="role" class="col-md-auto col-form-label text-md-end form-label-fixed">権限 <span class="text-danger">*</span></label>
                     <div class="col-12 col-md">
                         <select name="role" id="role" class="form-select @error('role') is-invalid @enderror" required
+                                autocomplete="off"
                                 style="max-width: 250px;">
                             <option value="staff" {{ old('role', $trainer->role) === 'staff' ? 'selected' : '' }}>一般</option>
                             <option value="admin" {{ old('role', $trainer->role) === 'admin' ? 'selected' : '' }}>管理者</option>

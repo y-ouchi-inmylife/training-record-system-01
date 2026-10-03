@@ -36,6 +36,7 @@
                         <input type="text" name="login_id" id="login_id"
                                class="form-control @error('login_id') is-invalid @enderror"
                                value="{{ old('login_id') }}" maxlength="50" required
+                               autocomplete="off"
                                style="max-width: 700px;">
                         <x-form-error field="login_id" />
                         <div class="form-text">※半角英数字とアンダースコア(_)のみ</div>
@@ -48,6 +49,7 @@
                         <input type="text" name="name" id="name"
                                class="form-control @error('name') is-invalid @enderror"
                                inputmode="text" value="{{ old('name') }}" maxlength="100" required
+                               autocomplete="off"
                                style="max-width: 700px;">
                         <x-form-error field="name" />
                     </div>
@@ -61,6 +63,9 @@
                         <input type="password" name="password" id="password"
                                class="form-control @error('password') is-invalid @enderror"
                                minlength="8" required
+                               {{-- 管理者が別の人のアカウントを作る画面のため、ブラウザが管理者自身の保存済みの
+                                    パスワードを入れないよう「新しいパスワードの欄」と伝える（off は無視されることがある。§4-5） --}}
+                               autocomplete="new-password"
                                style="max-width: 700px;">
                         <x-form-error field="password" />
                         <div class="form-text">※初回ログイン時に変更が求められます。</div>
@@ -74,6 +79,7 @@
                              ここは is-invalid・<x-form-error> とも置かない（他画面と同じ扱い）。 --}}
                         <input type="password" name="password_confirmation" id="password_confirmation"
                                class="form-control" minlength="8" required
+                               autocomplete="new-password"
                                style="max-width: 700px;">
                         {{-- パスワード要件は、以前と同じくパスワード（確認）のあとに置く（項目の並び順を変えない） --}}
                         <div class="form-text">
@@ -91,6 +97,7 @@
                     <label for="role" class="col-md-auto col-form-label text-md-end form-label-fixed">権限 <span class="text-danger">*</span></label>
                     <div class="col-12 col-md">
                         <select name="role" id="role" class="form-select @error('role') is-invalid @enderror" required
+                                autocomplete="off"
                                 style="max-width: 250px;">
                             <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>一般</option>
                             <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>管理者</option>

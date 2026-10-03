@@ -154,6 +154,38 @@ class TrainerFormErrorRenderingTest extends TestCase
         $this->assertLessThan(strpos($html, '※半角英数字とアンダースコア(_)のみ'), strpos($html, 'ERR_login_id'));
     }
 
+    // ---- ブラウザの自動入力を止める指定（§4-5。2026-10）----
+
+    /**
+     * id の入力欄（input / select）の開始タグを取り出す（Blade の -> を含む値でも途中で切れないようにする）
+     */
+    private function tagOf(string $html, string $id): string
+    {
+        $this->assertMatchesRegularExpression('/<(input|select)\b(?:->|[^>])*\bid="' . $id . '"(?:->|[^>])*>/s', $html, $id);
+        preg_match('/<(input|select)\b(?:->|[^>])*\bid="' . $id . '"(?:->|[^>])*>/s', $html, $m);
+
+        return $m[0];
+    }
+
+    public function test_登録_ログインID名前権限はoff_パスワードはnew_passwordになる(): void
+    {
+        $html = (string) $this->renderCreate([]);
+        foreach (['login_id', 'name', 'role'] as $id) {
+            $this->assertStringContainsString('autocomplete="off"', $this->tagOf($html, $id), $id);
+        }
+        foreach (['password', 'password_confirmation'] as $id) {
+            $this->assertStringContainsString('autocomplete="new-password"', $this->tagOf($html, $id), $id);
+        }
+    }
+
+    public function test_編集_ログインID名前権限はoffになる(): void
+    {
+        $html = (string) $this->renderEdit([]);
+        foreach (['login_id', 'name', 'role'] as $id) {
+            $this->assertStringContainsString('autocomplete="off"', $this->tagOf($html, $id), $id);
+        }
+    }
+
     // ---- パスワードリセット（S-0804）----
 
     public function test_リセット_formにnovalidateが付く(): void
