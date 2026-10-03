@@ -120,14 +120,22 @@
                     {{-- 音声ファイルのみ削除のフォーム。ボタンは音声ファイルの段（#audio-update-form の内側）に置き、
                          form 属性でこのフォームを送信する（フォームの入れ子を避けるため、フォーム自体はここに残す） --}}
                     <form id="delete-audio-form" method="POST" style="display: none;"
-                          onsubmit="if (!this.action) { alert('削除対象が不明です。'); return false; } return confirm('音声ファイルのみ削除します。文字起こし・要約は残ります。よろしいですか?')">
+                          onsubmit="if (!this.getAttribute('action')) { alert('削除対象が不明です。'); return false; } return confirm('音声ファイルのみ削除します。文字起こし・要約は残ります。よろしいですか?')">
                         @csrf
                         @method('DELETE')
+                        {{-- 削除のあとも、今のページ番号と登録者の絞り込みを保って一覧に戻るため、一緒に送る
+                             （値はページの読み込み時に画面の URL のクエリから入れる。下の JS） --}}
+                        <input type="hidden" name="page" value="" data-list-query="page">
+                        <input type="hidden" name="trainer_id" value="" data-list-query="trainer_id">
                     </form>
                     <form id="delete-record-form" method="POST" style="display: none;"
-                          onsubmit="if (!this.action) { alert('削除対象が不明です。'); return false; } return confirm('この音声記録（音声ファイル + 文字起こし + 要約）を完全に削除します。よろしいですか?')">
+                          onsubmit="if (!this.getAttribute('action')) { alert('削除対象が不明です。'); return false; } return confirm('この音声記録（音声ファイル + 文字起こし + 要約）を完全に削除します。よろしいですか?')">
                         @csrf
                         @method('DELETE')
+                        {{-- 削除のあとも、今のページ番号と登録者の絞り込みを保って一覧に戻るため、一緒に送る
+                             （値はページの読み込み時に画面の URL のクエリから入れる。下の JS） --}}
+                        <input type="hidden" name="page" value="" data-list-query="page">
+                        <input type="hidden" name="trainer_id" value="" data-list-query="trainer_id">
                         <button type="submit" class="btn btn-danger">削除</button>
                     </form>
                 </div>
@@ -243,6 +251,8 @@ document.addEventListener('DOMContentLoaded', function() {
         saved: '音声記録を保存しました。',
         transcription: '文字起こしが完了し、保存しました。',
         summary: '要約が完了し、保存しました。',
+        // 「音声ファイルのみ削除」のとき（2026-10。コントローラーが done=audio_deleted を付けて一覧に戻す）
+        audio_deleted: '音声ファイルを削除しました。',
     };
     // 処理中のバッジの文言・色は、サーバーが描画するときと同じ対応表を使う
     const STATUS_LABELS = @json(\App\Models\AudioRecord::statusLabels());
@@ -745,6 +755,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- ページ読み込み時の自動展開 ---
     const params = new URLSearchParams(window.location.search);
+
+    // 削除のフォームの隠し項目に、今のページ番号と登録者の絞り込みを入れる（highlight・done は送らない）
+    document.querySelectorAll('input[data-list-query]').forEach(function (input) {
+        input.value = params.get(input.dataset.listQuery) || '';
+    });
     const highlightId = params.get('highlight');
     if (highlightId) {
         const targetRow = document.querySelector('.audio-row[data-audio-id="' + highlightId + '"]');

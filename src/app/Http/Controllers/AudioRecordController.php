@@ -44,6 +44,12 @@ class AudioRecordController extends Controller
 
         $audioRecords = $query->paginate(5)->appends($request->query());
 
+        // ページ番号が最後のページを超えたとき（そのページの最後の 1 件を削除した・URL を直接入れた）は、
+        // 最後のページに移る。ほかのクエリ（trainer_id・highlight・done など）は保つ。0 件のときは今までどおり
+        if ($audioRecords->total() > 0 && $audioRecords->currentPage() > $audioRecords->lastPage()) {
+            return redirect()->route('audio-records.index', array_merge($request->query(), ['page' => $audioRecords->lastPage()]));
+        }
+
         // プルダウン用トレーナー一覧（system_adminを除外）
         $trainers = Trainer::practitioners()
             ->orderBy('display_order')
@@ -230,11 +236,13 @@ class AudioRecordController extends Controller
     /**
      * 音声ファイルの削除
      */
-    public function destroy(AudioRecord $audioRecord): RedirectResponse
+    public function destroy(Request $request, AudioRecord $audioRecord): RedirectResponse
     {
+        // 戻り先は、削除の前に見ていたページ番号と登録者の絞り込みを保った一覧
+        $listQuery = $this->listRedirectQuery($request);
 
         if (!$audioRecord->canDelete()) {
-            return redirect()->route('audio-records.index')
+            return redirect()->route('audio-records.index', $listQuery)
                 ->with('error', '処理中の音声ファイルは削除できません。');
         }
 
@@ -245,18 +253,20 @@ class AudioRecordController extends Controller
 
         $audioRecord->delete();
 
-        return redirect()->route('audio-records.index')
+        return redirect()->route('audio-records.index', $listQuery)
             ->with('success', '音声ファイルを削除しました。');
     }
 
     /**
      * 音声ファイルのみ削除（文字起こし・要約は残す）
      */
-    public function deleteAudioOnly(AudioRecord $audioRecord): RedirectResponse
+    public function deleteAudioOnly(Request $request, AudioRecord $audioRecord): RedirectResponse
     {
+        // 戻り先は、削除の前に見ていたページ番号と登録者の絞り込みを保った一覧
+        $listQuery = $this->listRedirectQuery($request);
 
         if (!$audioRecord->canDelete()) {
-            return redirect()->route('audio-records.index')
+            return redirect()->route('audio-records.index', $listQuery)
                 ->with('error', '処理中の音声ファイルは削除できません。');
         }
 
@@ -268,8 +278,48 @@ class AudioRecordController extends Controller
         // file_path を NULL に更新（レコードは残す）
         $audioRecord->update(['file_path' => null]);
 
-        return redirect()->route('audio-records.index')
-            ->with('success', '音声ファイルを削除しました。文字起こし・要約は保持されています。');
+        // 記録は残るので、更新のときと同じく、その行の編集パネルを開き直し、パネルの中に完了のメッセージを出す
+        // （画面側の DONE_MESSAGES の audio_deleted。フラッシュのメッセージと二重にならないよう、フラッシュは出さない）
+        return redirect()->route('audio-records.index', $listQuery + [
+            'highlight' => $audioRecord->id,
+            'done' => 'audio_deleted',
+        ]);
+    }
+
+    /**
+     * 削除のあとに一覧へ戻るときのクエリ（page・trainer_id）を、送られてきた値から組み立てる
+     */
+    private function listRedirectQuery(Request $request): array
+    {
+        return self::buildListRedirectQuery(
+            $request->input('page'),
+            $request->input('trainer_id'),
+            fn (int $id) => Trainer::whereKey($id)->exists()
+        );
+    }
+
+    /**
+     * 一覧へ戻るときのクエリを組み立てる（テストから直接呼べるよう、トレーナーの存在の確かめ方を引数で受け取る）
+     *
+     * 送られてきた URL をそのまま戻り先にはせず（ほかのサイトへ飛ばされないように）、確かめた値だけを使う。
+     * - page：1 以上の整数のときだけ使う
+     * - trainer_id：'all'（全員）か、存在するトレーナーの ID のときだけ使う（それ以外は付けない＝自分の記録）
+     */
+    public static function buildListRedirectQuery(mixed $page, mixed $trainerId, callable $trainerExists): array
+    {
+        $query = [];
+
+        if (is_string($page) && preg_match('/\A[1-9][0-9]{0,8}\z/', $page)) {
+            $query['page'] = (int) $page;
+        }
+
+        if ($trainerId === 'all') {
+            $query['trainer_id'] = 'all';
+        } elseif (is_string($trainerId) && preg_match('/\A[1-9][0-9]{0,9}\z/', $trainerId) && $trainerExists((int) $trainerId)) {
+            $query['trainer_id'] = (int) $trainerId;
+        }
+
+        return $query;
     }
 
     /**
