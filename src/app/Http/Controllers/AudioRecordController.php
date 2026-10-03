@@ -254,7 +254,7 @@ class AudioRecordController extends Controller
         $audioRecord->delete();
 
         return redirect()->route('audio-records.index', $listQuery)
-            ->with('success', '音声ファイルを削除しました。');
+            ->with('success', '音声記録を削除しました。');
     }
 
     /**

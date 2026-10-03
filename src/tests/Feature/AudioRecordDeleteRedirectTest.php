@@ -17,7 +17,8 @@ use Tests\TestCase;
  *   - 戻り先のクエリを組み立てる処理（buildListRedirectQuery）は、トレーナーの存在の確かめ方を引数で渡して確かめる
  *   - コントローラーは、DB に書き込む前に応答が決まる場面（処理中で削除を断る）だけを確かめる
  *   - 画面は、DB に保存しない記録 1 件の一覧を描画して、削除のフォームと DONE_MESSAGES を確かめる
- * 削除の成功・ページ番号が最後のページを超えたときの転送は DB を伴うため、ここでは対象外（ブラウザで確認する）。
+ * 削除の成功は、DB に保存しない記録（exists=false。delete() は DB に触れずに終わる）で、戻り先とメッセージだけを確かめる。
+ * ページ番号が最後のページを超えたときの転送は DB を伴うため、ここでは対象外（ブラウザで確認する）。
  */
 class AudioRecordDeleteRedirectTest extends TestCase
 {
@@ -107,6 +108,21 @@ class AudioRecordDeleteRedirectTest extends TestCase
 
         $this->assertSame(route('audio-records.index', ['page' => 3, 'trainer_id' => 'all']), $response->getTargetUrl());
         $this->assertSame('処理中の音声ファイルは削除できません。', $response->getSession()->get('error'));
+    }
+
+    public function test_削除の成功のときは音声記録を削除しましたを出し_ページ番号と絞り込みを保つ(): void
+    {
+        // DB に保存しない、処理中でない・音声ファイルのない記録（ストレージにも DB にも触れない）
+        $record = new AudioRecord;
+        $record->forceFill(['id' => 7, 'status' => AudioRecord::STATUS_UNPROCESSED, 'title' => 't', 'file_path' => null]);
+
+        $response = app(AudioRecordController::class)->destroy(
+            $this->deleteRequest(['page' => '2', 'trainer_id' => 'all']),
+            $record
+        );
+
+        $this->assertSame(route('audio-records.index', ['page' => 2, 'trainer_id' => 'all']), $response->getTargetUrl());
+        $this->assertSame('音声記録を削除しました。', $response->getSession()->get('success'));
     }
 
     public function test_ほかのサイトのurlや余計なクエリは戻り先に入らない(): void

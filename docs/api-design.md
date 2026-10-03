@@ -885,7 +885,7 @@ POST /training-records に以下を追加する。
 - 処理中（文字起こし中・要約中）の場合は削除せず、音声記録一覧へリダイレクト
 
 **レスポンス**:
-- `redirect('/audio-records?page=…&trainer_id=…')`（受け取った `page`・`trainer_id` のうち、確かめた値だけを付けて一覧のルートで組み立てる。送られてきた URL はそのまま使わない）。成功時は success（「音声ファイルを削除しました。」）、処理中で断ったときは error のフラッシュメッセージ
+- `redirect('/audio-records?page=…&trainer_id=…')`（受け取った `page`・`trainer_id` のうち、確かめた値だけを付けて一覧のルートで組み立てる。送られてきた URL はそのまま使わない）。成功時は success（「音声記録を削除しました。」）、処理中で断ったときは error のフラッシュメッセージ。成功時の文言は 2026-10 に「音声ファイルを削除しました。」から直した（「音声ファイルのみ削除」の完了メッセージと区別がつかなかったため）
 
 
 ###### DELETE /audio-records/{id}/delete-audio
