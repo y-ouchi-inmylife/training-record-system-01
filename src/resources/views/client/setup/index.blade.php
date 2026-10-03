@@ -39,26 +39,6 @@
                 <x-form-error-summary />
             @endif
 
-            {{-- 「ログイン情報」小見出し（2026-09 追加、4 か所の 1 番目）。
-                 メール表示行とパスワード入力の 2 つをひとつのまとまりとして扱う。
-                 <h2 fs-6> を使う理由・fs-6 を外さない旨は下の「お名前」小見出しの
-                 コメント参照。**fs-6 を外さないこと**。
-                 文言「ログイン情報」にした理由：当初は「『パスワード』と重複するため
-                 パスワードのまとまりには小見出しを置かない」方針だったが、他 3 か所
-                 との非対称で構造把握が難しいという指摘を 2026-09 に受け、パスワードと
-                 語が重複しない「ログイン情報」で追加した。メール表示行もこのまとまりに
-                 入るので実態にも合う（設計書 S-1403 備考 / §4-7 参照）。 --}}
-            <h2 class="fs-6 fw-bold mb-2">ログイン情報</h2>
-            {{-- メールアドレスは表示のみ（S-1411 の「お名前」表示行と同じマークアップに揃える）。
-                 説明文で埋め込むより行として立っている方が、ログイン ID の確認場面として目に入る。
-                 下に区切り線は引かない：ログイン情報まとまりの内部（メール表示 → パスワード入力欄）
-                 の切り替わりであり、まとまりの境目ではない。まとまりの境目（パスワード（確認）
-                 の下）に区切り線①が入る。 --}}
-            <div class="mb-3">
-                <div class="text-muted small">メールアドレス</div>
-                <div>{{ $client->email }}</div>
-            </div>
-
             {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
                  required・type・inputmode・autocomplete などの属性は残す。 --}}
             <form method="POST" action="{{ route('client-portal.setup.store', ['token' => $token]) }}" novalidate>
@@ -76,40 +56,6 @@
                     class="visually-hidden"
                 >
 
-                <div class="mb-3">
-                    <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
-                    <input
-                        type="password"
-                        class="form-control @error('password') is-invalid @enderror"
-                        id="password"
-                        name="password"
-                        required
-                        autofocus
-                        autocomplete="new-password"
-                        aria-describedby="password-help"
-                    >
-                    {{-- 強度要件のヘルプ文は <x-form-error> の下に置くと、エラー時に欄との間にヘルプ文が
-                         挟まる。Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで
-                         ヘルプ文を挟んでも表示される。block は付けない。 --}}
-                    <x-form-error field="password" />
-                    <div id="password-help" class="form-text">
-                        8 文字以上で、大文字・小文字・数字・記号をそれぞれ 1 つ以上入れてください。
-                    </div>
-                </div>
-                {{-- パスワード(確認) の下にまとまりの区切り線を引く(4 まとまりの境目の 2 本目)。
-                     pb-3 は罫線とパスワード確認欄下端の間隔、mb-3 は罫線と次のまとまり(氏名)との間隔。 --}}
-                <div class="mb-3 pb-3 border-bottom">
-                    <label for="password_confirmation" class="form-label">パスワード（確認） <span class="text-danger">*</span></label>
-                    <input
-                        type="password"
-                        class="form-control"
-                        id="password_confirmation"
-                        name="password_confirmation"
-                        required
-                        autocomplete="new-password"
-                    >
-                </div>
-
                 {{-- 「お名前」「ご連絡先」の小見出し（太字）は入力欄のまとまりの先頭に置く。
                      見出しタグ <h2> を使う理由：読み上げソフトに画面の構造を伝えるため。
                      見た目だけの太字（旧 <p class="fw-bold">）では構造が伝わらない。
@@ -118,8 +64,10 @@
                      見出しタグは既定で大きなフォントサイズが付くが、本文と地続きの小見出しに
                      するために fs-6（= 1rem = 本文サイズ）で明示的に落とす。**fs-6 を外さないこと**
                      （後から「不要」と見て消されると見た目が変わる）。
-                     パスワードのまとまりには置かない：「パスワード」「パスワード（確認）」の
-                     ラベル自体がまとまりの内容を表すため、見出しを重ねると同じ語が二重になる。
+                     パスワードのまとまりにも小見出しを置く：当初は「同じ語の重複」を避けて
+                     置かない方針だったが、他 3 か所との非対称で構造把握が難しいため、
+                     「ログイン情報」の文言で置いた（2026-09 追加。詳しくは下の「ログイン情報」
+                     小見出し直前のコメントを参照）。
                      区切り線と小見出しの役割は違う：線＝「ここで切れる」、小見出し＝「次が何か」。
                      両方置いて相補的に働かせる。文言「お名前」は S-1406/S-1411 の表示行と揃える。
                      詳細は設計書 S-1403 備考 / client-portal-design-plan.md §4-7 参照。 --}}
@@ -143,9 +91,9 @@
                         <x-form-error field="first_name" />
                     </div>
                 </div>
-                {{-- せい・めい行の下にまとまりの区切り線を引く（4 まとまりの境目の 3 本目、氏名まとまりの下）。
-                     連絡先まとまりの下（最終まとまり）には線を引かない（カード枠が外周を担当するため。
-                     設計書 S-1403 備考 / client-portal-design-plan.md §4-7 参照）。 --}}
+                {{-- せい・めい行の下にまとまりの区切り線①を引く（お名前／ご連絡先の境目。
+                     2026-10 変更でログイン情報を末尾に移したため、お名前が先頭まとまりになり、
+                     ここが 1 本目の区切り線になった。設計書 S-1403 備考 / §4-7 参照）。 --}}
                 <div class="row g-2 mb-3 pb-3 border-bottom">
                     <div class="col-sm-6">
                         <label for="last_name_kana" class="form-label">せい</label>
@@ -229,7 +177,7 @@
                     <x-form-error field="address3" />
                 </div>
                 {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素。次の「愛犬の情報」まとまりとの
-                     境目に区切り線③を引く（設計書 S-1403 / client-portal-design-plan.md §4-7 参照）。
+                     境目に区切り線②を引く（設計書 S-1403 / §4-7 参照）。
                      pb-3 は罫線と入力欄下端の間隔、mb-3 は罫線と次のまとまりとの間隔。 --}}
                 <div class="mb-3 pb-3 border-bottom">
                     <label for="address4" class="form-label">建物名・部屋番号</label>
@@ -282,17 +230,87 @@
                     <x-form-error field="trainee_birth_date" />
                 </div>
                 {{-- 備考：ラベル下（.form-text）に多頭飼い向けの案内を出す。
-                     設計書 S-1403 の「多頭飼いの運用」参照。備考の下には区切り線を引かない
-                     （愛犬の情報が最終まとまりで、カード枠が外周を担当するため）。
+                     設計書 S-1403 の「多頭飼いの運用」参照。
+                     備考の下に区切り線③を引く（愛犬の情報／ログイン情報の境目。
+                     2026-10 変更でログイン情報を末尾に移したため、愛犬の情報が最終まとまりで
+                     なくなり、ここに境目の線が入るようになった）。
                      多頭飼いの案内（.form-text）は <x-form-error> の下に置くと、エラー時に欄との
                      間に案内文が挟まるが、Bootstrap の .is-invalid ~ .invalid-feedback の
                      「以後の兄弟」セレクタで案内文を挟んでも表示される（パスワードと同じ扱い）。 --}}
-                <div class="mb-3">
+                <div class="mb-3 pb-3 border-bottom">
                     <label for="trainee_note" class="form-label">備考</label>
                     <textarea class="form-control @error('trainee_note') is-invalid @enderror"
                               id="trainee_note" name="trainee_note" rows="3">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
                     <x-form-error field="trainee_note" />
                     <div class="form-text">2頭目以降がいらっしゃる場合は、こちらにご記入ください。</div>
+                </div>
+
+                {{-- 「ログイン情報」小見出し（4 か所の最後、2026-10 に末尾へ移した）。
+                     メール表示・パスワード・パスワード（確認）の 3 つを 1 つのまとまりとして扱う。
+                     <h2 fs-6> を使う理由・fs-6 を外さない旨は上の「お名前」小見出しの
+                     コメント参照。**fs-6 を外さないこと**。
+                     なぜ末尾に移したか：Laravel 標準でパスワードは old() の対象外（セッションに
+                     残さない）ため、入力エラーで戻ったときはパスワード欄だけが空になる。
+                     ログイン情報を一番上に置くと、電話番号を 1 文字直すだけでも、
+                     上まで戻ってパスワードを入れ直すことになり不便だった。末尾に置き、
+                     上から赤字の欄を直して、最後にパスワードを入れて登録する一方通行の
+                     流れにする（設計書 S-1403 備考 / §4-7 参照）。 --}}
+                <h2 class="fs-6 fw-bold mb-2">ログイン情報</h2>
+                {{-- メールアドレスは表示のみ（S-1411 の「お名前」表示行と同じマークアップに揃える）。
+                     説明文で埋め込むより行として立っている方が、ログイン ID の確認場面として目に入る。 --}}
+                <div class="mb-3">
+                    <div class="text-muted small">メールアドレス</div>
+                    <div>{{ $client->email }}</div>
+                </div>
+
+                {{-- エラーで戻ったとき、パスワード以外の欄のエラーがあれば、
+                     パスワードが空に戻っている理由をパスワード欄の上で控えめに伝える
+                     （.form-text で赤字〔invalid-feedback〕と区別。2026-10 追加）。
+                     パスワードだけのエラーのときは、欄の下の赤字で原因が伝わるため出さない。 --}}
+                @if ($errors->hasAny([
+                    'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
+                    'phone1', 'phone2',
+                    'postal_code', 'address1', 'address2', 'address3', 'address4',
+                    'trainee_name', 'trainee_breed', 'trainee_sex', 'trainee_birth_date', 'trainee_note',
+                ]))
+                    <div class="form-text mb-2">確認のため、パスワードをもう一度入力してください。</div>
+                @endif
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
+                    {{-- autofocus は付けない：ログイン情報を末尾に移したため、autofocus を付けると
+                         ページが最下部まで自動スクロールし、「エラー時にページの先頭（上部の案内）が
+                         見えている」要件（§2-7）と矛盾するため（2026-10 変更）。 --}}
+                    <input
+                        type="password"
+                        class="form-control @error('password') is-invalid @enderror"
+                        id="password"
+                        name="password"
+                        required
+                        autocomplete="new-password"
+                        aria-describedby="password-help"
+                    >
+                    {{-- 強度要件のヘルプ文は <x-form-error> の下に置くと、エラー時に欄との間にヘルプ文が
+                         挟まる。Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで
+                         ヘルプ文を挟んでも表示される。block は付けない。 --}}
+                    <x-form-error field="password" />
+                    <div id="password-help" class="form-text">
+                        8 文字以上で、大文字・小文字・数字・記号をそれぞれ 1 つ以上入れてください。
+                    </div>
+                </div>
+                {{-- パスワード（確認）はログイン情報まとまりの最終要素で、ログイン情報自体も
+                     最終まとまりとなるため、下に区切り線は引かない（カード枠が外周を担当。
+                     2026-10 変更）。 --}}
+                <div class="mb-3">
+                    <label for="password_confirmation" class="form-label">パスワード（確認） <span class="text-danger">*</span></label>
+                    <input
+                        type="password"
+                        class="form-control"
+                        id="password_confirmation"
+                        name="password_confirmation"
+                        required
+                        autocomplete="new-password"
+                    >
                 </div>
 
                 @include('layouts.partials.privacy-consent')

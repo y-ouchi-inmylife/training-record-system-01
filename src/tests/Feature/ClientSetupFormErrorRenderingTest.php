@@ -124,4 +124,68 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $view->assertSee('ERR_postal_code');
         $view->assertSee('has-validation', false);
     }
+
+    /**
+     * 2026-10 変更：ログイン情報（パスワード・パスワード確認）を 4 まとまりの最後
+     *（愛犬の情報の後、登録ボタンの直前）に移した。入力エラーで戻ったとき、
+     * 一番上まで戻ってパスワードを入れ直す必要がなくなるようにするため。
+     */
+    public function test_初回設定_ログイン情報はまとまりの最後に描画される(): void
+    {
+        $html = $this->renderSetup([])->__toString();
+
+        // 「愛犬の情報」小見出し／備考（trainee_note）の位置より後に、
+        // 「ログイン情報」小見出しとパスワード欄が来ること。
+        $posTraineeHeading = mb_strpos($html, '愛犬の情報');
+        $posTraineeNote = mb_strpos($html, 'name="trainee_note"');
+        $posLoginHeading = mb_strpos($html, 'ログイン情報');
+        $posPassword = mb_strpos($html, 'id="password"');
+
+        $this->assertNotFalse($posTraineeHeading);
+        $this->assertNotFalse($posTraineeNote);
+        $this->assertNotFalse($posLoginHeading);
+        $this->assertNotFalse($posPassword);
+
+        $this->assertGreaterThan($posTraineeHeading, $posLoginHeading);
+        $this->assertGreaterThan($posTraineeNote, $posLoginHeading);
+        $this->assertGreaterThan($posTraineeNote, $posPassword);
+
+        // 「ログイン情報」まとまりの中にメールアドレスの表示行（text-muted small ラベル）
+        // が入っていること。owner@example.com は hidden の username input（フォーム冒頭）
+        // にも値として入るため、ここは表示行のラベル文字列で位置を見る。
+        $posEmailLabel = mb_strpos($html, 'メールアドレス</div>');
+        $this->assertNotFalse($posEmailLabel);
+        $this->assertGreaterThan($posLoginHeading, $posEmailLabel);
+        $this->assertGreaterThan($posEmailLabel, $posPassword);
+    }
+
+    /**
+     * 2026-10 追加：パスワード以外の欄にエラーがあって戻ったとき、
+     * パスワード欄の上に「確認のため、パスワードをもう一度入力してください。」の
+     * 一言を控えめな .form-text で出す。
+     */
+    public function test_初回設定_パスワード以外のエラーで戻るとパスワード再入力の案内が出る(): void
+    {
+        $view = $this->renderSetup(['phone1' => 'ERR_phone1']);
+        $view->assertSee('確認のため、パスワードをもう一度入力してください。');
+    }
+
+    public function test_初回設定_エラーなしではパスワード再入力の案内は出ない(): void
+    {
+        $view = $this->renderSetup([]);
+        $view->assertDontSee('確認のため、パスワードをもう一度入力してください。');
+    }
+
+    /**
+     * パスワード自体のエラーのみのときは、欄の下の赤字で原因が伝わるため、
+     * 一言の案内は出さない。
+     */
+    public function test_初回設定_パスワードだけのエラーのときは案内を出さない(): void
+    {
+        $view = $this->renderSetup(['password' => 'ERR_password']);
+        // パスワードの欄下エラーは出る
+        $view->assertSee('ERR_password');
+        // 一言の案内は出ない（.form-text で区別）
+        $view->assertDontSee('確認のため、パスワードをもう一度入力してください。');
+    }
 }
