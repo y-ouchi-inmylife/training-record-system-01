@@ -242,7 +242,9 @@
                      2026-10 変更でログイン情報を末尾に移したため、ここに境目の線が入る。
                      他 2 本の区切り線は 2026-10 に削除した）。
                      経緯：2026-10 にいったんラベルの右に移したが、ブラウザで確認したうえで
-                     入力欄の下に戻し、文言を「備考にご記入ください」に変えた。
+                     入力欄の下に戻した。文言は何度か見直し、現在は「ほかにもトレーニングを受ける
+                     愛犬がいる場合は、名前・犬種などをこの欄にご記入ください。」。
+                     （何を書けばよいかを示し、トレーニングを受ける犬に対象を絞るため）
                      設計書 S-1403 の「多頭飼いの運用」参照。 --}}
                 <div class="mb-3 pb-3 border-bottom">
                     <label for="trainee_note" class="form-label">備考</label>
@@ -250,7 +252,7 @@
                               id="trainee_note" name="trainee_note" rows="3"
                               aria-describedby="trainee_note-help">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
                     <x-form-error field="trainee_note" />
-                    <div id="trainee_note-help" class="form-text">2頭目以降がいらっしゃる場合は、備考にご記入ください。</div>
+                    <div id="trainee_note-help" class="form-text">ほかにもトレーニングを受ける愛犬がいる場合は、名前・犬種などをこの欄にご記入ください。</div>
                 </div>
 
                 {{-- 「ログイン情報」小見出し（4 か所の最後、2026-10 に末尾へ移した）。
