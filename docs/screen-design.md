@@ -414,6 +414,24 @@ Bootstrap 既定（`font-weight: 700`）を使い、個別に変更しない。
   - **段階 5-3a**（音声記録一覧の編集パネル・メディア詳細・要約一覧）：`AudioRecordController::update`、`AudioRecordController::summaries`、`MediaRecordController::update`。既存の `attributes.title=表示名` と `custom.client_id.required` を使う。文言変更：「会員を指定してください。」→「会員を選択してください。」
   - **段階 5-3b**（メディア登録モーダル）：`MediaRecordController::uploadUrl`・`store` の `validate()` 第 2 引数を削除し、独自の `{"error":...}` 形式を Laravel 標準の `ValidationException::withMessages` に書き換え。`attributes.original_filename=元ファイル名`、`attributes.file_size=ファイルサイズ`、`attributes.storage_key=保存キー` と `custom.original_filename.format`、`custom.file_size.max`（`:limit` プレースホルダ）、`custom.storage_key.format` を追加
 
+
+### 2-9. 一覧のページ送り
+
+ページ送りのある一覧（S-0304 会員一覧・S-0402 トレーニング記録一覧・S-0505 音声記録一覧・S-0701 音声ファイル一覧・S-1302 メディア一覧・S-0805 操作履歴）の、表の下のページ送りの表示を揃える（**2026-10 変更**）。
+
+```
+              全7件中 1〜5件   ‹  1  2  ›
+```
+
+- 件数の表示「**全{全件数}件中 {最初の番号}〜{最後の番号}件**」と、ページ切り替え（‹ 前のページ・ページ番号・次のページ ›）を**横に並べ、まとまりごと中央に置く**（件数の表示が左、ページ切り替えがその右隣）。件数の表示は控えめな文字（`small`・`text-muted`）とし、ページ切り替えと縦の位置（中央）を揃える。数字は桁区切りを付ける（`1,234`）。
+- **PC の幅とスマホの幅で同じ形**にする。幅が足りないときは、件数の表示が上・ページ切り替えが下の 2 段に折り返し、ページ番号が多いときはページ番号の並びも折り返す（どれも中央。横にはみ出さない）。
+- ページ番号が多いときの「...」の省略、今のページの強調、押せないボタン（最初のページの ‹ など）の表示は、Laravel 標準の動きのまま。‹・› の読み上げ用の名前（`aria-label`）は「前のページ」「次のページ」。
+- **1 ページに収まるときは何も表示しない**。
+- 実装：Laravel 標準の Bootstrap 5 用のビュー（`AppServiceProvider` の `Paginator::useBootstrapFive()` で既定）を、`resources/views/vendor/pagination/bootstrap-5.blade.php` に置いて上書きする。個々の画面の `{{ $xxx->links() }}` はビューの名前を指定せずに呼ぶ。
+- 以前は Laravel 標準の表示（左に英語の「Showing 1 to 5 of 7 results」、右寄せのページ切り替え、スマホの幅では「Previous」「Next」だけ）だった。
+- 表の上などに別に出している件数の表示（S-0304・S-0402 の「N件」など）は、この決まりの対象外（そのまま）。
+- トレーニング記録の登録・編集のメディアの追加（S-0401-M02・S-0404-M01）のページ送りは、JSON の応答から画面の JavaScript で組み立てる別の作り（「«前 1 / 3 次»」）で、この決まりの対象外。
+
 ---
 
 ## 3. 画面詳細
