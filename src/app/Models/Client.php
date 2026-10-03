@@ -330,7 +330,7 @@ class Client extends Authenticatable
             self::STATUS_IN_USE => '利用中',
             self::STATUS_AWAITING_SETUP => '初回設定待ち',
             self::STATUS_AWAITING_EMAIL => '登録待ち',
-            self::STATUS_NO_EMAIL => 'なし',
+            self::STATUS_NO_EMAIL => '未登録',
         };
 
         $isExpired = $this->show_expired_note;
