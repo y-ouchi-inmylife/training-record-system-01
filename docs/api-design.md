@@ -934,7 +934,7 @@ POST /training-records に以下を追加する。
 **リクエスト**:
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
-| current_prompt | string | ● | required, string, max:2000 | 要約プロンプト |
+| current_prompt | string | ● | required, string, max:5000 | 要約プロンプト |
 
 **レスポンス**:
 - `redirect('/settings/summary-prompts')`
