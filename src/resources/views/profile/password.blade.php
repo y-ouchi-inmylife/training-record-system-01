@@ -8,9 +8,10 @@
         <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-4" style="max-width: 700px;">
                 <h2 class="mb-0">パスワード変更</h2>
+                {{-- 「キャンセル」は置かない（2026-10 に削除。この画面へはナビのメニューからどの画面からでも来るため、
+                     マイプロフィールに戻る「キャンセル」は戻り先が合わなかった。やめたいときはナビから別の画面に移る） --}}
                 <div class="d-flex gap-2">
                     <button type="submit" form="profile-password-form" class="btn btn-success">更新</button>
-                    <a href="{{ route('profile.edit') }}" class="btn btn-secondary">キャンセル</a>
                 </div>
             </div>
 

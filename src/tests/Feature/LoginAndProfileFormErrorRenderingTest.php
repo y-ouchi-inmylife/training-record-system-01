@@ -304,4 +304,17 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
         $this->assertStringNotContainsString(route('profile.password.edit'), $main);
         $this->assertStringNotContainsString('form-label-fixed d-none d-md-block', $html);
     }
+
+    public function test_パスワード変更_更新のボタンだけで_キャンセルのボタンは置かない(): void
+    {
+        $html = (string) $this->renderProfilePassword([]);
+        // ナビなど本文の外の文字に引っかからないよう、見出しからフォームの終わりまでで確かめる
+        $start = strpos($html, '<h2 class="mb-0">パスワード変更</h2>');
+        $this->assertNotFalse($start);
+        $body = substr($html, $start, strpos($html, '</form>', $start) - $start);
+
+        $this->assertStringContainsString('<button type="submit" form="profile-password-form" class="btn btn-success">更新</button>', $body);
+        $this->assertStringNotContainsString('キャンセル', $body);
+        $this->assertStringNotContainsString('btn-secondary', $body);
+    }
 }
