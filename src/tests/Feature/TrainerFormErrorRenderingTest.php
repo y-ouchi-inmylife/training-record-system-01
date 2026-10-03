@@ -240,4 +240,39 @@ class TrainerFormErrorRenderingTest extends TestCase
         $view->assertSee('ERR_new_password');
         $view->assertSee('is-invalid', false);
     }
+
+    // ---- 横並びのレイアウト（§4-5。2026-10）----
+
+    private const HORIZONTAL_LABEL = 'class="col-md-auto col-form-label text-md-end form-label-fixed"';
+
+    /**
+     * 各ラベルが横並びの固定幅になり、縦積みの form-label が残っていないことを確かめる
+     */
+    private function assertHorizontalLabels(string $html, array $fields): void
+    {
+        foreach ($fields as $field) {
+            $this->assertStringContainsString('<label for="' . $field . '" ' . self::HORIZONTAL_LABEL . '>', $html, $field);
+        }
+        $this->assertStringNotContainsString('class="form-label"', $html);
+    }
+
+    /**
+     * 確認の欄のラベルは、見える文言が「（確認）」で、見えない「新しいパスワード」を含む。
+     * パスワード要件の説明は、確認の入力欄より後にある
+     */
+    private function assertConfirmationLabelAndRequirements(string $html): void
+    {
+        $this->assertStringContainsString(
+            '<label for="new_password_confirmation" ' . self::HORIZONTAL_LABEL . '><span class="visually-hidden">新しいパスワード</span>（確認） <span class="text-danger">*</span></label>',
+            $html
+        );
+        $this->assertLessThan(strpos($html, 'パスワード要件：'), strpos($html, 'id="new_password_confirmation"'));
+    }
+
+    public function test_リセット_横並びで_確認のラベルとパスワード要件の位置がそろう(): void
+    {
+        $html = (string) $this->renderResetPassword([]);
+        $this->assertHorizontalLabels($html, ['login_id', 'trainer_name', 'new_password', 'new_password_confirmation']);
+        $this->assertConfirmationLabelAndRequirements($html);
+    }
 }

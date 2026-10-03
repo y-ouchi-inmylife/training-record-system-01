@@ -32,35 +32,46 @@
                        autocomplete="username" readonly tabindex="-1" aria-hidden="true"
                        class="visually-hidden">
 
-                <div class="mb-3">
-                    <label for="new_password" class="form-label">新しいパスワード <span class="text-danger">*</span></label>
-                    <input type="password" name="new_password" id="new_password"
-                           class="form-control @error('new_password') is-invalid @enderror"
-                           minlength="8" required
-                           autocomplete="new-password"
-                           style="max-width: 700px;">
-                    <x-form-error field="new_password" />
-                </div>
-
-                <div class="mb-3">
-                    <label for="new_password_confirmation" class="form-label">新しいパスワード（確認） <span class="text-danger">*</span></label>
-                    {{-- 確認用の欄に対する confirmed の文言は new_password 側に出る（他画面と同じ扱い）--}}
-                    <input type="password" name="new_password_confirmation" id="new_password_confirmation"
-                           class="form-control" minlength="8" required
-                           autocomplete="new-password"
-                           style="max-width: 700px;">
-                </div>
-
-                <div class="mb-4">
-                    <div class="form-text">
-                        パスワード要件：
-                        <ul class="mb-0">
-                            <li>8文字以上</li>
-                            <li>大文字、小文字、数字、記号をそれぞれ1文字以上含む</li>
-                            <li>よく使われるパスワードは使用できません</li>
-                        </ul>
+                {{-- §4-5 の横並び（ラベルを左〔幅 140px・右寄せ〕、入力欄を右）。2026-10 に縦積みからそろえた
+                     （トレーナーの登録・編集〔S-0801・S-0803〕と同じ形）。見出しのボタンと右端をそろえるため、
+                     全体を幅 700px に収め、1 行 1 項目にする。説明文（form-text）は入力欄の下、エラーの赤字の
+                     さらに下に置き、説明文のある行は align-items-start にする。スマホの幅ではラベルが上に積まれる --}}
+                <div style="max-width: 700px;">
+                <div class="row g-2 align-items-center mb-2">
+                    <label for="new_password" class="col-md-auto col-form-label text-md-end form-label-fixed">新しいパスワード <span class="text-danger">*</span></label>
+                    <div class="col-12 col-md">
+                        <input type="password" name="new_password" id="new_password"
+                               class="form-control @error('new_password') is-invalid @enderror"
+                               minlength="8" required
+                               autocomplete="new-password"
+                               style="max-width: 700px;">
+                        <x-form-error field="new_password" />
                     </div>
                 </div>
+
+                <div class="row g-2 align-items-start">
+                    {{-- 見える文言は「（確認）」だけにする（「新しいパスワード（確認）」は幅 140px に 1 行で収まらないため。
+                         すぐ上の「新しいパスワード」の確認の欄であることは並びで分かる）。読み上げでは
+                         見えない「新しいパスワード」と合わせて「新しいパスワード（確認）」と読まれる --}}
+                    <label for="new_password_confirmation" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="visually-hidden">新しいパスワード</span>（確認） <span class="text-danger">*</span></label>
+                    <div class="col-12 col-md">
+                        {{-- 確認用の欄に対する confirmed の文言は new_password 側に出る（他画面と同じ扱い）--}}
+                        <input type="password" name="new_password_confirmation" id="new_password_confirmation"
+                               class="form-control" minlength="8" required
+                               autocomplete="new-password"
+                               style="max-width: 700px;">
+                        {{-- パスワード要件は、以前と同じくこの欄のあとに置く（項目の並び順を変えない） --}}
+                        <div class="form-text">
+                            パスワード要件：
+                            <ul class="mb-0">
+                                <li>8文字以上</li>
+                                <li>大文字、小文字、数字、記号をそれぞれ1文字以上含む</li>
+                                <li>よく使われるパスワードは使用できません</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                </div>{{-- 幅 700px のまとまりの終わり --}}
             </form>
         </div>
     </div>

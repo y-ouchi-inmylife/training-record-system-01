@@ -251,4 +251,57 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
         $this->assertStringContainsString('value="sato"', $hidden);
         $this->assertStringNotContainsString('name=', $hidden);
     }
+
+    // ---- 横並びのレイアウト（§4-5。2026-10）----
+
+    private const HORIZONTAL_LABEL = 'class="col-md-auto col-form-label text-md-end form-label-fixed"';
+
+    /**
+     * 各ラベルが横並びの固定幅になり、縦積みの form-label が残っていないことを確かめる
+     */
+    private function assertHorizontalLabels(string $html, array $fields): void
+    {
+        foreach ($fields as $field) {
+            $this->assertStringContainsString('<label for="' . $field . '" ' . self::HORIZONTAL_LABEL . '>', $html, $field);
+        }
+        $this->assertStringNotContainsString('class="form-label"', $html);
+    }
+
+    /**
+     * 確認の欄のラベルは、見える文言が「（確認）」で、見えない「新しいパスワード」を含む。
+     * パスワード要件の説明は、確認の入力欄より後にある
+     */
+    private function assertConfirmationLabelAndRequirements(string $html): void
+    {
+        $this->assertStringContainsString(
+            '<label for="new_password_confirmation" ' . self::HORIZONTAL_LABEL . '><span class="visually-hidden">新しいパスワード</span>（確認） <span class="text-danger">*</span></label>',
+            $html
+        );
+        $this->assertLessThan(strpos($html, 'パスワード要件：'), strpos($html, 'id="new_password_confirmation"'));
+    }
+
+    public function test_強制パスワード変更_横並びで_確認のラベルとパスワード要件の位置がそろう(): void
+    {
+        $html = (string) $this->renderChangePassword([]);
+        $this->assertHorizontalLabels($html, ['new_password', 'new_password_confirmation']);
+        $this->assertConfirmationLabelAndRequirements($html);
+    }
+
+    public function test_パスワード変更_横並びで_確認のラベルとパスワード要件の位置がそろう(): void
+    {
+        $html = (string) $this->renderProfilePassword([]);
+        $this->assertHorizontalLabels($html, ['current_password', 'new_password', 'new_password_confirmation']);
+        $this->assertConfirmationLabelAndRequirements($html);
+    }
+
+    public function test_マイプロフィール_横並びで_パスワード変更のリンクは入力欄の列にそろう(): void
+    {
+        $html = (string) $this->renderProfileEdit([]);
+        $this->assertHorizontalLabels($html, ['login_id', 'name', 'role']);
+        // リンクの前に、ラベルの幅の空きの列（スマホの幅では消す）がある
+        $this->assertMatchesRegularExpression(
+            '/<div class="col-md-auto form-label-fixed d-none d-md-block"><\/div>\s*<div class="col-12 col-md">\s*<a href="[^"]*\/profile\/password">パスワード変更<\/a>/',
+            $html
+        );
+    }
 }
