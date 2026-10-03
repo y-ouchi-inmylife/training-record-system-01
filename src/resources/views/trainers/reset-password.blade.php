@@ -29,6 +29,7 @@
                     <label for="login_id" class="form-label">ログインID</label>
                     <input type="text" id="login_id" class="form-control"
                            value="{{ $trainer->login_id }}" disabled
+                           autocomplete="off"
                            style="max-width: 700px;">
                 </div>
 
@@ -36,6 +37,7 @@
                     <label for="trainer_name" class="form-label">名前</label>
                     <input type="text" id="trainer_name" class="form-control"
                            value="{{ $trainer->name }}" disabled
+                           autocomplete="off"
                            style="max-width: 700px;">
                 </div>
 
@@ -44,6 +46,9 @@
                     <input type="password" name="new_password" id="new_password"
                            class="form-control @error('new_password') is-invalid @enderror"
                            minlength="8" required
+                           {{-- 管理者が別の人のパスワードを決める画面のため、ブラウザが管理者自身の保存済みの
+                                パスワードを入れないよう「新しいパスワードの欄」と伝える（§4-5） --}}
+                           autocomplete="new-password"
                            style="max-width: 700px;">
                     <x-form-error field="new_password" />
                 </div>
@@ -53,6 +58,7 @@
                     {{-- 確認用の欄に対する confirmed の文言は new_password 側に出る（他画面と同じ扱い）--}}
                     <input type="password" name="new_password_confirmation" id="new_password_confirmation"
                            class="form-control" minlength="8" required
+                           autocomplete="new-password"
                            style="max-width: 700px;">
                 </div>
 

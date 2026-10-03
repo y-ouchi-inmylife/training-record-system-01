@@ -218,6 +218,19 @@ class TrainerFormErrorRenderingTest extends TestCase
         $view->assertDontSee('name="password_confirmation"', false);
     }
 
+    public function test_リセット_新しいパスワードはnew_password_表示の欄はoffになる(): void
+    {
+        $html = (string) $this->renderResetPassword([]);
+        foreach (['new_password', 'new_password_confirmation'] as $id) {
+            $this->assertStringContainsString('autocomplete="new-password"', $this->tagOf($html, $id), $id);
+        }
+        foreach (['login_id', 'trainer_name'] as $id) {
+            $this->assertStringContainsString('autocomplete="off"', $this->tagOf($html, $id), $id);
+        }
+        // 別の人のパスワードを決める画面なので、管理者自身の username の隠し項目は置かない
+        $this->assertStringNotContainsString('autocomplete="username"', $html);
+    }
+
     public function test_リセット_新しいパスワードにエラーで上部案内と欄下文言が出る(): void
     {
         $errors = ['new_password' => 'ERR_new_password'];

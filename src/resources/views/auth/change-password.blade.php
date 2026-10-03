@@ -26,11 +26,18 @@
                 {{-- 画面上部の 1 文の案内（設計書 §2-7） --}}
                 <x-form-error-summary />
 
+                {{-- パスワードマネージャー向け username（保存パスワードの紐付け先。会員側のパスワードの変更と同じ形）。
+                     name は付けない（送信の中身を変えないため。autocomplete はブラウザが読むだけで、送信には要らない） --}}
+                <input type="text" value="{{ auth()->user()->login_id }}"
+                       autocomplete="username" readonly tabindex="-1" aria-hidden="true"
+                       class="visually-hidden">
+
                 <div class="mb-3">
                     <label for="new_password" class="form-label">新しいパスワード <span class="text-danger">*</span></label>
                     <input type="password" name="new_password" id="new_password"
                            class="form-control @error('new_password') is-invalid @enderror"
                            minlength="8" required
+                           autocomplete="new-password"
                            style="max-width: 700px;">
                     <x-form-error field="new_password" />
                 </div>
@@ -40,6 +47,7 @@
                     {{-- 確認用の欄に対する confirmed の文言は new_password 側に出る（他画面と同じ扱い）--}}
                     <input type="password" name="new_password_confirmation" id="new_password_confirmation"
                            class="form-control" minlength="8" required
+                           autocomplete="new-password"
                            style="max-width: 700px;">
                 </div>
 

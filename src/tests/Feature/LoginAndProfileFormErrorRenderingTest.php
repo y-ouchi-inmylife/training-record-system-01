@@ -51,6 +51,8 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
 
     private function renderProfilePassword(array $errors): \Illuminate\Testing\TestView
     {
+        // パスワードマネージャー向けの username の隠し項目が auth()->user() のログインID を出すため、ログインさせる
+        $this->actingAs($this->makeTrainer());
         return $this->withViewErrors($errors)->view('profile.password');
     }
 
@@ -194,5 +196,59 @@ class LoginAndProfileFormErrorRenderingTest extends TestCase
     public function test_current_passwordルールの既定文言は現在のパスワードが正しくありませんになる(): void
     {
         $this->assertSame('現在のパスワードが正しくありません。', __('validation.current_password'));
+    }
+
+    // ---- ブラウザ・パスワードマネージャーの自動入力の指定（§4-5。2026-10）----
+
+    /**
+     * id の入力欄（input / select）の開始タグを取り出す（Blade の -> を含む値でも途中で切れないようにする）
+     */
+    private function tagOf(string $html, string $id): string
+    {
+        $this->assertMatchesRegularExpression('/<(input|select)\b(?:->|[^>])*\bid="' . $id . '"(?:->|[^>])*>/s', $html, $id);
+        preg_match('/<(input|select)\b(?:->|[^>])*\bid="' . $id . '"(?:->|[^>])*>/s', $html, $m);
+
+        return $m[0];
+    }
+
+    /**
+     * パスワードマネージャー向けの username の隠し項目（name なし＝送信しない）を取り出す
+     */
+    private function hiddenUsernameTag(string $html): string
+    {
+        $this->assertSame(1, preg_match_all('/<input\b[^>]*autocomplete="username"[^>]*>/s', $html, $m));
+
+        return $m[0][0];
+    }
+
+    public function test_ログイン_ログインIDはusername_パスワードはcurrent_passwordになる(): void
+    {
+        $html = (string) $this->renderLogin([]);
+        $this->assertStringContainsString('autocomplete="username"', $this->tagOf($html, 'login_id'));
+        $this->assertStringContainsString('autocomplete="current-password"', $this->tagOf($html, 'password'));
+    }
+
+    public function test_強制パスワード変更_新しいパスワードはnew_passwordで_usernameの隠し項目がある(): void
+    {
+        $html = (string) $this->renderChangePassword([]);
+        foreach (['new_password', 'new_password_confirmation'] as $id) {
+            $this->assertStringContainsString('autocomplete="new-password"', $this->tagOf($html, $id), $id);
+        }
+        $hidden = $this->hiddenUsernameTag($html);
+        $this->assertStringContainsString('value="sato"', $hidden);
+        $this->assertStringContainsString('class="visually-hidden"', $hidden);
+        $this->assertStringNotContainsString('name=', $hidden);
+    }
+
+    public function test_パスワード変更_今のパスワードはcurrent_password_新しいパスワードはnew_passwordで_usernameの隠し項目がある(): void
+    {
+        $html = (string) $this->renderProfilePassword([]);
+        $this->assertStringContainsString('autocomplete="current-password"', $this->tagOf($html, 'current_password'));
+        foreach (['new_password', 'new_password_confirmation'] as $id) {
+            $this->assertStringContainsString('autocomplete="new-password"', $this->tagOf($html, $id), $id);
+        }
+        $hidden = $this->hiddenUsernameTag($html);
+        $this->assertStringContainsString('value="sato"', $hidden);
+        $this->assertStringNotContainsString('name=', $hidden);
     }
 }

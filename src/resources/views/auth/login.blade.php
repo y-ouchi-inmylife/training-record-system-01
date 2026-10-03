@@ -42,6 +42,7 @@
                                 value="{{ old('login_id') }}"
                                 required
                                 autofocus
+                                autocomplete="username"
                             >
                             <x-form-error field="login_id" />
                         </div>
@@ -54,6 +55,7 @@
                                 id="password"
                                 name="password"
                                 required
+                                autocomplete="current-password"
                             >
                             <x-form-error field="password" />
                         </div>
