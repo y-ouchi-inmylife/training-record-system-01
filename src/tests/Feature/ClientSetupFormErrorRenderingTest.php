@@ -201,19 +201,27 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     }
 
     /**
-     * 2026-10 変更：備考の注意書きを「備考」ラベルの右（同じ行）に移した。
-     * 入力欄の下はエラー時の赤字の場所として空けるため。
+     * 2026-10 変更：備考の注意書きを入力欄の下（テキストエリアと欄下エラーの後）に戻し、
+     * 文言を「備考にご記入ください」に変えた。パスワード欄の「8 文字以上で…」の説明と
+     * 同じ並び。欄下エラーは Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」
+     * セレクタで、注意書きが挟まっても入力欄のすぐ下に出る（並び順で手前にあるため）。
      */
-    public function test_初回設定_備考の注意書きがテキストエリアより前に描画される(): void
+    public function test_初回設定_備考の注意書きがテキストエリアより後に描画される(): void
     {
         $html = $this->renderSetup([])->__toString();
 
-        $posHelp = mb_strpos($html, '2頭目以降がいらっしゃる場合は、こちらにご記入ください。');
         $posTextarea = mb_strpos($html, 'id="trainee_note"');
+        $posHelp = mb_strpos($html, '2頭目以降がいらっしゃる場合は、備考にご記入ください。');
 
-        $this->assertNotFalse($posHelp);
         $this->assertNotFalse($posTextarea);
-        $this->assertLessThan($posTextarea, $posHelp);
+        $this->assertNotFalse($posHelp);
+        $this->assertGreaterThan($posTextarea, $posHelp);
+    }
+
+    public function test_初回設定_備考の注意書きの旧文言が残っていない(): void
+    {
+        $view = $this->renderSetup([]);
+        $view->assertDontSee('こちらにご記入ください');
     }
 
     /**

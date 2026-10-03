@@ -232,24 +232,25 @@
                            autocomplete="off">
                     <x-form-error field="trainee_birth_date" />
                 </div>
-                {{-- 備考：多頭飼い向けの案内（.form-text）を「備考」ラベルの右に並べる
-                     （2026-10 変更。入力欄の下はエラー時の赤字〔invalid-feedback〕の場所として
-                     空け、注意書きは入力の前に読める位置に置くため）。スマホ幅では flex-wrap で
-                     自然に折り返す（ラベルの下に回り込む）。textarea とは aria-describedby で
-                     紐付けて読み上げでも案内が入力の説明として伝わるようにする。
-                     備考の下には区切り線③を引く（愛犬の情報／ログイン情報の境目。
+                {{-- 備考：多頭飼い向けの案内（.form-text）は入力欄の下に置く
+                     （パスワードの「8 文字以上で…」の説明と同じ並び。ラベル → テキストエリア →
+                     欄下エラー → 注意書き）。欄下エラーは Bootstrap の
+                     .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで表示されるため、
+                     注意書きが挟まっても赤字は入力欄のすぐ下に出る（並び順で手前にあるため）。
+                     textarea とは aria-describedby で紐付けて読み上げでも案内が入力の説明として伝わる。
+                     備考の下には区切り線を引く（愛犬の情報／ログイン情報の境目。
                      2026-10 変更でログイン情報を末尾に移したため、ここに境目の線が入る。
                      他 2 本の区切り線は 2026-10 に削除した）。
+                     経緯：2026-10 にいったんラベルの右に移したが、ブラウザで確認したうえで
+                     入力欄の下に戻し、文言を「備考にご記入ください」に変えた。
                      設計書 S-1403 の「多頭飼いの運用」参照。 --}}
                 <div class="mb-3 pb-3 border-bottom">
-                    <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
-                        <label for="trainee_note" class="form-label mb-0">備考</label>
-                        <span id="trainee_note-help" class="form-text">2頭目以降がいらっしゃる場合は、こちらにご記入ください。</span>
-                    </div>
+                    <label for="trainee_note" class="form-label">備考</label>
                     <textarea class="form-control @error('trainee_note') is-invalid @enderror"
                               id="trainee_note" name="trainee_note" rows="3"
                               aria-describedby="trainee_note-help">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
                     <x-form-error field="trainee_note" />
+                    <div id="trainee_note-help" class="form-text">2頭目以降がいらっしゃる場合は、備考にご記入ください。</div>
                 </div>
 
                 {{-- 「ログイン情報」小見出し（4 か所の最後、2026-10 に末尾へ移した）。
