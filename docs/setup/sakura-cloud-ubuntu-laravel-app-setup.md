@@ -193,7 +193,8 @@ nano .env
 | `DB_PASSWORD` | 秘密情報 |
 | `SESSION_DRIVER` | `database` |
 | `FILESYSTEM_DISK` | `local` |
-| `QUEUE_CONNECTION` | `sync`（第10段階で `database` に切り替える予定） |
+| `QUEUE_CONNECTION` | `sync`（第10段階の段階 2 で `database` に切り替える） |
+| `DB_QUEUE_RETRY_AFTER` | 書かない（既定の `660`。第10段階の段階 2 で明示する） |
 | `CACHE_STORE` | `database` |
 
 #### メール
@@ -424,7 +425,7 @@ server {
 
 ### 7-2. 文字起こし・要約の API の待ち時間を延ばす
 
-文字起こしと要約は、ブラウザからのリクエストの中で実行する（`QUEUE_CONNECTION=sync`）。60 分の録音の文字起こしは、音声の変換と外部 API の応答を合わせて 1 分半〜2 分かかり、nginx が PHP の応答を待つ時間の初期値（`fastcgi_read_timeout` 60 秒）を超える。そのため、**この2つの API だけ**、待ち時間を 300 秒に延ばす。
+文字起こしと要約は、ブラウザからのリクエストの中で実行する（キューの設定にかかわらず `dispatchSync` でその場で動かす。第10段階）。60 分の録音の文字起こしは、音声の変換と外部 API の応答を合わせて 1 分半〜2 分かかり、nginx が PHP の応答を待つ時間の初期値（`fastcgi_read_timeout` 60 秒）を超える。そのため、**この2つの API だけ**、待ち時間を 300 秒に延ばす。
 
 トレーナー用ドメイン（`mikan-trs01-staff.inmylife1965.com`）の `server` ブロックの中、`location ~ \.php$` の前に、次を加える。
 
@@ -442,7 +443,8 @@ server {
 - この2つの API へのリクエストを、`index.php` に直接渡す。`SCRIPT_FILENAME` と `SCRIPT_NAME` を `index.php` に合わせるのは、Laravel が URL を正しく読み取れるようにするため。
 - 300 秒の根拠：変換後に上限に収まる最長の録音（約 2 時間 10 分）でも、変換が約 1 分、外部 API が 2〜3 分の見込みで、300 秒に収まる。`OPENAI_REQUEST_TIMEOUT`（300 秒）とも合う。
 - ほかのページやリクエストの待ち時間は、初期値（60 秒）のまま。
-- 処理が終わるまで、PHP のプロセスを1つ使い続ける（プールの `pm.max_children` は 5）。同時に何人も長い文字起こしをすると、ほかの画面の表示が遅くなることがある。利用が増えてきたら、キューへの切り替え（第10段階）を検討する。
+- 処理が終わるまで、PHP のプロセスを1つ使い続ける（プールの `pm.max_children` は 5）。同時に何人も長い文字起こしをすると、ほかの画面の表示が遅くなることがある。利用が増えてきたら、文字起こし・要約のキューへの切り替え（第10段階。録音実行の流れの作り直しが要る）を検討する。
+- メディアの変換・サムネイルの API は、待ち時間を延ばしていない（60 秒のまま）。本番でキューを使う（第10段階の段階 2）と、API はジョブを渡してすぐ返るため、延ばす必要はない。
 
 実績（2026-09-28）：60 分の録音で、変換約 27 秒、外部 API 約 70 秒、合わせて約 1 分半〜2 分。
 
@@ -507,31 +509,40 @@ sudo certbot renew --dry-run
 
 ---
 
-## 第10段階：キューワーカーの常駐　【未適用】
+## 第10段階：キューワーカーの常駐　【段階 1 で準備済み。本番への適用は段階 2】
 
-### 10-1. 現在の状態と、処理時間の上限
+**2026-10 変更**：メディアの変換・サムネイル（`ConvertMediaJob`・`GenerateThumbnailJob`）を、キュー（本番は `database`）で後ろで動かす準備をした（段階 1）。本番への適用（`.env` の切り替えと supervisor の導入）は段階 2 で行う。
 
-現在は `QUEUE_CONNECTION=sync` のため、メディア変換や AI の処理が、ブラウザからのリクエストの中で実行される。そのため、1回のリクエストにかけられる時間の上限を意識する必要がある。
+### 10-1. 何がキューで動き、何がその場で動くか
 
-- **PHP の `max_execution_time`（30 秒）**：Linux では、PHP 自身が計算している時間だけを数える。外部コマンド（FFmpeg・ImageMagick）の実行、API（OpenAI・Anthropic）の応答、DB の応答を待つ時間は数えない。そのため、変換や AI の処理では、この上限には当たりにくい。（Windows ではこれらの待ち時間も数えるため、開発環境では 30 秒で止まることがある。）
-- **nginx の `fastcgi_read_timeout`（初期値 60 秒）**：nginx が PHP の応答を待つ時間。本番で実際に先に効くのはこちら。60 秒を超えると、ブラウザに「504 Gateway Time-out」が表示される。このとき PHP 側の処理は裏で続いていることがあり、画面はエラーでも、結果は保存されている、という分かりにくい状態になり得る。
-  - 文字起こし・要約の API だけは、300 秒に延ばしている（7-2）。ほかのリクエストは初期値の 60 秒のまま。
+| 処理 | 動き方 | 画面の待ち方 |
+|---|---|---|
+| メディアの変換・サムネイル（`ConvertMediaJob`・`GenerateThumbnailJob`） | キューの設定（`QUEUE_CONNECTION`）に従う。本番（段階 2 のあと）は `database` のワーカーが後ろで動かす | 登録のモーダルが、状態を返す API（`GET /api/media-records/{id}/status`）を 3 秒ごとに問い合わせて終わりを待つ（最大 15 分）。キューでも sync でも動く |
+| 文字起こし・要約（`TranscribeAudioJob`・`SummarizeJob`） | **キューの設定にかかわらず、その場で動く**（`dispatchSync`）。nginx の待ち時間は 7-2 のとおり 300 秒 | 画面は API の応答を待つ（応答＝完了）。キューに移すのは別の段階 |
+| 会員のプロフィール写真（ImageMagick）・メールの送信 | その場で動く（ジョブを使っていない） | — |
 
-### 10-2. 運用の方針
+- メディアのジョブは 1 回だけ試す（`$tries = 1`）。時間の上限は 600 秒（`$timeout`）。失敗したとき（ワーカーの時間切れを含む）は、記録の状態を「エラー」にする。
+- **時間の関係**：ワーカーの `--timeout=600`（ジョブの時間の上限）＜ キューの `retry_after=660`（ジョブが戻ってこない＝ワーカーが落ちたとみなすまでの秒数）。`retry_after` のほうが短いと、まだ動いている長いジョブが「戻ってこない」とみなされ、もう一度渡されて二重に動く。そのため `config/queue.php` の既定値を 660 にしてある（`.env` の `DB_QUEUE_RETRY_AFTER`）。
+- その場で動く処理の時間の上限：PHP の `max_execution_time`（30 秒）は、Linux では PHP 自身が計算している時間だけを数え、外部コマンド（FFmpeg・ImageMagick）・API・DB を待つ時間は数えないため、当たりにくい。先に効くのは nginx の `fastcgi_read_timeout`（初期値 60 秒。文字起こし・要約の API だけ 300 秒。7-2）で、超えるとブラウザに「504 Gateway Time-out」が出る（PHP 側の処理は裏で続いていることがある）。
+- ワーカーは 1 つ（`numprocs=1`）から始める。メモリ 2GB のサーバーに、nginx・PHP-FPM・MySQL と同居し、FFmpeg・ImageMagick が PHP-FPM と同時に動くため。導入後は `free -h` でメモリの使い方を見る。
 
-60 分の録音への対応で、文字起こしが 60 秒を超えるようになったため、まず **文字起こし・要約の API だけ nginx の待ち時間を 300 秒に延ばした**（7-2、2026-09-28）。`QUEUE_CONNECTION=sync`・`OPENAI_REQUEST_TIMEOUT=300` は変えていない。これで、画面は処理が終わるまで待ち、結果（「録音が長すぎる」などのエラーのメッセージを含む）を受け取れる。
+### 10-2. 本番に適用する手順（段階 2）
 
-キューへの切り替え（10-3）は、別の件として採用するかを検討する。次のような状況が出てきたら、改めて検討する。
+1. supervisor を入れる（サーバー構築手順書 2-6）。
 
-- 利用者が増え、同時に長い文字起こしをすることで、ほかの画面の表示が遅くなる
-- 処理が終わるまで画面で待たされることが、現場で不満になる
-- AI の応答を非同期にする必要が出てくる
+2. 本番の `.env` に、次の 2 行を書く（`QUEUE_CONNECTION` の行は書き換える）。
 
-### 10-3. キューに切り替える手順
+```
+QUEUE_CONNECTION=database
+DB_QUEUE_RETRY_AFTER=660
+```
 
-1. `.env` の `QUEUE_CONNECTION` を `database` に変更する。
-2. `jobs` / `failed_jobs` テーブルのマイグレーションがあるか確認し、なければ整備する。
-3. supervisor にワーカーの設定を追加する（下は案。導入時に検証して確定する）。
+```bash
+cd /var/www/training-record-system-01/src
+sudo -u trs01 php artisan config:clear
+```
+
+3. supervisor のワーカーの設定を作る。
 
 ```bash
 sudo nano /etc/supervisor/conf.d/training-record-system-01-worker.conf
@@ -539,15 +550,24 @@ sudo nano /etc/supervisor/conf.d/training-record-system-01-worker.conf
 
 ```ini
 [program:training-record-system-01-worker]
-command=/usr/bin/php /var/www/training-record-system-01/src/artisan queue:work --sleep=3 --tries=1 --timeout=600
+command=/usr/bin/php /var/www/training-record-system-01/src/artisan queue:work database --sleep=3 --tries=1 --timeout=600 --max-time=3600
 user=trs01
+numprocs=1
 autostart=true
 autorestart=true
-numprocs=1
+stopwaitsecs=610
 redirect_stderr=true
 stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker.log
-stopwaitsecs=610
 ```
+
+- `--tries=1`：ジョブの `$tries`（1）と同じ。失敗したジョブはくり返さない。
+- `--timeout=600`：ジョブの時間の上限。`retry_after`（660）より短くする（10-1）。
+- `--max-time=3600`：1 時間ごとにワーカーを立ち上げ直す（メモリの増え続けを防ぐ。supervisor が `autorestart` で立ち上げ直す）。
+- `stopwaitsecs=610`：止めるとき、動いているジョブ（最大 600 秒）が終わるまで待つ。
+- ワーカーは PHP-FPM のプールを通らない（コマンドラインの PHP で動く）ため、第6段階の `open_basedir` などの制限はかからない。実行ユーザーは `trs01` にそろえる。
+- ジョブの時間の上限を効かせるには、PHP の `pcntl` が要る。`php -m | grep pcntl` で出ることを確かめる（Ubuntu の PHP の CLI には入っている）。
+
+4. 設定を読み込ませ、動いていることを確かめる。
 
 ```bash
 sudo supervisorctl reread
@@ -555,8 +575,67 @@ sudo supervisorctl update
 sudo supervisorctl status
 ```
 
-- ワーカーは PHP-FPM のプールを通らない（コマンドラインの PHP で動く）ため、第6段階の `open_basedir` などの制限はかからない。実行ユーザーは `trs01` にそろえる。
-- キューの設定はアプリ全体で共通のため audio 系のジョブもキューに乗るが、**audio 関連のコード・ジョブ定義は変更しない**。対象はメディア変換系のみ。
+- `training-record-system-01-worker` が `RUNNING` であること。
+
+5. 確認。
+
+- メディアを 1 件登録し（写真の heic か動画の mov が分かりやすい）、登録のモーダルの行が「処理中」のあと「完了」になり、一覧にサムネイルが出ること。
+- `jobs` のテーブルが空に戻ること、`failed_jobs` が増えないこと。
+
+```bash
+mysql -u trs_user_01 -p training_record_01 -e "SELECT COUNT(*) AS jobs FROM jobs; SELECT COUNT(*) AS failed FROM failed_jobs;"
+sudo tail -n 20 storage/logs/worker.log
+```
+
+- 文字起こし・要約が、今までどおりその場で動くこと（音声記録一覧から、短い音声で 1 回）。
+
+6. 戻し方（うまくいかなかったとき）。
+
+```bash
+# .env の QUEUE_CONNECTION を sync に戻す
+cd /var/www/training-record-system-01/src
+sudo -u trs01 php artisan config:clear
+sudo supervisorctl stop training-record-system-01-worker
+```
+
+- sync に戻すと、メディアの変換・サムネイルはまたその場で動く（画面はどちらでも動く）。戻す前に `jobs` に残っていたジョブは動かないので、その記録は「処理中」のまま残る。ワーカーを止める前に `jobs` が空であることを確かめるか、残ったジョブを `sudo -u trs01 php artisan queue:work database --once --tries=1 --timeout=600` で 1 件ずつ流す。
+
+### 10-3. 監視と、失敗したジョブの扱い
+
+- **ワーカーが動いているか**：`sudo supervisorctl status`（`RUNNING` であること）。落ちても supervisor が立ち上げ直す（`autorestart`）。
+- **たまっているジョブ**：`SELECT COUNT(*) FROM jobs;` が 0 に戻ること。増え続けていたら、ワーカーが止まっている。
+- **失敗したジョブ**：
+
+```bash
+cd /var/www/training-record-system-01/src
+sudo -u trs01 php artisan queue:failed            # 一覧
+sudo -u trs01 php artisan queue:retry <ID>        # もう一度流す（all で全部）
+sudo -u trs01 php artisan queue:forget <ID>       # 一覧から消す
+```
+
+  - メディアのジョブが失敗すると、記録の状態は「エラー」になる。`queue:retry` で流し直しても、ジョブは状態が「処理中」のときしか動かないため、何もせずに終わる。やり直すときは、そのメディアを削除して登録し直す。
+- **`worker.log` のローテーション**：supervisor が書き出すログは Laravel のログと別なので、logrotate の対象にする。
+
+```bash
+sudo nano /etc/logrotate.d/training-record-system-01-worker
+```
+
+```
+/var/www/training-record-system-01/src/storage/logs/worker.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+```
+
+- `copytruncate`：ワーカーがファイルを開いたまま書き続けるため、写しを取ってから中身を空にする。
+
+### 10-4. 開発の環境
+
+開発の環境でのキューの使い方（ふだんは sync、確かめたいときだけワーカーを動かす）は、`docs/setup/dev-environment-queue.md` を参照。
 
 ---
 
@@ -657,9 +736,10 @@ sudo -u trs01 php artisan config:clear
 sudo -u trs01 php artisan view:clear
 sudo -u trs01 php artisan route:clear
 sudo systemctl reload php8.4-fpm
-# キューワーカー導入後は、コードを読み直させるために再起動する
-# sudo supervisorctl restart training-record-system-01-worker
+sudo -u trs01 php artisan queue:restart
 ```
+
+- **`queue:restart` を最後に実行する**：キューのワーカー（第10段階）は、立ち上がったときのコードを読んだまま動き続ける。`queue:restart` は、ワーカーに「今のジョブを終えたら止まる」ように知らせ（キャッシュに印を置く）、supervisor が新しいコードで立ち上げ直す。キューを使っていない環境（`QUEUE_CONNECTION=sync`）でも、印を置くだけなので、実行して害はない。
 
 - `npm run build` は不要（`public/build/` はコミット済み）。SCSS などを変更したときは、開発環境でビルドして、ハッシュ付きの CSS と `manifest.json` ごとコミットする。
 - `.env` だけを変更したときは `config:clear` を実行する。
@@ -671,7 +751,7 @@ sudo systemctl reload php8.4-fpm
 
 ## 付録A　本番の未対応事項（2026-09-26 時点）
 
-- [ ] 第10段階 キューワーカーの常駐（`QUEUE_CONNECTION=database` への切り替えと supervisor の導入）：AI の応答の同期・非同期も含め、実際の運用を見て判断する
+- [ ] 第10段階 キューワーカーの常駐（`QUEUE_CONNECTION=database` への切り替えと supervisor の導入）：段階 1（メディアの変換・サムネイルを、キューでも sync でも動く形にする）は 2026-10 に済み。本番への適用（段階 2）は 10-2 の手順で行う。文字起こし・要約のキューへの切り替えは、録音実行の流れの作り直しが要るため、別の段階で検討する
 
 ---
 

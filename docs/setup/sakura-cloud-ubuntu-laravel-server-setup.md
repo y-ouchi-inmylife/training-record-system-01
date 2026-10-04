@@ -23,7 +23,7 @@
 | Composer | PHP のライブラリを取り込む道具 | 公式インストーラ | 2.10.2 |
 | Node.js / npm | 入れない（ビルド成果物をコミットする方針。2-5） | — | — |
 | certbot（＋nginx プラグイン） | 無料の SSL 証明書を取得・自動更新する道具 | Ubuntu 標準パッケージ | 2.9.0 |
-| supervisor | キューワーカーなどを常駐させ、止まったら自動で再起動する仕組み | 【sakura-cloud-prod-01 未適用】 | — |
+| supervisor | キューワーカーなどを常駐させ、止まったら自動で再起動する仕組み | Ubuntu 標準パッケージ（【sakura-cloud-prod-01 未適用】。training-record-system-01 の段階 2 で入れる） | — |
 
 ---
 
@@ -366,16 +366,20 @@ composer --version
 - `apt policy nodejs` の候補（Candidate）には Ubuntu 標準の 18 系が表示されるが、入れない限り影響はない。
 - 将来、本番で Node.js が必要なアプリを載せることになった場合は、NodeSource のセットアップスクリプト（`curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -` の後に `sudo apt install -y nodejs`）で入れ直せる。スクリプトが、配布元・鍵・優先度の設定を作り直す。
 
-### 2-6. supervisor　【sakura-cloud-prod-01 未適用】
+### 2-6. supervisor　【sakura-cloud-prod-01 未適用。training-record-system-01 の段階 2 で入れる】
 
 キューワーカー（`php artisan queue:work`）を常駐させ、落ちても自動再起動させるために使う。
 
 ```bash
 sudo apt install -y supervisor
-sudo systemctl status supervisor
+sudo systemctl enable --now supervisor
+sudo systemctl status supervisor --no-pager
 ```
 
-ワーカーの設定ファイル（`/etc/supervisor/conf.d/<アプリ名>-worker.conf`）はアプリ構築手順書で作成する。
+- `enable --now`：今すぐ動かし、サーバーを立ち上げ直したときにも自動で動くようにする（apt で入れた時点で有効になっていることが多いが、明示する）。
+- `status` が `active (running)` であること。
+
+ワーカーの設定ファイル（`/etc/supervisor/conf.d/<アプリ名>-worker.conf`）・`worker.log` のローテーションは、アプリ構築手順書（training-record-system-01 は第10段階）で作成する。
 
 ### 2-7. certbot（Let's Encrypt）
 

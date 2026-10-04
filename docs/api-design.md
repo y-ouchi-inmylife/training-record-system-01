@@ -162,6 +162,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 内部API | - | POST | `/api/media-records` | アップロード完了後、メディアレコードを作成する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/media-records/{id}/play` | メディアを表示・再生する（ストリーミング） | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records/{id}/convert` | 表示用変換（heic→jpeg / mov→mp4）を起動する | auth | 管理者、一般 |
+| 内部API | - | POST | `/api/media-records/{id}/generate-thumbnail` | サムネイル生成を起動する | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/media-records/{id}/status` | 表示用変換・サムネイル生成の状態を返す（**2026-10 追加**） | auth | 管理者、一般 |
 
 ※ 認証列は実装のミドルウェア区分を示す。`public`＝認証不要（誰でもアクセス可）、`guest`＝未認証ユーザー向け（ログイン済みはホーム画面へリダイレクト）、`auth`＝要認証（ログイン済みのトレーナー）。（クライアント閲覧機能では guard を明示し、`guest:client`＝未認証のクライアント向け（ログイン済みはクライアントダッシュボードへリダイレクト）、`auth:client`＝要認証（ログイン済みのクライアント）を用いる。）
 ※ 権限列は認証後のロール制限を示す。`-`＝認証不要のため対象外、`全員`＝ログイン済みの全トレーナー（システム管理者を含む）、`管理者、一般`＝システム管理者を除く実務トレーナー、`管理者`＝管理者のみ、`システム管理者`＝システム管理者のみ、`管理者、システム管理者`＝管理者とシステム管理者のみ（一般トレーナーを除く）。`クライアント`＝ログイン済みのクライアント（飼い主）。
@@ -1982,6 +1984,7 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - 音声ファイルを文字起こしする（同期実行）
+- キューの設定（`QUEUE_CONNECTION`）にかかわらず、ジョブをその場で動かす（`dispatchSync`）。画面（音声記録一覧・録音実行）が「API の応答＝完了」の作りのため（**2026-10**。キューに移すのは別の段階）
 
 **レスポンス**（JSON）:
 - 成功：`{ "data": { ... } }`
@@ -2003,6 +2006,7 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - 文字起こしテキストを要約する（同期実行）
+- キューの設定（`QUEUE_CONNECTION`）にかかわらず、ジョブをその場で動かす（`dispatchSync`。理由は transcribe と同じ。**2026-10**）
 - 要約の元は、DB に保存済みの文字起こしテキスト（リクエストで本文は受け取らない。画面で未保存の変更がある場合は、先に `PUT /audio-records/{id}` で保存してから呼ぶ）
 
 **レスポンス**（JSON）:
@@ -2161,10 +2165,53 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - 対象メディアの conversion_status が pending であることを確認する（既に処理中・完了・変換不要の場合は何もしないか、対象外として扱う）
-- 変換ジョブ（ConvertMediaJob）を起動する。ジョブは非同期（ShouldQueue）で、開発環境では同期実行、本番環境ではキューワーカーで非同期実行する
+- conversion_status を processing にしてから、変換ジョブ（ConvertMediaJob）を渡す。ジョブはキューの設定（`QUEUE_CONNECTION`）に従って動く：本番は `database`（supervisor で常駐させたワーカーが後ろで動かす。アプリ構築手順書 第10段階）、開発はふだん `sync`（その場で動く）（**2026-10 変更**）
 - ジョブ内で、原本（original_path）をストレージから取得 → 変換（写真は ImageMagick で heic→jpeg、動画は FFmpeg で mov→mp4）→ 変換後ファイルをストレージに保存 → display_path にパスをセット → conversion_status を done に更新する
 - 変換中は conversion_status を processing、失敗時は error とする
+- ジョブは 1 回だけ試す（`$tries = 1`。変換の失敗はくり返しても直らないことが多いため）。時間の上限は 600 秒（`$timeout`）。ワーカーの時間切れなど、ジョブの中で例外を受けられない失敗でも、`failed()` で conversion_status を error にする（**2026-10 変更**）
+- ジョブを渡したら、**その時点の状態をそのまま返す**（**2026-10 変更**。以前は同期実行が前提で、応答の時点で完了していた）：sync なら done（失敗は HTTP 500）、キューなら processing。processing のときは、呼び出し側が `GET /api/media-records/{id}/status` を問い合わせて終わりを待つ
 
 **レスポンス**（JSON）:
-- 成功（変換起動）：`{ "data": <メディア> }`（同期実行の場合は変換完了後の状態、非同期の場合は processing 状態）
+- 成功（変換起動）：`{ "data": <状態> }`（HTTP 200。`<状態>` の形は `GET /api/media-records/{id}/status` と同じ）
+- conversion_status が pending でない場合：エラーを返す（HTTP 409。`{ "error": <文言>, "conversion_status": <状態> }`）
+- 変換に失敗した場合（sync のとき）・ジョブを渡せなかった場合：エラーを返す（HTTP 500。`{ "error": "表示用変換に失敗しました。", "media_record_id": <ID> }`）
 - 該当なし：エラーを返す（HTTP 404）
+
+##### POST /api/media-records/{id}/generate-thumbnail
+
+**概要**: メディアのサムネイル（200×200）の生成を起動する内部API。メディア登録モーダル（S-1302-M02）で、レコード作成（store）と表示用変換（必要な場合）のあとに、thumbnail_status が pending の場合に呼び出す。
+
+**処理**:
+- 対象メディアの thumbnail_status が pending であることを確認する
+- thumbnail_status を processing にしてから、サムネイル生成ジョブ（GenerateThumbnailJob）を渡す。ジョブの動き方（キューの設定に従う・1 回だけ試す・時間の上限 600 秒・`failed()` で error にする）は convert と同じ（**2026-10 変更**）
+- ジョブ内で、原本からサムネイルを作ってストレージに保存 → thumbnail_path にパスをセット → thumbnail_status を done に更新する。失敗時は error とする
+- ジョブを渡したら、その時点の状態をそのまま返す（convert と同じ。**2026-10 変更**）
+
+**レスポンス**（JSON）:
+- 成功（生成起動）：`{ "data": <状態> }`（HTTP 200。`<状態>` の形は `GET /api/media-records/{id}/status` と同じ。done なら `thumbnail_url` が入る）
+- thumbnail_status が pending でない場合：エラーを返す（HTTP 409。`{ "error": <文言>, "thumbnail_status": <状態> }`）
+- 生成に失敗した場合（sync のとき）・ジョブを渡せなかった場合：エラーを返す（HTTP 500。`{ "error": "サムネイル生成に失敗しました。", "media_record_id": <ID> }`）
+- 該当なし：エラーを返す（HTTP 404）
+
+##### GET /api/media-records/{id}/status
+
+**概要**: メディアの表示用変換・サムネイル生成の状態を返す内部API（**2026-10 追加**）。メディア登録モーダル（S-1302-M02）が、convert・generate-thumbnail の応答が processing（キューで処理中）だったときに、一定の間隔で問い合わせて終わりを待つために使う。
+
+**処理**:
+- 対象メディアの状態を読んで返す（何も変えない）
+- 権限の確かめ方は、ほかのメディアの内部API（convert・generate-thumbnail・play）と同じ（認証・トレーナーの権限・IP 制限）
+
+**レスポンス**（JSON）:
+- 成功：`{ "data": <状態> }`（HTTP 200）
+- 該当なし：エラーを返す（HTTP 404）
+
+`<状態>`（convert・generate-thumbnail の成功の応答と同じ形）：メディアのレコードの列（`id`・`type`・`conversion_status`・`thumbnail_status`・`display_path`・`thumbnail_path` など）に、次を足したもの。
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| conversion_status | string | 表示用変換の状態（not_required / pending / processing / done / error） |
+| thumbnail_status | string | サムネイル生成の状態（pending / processing / done / error） |
+| thumbnail_url | string \| null | サムネイルの表示用 URL（署名付き。thumbnail_status が done のときだけ。それ以外は null） |
+| display_title | string | 表示名（title が空なら元ファイル名） |
+| is_processing | boolean | 変換かサムネイルのどちらかが処理中（processing）か |
+| has_error | boolean | 変換かサムネイルのどちらかがエラー（error）か |

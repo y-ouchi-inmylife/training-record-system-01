@@ -154,7 +154,7 @@ flowchart TD
 | 文字起こし | openai-php/client 0.19.0 + openai-php/laravel 0.19.0（Whisper API） | OpenAI APIクライアントとLaravel統合パッケージ |
 | 文字起こし前処理 | FFmpeg（`config('media.ffmpeg_path')`） | Whisper API の 1 リクエスト上限（25MB）に収めるため、24MB を超える音声ファイルはサーバー側で送信前にダウンコンバートする（モノラル・16kHz・Opus 24 kbps 固定の Ogg）。元の録音ファイルは変更・削除しない |
 | 要約 | anthropic-ai/sdk 0.6.0（Claude API） | Claude APIクライアント |
-| 実行方式 | 同期実行（QUEUE_CONNECTION=sync） | 文字起こし・要約はブラウザで待機する同期実行方式（文字起こし・要約の API は、60 分程度の録音で処理が 60 秒を超えるため、本番の nginx でこの2つの API だけ PHP の応答を待つ時間（fastcgi_read_timeout）を 300 秒に延ばしている（アプリ構築手順書 7-2）。）。ブラウザで待機できる処理時間内に収まることから採用。Job クラス（SummarizeJob、TranscribeAudioJob）は非同期化できる構造として実装済み。現在のクラウド IaaS 環境ではワーカー常駐が可能なため、将来 QUEUE_CONNECTION の切替とワーカー常駐により非同期化する余地がある（現状は同期実行のまま）|
+| 実行方式 | 文字起こし・要約は同期実行（`dispatchSync` で固定）。メディアの変換・サムネイルはキュー（**2026-10 変更**） | **2026-10 変更**：キューの接続（`QUEUE_CONNECTION`）は、本番は `database`（supervisor で常駐させたワーカーが後ろで動かす。アプリ構築手順書 第10段階）、開発はふだん `sync`（その場で動く）。メディアの変換・サムネイル（ConvertMediaJob・GenerateThumbnailJob）はキューの設定に従って動き、画面は状態を返す API（`GET /api/media-records/{id}/status`）を問い合わせて終わりを待つ（キューでも sync でも動く）。文字起こし・要約（TranscribeAudioJob・SummarizeJob）は、画面が「API の応答＝完了」の作りのため、キューの設定にかかわらず `dispatchSync` でその場で動かす（キューに移すのは別の段階）。以下は文字起こし・要約の説明：文字起こし・要約はブラウザで待機する同期実行方式（文字起こし・要約の API は、60 分程度の録音で処理が 60 秒を超えるため、本番の nginx でこの2つの API だけ PHP の応答を待つ時間（fastcgi_read_timeout）を 300 秒に延ばしている（アプリ構築手順書 7-2）。）。ブラウザで待機できる処理時間内に収まることから採用。Job クラス（SummarizeJob、TranscribeAudioJob）は非同期化できる構造として実装済み。現在のクラウド IaaS 環境ではワーカー常駐が可能なため、将来 QUEUE_CONNECTION の切替とワーカー常駐により非同期化する余地がある（現状は同期実行のまま）|
 
 ### 2-3. データベース
 
