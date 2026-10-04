@@ -165,6 +165,26 @@ class RecordingSessionViewRenderingTest extends TestCase
         );
     }
 
+    public function test_作成するは記録の作成を後ろで進めて待たずにログアウトする(): void
+    {
+        // 2026-10：文字起こし → 要約 → トレーニング記録の作成を、ひとつながりでキューに渡す API を 1 回だけ呼ぶ。
+        // 文字起こし・要約・自動作成を順に呼ぶ処理は残っていない
+        $html = $this->renderSession()->__toString();
+        $this->assertStringContainsString("'/auto-create-training-record'", $html);
+        $this->assertSame(1, substr_count($html, "'/auto-create-training-record'"));
+        $this->assertStringNotContainsString("'/transcribe'", $html);
+        $this->assertStringNotContainsString("'/summarize'", $html);
+        $this->assertStringNotContainsString('/api/training-records/auto-create', $html);
+        $this->assertStringNotContainsString('id="transcription_status"', $html);
+        $this->assertStringNotContainsString('id="summary_status"', $html);
+
+        // 受け付けの応答を待つ間の表示と、受け付けたあとの文言
+        $this->assertStringContainsString('送信中... このまましばらくお待ちください。', $html);
+        $this->assertStringContainsString('文字起こし・要約・トレーニング記録の作成は、後ろで進めます。結果は音声記録一覧・トレーニング記録一覧で確かめてください。', $html);
+        // 受け付けられなかったときは、音声記録一覧からやり直せることを添える
+        $this->assertStringContainsString('音声は保存済みです。音声記録一覧から、文字起こし・要約をやり直せます。', $html);
+    }
+
     public function test_アップロード失敗の_alert_が残っていない(): void
     {
         $view = $this->renderSession();

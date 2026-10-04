@@ -277,34 +277,33 @@
         </div>
     </div>
 
-    {{-- モーダル4: 処理中 --}}
+    {{-- モーダル4: 送信中（「作成する」の受け付けの応答を待つ間。閉じるボタンは付けない。
+         文字起こし・要約・記録の作成は後ろで進めるため、ここでは受け付けの応答だけを待つ。2026-10） --}}
     <div class="modal fade" id="modal-processing" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">トレーニング記録を準備中</h5>
+                    <h5 class="modal-title">トレーニング記録の作成</h5>
                 </div>
-                <div class="modal-body">
-                    <div id="progress_status">
-                        <p>&#x2705; 入力完了</p>
-                        <p id="transcription_status">&#x23F3; 文字起こし中...</p>
-                        <p id="summary_status">&#x2B1C; 要約処理待ち</p>
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">送信中...</span>
                     </div>
-                    <p class="text-muted mt-3">処理に数十秒かかる場合があります。このまましばらくお待ちください...</p>
+                    <p class="mb-0">送信中... このまましばらくお待ちください。</p>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- モーダル5: トレーニング記録登録完了 --}}
+    {{-- モーダル5: 受け付け（文字起こし・要約・記録の作成を後ろで進める。2026-10） --}}
     <div class="modal fade" id="modal-record-created" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">トレーニング記録登録</h5>
+                    <h5 class="modal-title">トレーニング記録の作成</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">トレーニング記録の登録が完了しました。</p>
+                    <p class="mb-0">文字起こし・要約・トレーニング記録の作成は、後ろで進めます。結果は音声記録一覧・トレーニング記録一覧で確かめてください。</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" id="btn-confirm-record-created">OK</button>
@@ -843,40 +842,9 @@
                 processingModal.show();
 
                 try {
-                    // 文字起こし実行
-                    var transcribeResponse = await fetch('/api/audio-records/' + uploadedAudioRecordId + '/transcribe', {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    });
-
-                    if (!transcribeResponse.ok) {
-                        var transcribeError = await transcribeResponse.json();
-                        throw new Error(transcribeError?.error?.message || '文字起こしに失敗しました。');
-                    }
-
-                    document.getElementById('transcription_status').innerHTML = '&#x2705; 文字起こし完了';
-
-                    // 要約実行
-                    document.getElementById('summary_status').innerHTML = '&#x23F3; 要約中...';
-                    var summarizeResponse = await fetch('/api/audio-records/' + uploadedAudioRecordId + '/summarize', {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    });
-
-                    if (!summarizeResponse.ok) {
-                        var summarizeError = await summarizeResponse.json();
-                        throw new Error(summarizeError?.error?.message || '要約に失敗しました。');
-                    }
-
-                    document.getElementById('summary_status').innerHTML = '&#x2705; 要約完了';
-
-                    // トレーニング記録を自動作成
-                    document.getElementById('progress_status').innerHTML =
-                        '<p>&#x2705; 文字起こし完了</p>' +
-                        '<p>&#x2705; 要約完了</p>' +
-                        '<p>&#x23F3; トレーニング記録を作成中...</p>';
-
-                    var createResponse = await fetch('/api/training-records/auto-create', {
+                    // 文字起こし → 要約 → トレーニング記録の作成を、ひとつながりで受け付けてもらう（2026-10）。
+                    // サーバーはキューに渡してすぐ返す（本番）。sync（開発）のときは、ここで 3 つとも終わってから返る
+                    var createResponse = await fetch('/api/audio-records/' + uploadedAudioRecordId + '/auto-create-training-record', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -885,7 +853,6 @@
                             'X-Requested-With': 'XMLHttpRequest'
                         },
                         body: JSON.stringify({
-                            audio_record_id: uploadedAudioRecordId,
                             client_id: clientId,
                             training_date: currentDate,
                             training_time: formatTimeHHMM(recordingStartTime) || null,
@@ -896,16 +863,17 @@
 
                     var result = await createResponse.json();
 
-                    if (result.success) {
+                    if (createResponse.ok && result.success) {
                         processingModal.hide();
                         showRecordCreatedModal();
                     } else {
-                        throw new Error(result.message || 'トレーニング記録の作成に失敗しました');
+                        throw new Error(result?.error?.message || result.message || 'トレーニング記録の作成を受け付けられませんでした。');
                     }
 
                 } catch (error) {
                     processingModal.hide();
-                    alert('エラーが発生しました: ' + error.message);
+                    // 音声は保存済みなので、音声記録一覧からやり直せることを添える
+                    alert('エラーが発生しました: ' + error.message + '\n音声は保存済みです。音声記録一覧から、文字起こし・要約をやり直せます。');
                     showLogoutModal();
                 }
             };
@@ -913,7 +881,7 @@
         }
 
         // ========================================
-        // モーダル5: トレーニング記録登録完了
+        // モーダル5: 受け付け（文字起こし・要約・記録の作成を後ろで進める）
         // ========================================
 
         function showRecordCreatedModal() {
