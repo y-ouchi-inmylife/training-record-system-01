@@ -659,9 +659,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 文字起こし・要約の API を呼ぶ（処理中のロック → 呼び出し → 成功・失敗後に読み込み直し）
+    // 文字起こし・要約の状態の問い合わせ（2026-10）。
+    // API はジョブを渡した時点の状態を返す：キュー（本番）なら処理中、sync（開発）なら終わった状態。
+    // 処理中なら、状態を返す API を ACTION_POLL_INTERVAL_MS ごとに問い合わせて終わりを待つ。
+    const ACTION_POLL_INTERVAL_MS = 3000;
+    // 上限は、止まったとみなす時間（AudioRecord::PROCESSING_STALL_MINUTES。30 分）にそろえる
+    const ACTION_POLL_TIMEOUT_MS = @json(\App\Models\AudioRecord::PROCESSING_STALL_MINUTES) * 60 * 1000;
+    // 問い合わせの通信の失敗が、この回数続いたらあきらめる（メディアの登録のモーダルと同じ）
+    const ACTION_POLL_MAX_FAILURES = 3;
+    const ACTION_PENDING_MESSAGE = '処理に時間がかかっています。しばらくしてから一覧を読み込み直してください。';
+
+    function sleepMs(ms) {
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
+    }
+
+    // 処理中（is_processing）の間、状態を返す API を問い合わせ、終わった状態の data を返す。
+    // 上限の時間を超えたとき・通信の失敗が続いたときは null を返す（処理はサーバー側で続いている）。
+    async function waitForAction(audioId, data) {
+        const startedAt = Date.now();
+        let failures = 0;
+        while (data.is_processing) {
+            if (Date.now() - startedAt >= ACTION_POLL_TIMEOUT_MS) {
+                return null;
+            }
+            await sleepMs(ACTION_POLL_INTERVAL_MS);
+            try {
+                const response = await fetch('/api/audio-records/' + audioId + '/status', {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                data = (await response.json()).data || {};
+                failures = 0;
+            } catch (e) {
+                console.error('状態の問い合わせエラー:', e);
+                failures++;
+                if (failures >= ACTION_POLL_MAX_FAILURES) {
+                    return null;
+                }
+            }
+        }
+        return data;
+    }
+
+    // 文字起こし・要約の API を呼ぶ（処理中のロック → 呼び出し → 処理中なら状態の問い合わせ → 成功・失敗後に読み込み直し）
     function startDetailAction(audioId, kind) {
         const isTranscribe = kind === 'transcription';
+        const fallback = isTranscribe ? '文字起こしに失敗しました。' : '要約に失敗しました。';
         lockForAction(audioId, isTranscribe ? detailTranscribeBtn : detailSummarizeBtn,
             isTranscribe ? STATUS_TRANSCRIBING : STATUS_SUMMARIZING);
 
@@ -680,6 +723,22 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(result => {
+            // 処理中（キュー）なら終わるまで問い合わせる。sync なら応答の時点で終わっているので問い合わせない
+            return waitForAction(audioId, (result && result.data) || {});
+        })
+        .then(finalData => {
+            if (finalData === null) {
+                // 上限の時間を超えた・通信の失敗が続いた：ロックを外し、読み込み直しを案内する（処理はサーバー側で続いている）
+                unlockAfterAction();
+                window.FormErrors.showFormMessage(detailFormError, ACTION_PENDING_MESSAGE);
+                return;
+            }
+            if (finalData.is_error) {
+                // キューで動いたジョブが失敗した：今の失敗のときと同じく、ロックを外してパネルの上部に出す
+                unlockAfterAction();
+                window.FormErrors.showFormMessage(detailFormError, fallback);
+                return;
+            }
             // 成功したときだけ、読み込み直した後に完了メッセージを出すため処理の種類を渡す
             navigateWithHighlight(audioId, kind);
         })
@@ -688,7 +747,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // 失敗時はページを読み込み直さず、処理中のロックを解除して入力を直せる状態に戻し、
             // 入力エラー以外の失敗として編集パネルの上部に文言を出す（§2-7。段階 5-3a）
             unlockAfterAction();
-            const fallback = isTranscribe ? '文字起こしに失敗しました。' : '要約に失敗しました。';
             const message = (error && error.error && error.error.message) || fallback;
             window.FormErrors.showFormMessage(detailFormError, message);
         });
