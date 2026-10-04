@@ -416,8 +416,10 @@ class AudioRecordController extends Controller
             // 停滞判定に使う updated_at を必ず現在時刻に進めるため touch() を呼ぶ（やり直しの二重判定を防ぐ）。
             $audioRecord->touch();
 
-            // 同期実行: dispatch完了時点で文字起こし処理が完了している
-            TranscribeAudioJob::dispatch($audioRecord->id);
+            // 同期実行: キューの設定（QUEUE_CONNECTION）にかかわらず、その場で動かす（dispatchSync）。
+            // 画面（音声記録一覧・録音実行）は API の応答＝完了の作りで、キューに乗ると録音実行の
+            // 流れ（文字起こし → 要約 → トレーニング記録の自動作成）が壊れるため。キューに移すのは別の段階（2026-10）
+            TranscribeAudioJob::dispatchSync($audioRecord->id);
 
             // 最新のステータスを取得
             $audioRecord->refresh();
@@ -494,8 +496,9 @@ class AudioRecordController extends Controller
             // 停滞判定に使う updated_at を必ず現在時刻に進めるため touch() を呼ぶ（やり直しの二重判定を防ぐ）。
             $audioRecord->touch();
 
-            // 同期実行: dispatch完了時点で要約処理が完了している
-            SummarizeJob::dispatch($audioRecord->id);
+            // 同期実行: キューの設定（QUEUE_CONNECTION）にかかわらず、その場で動かす（dispatchSync）。
+            // 理由は transcribe() と同じ（画面が API の応答＝完了の作り。キューに移すのは別の段階。2026-10）
+            SummarizeJob::dispatchSync($audioRecord->id);
 
             // 最新のステータスを取得
             $audioRecord->refresh();
