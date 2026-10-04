@@ -143,7 +143,7 @@
 <body>
     <!-- 録音画面（最初から表示） -->
     <div id="recording-container">
-        <h2 class="recording-title waiting-warning" id="recording-title">録音は開始されていません</h2>
+        <h2 class="recording-title waiting-warning" id="recording-title">停止中</h2>
 
         <!-- タイマー -->
         <div class="timer waiting" id="timer-display">
@@ -162,7 +162,7 @@
                 一時停止
             </button>
             <button id="btn-start-recording" class="btn btn-danger btn-control">
-                開始
+                録音開始
             </button>
         </div>
 
@@ -427,6 +427,18 @@
 
             function draw() {
                 animationId = requestAnimationFrame(draw);
+
+                // 録音の前は、メーターを空の表示（背景と枠線だけ）にする。
+                // マイクの音は画面を開いたときから拾っているが、録音の前からメーターが動くと
+                // 録音しているように見えるため（2026-10）。録音を始めたら（isRecording）動かす
+                if (!isRecording) {
+                    canvasContext.fillStyle = '#f0f0f0';
+                    canvasContext.fillRect(0, 0, width, height);
+                    canvasContext.strokeStyle = '#dee2e6';
+                    canvasContext.lineWidth = 2;
+                    canvasContext.strokeRect(0, 0, width, height);
+                    return;
+                }
 
                 analyser.getByteFrequencyData(dataArray);
 
