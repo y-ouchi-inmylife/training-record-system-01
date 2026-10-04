@@ -21,6 +21,10 @@ Route::domain(config('subdomain.trainer_host'))
     Route::get('/audio-records/{audioRecord}/summary', [AudioRecordController::class, 'getSummary'])->name('api.audio-records.summary');
     Route::post('/audio-records/{audioRecord}/transcribe', [AudioRecordController::class, 'transcribe'])->name('api.audio-records.transcribe');
     Route::post('/audio-records/{audioRecord}/summarize', [AudioRecordController::class, 'summarize'])->name('api.audio-records.summarize');
+    // 文字起こし・要約の状態の問い合わせ（キューで処理中のとき、音声記録一覧が一定の間隔で呼ぶ。2026-10）
+    Route::get('/audio-records/{audioRecord}/status', [AudioRecordController::class, 'status'])->name('api.audio-records.status');
+    // 録音実行の「作成する」：文字起こし → 要約 → トレーニング記録の作成をひとつながりで始める（2026-10）
+    Route::post('/audio-records/{audioRecord}/auto-create-training-record', [AudioRecordController::class, 'startAutoCreate'])->name('api.audio-records.auto-create-training-record');
     Route::get('/trainers', [TrainerController::class, 'apiList'])->name('api.trainers.list');
     Route::post('/training-records/auto-create', [TrainingRecordController::class, 'autoCreate'])->name('api.training-records.auto-create');
     Route::get('/training-records/available-media', [TrainingRecordController::class, 'availableMedia'])->name('api.training-records.available-media');

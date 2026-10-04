@@ -14,18 +14,20 @@ use Illuminate\Support\Facades\Log;
 /**
  * 文字起こしテキストの要約ジョブ
  *
- * Laravelキューで非同期実行される。
  * Claude APIにテキストを送信し、要約結果をDBに保存する。
  *
+ * キューの設定（QUEUE_CONNECTION）に従って、並び audio で動く（本番は database ＋ 音声用のワーカー、
+ * 開発はふだん sync でその場で動く。2026-10）。音声記録一覧の「要約」から単独で、
+ * 録音実行の「作成する」から文字起こしに続くひとつながりの 2 番目として呼ばれる。
  */
 class SummarizeJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * ジョブを試行する回数
+     * ジョブを試行する回数（外部の API を何度も呼ぶと費用がかかるため 1 回だけ。2026-10）
      */
-    public int $tries = 3;
+    public int $tries = 1;
 
     /**
      * ジョブがタイムアウトするまでの秒数
@@ -33,13 +35,17 @@ class SummarizeJob implements ShouldQueue
     public int $timeout = 600;
 
     /**
-     * リトライ間隔（秒）
+     * @param  bool  $continueFromTranscription  ひとつながり（文字起こし → 要約）の 2 番目として動くか。
+     *   単独で呼ぶときはコントローラーが「要約中」にしてから渡すが、ひとつながりのときは文字起こしのジョブが
+     *   「文字起こし済み」で終わるため、このジョブの始めで「要約中」にする（2026-10）
      */
-    public int $backoff = 60;
-
     public function __construct(
-        private readonly int $audioRecordId
-    ) {}
+        private readonly int $audioRecordId,
+        private readonly bool $continueFromTranscription = false,
+    ) {
+        // 音声のジョブは並び audio で動かす（メディアの media と分け、文字起こしの間もサムネイルを待たせない）
+        $this->onQueue('audio');
+    }
 
     public function handle(SummarizationService $summarizationService): void
     {
@@ -48,6 +54,12 @@ class SummarizeJob implements ShouldQueue
         if (!$audioRecord) {
             Log::warning("SummarizeJob: 音声ファイルが見つかりません (ID: {$this->audioRecordId})");
             return;
+        }
+
+        // ひとつながりの 2 番目のときは、文字起こし済みからここで「要約中」にする。
+        // 状態が変わるので updated_at も進み、止まったとみなす判定が要約の段階の始めから数えられる
+        if ($this->continueFromTranscription && $audioRecord->status === AudioRecord::STATUS_TRANSCRIBED) {
+            $audioRecord->update(['status' => AudioRecord::STATUS_SUMMARIZING]);
         }
 
         // 既に別の状態に遷移している場合はスキップ
@@ -85,6 +97,23 @@ class SummarizeJob implements ShouldQueue
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * ジョブが失敗したときに呼ばれる（2026-10）。
+     *
+     * handle() の catch に入らない失敗（ワーカーの時間切れ・試行の回数を超えた、など）でも、状態を「エラー」にする。
+     * 要約中のままのときだけ変える（handle() の catch ですでにエラーにした場合は何もしない）。
+     */
+    public function failed(?\Throwable $e): void
+    {
+        $updated = AudioRecord::where('id', $this->audioRecordId)
+            ->where('status', AudioRecord::STATUS_SUMMARIZING)
+            ->update(['status' => AudioRecord::STATUS_ERROR]);
+
+        if ($updated > 0) {
+            Log::error("SummarizeJob: 失敗のため状態をエラーにしました (ID: {$this->audioRecordId}): " . ($e?->getMessage() ?? '不明'));
         }
     }
 }

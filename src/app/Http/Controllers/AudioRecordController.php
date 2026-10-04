@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\TranscriptionInputTooLargeException;
+use App\Jobs\CreateTrainingRecordFromAudioJob;
 use App\Jobs\SummarizeJob;
 use App\Jobs\TranscribeAudioJob;
 use App\Models\AudioRecord;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -333,7 +335,7 @@ class AudioRecordController extends Controller
     {
         // 生きている処理中（文字起こし中／要約中）は編集を拒否する。
         // updated_at を上書きすると停滞判定に使う「処理中になった時刻」の代用が狂うため。
-        // 止まったとみなす記録（15 分経過）は編集可能（判定は既に済んでいるため）。
+        // 止まったとみなす記録（30 分経過）は編集可能（判定は既に済んでいるため）。
         if ($audioRecord->isProcessing() && !$audioRecord->isStalled()) {
             $message = '処理中の音声記録は編集できません。処理が完了してから編集してください。';
             if ($request->expectsJson()) {
@@ -376,7 +378,11 @@ class AudioRecordController extends Controller
     }
 
     /**
-     * 文字起こし処理を実行する（同期実行）
+     * 文字起こしを始める
+     *
+     * ジョブを並び audio に渡し、その時点の状態を返す（2026-10 変更。以前は dispatchSync でその場で動かしていた）：
+     * sync なら終わった状態（transcribed。失敗は 500）、キュー（本番の database）なら transcribing。
+     * transcribing のときは、画面が状態を返す API（status()）を問い合わせて終わりを待つ。
      */
     public function transcribe(AudioRecord $audioRecord): JsonResponse
     {
@@ -416,20 +422,18 @@ class AudioRecordController extends Controller
             // 停滞判定に使う updated_at を必ず現在時刻に進めるため touch() を呼ぶ（やり直しの二重判定を防ぐ）。
             $audioRecord->touch();
 
-            // 同期実行: キューの設定（QUEUE_CONNECTION）にかかわらず、その場で動かす（dispatchSync）。
-            // 画面（音声記録一覧・録音実行）は API の応答＝完了の作りで、キューに乗ると録音実行の
-            // 流れ（文字起こし → 要約 → トレーニング記録の自動作成）が壊れるため。キューに移すのは別の段階（2026-10）
-            TranscribeAudioJob::dispatchSync($audioRecord->id);
+            // キューの設定に従って動く（sync ならここで終わっている。キューなら後ろで動く）
+            TranscribeAudioJob::dispatch($audioRecord->id);
 
             // 最新のステータスを取得
             $audioRecord->refresh();
 
             return response()->json([
-                'data' => [
-                    'id' => $audioRecord->id,
-                    'status' => $audioRecord->status,
-                    'message' => '文字起こしが完了しました。',
-                ],
+                'data' => array_merge($this->statusPayload($audioRecord), [
+                    'message' => $audioRecord->status === AudioRecord::STATUS_TRANSCRIBING
+                        ? '文字起こしを受け付けました。'
+                        : '文字起こしが完了しました。',
+                ]),
             ]);
         } catch (TranscriptionInputTooLargeException $e) {
             // 入力サイズ超過は利用者向けのメッセージをそのまま返す（接頭辞を付けない）
@@ -456,7 +460,10 @@ class AudioRecordController extends Controller
     }
 
     /**
-     * 要約処理を実行する（同期実行）
+     * 要約を始める
+     *
+     * ジョブを並び audio に渡し、その時点の状態を返す（2026-10 変更。transcribe() と同じ）：
+     * sync なら終わった状態（completed。失敗は 500）、キューなら summarizing。
      */
     public function summarize(AudioRecord $audioRecord): JsonResponse
     {
@@ -496,19 +503,18 @@ class AudioRecordController extends Controller
             // 停滞判定に使う updated_at を必ず現在時刻に進めるため touch() を呼ぶ（やり直しの二重判定を防ぐ）。
             $audioRecord->touch();
 
-            // 同期実行: キューの設定（QUEUE_CONNECTION）にかかわらず、その場で動かす（dispatchSync）。
-            // 理由は transcribe() と同じ（画面が API の応答＝完了の作り。キューに移すのは別の段階。2026-10）
-            SummarizeJob::dispatchSync($audioRecord->id);
+            // キューの設定に従って動く（sync ならここで終わっている。キューなら後ろで動く）
+            SummarizeJob::dispatch($audioRecord->id);
 
             // 最新のステータスを取得
             $audioRecord->refresh();
 
             return response()->json([
-                'data' => [
-                    'id' => $audioRecord->id,
-                    'status' => $audioRecord->status,
-                    'message' => '要約が完了しました。',
-                ],
+                'data' => array_merge($this->statusPayload($audioRecord), [
+                    'message' => $audioRecord->status === AudioRecord::STATUS_SUMMARIZING
+                        ? '要約を受け付けました。'
+                        : '要約が完了しました。',
+                ]),
             ]);
         } catch (\Throwable $e) {
             Log::error('要約エラー', [
@@ -525,6 +531,114 @@ class AudioRecordController extends Controller
                 'error' => ['message' => '要約中にエラーが発生しました: ' . $e->getMessage()],
             ], 500);
         }
+    }
+
+    /**
+     * 文字起こし・要約の状態を返す（GET /api/audio-records/{id}/status。2026-10）
+     *
+     * 音声記録一覧の「文字起こし」「要約」で、API の応答が処理中（キューで処理中）だったときに、
+     * 画面が一定の間隔で問い合わせて終わりを待つために使う。
+     */
+    public function status(AudioRecord $audioRecord): JsonResponse
+    {
+        return response()->json(['data' => $this->statusPayload($audioRecord)]);
+    }
+
+    /**
+     * 録音実行の「作成する」から、文字起こし → 要約 → トレーニング記録の作成をひとつながりで始める
+     * （POST /api/audio-records/{id}/auto-create-training-record。2026-10）
+     *
+     * 入力を検証し（担当1・担当2 などは今の autoCreate と同じ規則・文言）、文字起こしを始められる状態か
+     * を確かめてから、状態を「文字起こし中」にし、3 つのジョブをひとつながり（Bus::chain）で並び audio に
+     * 渡して、すぐ返す（202）。途中で失敗したら次の段階には進まない（Bus::chain の標準の動き）。
+     * sync のときは、ここで 3 つとも終わってから返る（失敗は 500）。
+     */
+    public function startAutoCreate(Request $request, AudioRecord $audioRecord): JsonResponse
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'training_date' => 'required|date',
+            'training_time' => 'nullable|date_format:H:i',
+            'trainer1_id' => 'required|exists:trainers,id',
+            'trainer2_id' => 'nullable|exists:trainers,id|different:trainer1_id',
+        ]);
+
+        if (!$audioRecord->canTranscribe()) {
+            if ($audioRecord->status === AudioRecord::STATUS_TRANSCRIBING) {
+                $message = '現在、文字起こしが実行中です。しばらくお待ちください。';
+            } elseif ($audioRecord->status === AudioRecord::STATUS_SUMMARIZING) {
+                $message = '現在、要約が実行中です。しばらくお待ちください。';
+            } else {
+                $message = 'この音声ファイルは現在処理できません。ステータス: ' . $audioRecord->status_label;
+            }
+            return response()->json([
+                'error' => ['message' => $message],
+            ], 409);
+        }
+
+        // APIキーの事前チェック（文字起こし・要約の両方を使うため、両方を確かめる）
+        if (empty(config('openai.api_key'))) {
+            return response()->json([
+                'error' => ['message' => 'OpenAI APIキーが設定されていません。管理者に連絡してください。'],
+            ], 400);
+        }
+        if (empty(config('services.anthropic.api_key'))) {
+            return response()->json([
+                'error' => ['message' => 'Anthropic APIキーが設定されていません。管理者に連絡してください。'],
+            ], 400);
+        }
+
+        try {
+            $audioRecord->update(['status' => AudioRecord::STATUS_TRANSCRIBING]);
+            // status が既に transcribing のまま（止まったとみなす場合のやり直し）でも updated_at を進める
+            $audioRecord->touch();
+
+            Bus::chain([
+                new TranscribeAudioJob($audioRecord->id),
+                new SummarizeJob($audioRecord->id, continueFromTranscription: true),
+                new CreateTrainingRecordFromAudioJob(array_merge($validated, [
+                    'audio_record_id' => $audioRecord->id,
+                ])),
+            ])->onQueue('audio')->dispatch();
+
+            $audioRecord->refresh();
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->statusPayload($audioRecord),
+            ], 202);
+        } catch (\Throwable $e) {
+            Log::error('録音のあとの処理（文字起こし → 要約 → 記録の作成）エラー', [
+                'audio_record_id' => $audioRecord->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            // ジョブ内でエラーステータスに更新されていない場合の安全策（transcribe・summarize と同型）
+            $audioRecord->refresh();
+            if ($audioRecord->isProcessing()) {
+                $audioRecord->update(['status' => AudioRecord::STATUS_ERROR]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => '文字起こし・要約・トレーニング記録の作成中にエラーが発生しました: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * 文字起こし・要約の API と状態を返す API の応答の data を作る（2026-10）
+     */
+    private function statusPayload(AudioRecord $audioRecord): array
+    {
+        return [
+            'id' => $audioRecord->id,
+            'status' => $audioRecord->status,
+            'status_label' => $audioRecord->status_label,
+            'is_processing' => $audioRecord->isProcessing(),
+            'is_error' => $audioRecord->isError(),
+            'is_stalled' => $audioRecord->isStalled(),
+        ];
     }
 
     /**

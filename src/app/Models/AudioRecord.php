@@ -41,10 +41,11 @@ class AudioRecord extends Model
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
     // 「文字起こし中」「要約中」のまま何分たったら処理が中断されたとみなすか。
-    // 根拠：FFmpeg のタイムアウト（600 秒）+ OPENAI_REQUEST_TIMEOUT（300 秒）= 900 秒 = 15 分。
+    // 根拠：FFmpeg のタイムアウト（600 秒）+ OPENAI_REQUEST_TIMEOUT（300 秒）= 900 秒 = 15 分に、
+    // キューで順番を待つ時間を加えて 30 分にする（2026-10。文字起こし・要約をキューで動かすため）。
     // これを超えて終わっていなければ確実に止まっている。
     // まだ処理中の記録を誤って「止まった」と判定し、二重実行が走ることを防ぐため、これより短くしない。
-    const PROCESSING_STALL_MINUTES = 15;
+    const PROCESSING_STALL_MINUTES = 30;
 
     protected $fillable = [
         'trainer_id',
@@ -168,7 +169,7 @@ class AudioRecord extends Model
      * 文字起こしを実行可能かどうか
      * 音声ファイルが存在していれば実行可能（再実行も含む）。
      * 生きている処理中（文字起こし中／要約中どちらも）は二重実行を防ぐため不可。
-     * ただし止まったとみなす場合（15 分経過）はやり直しを許可する。
+     * ただし止まったとみなす場合（30 分経過）はやり直しを許可する。
      */
     public function canTranscribe(): bool
     {
@@ -185,7 +186,7 @@ class AudioRecord extends Model
      * 要約を実行可能かどうか
      * 文字起こしテキストが存在していれば実行可能（再実行も含む）。
      * 生きている処理中（文字起こし中／要約中どちらも）は二重実行を防ぐため不可。
-     * ただし止まったとみなす場合（15 分経過）はやり直しを許可する。
+     * ただし止まったとみなす場合（30 分経過）はやり直しを許可する。
      */
     public function canSummarize(): bool
     {
