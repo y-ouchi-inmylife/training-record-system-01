@@ -494,7 +494,7 @@ erDiagram
 | role | VARCHAR(20) | NO | 'staff' | 権限（5-15.参照） |
 | last_login_at | TIMESTAMP | YES | NULL | 最終ログイン日時 |
 | password | VARCHAR(255) | NO | — | パスワードのハッシュ値（bcryptで暗号化、60文字固定） |
-| is_locked | BOOLEAN | NO | false | アカウントロック状態。5回連続ログイン失敗または30日間未ログインで true になる |
+| is_locked | BOOLEAN | NO | false | アカウントロック状態。5回連続ログイン失敗、長期間未ログイン（初期値30日）、または発行後の未使用（初期値7日）で true になる（日数は `.env` で設定。バッチ設計書 1-2。**2026-10 変更**） |
 | is_active | BOOLEAN | NO | true | アカウント有効フラグ。falseの場合ログイン不可 |
 | must_change_password | BOOLEAN | NO | false | 初回ログイン時パスワード変更必須フラグ |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |

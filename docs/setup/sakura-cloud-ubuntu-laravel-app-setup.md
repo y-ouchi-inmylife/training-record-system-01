@@ -560,17 +560,69 @@ sudo supervisorctl status
 
 ---
 
-## 第11段階：DB バックアップの cron
+## 第11段階：バッチの cron（Laravel のスケジュール）
 
-`trs01` の crontab に、毎日 04:00 のバックアップを登録する。スケジューラ（`schedule:run`）は使わず、コマンドを直接登録する。
+定期的に動かすバッチ（アカウントのロック・音声ファイルの削除・DB のバックアップ）は、Laravel のスケジュール（`bootstrap/app.php` の `withSchedule`）にまとめてある。cron は、`schedule:run` を毎分動かす 1 行だけを `trs01` の crontab に登録する。
+
+**2026-10 変更**：以前は「スケジューラ（`schedule:run`）は使わず、コマンドを直接登録する」として、バックアップ（毎日 04:00）の 1 行だけを登録していた。サーバーの移行のときに、cron に直接書いていたバッチのうちバックアップしか移されず、ほかのバッチ（アカウントのロック・音声ファイルの削除）が止まっていたため、スケジュールにまとめる形に変えた。まとめておけば、バッチが増えても cron を触らずに済み、`schedule:list` で全部の時刻を確かめられる。
 
 ```bash
 sudo crontab -u trs01 -e
 ```
 
 ```
-0 4 * * * cd /var/www/training-record-system-01/src && /usr/bin/php artisan db:backup >> storage/logs/cron-backup.log 2>&1
+* * * * * cd /var/www/training-record-system-01/src && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
 ```
+
+スケジュールに登録しているバッチ（毎日。詳細はバッチ設計書 1 章）：
+
+| 時刻 | ID | バッチ | ログ |
+|---|---|---|---|
+| 2:00 | B-0201 | 長期間ログインしていないアカウントのロック（`trainers:lock-inactive`） | `storage/logs/laravel*.log` の `[LockInactiveTrainers]` |
+| 2:10 | B-0202 | 一度も使われていないアカウントのロック（`trainers:lock-unused`） | 同 `[LockUnusedTrainers]` |
+| 2:20 | B-0101 | 音声ファイルの削除（`audio-records:delete-expired`） | 同 `[DeleteExpiredAudioRecords]` |
+| 2:30 | B-0301 | DB のバックアップ（`db:backup`） | 同 `[BackupDatabase]`。コンソールへの出力は `storage/logs/cron-backup.log` に追記 |
+
+### 11-1. 既存の環境で cron を書き換える（2026-10）
+
+2026-10 より前に構築した環境では、`trs01` の crontab に `db:backup` を直接動かす行（`0 4 * * * … artisan db:backup …`）がある。この行を消して、上の `schedule:run` の行に**置き換える**。両方を残すと、バックアップが 2:30（スケジュール）と 04:00（cron）の 2 回動く。
+
+```bash
+sudo crontab -u trs01 -l      # 今の行を確かめる（db:backup の 1 行のはず）
+sudo crontab -u trs01 -e      # db:backup の行を消し、schedule:run の行を書く
+sudo crontab -u trs01 -l      # schedule:run の 1 行だけになったことを確かめる
+```
+
+### 11-2. 日数の設定
+
+バッチが使う日数は `.env` で設定する。書いていなければ初期値で動く。有効な範囲の外・整数でないときは、そのバッチは何もせず（ロック・削除をせず）、エラーをログに残して終わる。
+
+| 項目 | 意味 | 初期値 | 有効な範囲 |
+|---|---|---|---|
+| `COUNSELOR_LOCK_INACTIVE_DAYS` | B-0201：最終ログインからの日数 | `30` | 1〜90 |
+| `COUNSELOR_LOCK_UNUSED_DAYS` | B-0202：作成からの日数（一度もログインしていないアカウント） | `7` | 1〜90 |
+| `AUDIO_RETENTION_DAYS` | B-0101：音声ファイルを残す日数 | `7` | 1〜30 |
+
+`.env` を変えたら、`sudo -u trs01 php artisan config:clear` を実行する。
+
+### 11-3. 確認
+
+```bash
+cd /var/www/training-record-system-01/src
+sudo -u trs01 php artisan schedule:list
+```
+
+- 4 行（`0 2 * * *` `trainers:lock-inactive`、`10 2 * * *` `trainers:lock-unused`、`20 2 * * *` `audio-records:delete-expired`、`30 2 * * *` `db:backup`）が出ること。
+
+翌朝、各バッチのログを確かめる。
+
+```bash
+sudo grep -h -E "\[(LockInactiveTrainers|LockUnusedTrainers|DeleteExpiredAudioRecords|BackupDatabase)\]" storage/logs/laravel*.log | tail -n 20
+sudo tail -n 20 storage/logs/cron-backup.log
+```
+
+- 各バッチの「開始します」と結果（「N件のトレーナーをロックしました。」「音声ファイル自動削除完了」「…をバックアップ用ストレージにアップロードしました」）が、その日の 2:00〜2:30 ごろの時刻で出ていること。
+- 「有効な範囲の外のため、何もせずに終了します」が出ていたら、`.env` の値を直して `config:clear` を実行する。
 
 ---
 
@@ -586,6 +638,7 @@ sudo crontab -u trs01 -e
 - [ ] PHP が `trs01` で動いている（画面を開いた後に `ps -eo user,cmd | grep "pool trs01"` で `trs01` のプロセスが表示される）
 - [ ] 新しく作られたログのファイル（`storage/logs/`）が `trs01` の所有になっている
 - [ ] `sudo -u trs01 php artisan db:backup` を手動で実行し、R2 にバックアップが作られる
+- [ ] `sudo -u trs01 php artisan schedule:list` で、4 つのバッチ（2:00・2:10・2:20・2:30）が出る（第11段階）
 - [ ] 翌朝、R2 のバケット `trs01-backup-prod` にバックアップが作られている（`storage/logs/cron-backup.log` も確認）
 
 ---
