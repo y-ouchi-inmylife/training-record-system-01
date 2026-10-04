@@ -49,6 +49,8 @@ class BatchScheduleTest extends TestCase
         foreach ($expected as $command => $expression) {
             $this->assertSame($expression, $events[$command]->expression, $command);
             $this->assertTrue($events[$command]->withoutOverlapping, $command . ' に withoutOverlapping がない');
+            // 印の有効期限は 60 分（既定の 1440 分だと、落ちて印が残ったときに翌日の回が飛ばされるため）
+            $this->assertSame(60, $events[$command]->expiresAt, $command . ' の印の有効期限が 60 分でない');
         }
     }
 

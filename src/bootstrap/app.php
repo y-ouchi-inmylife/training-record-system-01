@@ -55,15 +55,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // 時刻はここにまとめる（php artisan schedule:list で確かめられる）。
         // 時刻は 10 分ずつずらし、バッチが重ならないようにする（2026-10）。
         // 日数は --days を付けずに呼び、設定（config/batch.php。.env）の値を使う。
+        // 重なり防止の印の有効期限は 60 分（既定の 24 時間だと、落ちて印が残ったときに翌日の同じ時刻の回が飛ばされるため。各バッチは数分で終わる）。
 
         // B-0201 長期間ログインしていないアカウントのロック（COUNSELOR_LOCK_INACTIVE_DAYS）
-        $schedule->command('trainers:lock-inactive')->dailyAt('02:00')->withoutOverlapping();
+        $schedule->command('trainers:lock-inactive')->dailyAt('02:00')->withoutOverlapping(60);
         // B-0202 一度も使われていないアカウントのロック（COUNSELOR_LOCK_UNUSED_DAYS）
-        $schedule->command('trainers:lock-unused')->dailyAt('02:10')->withoutOverlapping();
+        $schedule->command('trainers:lock-unused')->dailyAt('02:10')->withoutOverlapping(60);
         // B-0101 保存期間を過ぎた音声ファイルの削除（AUDIO_RETENTION_DAYS）
-        $schedule->command('audio-records:delete-expired')->dailyAt('02:20')->withoutOverlapping();
+        $schedule->command('audio-records:delete-expired')->dailyAt('02:20')->withoutOverlapping(60);
         // B-0301 DB のバックアップ（R2 へ送る）。出力は、cron から直接動かしていたときと同じログに出す
-        $schedule->command('db:backup')->dailyAt('02:30')->withoutOverlapping()
+        $schedule->command('db:backup')->dailyAt('02:30')->withoutOverlapping(60)
             ->appendOutputTo(storage_path('logs/cron-backup.log'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
