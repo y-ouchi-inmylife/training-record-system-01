@@ -622,16 +622,21 @@ sudo nano /etc/logrotate.d/training-record-system-01-worker
 
 ```
 /var/www/training-record-system-01/src/storage/logs/worker.log {
+    su root trs01
     weekly
     rotate 8
     compress
+    delaycompress
     missingok
     notifempty
     copytruncate
 }
 ```
 
+- `su root trs01`：`storage/logs` は `trs01` のグループで書き込める（`drwxrws---`）ため、`su` がないと logrotate は「親のフォルダーの権限が安全でない」（`parent directory has insecure permissions`）としてローテーションを断る。`worker.log` は supervisor が root として書くため持ち主が root（`-rw-r--r-- root trs01`）で、`su trs01 trs01` にすると中身を空にできない。そのため、root として、グループは `trs01` で処理する（**2026-10 追加**。本番の適用時に分かった）。
 - `copytruncate`：ワーカーがファイルを開いたまま書き続けるため、写しを取ってから中身を空にする。
+- `delaycompress`：直近の 1 つ（`worker.log.1`）は圧縮せずに残し、すぐ読めるようにする。
+- 確かめ方：`sudo logrotate -d /etc/logrotate.d/training-record-system-01-worker`（実際には何もせず、何をするかを表示する）で、`parent directory has insecure permissions` のエラーが出ないこと。初めて読み込んだ直後は `log does not need rotating (log has already been rotated)` と出る（その時点を最初のローテーションとして記録するため。以後は毎週）。
 
 ### 10-4. 開発の環境
 
