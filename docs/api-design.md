@@ -151,10 +151,12 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント閲覧 | S-1408 クライアントパスワード再設定画面 | POST | `/client-portal/password-reset/{token}` | 新しいパスワードを保存し、ログイン画面へ遷移する | public | - |
 | クライアント管理 | S-0305 クライアント詳細画面 | POST | `/clients/{client}/email-registration-tokens` | マイページ登録案内を発行する（未発行時の発行と再発行を同じエンドポイントで扱う。トークン自体は「メールアドレス登録用 URL」で、URL パスもそのまま） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/clients/search` | クライアントを検索する | auth | 管理者、一般 |
-| 内部API | - | POST | `/api/training-records/auto-create` | 音声記録の要約からトレーニング記録を作成する | auth | 管理者、一般 |
+| 内部API | - | POST | `/api/training-records/auto-create` | 音声記録の要約からトレーニング記録を作成する（**2026-10**：画面からは呼ばれなくなった。録音実行は `/api/audio-records/{id}/auto-create-training-record` を使う） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/training-records/available-media` | トレーニング記録に紐づけ可能なメディア一覧を取得する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/audio-records/{id}/transcribe` | 文字起こしを実行する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/audio-records/{id}/summarize` | 要約を実行する | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/audio-records/{id}/status` | 文字起こし・要約の状態を返す（**2026-10 追加**） | auth | 管理者、一般 |
+| 内部API | - | POST | `/api/audio-records/{id}/auto-create-training-record` | 文字起こし → 要約 → トレーニング記録の作成をひとつながりで始める（録音実行の「作成する」。**2026-10 追加**） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/audio-records/{id}/summary` | 音声記録の要約テキストを取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/audio-records/summaries` | 要約取り込み候補の音声記録一覧を取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/trainers` | 担当トレーナーの選択候補を取得する | auth | 管理者、一般 |
@@ -705,11 +707,11 @@ POST /training-records に以下を追加する。
 
 録音して音声記録を作成することがこの画面の主機能。さらに、作成した音声記録に文字起こし・要約を行い、その要約からトレーニング記録を作成することも可能。
 
-処理フロー：
+処理フロー（**2026-10 変更**）：
 1. 録音した音声を POST /audio-records/recording でアップロードし、音声記録を作成
-2. POST /api/audio-records/{id}/transcribe で文字起こし
-3. POST /api/audio-records/{id}/summarize で要約
-4. POST /api/training-records/auto-create で要約からトレーニング記録を作成
+2. トレーニング記録を作る場合は、POST /api/audio-records/{id}/auto-create-training-record で、文字起こし → 要約 → トレーニング記録の作成をひとつながりで受け付けてもらう（後ろで進む。画面は待たずにログアウトする）
+
+（以前は、画面が POST /api/audio-records/{id}/transcribe → POST /api/audio-records/{id}/summarize → POST /api/training-records/auto-create を、それぞれの応答を待ちながら順に呼んでいた）
 
 ###### GET /recording-v2/session
 
@@ -861,7 +863,7 @@ POST /training-records に以下を追加する。
 | summary_text | string | | nullable, string | 要約テキスト |
 
 **処理**:
-- 処理中（止まっていない文字起こし中・要約中）の記録は編集を受け付けない（停滞判定に使う `updated_at` を上書きしないため。15 分以上経過して止まったとみなす記録は受け付ける）
+- 処理中（止まっていない文字起こし中・要約中）の記録は編集を受け付けない（停滞判定に使う `updated_at` を上書きしないため。30 分以上経過して止まったとみなす記録は受け付ける。**2026-10 変更**。以前は 15 分）
 - 表示名・文字起こしテキスト・要約テキストを保存する（`status` は変えない）
 
 **レスポンス**:
@@ -1933,6 +1935,8 @@ POST /training-records に以下を追加する。
 
 **概要**: 音声記録の要約からトレーニング記録を作成する内部API。
 
+**2026-10**：録音実行の画面からは呼ばれなくなった（`POST /api/audio-records/{id}/auto-create-training-record` に置き換えた）。記録の中身を作る処理は `TrainingRecordAutoCreateService` に取り出し、この API と、ひとつながりの最後のジョブ（`CreateTrainingRecordFromAudioJob`）の両方から使う。API は今は残している。
+
 **リクエスト**（JSON）:
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
@@ -1983,21 +1987,21 @@ POST /training-records に以下を追加する。
 **概要**: 音声記録の文字起こしを実行する内部API。
 
 **処理**:
-- 音声ファイルを文字起こしする（同期実行）
-- キューの設定（`QUEUE_CONNECTION`）にかかわらず、ジョブをその場で動かす（`dispatchSync`）。画面（音声記録一覧・録音実行）が「API の応答＝完了」の作りのため（**2026-10**。キューに移すのは別の段階）
+- 状態を「文字起こし中」（transcribing）にしてから、文字起こしのジョブ（TranscribeAudioJob）を並び `audio` に渡す。ジョブはキューの設定（`QUEUE_CONNECTION`）に従って動く：本番は `database`（音声用のワーカーが後ろで動かす）、開発はふだん `sync`（その場で動く）（**2026-10 変更**。以前は `dispatchSync` でその場で動かしていた）
+- ジョブは 1 回だけ試す（`$tries = 1`）。失敗したとき（ワーカーの時間切れを含む）は、状態を「エラー」にする
+- ジョブを渡したら、**その時点の状態をそのまま返す**：sync なら transcribed（失敗は HTTP 500）、キューなら transcribing。transcribing のときは、呼び出し側が `GET /api/audio-records/{id}/status` を問い合わせて終わりを待つ
 
 **レスポンス**（JSON）:
-- 成功：`{ "data": { ... } }`
+- 成功：`{ "data": { ... } }`（HTTP 200）
 - 処理できない状態の場合：エラーを返す（HTTP 409）
 - APIキーが設定されていない場合：エラーを返す（HTTP 400）
+- 文字起こしに失敗した場合（sync のとき）：エラーを返す（HTTP 500）
 
-成功時の `data`：
+成功時の `data`：`GET /api/audio-records/{id}/status` の `data` に、次を足したもの。
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | integer | 音声記録ID |
-| status | string | 処理状態 |
-| message | string | 完了メッセージ |
+| message | string | 「文字起こしを受け付けました。」（transcribing のとき）／「文字起こしが完了しました。」（終わっているとき） |
 
 
 ##### POST /api/audio-records/{id}/summarize
@@ -2005,22 +2009,77 @@ POST /training-records に以下を追加する。
 **概要**: 音声記録の要約を実行する内部API。
 
 **処理**:
-- 文字起こしテキストを要約する（同期実行）
-- キューの設定（`QUEUE_CONNECTION`）にかかわらず、ジョブをその場で動かす（`dispatchSync`。理由は transcribe と同じ。**2026-10**）
+- 状態を「要約中」（summarizing）にしてから、要約のジョブ（SummarizeJob）を並び `audio` に渡す。動き方・応答の考え方は transcribe と同じ（**2026-10 変更**）：sync なら completed、キューなら summarizing を返す
 - 要約の元は、DB に保存済みの文字起こしテキスト（リクエストで本文は受け取らない。画面で未保存の変更がある場合は、先に `PUT /audio-records/{id}` で保存してから呼ぶ）
 
 **レスポンス**（JSON）:
-- 成功：`{ "data": { ... } }`
+- 成功：`{ "data": { ... } }`（HTTP 200）
 - 要約できない状態の場合：エラーを返す（HTTP 409）
 - APIキーが設定されていない場合：エラーを返す（HTTP 400）
+- 要約に失敗した場合（sync のとき）：エラーを返す（HTTP 500）
 
-成功時の `data`：
+成功時の `data`：`GET /api/audio-records/{id}/status` の `data` に、次を足したもの。
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| message | string | 「要約を受け付けました。」（summarizing のとき）／「要約が完了しました。」（終わっているとき） |
+
+
+##### GET /api/audio-records/{id}/status
+
+**概要**: 音声記録の文字起こし・要約の状態を返す内部API（**2026-10 追加**）。音声記録一覧（S-0505）が、transcribe・summarize の応答が処理中（キューで処理中）だったときに、3 秒ごとに問い合わせて終わりを待つために使う。
+
+**処理**:
+- 対象の音声記録の状態を読んで返す（何も変えない）
+- 権限の確かめ方は、ほかの音声記録の内部API（transcribe・summarize）と同じ（認証・トレーナーの権限・IP 制限）
+
+**レスポンス**（JSON）:
+- 成功：`{ "data": { ... } }`（HTTP 200）
+- 該当なし：エラーを返す（HTTP 404）
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | id | integer | 音声記録ID |
-| status | string | 処理状態 |
-| message | string | 完了メッセージ |
+| status | string | 処理状態（unprocessed / transcribing / transcribed / summarizing / completed / error） |
+| status_label | string | 処理状態の表示名 |
+| is_processing | boolean | 処理中（文字起こし中・要約中）か |
+| is_error | boolean | エラーか |
+| is_stalled | boolean | 処理中のまま 30 分以上たって、止まったとみなすか（`AudioRecord::PROCESSING_STALL_MINUTES`） |
+
+
+##### POST /api/audio-records/{id}/auto-create-training-record
+
+**概要**: 録音実行（S-0502）のトレーニング記録作成モーダル（S-0502-M01）の「作成する」から呼ぶ内部API（**2026-10 追加**）。文字起こし → 要約 → トレーニング記録の作成を、ひとつながりで受け付けて、すぐ返す。
+
+**リクエスト**（JSON）：
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| client_id | integer | ● | required, exists:clients,id | クライアントID |
+| training_date | date | ● | required, date | 日付 |
+| training_time | time | | nullable, date_format:H:i | 時刻 |
+| trainer1_id | integer | ● | required, exists:trainers,id | 担当1 |
+| trainer2_id | integer | | nullable, exists:trainers,id, different:trainer1_id | 担当2（担当1と異なること） |
+
+（規則と文言は `POST /api/training-records/auto-create` と同じ。音声記録は URL の `{id}` で指定する）
+
+**処理**:
+- 入力を検証する（HTTP 422。文言は `lang/ja/validation.php` の `custom.trainer1_id.required`・`custom.trainer2_id.different` など。画面側の確認と同じ文言）
+- 文字起こしを始められるか（音声ファイルがある・処理中でない。30 分以上たって止まったとみなす処理中は可）を確かめる。始められないときは受け付けない（HTTP 409）
+- OpenAI・Anthropic の API キーが設定されているかを確かめる（HTTP 400）
+- 状態を「文字起こし中」にし、次の 3 つのジョブをひとつながり（`Bus::chain`）で並び `audio` に渡す
+  1. 文字起こし（TranscribeAudioJob）：終わったら「文字起こし済み」
+  2. 要約（SummarizeJob。ひとつながりの 2 番目として、始めに「要約中」にする）：終わったら「要約完了」
+  3. トレーニング記録の作成（CreateTrainingRecordFromAudioJob）：要約が完了しているときだけ、要約を記録内容にしてトレーニング記録を作る（中身は `TrainingRecordAutoCreateService`。`POST /api/training-records/auto-create` と同じ）
+- 途中で失敗したら、次のジョブは動かない（`Bus::chain` の標準の動き）。文字起こし・要約の失敗では、状態を「エラー」にする。どのジョブも 1 回だけ試す
+- sync のときは、3 つとも終わってから応答が返る
+
+**レスポンス**（JSON）:
+- 受け付け：`{ "success": true, "data": <状態> }`（HTTP 202。`<状態>` は `GET /api/audio-records/{id}/status` と同じ形。キューなら transcribing、sync なら終わった状態）
+- 入力エラー：HTTP 422（Laravel 標準の `{message, errors}`）
+- 始められない状態：`{ "error": { "message": <文言> } }`（HTTP 409）
+- API キーが未設定：`{ "error": { "message": <文言> } }`（HTTP 400）
+- 失敗（sync のとき）・ジョブを渡せなかったとき：`{ "success": false, "message": <文言> }`（HTTP 500）
 
 
 ##### GET /api/audio-records/{id}/summary

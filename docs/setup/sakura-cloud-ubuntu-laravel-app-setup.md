@@ -425,7 +425,9 @@ server {
 
 ### 7-2. 文字起こし・要約の API の待ち時間を延ばす
 
-文字起こしと要約は、ブラウザからのリクエストの中で実行する（キューの設定にかかわらず `dispatchSync` でその場で動かす。第10段階）。60 分の録音の文字起こしは、音声の変換と外部 API の応答を合わせて 1 分半〜2 分かかり、nginx が PHP の応答を待つ時間の初期値（`fastcgi_read_timeout` 60 秒）を超える。そのため、**この2つの API だけ**、待ち時間を 300 秒に延ばす。
+**2026-10 変更**：文字起こし・要約はキューで後ろで動かすようになった（第10段階）。本番（`QUEUE_CONNECTION=database`）では、この 2 つの API はジョブを渡してすぐ返るため、この設定は効かなくなった。sync の環境（開発や、本番を sync に戻したとき）では今までどおり長くかかることがあるため、設定は残してよい（外さなくても害はない）。以下は、sync で動かしていたときの説明。
+
+文字起こしと要約は、ブラウザからのリクエストの中で実行する（sync のとき）。60 分の録音の文字起こしは、音声の変換と外部 API の応答を合わせて 1 分半〜2 分かかり、nginx が PHP の応答を待つ時間の初期値（`fastcgi_read_timeout` 60 秒）を超える。そのため、**この2つの API だけ**、待ち時間を 300 秒に延ばす。
 
 トレーナー用ドメイン（`mikan-trs01-staff.inmylife1965.com`）の `server` ブロックの中、`location ~ \.php$` の前に、次を加える。
 
@@ -509,22 +511,26 @@ sudo certbot renew --dry-run
 
 ---
 
-## 第10段階：キューワーカーの常駐　【段階 1 で準備済み。本番への適用は段階 2】
+## 第10段階：キューワーカーの常駐
 
-**2026-10 変更**：メディアの変換・サムネイル（`ConvertMediaJob`・`GenerateThumbnailJob`）を、キュー（本番は `database`）で後ろで動かす準備をした（段階 1）。本番への適用（`.env` の切り替えと supervisor の導入）は段階 2 で行う。
+**2026-10 変更**：
+- 段階 1・2：メディアの変換・サムネイル（`ConvertMediaJob`・`GenerateThumbnailJob`）を、キュー（本番は `database`）で後ろで動かすようにした。このとき文字起こし・要約は、画面が「API の応答＝完了」の作りだったため、`dispatchSync` に固定してその場で動かしていた。
+- 段階 3：**文字起こし・要約・トレーニング記録の自動作成も、キューで後ろで動かす**ようにした。音声とメディアで並び（キュー）を分け（`audio`・`media`）、**ワーカーを 2 つ**にした（10-5）。
 
 ### 10-1. 何がキューで動き、何がその場で動くか
 
 | 処理 | 動き方 | 画面の待ち方 |
 |---|---|---|
-| メディアの変換・サムネイル（`ConvertMediaJob`・`GenerateThumbnailJob`） | キューの設定（`QUEUE_CONNECTION`）に従う。本番（段階 2 のあと）は `database` のワーカーが後ろで動かす | 登録のモーダルが、状態を返す API（`GET /api/media-records/{id}/status`）を 3 秒ごとに問い合わせて終わりを待つ（最大 15 分）。キューでも sync でも動く |
-| 文字起こし・要約（`TranscribeAudioJob`・`SummarizeJob`） | **キューの設定にかかわらず、その場で動く**（`dispatchSync`）。nginx の待ち時間は 7-2 のとおり 300 秒 | 画面は API の応答を待つ（応答＝完了）。キューに移すのは別の段階 |
+| メディアの変換・サムネイル（`ConvertMediaJob`・`GenerateThumbnailJob`） | キューの設定（`QUEUE_CONNECTION`）に従う。本番は `database` のワーカーが後ろで動かす。並び `media`（**2026-10 変更**） | 登録のモーダルが、状態を返す API（`GET /api/media-records/{id}/status`）を 3 秒ごとに問い合わせて終わりを待つ（最大 15 分）。キューでも sync でも動く |
+| 文字起こし・要約（`TranscribeAudioJob`・`SummarizeJob`）（音声記録一覧の「文字起こし」「要約」） | キューの設定に従う（**2026-10 変更**。以前は `dispatchSync` でその場で動かしていた）。並び `audio` | 音声記録一覧が、状態を返す API（`GET /api/audio-records/{id}/status`）を 3 秒ごとに問い合わせて終わりを待つ（最大 30 分） |
+| 録音実行の「作成する」（文字起こし → 要約 → トレーニング記録の作成。`CreateTrainingRecordFromAudioJob`） | 3 つのジョブをひとつながり（`Bus::chain`）で並び `audio` に渡す（**2026-10 追加**）。途中で失敗したら、次の段階には進まない | 待たない。受け付けたら「後ろで進めます」と出してログアウトする（sync のときは、受け付けの応答が返るまでに 3 つとも終わる） |
 | 会員のプロフィール写真（ImageMagick）・メールの送信 | その場で動く（ジョブを使っていない） | — |
 
-- メディアのジョブは 1 回だけ試す（`$tries = 1`）。時間の上限は 600 秒（`$timeout`）。失敗したとき（ワーカーの時間切れを含む）は、記録の状態を「エラー」にする。
+- どのジョブも 1 回だけ試す（`$tries = 1`。音声は外部の API を何度も呼ぶと費用がかかるため、メディアはくり返しても直らないことが多いため）。時間の上限は 600 秒（`$timeout`）。失敗したとき（ワーカーの時間切れを含む）は、記録の状態を「エラー」にする（処理中のときだけ）。
+- 音声記録の「止まったとみなす時間」（`AudioRecord::PROCESSING_STALL_MINUTES`）は 30 分（**2026-10 変更**。以前は 15 分。キューで順番を待つ時間も加わるため）。
 - **時間の関係**：ワーカーの `--timeout=600`（ジョブの時間の上限）＜ キューの `retry_after=660`（ジョブが戻ってこない＝ワーカーが落ちたとみなすまでの秒数）。`retry_after` のほうが短いと、まだ動いている長いジョブが「戻ってこない」とみなされ、もう一度渡されて二重に動く。そのため `config/queue.php` の既定値を 660 にしてある（`.env` の `DB_QUEUE_RETRY_AFTER`）。
 - その場で動く処理の時間の上限：PHP の `max_execution_time`（30 秒）は、Linux では PHP 自身が計算している時間だけを数え、外部コマンド（FFmpeg・ImageMagick）・API・DB を待つ時間は数えないため、当たりにくい。先に効くのは nginx の `fastcgi_read_timeout`（初期値 60 秒。文字起こし・要約の API だけ 300 秒。7-2）で、超えるとブラウザに「504 Gateway Time-out」が出る（PHP 側の処理は裏で続いていることがある）。
-- ワーカーは 1 つ（`numprocs=1`）から始める。メモリ 2GB のサーバーに、nginx・PHP-FPM・MySQL と同居し、FFmpeg・ImageMagick が PHP-FPM と同時に動くため。導入後は `free -h` でメモリの使い方を見る。
+- ワーカーは**音声用とメディア用の 2 つ**（それぞれ `numprocs=1`）。1 つのままだと、数分かかる文字起こしの間、写真のサムネイルまで待たされるため（**2026-10 変更**。以前は 1 つ）。メモリ 2GB のサーバーに nginx・PHP-FPM・MySQL と同居し、FFmpeg・ImageMagick が PHP-FPM と同時に動くが、2026-10 の時点で `available` が約 1GB あり、余裕がある。ワーカーを増やしたあとも `free -h` でメモリの使い方を見る。
 
 ### 10-2. 本番に適用する手順（段階 2）
 
@@ -542,23 +548,36 @@ cd /var/www/training-record-system-01/src
 sudo -u trs01 php artisan config:clear
 ```
 
-3. supervisor のワーカーの設定を作る。
+3. supervisor のワーカーの設定を作る（音声用とメディア用の 2 つ。**2026-10 変更**。すでに 1 つの設定〔`training-record-system-01-worker`〕で動いている環境は、10-5 の手順で置き換える）。
 
 ```bash
 sudo nano /etc/supervisor/conf.d/training-record-system-01-worker.conf
 ```
 
 ```ini
-[program:training-record-system-01-worker]
-command=/usr/bin/php /var/www/training-record-system-01/src/artisan queue:work database --sleep=3 --tries=1 --timeout=600 --max-time=3600
+[program:training-record-system-01-worker-audio]
+command=/usr/bin/php /var/www/training-record-system-01/src/artisan queue:work database --queue=audio --sleep=3 --tries=1 --timeout=600 --max-time=3600
 user=trs01
 numprocs=1
 autostart=true
 autorestart=true
 stopwaitsecs=610
 redirect_stderr=true
-stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker.log
+stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker-audio.log
+
+[program:training-record-system-01-worker-media]
+command=/usr/bin/php /var/www/training-record-system-01/src/artisan queue:work database --queue=media,default --sleep=3 --tries=1 --timeout=600 --max-time=3600
+user=trs01
+numprocs=1
+autostart=true
+autorestart=true
+stopwaitsecs=610
+redirect_stderr=true
+stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker-media.log
 ```
+
+- `--queue=audio`：音声のジョブ（文字起こし・要約・トレーニング記録の作成）だけを処理する。
+- `--queue=media,default`：メディアのジョブ（変換・サムネイル）を処理する。並びを指定していないジョブ（`default`）も、念のためこちらで拾う。
 
 - `--tries=1`：ジョブの `$tries`（1）と同じ。失敗したジョブはくり返さない。
 - `--timeout=600`：ジョブの時間の上限。`retry_after`（660）より短くする（10-1）。
@@ -575,7 +594,7 @@ sudo supervisorctl update
 sudo supervisorctl status
 ```
 
-- `training-record-system-01-worker` が `RUNNING` であること。
+- `training-record-system-01-worker-audio` と `training-record-system-01-worker-media` が `RUNNING` であること。
 
 5. 確認。
 
@@ -584,10 +603,11 @@ sudo supervisorctl status
 
 ```bash
 mysql -u trs_user_01 -p training_record_01 -e "SELECT COUNT(*) AS jobs FROM jobs; SELECT COUNT(*) AS failed FROM failed_jobs;"
-sudo tail -n 20 storage/logs/worker.log
+sudo tail -n 20 storage/logs/worker-media.log
+sudo tail -n 20 storage/logs/worker-audio.log
 ```
 
-- 文字起こし・要約が、今までどおりその場で動くこと（音声記録一覧から、短い音声で 1 回）。
+- 音声記録一覧で、短い音声の「文字起こし」「要約」が、処理中のあと完了に変わること（音声用のワーカーのログに出る）。録音実行で短く録音し、「作成する」で「後ろで進めます」と出てログアウトし、しばらくしてトレーニング記録ができていること。外部の API を呼ぶので、短い音声で 1 回ずつにする。
 
 6. 戻し方（うまくいかなかったとき）。
 
@@ -595,10 +615,10 @@ sudo tail -n 20 storage/logs/worker.log
 # .env の QUEUE_CONNECTION を sync に戻す
 cd /var/www/training-record-system-01/src
 sudo -u trs01 php artisan config:clear
-sudo supervisorctl stop training-record-system-01-worker
+sudo supervisorctl stop training-record-system-01-worker-audio training-record-system-01-worker-media
 ```
 
-- sync に戻すと、メディアの変換・サムネイルはまたその場で動く（画面はどちらでも動く）。戻す前に `jobs` に残っていたジョブは動かないので、その記録は「処理中」のまま残る。ワーカーを止める前に `jobs` が空であることを確かめるか、残ったジョブを `sudo -u trs01 php artisan queue:work database --once --tries=1 --timeout=600` で 1 件ずつ流す。
+- sync に戻すと、メディアの変換・サムネイル・文字起こし・要約はまたその場で動く（画面はどちらでも動く。録音実行の「作成する」は、3 つとも終わるまで待つ）。戻す前に `jobs` に残っていたジョブは動かないので、その記録は「処理中」のまま残る。ワーカーを止める前に `jobs` が空であることを確かめるか、残ったジョブを `sudo -u trs01 php artisan queue:work database --once --tries=1 --timeout=600` で 1 件ずつ流す。
 
 ### 10-3. 監視と、失敗したジョブの扱い
 
@@ -614,14 +634,16 @@ sudo -u trs01 php artisan queue:forget <ID>       # 一覧から消す
 ```
 
   - メディアのジョブが失敗すると、記録の状態は「エラー」になる。`queue:retry` で流し直しても、ジョブは状態が「処理中」のときしか動かないため、何もせずに終わる。やり直すときは、そのメディアを削除して登録し直す。
-- **`worker.log` のローテーション**：supervisor が書き出すログは Laravel のログと別なので、logrotate の対象にする。
+  - 音声のジョブ（文字起こし・要約）が失敗すると、音声記録の状態は「エラー」になる。`queue:retry` では動かない（メディアと同じ理由）。やり直しは、音声記録一覧の「文字起こし」「要約」で手で行う。録音実行の「作成する」で途中で止まった場合は、要約まで終えてから、トレーニング記録の登録の「音声記録の要約から入力」で記録を作る。
+- **ワーカーのログ（`worker-audio.log`・`worker-media.log`）のローテーション**：supervisor が書き出すログは Laravel のログと別なので、logrotate の対象にする。
 
 ```bash
 sudo nano /etc/logrotate.d/training-record-system-01-worker
 ```
 
 ```
-/var/www/training-record-system-01/src/storage/logs/worker.log {
+/var/www/training-record-system-01/src/storage/logs/worker-audio.log
+/var/www/training-record-system-01/src/storage/logs/worker-media.log {
     su root trs01
     weekly
     rotate 8
@@ -633,7 +655,8 @@ sudo nano /etc/logrotate.d/training-record-system-01-worker
 }
 ```
 
-- `su root trs01`：`storage/logs` は `trs01` のグループで書き込める（`drwxrws---`）ため、`su` がないと logrotate は「親のフォルダーの権限が安全でない」（`parent directory has insecure permissions`）としてローテーションを断る。`worker.log` は supervisor が root として書くため持ち主が root（`-rw-r--r-- root trs01`）で、`su trs01 trs01` にすると中身を空にできない。そのため、root として、グループは `trs01` で処理する（**2026-10 追加**。本番の適用時に分かった）。
+- 2 つのログを、同じ設定でまとめて扱う（**2026-10 変更**。以前は `worker.log` の 1 つ）。
+- `su root trs01`：`storage/logs` は `trs01` のグループで書き込める（`drwxrws---`）ため、`su` がないと logrotate は「親のフォルダーの権限が安全でない」（`parent directory has insecure permissions`）としてローテーションを断る。ワーカーのログ（以前の `worker.log`）は supervisor が root として書くため持ち主が root（`-rw-r--r-- root trs01`）で、`su trs01 trs01` にすると中身を空にできない。そのため、root として、グループは `trs01` で処理する（**2026-10 追加**。本番の適用時に分かった）。
 - `copytruncate`：ワーカーがファイルを開いたまま書き続けるため、写しを取ってから中身を空にする。
 - `delaycompress`：直近の 1 つ（`worker.log.1`）は圧縮せずに残し、すぐ読めるようにする。
 - 確かめ方：`sudo logrotate -d /etc/logrotate.d/training-record-system-01-worker`（実際には何もせず、何をするかを表示する）で、`parent directory has insecure permissions` のエラーが出ないこと。初めて読み込んだ直後は `log does not need rotating (log has already been rotated)` と出る（その時点を最初のローテーションとして記録するため。以後は毎週）。
@@ -641,6 +664,31 @@ sudo nano /etc/logrotate.d/training-record-system-01-worker
 ### 10-4. 開発の環境
 
 開発の環境でのキューの使い方（ふだんは sync、確かめたいときだけワーカーを動かす）は、`docs/setup/dev-environment-queue.md` を参照。
+
+### 10-5. ワーカーを 2 つにして、文字起こし・要約をキューに移す（2026-10。段階 3）
+
+すでに 1 つのワーカー（`training-record-system-01-worker`）で動いている本番に、段階 3 のコードを入れる手順。**ワーカーの設定を先に 2 つに置き換えてから、新しいコードを反映する**。
+
+**順番の理由**：新しいコードは、音声のジョブを並び `audio` に渡す。今の 1 つのワーカーは並びを指定していない（`default` だけを聞く）ため、先に新しいコードを入れると、`audio` を聞くワーカーがいない間、録音のあとの処理（文字起こし → 要約 → 記録の作成）と音声記録一覧の文字起こし・要約が「処理中」のまま止まる。逆に、先にワーカーを 2 つにしておけば、メディア用のワーカーが `media,default` を聞くので、古いコードのメディアのジョブ（`default`）もそのまま処理され、どちらの順番の間も止まらない。
+
+① ワーカーの設定を 2 つに置き換える（古いコードのまま）。
+
+```bash
+sudo supervisorctl stop training-record-system-01-worker   # 動いているジョブが終わるまで待つ（stopwaitsecs=610）
+sudo nano /etc/supervisor/conf.d/training-record-system-01-worker.conf   # 中身を 10-2 の 3 の 2 つの設定に入れ替える
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl status
+```
+
+- `training-record-system-01-worker-audio` と `training-record-system-01-worker-media` が `RUNNING` で、古い `training-record-system-01-worker` が一覧から消えていること（`update` が、消えた設定のプログラムを止めて外す）。
+- logrotate の設定を、10-3 のとおり 2 つのログに合わせる。古い `worker.log` は、残っていれば消してよい。
+
+② 新しいコードを反映する（第13段階のとおり。`git pull` → キャッシュのクリア → `reload` → `queue:restart`）。
+
+③ 確かめる（10-2 の 5 のとおり）。音声記録一覧の文字起こし・要約、録音実行の「作成する」、メディアの登録の 3 つ。`jobs` が空に戻り、`failed_jobs` が増えないこと。
+
+- 戻すとき：新しいコードを前のコミットに戻してから（`git checkout <前のコミット>` と第13段階のキャッシュのクリア）、ワーカーの設定を 1 つに戻す。2 つのワーカーのままでも、古いコードのジョブ（`default`）はメディア用のワーカーが処理するので、急がなくてよい。
 
 ---
 
@@ -756,7 +804,7 @@ sudo -u trs01 php artisan queue:restart
 
 ## 付録A　本番の未対応事項（2026-09-26 時点）
 
-- [ ] 第10段階 キューワーカーの常駐（`QUEUE_CONNECTION=database` への切り替えと supervisor の導入）：段階 1（メディアの変換・サムネイルを、キューでも sync でも動く形にする）は 2026-10 に済み。本番への適用（段階 2）は 10-2 の手順で行う。文字起こし・要約のキューへの切り替えは、録音実行の流れの作り直しが要るため、別の段階で検討する
+- [ ] 第10段階 段階 3（文字起こし・要約・トレーニング記録の自動作成をキューへ移し、ワーカーを 2 つにする）の本番への適用：10-5 の手順（ワーカーを 2 つにする → 新しいコードを反映 → 確かめる）で行う。段階 1・2（メディアの変換・サムネイルのキュー化と、supervisor でのワーカーの常駐）は 2026-10 に済み
 
 ---
 
