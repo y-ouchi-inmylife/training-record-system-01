@@ -311,7 +311,9 @@ class MediaRecordController extends Controller
      *
      * 写真（heic/heif）を jpeg に、動画（mov）を mp4 に変換する。
      * conversion_status が pending のときのみ実行可能。
-     * 開発は QUEUE_CONNECTION=sync で同期実行のため、レスポンス時点で done/error に遷移している。
+     * ジョブを渡したら、その時点の状態をそのまま返す（2026-10）：sync なら done（失敗は 500）、
+     * キュー（本番の database）なら processing。processing のときは、画面が状態を返す API
+     * （status()）を問い合わせて終わりを待つ。
      * type 別の振り分けは ConvertMediaJob 側で行う。
      */
     public function convert(MediaRecord $mediaRecord): JsonResponse
@@ -326,12 +328,12 @@ class MediaRecordController extends Controller
         try {
             $mediaRecord->update(['conversion_status' => MediaRecord::CONVERSION_PROCESSING]);
 
-            // 同期実行: dispatch完了時点で変換処理が完了している
+            // キューの設定に従って動く（sync ならここで終わっている。キューなら後ろで動く）
             ConvertMediaJob::dispatch($mediaRecord->id);
 
             $mediaRecord->refresh();
 
-            return response()->json(['data' => $mediaRecord]);
+            return response()->json(['data' => $this->statusPayload($mediaRecord)]);
         } catch (\Throwable $e) {
             Log::error('メディア変換エラー', [
                 'media_record_id' => $mediaRecord->id,
@@ -358,7 +360,8 @@ class MediaRecordController extends Controller
      * サムネイル生成を起動（POST /api/media-records/{id}/generate-thumbnail）
      *
      * 原本から 200x200 のサムネイルを生成する。thumbnail_status が pending のときのみ実行可能。
-     * 開発は QUEUE_CONNECTION=sync で同期実行のため、レスポンス時点で done/error に遷移している。
+     * ジョブを渡したら、その時点の状態をそのまま返す（2026-10。convert() と同じ）：sync なら done
+     * （失敗は 500）、キュー（本番の database）なら processing。
      * type 別の振り分けは GenerateThumbnailJob 側で行う（API は全メディアを受け付ける）。
      */
     public function generateThumbnail(MediaRecord $mediaRecord): JsonResponse
@@ -373,23 +376,12 @@ class MediaRecordController extends Controller
         try {
             $mediaRecord->update(['thumbnail_status' => MediaRecord::THUMBNAIL_PROCESSING]);
 
-            // 同期実行: dispatch完了時点でサムネイル生成処理が完了している
+            // キューの設定に従って動く（sync ならここで終わっている。キューなら後ろで動く）
             GenerateThumbnailJob::dispatch($mediaRecord->id);
 
             $mediaRecord->refresh();
 
-            // 段2 のため、登録モーダルの呼び出し側が再フェッチ不要で
-            // 仮紐づけ表示に使えるよう、thumbnail_url と display_title を含めて返す。
-            // QUEUE_CONNECTION=sync のため、ここで thumbnail_status=done が確定済み。
-            $thumbnailUrl = $mediaRecord->temporaryThumbnailUrl(
-                now()->addMinutes(self::PLAY_URL_EXPIRES_MINUTES)
-            );
-            return response()->json([
-                'data' => array_merge($mediaRecord->toArray(), [
-                    'thumbnail_url' => $thumbnailUrl,
-                    'display_title' => $mediaRecord->display_title,
-                ]),
-            ]);
+            return response()->json(['data' => $this->statusPayload($mediaRecord)]);
         } catch (\Throwable $e) {
             Log::error('サムネイル生成エラー', [
                 'media_record_id' => $mediaRecord->id,
@@ -409,5 +401,41 @@ class MediaRecordController extends Controller
                 'media_record_id' => $mediaRecord->id,
             ], 500);
         }
+    }
+
+    /**
+     * 変換・サムネイルの状態を返す（GET /api/media-records/{id}/status。2026-10）
+     *
+     * メディアの登録のモーダルが、変換・サムネイルの API の応答が processing（キューで処理中）
+     * だったときに、一定の間隔で問い合わせて終わりを待つために使う。
+     * 応答の形は convert() / generateThumbnail() と同じ（statusPayload()）。
+     */
+    public function status(MediaRecord $mediaRecord): JsonResponse
+    {
+        return response()->json(['data' => $this->statusPayload($mediaRecord)]);
+    }
+
+    /**
+     * 変換・サムネイルの API と状態を返す API の応答の data を作る。
+     *
+     * レコードの列（conversion_status・thumbnail_status など）に、画面の表示に要る値を足す：
+     *   - thumbnail_url: サムネイルの表示用 URL（thumbnail_status=done のときだけ。それ以外は null）。
+     *     登録モーダルの呼び出し側（段2 のトレーニング記録の編集）が、取り直さずに仮の紐づけの表示に使う
+     *   - display_title: 表示名
+     *   - is_processing: 変換かサムネイルのどちらかが処理中（processing）か
+     *   - has_error: 変換かサムネイルのどちらかがエラー（error）か
+     */
+    private function statusPayload(MediaRecord $mediaRecord): array
+    {
+        return array_merge($mediaRecord->toArray(), [
+            'thumbnail_url' => $mediaRecord->temporaryThumbnailUrl(
+                now()->addMinutes(self::PLAY_URL_EXPIRES_MINUTES)
+            ),
+            'display_title' => $mediaRecord->display_title,
+            'is_processing' => $mediaRecord->conversion_status === MediaRecord::CONVERSION_PROCESSING
+                || $mediaRecord->thumbnail_status === MediaRecord::THUMBNAIL_PROCESSING,
+            'has_error' => $mediaRecord->conversion_status === MediaRecord::CONVERSION_ERROR
+                || $mediaRecord->thumbnail_status === MediaRecord::THUMBNAIL_ERROR,
+        ]);
     }
 }

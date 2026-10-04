@@ -66,6 +66,12 @@
                         <strong><span id="mediaUploadSummaryTotal">0</span> 個中 <span id="mediaUploadSummarySuccess">0</span> 個成功、<span id="mediaUploadSummaryFailure">0</span> 個失敗。</strong>
                         成功したファイルは登録済みです。失敗したファイルは登録されていません。
                         <ul id="mediaUploadSummaryFailureList" class="mb-0 mt-2"></ul>
+                        {{-- 変換・サムネイルの問い合わせが上限の時間を超えた（またはくり返し通信に失敗した）ファイル。
+                             登録は済んでいて、処理はサーバー側で続いている（2026-10） --}}
+                        <div id="mediaUploadSummaryPending" class="d-none mt-2">
+                            次のファイルは登録済みですが、変換・サムネイルに時間がかかっています。しばらくしてから一覧で確かめてください。
+                            <ul id="mediaUploadSummaryPendingList" class="mb-0 mt-1"></ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -102,11 +108,33 @@
     // 部分失敗時：閉じた時に成功分を反映するため reload が要るかを保持
     let needsReloadOnClose = false;
 
+    // 変換・サムネイルの状態の問い合わせ（2026-10）。
+    // 変換・サムネイルの API の応答が processing（キューで処理中）のとき、状態を返す API を
+    // 一定の間隔で問い合わせて終わりを待つ。sync なら API の応答の時点で終わっているので問い合わせない。
+    const POLL_INTERVAL_MS = 3000;
+    // 上限は 15 分（ジョブの時間の上限 600 秒・キューの retry_after 660 秒より長く）
+    const POLL_TIMEOUT_MS = 15 * 60 * 1000;
+    // 問い合わせの通信の失敗が、この回数続いたらあきらめる
+    const POLL_MAX_FAILURES = 3;
+    const POLL_PENDING_MESSAGE = '処理に時間がかかっています。しばらくしてから一覧で確かめてください。';
+    const POLL_UNREACHABLE_MESSAGE = '処理の状態を確かめられませんでした。しばらくしてから一覧で確かめてください。';
+    // モーダルが閉じられたら問い合わせを止める（処理中は閉じられないため、ページを離れたときなどの保険）
+    let pollAborted = false;
+
+    // 問い合わせを打ち切ったファイル（登録は済み・処理はサーバー側で続いている）を表す
+    class MediaStillProcessingError extends Error {
+        constructor(message, media) {
+            super(message);
+            this.media = media;
+        }
+    }
+
     // 要素参照（DOMContentLoaded 後に取得）
     let submitBtn, headerCloseBtn, closeBtn, fileInput, fileErrorEl;
     let inProgressEl, progressMessage, progressBar;
     let fileListEl, fileListCountEl, fileListItemsEl;
     let resultSummaryEl, summaryTotalEl, summarySuccessEl, summaryFailureEl, summaryFailureListEl;
+    let summaryPendingEl, summaryPendingListEl;
 
     // 選択中のファイル配列と、各ファイルに対応する行 DOM・状態の Map
     let selectedFiles = [];
@@ -235,14 +263,18 @@
             case 'error':
                 html = '<span class="badge bg-danger">失敗</span>';
                 break;
+            case 'waiting':
+                // 登録は済んでいて、変換・サムネイルがサーバー側で続いている（問い合わせを打ち切った）
+                html = '<span class="badge bg-warning text-dark">確認待ち</span>';
+                break;
         }
         row.statusEl.innerHTML = html;
-        if (status === 'error' && errorMessage) {
+        if ((status === 'error' || status === 'waiting') && errorMessage) {
             const li = row.statusEl.closest('li');
             const old = li.querySelector('.row-error-message');
             if (old) old.remove();
             const msg = document.createElement('div');
-            msg.className = 'row-error-message text-danger small w-100';
+            msg.className = 'row-error-message small w-100 ' + (status === 'error' ? 'text-danger' : 'text-body-secondary');
             msg.textContent = errorMessage;
             li.classList.add('flex-wrap');
             li.appendChild(msg);
@@ -328,6 +360,44 @@
         });
     }
 
+    function sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    // 変換・サムネイルの終わりを待つ（2026-10）。
+    // data は直前の応答（API の応答、または状態を返す API の応答）の data。statusKey の状態が
+    // processing の間は、状態を返す API を POLL_INTERVAL_MS ごとに問い合わせる。
+    // 終わったら（done / error など）最後の data を返す。上限の時間を超えたとき・通信の失敗が
+    // 続いたときは MediaStillProcessingError を投げる（登録は済み・処理はサーバー側で続いている）。
+    async function waitUntilFinished(media, statusKey, data) {
+        const startedAt = Date.now();
+        let failures = 0;
+        while (data[statusKey] === 'processing') {
+            if (pollAborted) {
+                throw new MediaStillProcessingError(POLL_PENDING_MESSAGE, media);
+            }
+            if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
+                throw new MediaStillProcessingError(POLL_PENDING_MESSAGE, media);
+            }
+            await sleep(POLL_INTERVAL_MS);
+            try {
+                const res = await fetch('/api/media-records/' + encodeURIComponent(media.id) + '/status', {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                data = (await res.json()).data || {};
+                failures = 0;
+            } catch (e) {
+                console.error(e);
+                failures++;
+                if (failures >= POLL_MAX_FAILURES) {
+                    throw new MediaStillProcessingError(POLL_UNREACHABLE_MESSAGE, media);
+                }
+            }
+        }
+        return data;
+    }
+
     // 1 ファイル分の処理（upload-url → 直PUT → store → convert? → generate-thumbnail?）。
     // 成功時は store で取得した media object を返す（呼び出し側のループで蓄積）。
     async function processOneFile(file) {
@@ -370,6 +440,12 @@
             if (!convertRes.ok) {
                 throw new Error(await readErrorMessage(convertRes, '表示用変換に失敗しました。'));
             }
+            // sync なら応答の時点で終わっている。キューなら processing で返るので、終わるまで問い合わせる
+            const converted = await waitUntilFinished(media, 'conversion_status', (await convertRes.json()).data || {});
+            if (converted.conversion_status === 'error') {
+                throw new Error('表示用変換に失敗しました。');
+            }
+            Object.assign(media, converted);
         }
 
         if (media.thumbnail_status === 'pending' && (media.type === 'photo' || media.type === 'video')) {
@@ -381,11 +457,15 @@
             if (!thumbRes.ok) {
                 throw new Error(await readErrorMessage(thumbRes, 'サムネイル生成に失敗しました。'));
             }
-            // generate-thumbnail のレスポンスを media にマージ。
+            // sync なら応答の時点で終わっている。キューなら processing で返るので、終わるまで問い合わせる
+            const thumbnailed = await waitUntilFinished(media, 'thumbnail_status', (await thumbRes.json()).data || {});
+            if (thumbnailed.thumbnail_status === 'error') {
+                throw new Error('サムネイル生成に失敗しました。');
+            }
+            // 最後の応答を media にマージ。
             // thumbnail_url / display_title / 最新の thumbnail_status などが入る。
             // onComplete 受信側（段2 の記録編集）が mediaSelection.add で必要なフィールドを得るため。
-            const thumbBody = await thumbRes.json();
-            Object.assign(media, thumbBody.data || {});
+            Object.assign(media, thumbnailed);
         }
 
         return media;
@@ -410,6 +490,15 @@
             li.textContent = r.file.name + ' — ' + r.error;
             summaryFailureListEl.appendChild(li);
         });
+        // 問い合わせを打ち切ったファイル（登録済み・処理はサーバー側で続いている）
+        const pendings = results.filter(function (r) { return r.ok && r.pending; });
+        summaryPendingListEl.innerHTML = '';
+        pendings.forEach(function (r) {
+            const li = document.createElement('li');
+            li.textContent = r.file.name;
+            summaryPendingListEl.appendChild(li);
+        });
+        summaryPendingEl.classList.toggle('d-none', pendings.length === 0);
         resultSummaryEl.classList.remove('d-none');
         inProgressEl.classList.add('d-none');
     }
@@ -427,6 +516,8 @@
         if (resultSummaryEl) resultSummaryEl.classList.add('d-none');
         if (inProgressEl) inProgressEl.classList.add('d-none');
         if (summaryFailureListEl) summaryFailureListEl.innerHTML = '';
+        if (summaryPendingListEl) summaryPendingListEl.innerHTML = '';
+        if (summaryPendingEl) summaryPendingEl.classList.add('d-none');
         setProgress(0);
         needsReloadOnClose = false;
         isUploading = false;
@@ -463,6 +554,8 @@
         summarySuccessEl = document.getElementById('mediaUploadSummarySuccess');
         summaryFailureEl = document.getElementById('mediaUploadSummaryFailure');
         summaryFailureListEl = document.getElementById('mediaUploadSummaryFailureList');
+        summaryPendingEl = document.getElementById('mediaUploadSummaryPending');
+        summaryPendingListEl = document.getElementById('mediaUploadSummaryPendingList');
 
         // ファイルの選択の欄の下のエラーの出し方を 1 か所に集める（§2-7「欄の下」の見た目に揃える）。
         // 静的な HTML には `invalid-feedback` を残さず、エラーがあるあいだだけ JS が class を付与する
@@ -517,6 +610,7 @@
             fileListItemsEl.querySelectorAll('li.flex-wrap').forEach(function (el) { el.classList.remove('flex-wrap'); });
 
             setState('uploading');
+            pollAborted = false;
             const results = [];
             const succeeded = [];
             for (let i = 0; i < files.length; i++) {
@@ -530,6 +624,13 @@
                     succeeded.push(media);
                 } catch (e) {
                     console.error(e);
+                    if (e instanceof MediaStillProcessingError) {
+                        // 登録は済み。変換・サムネイルはサーバー側で続いているので、失敗にはしない
+                        setRowStatus(file, 'waiting', e.message);
+                        results.push({ file: file, ok: true, pending: true, media: e.media });
+                        succeeded.push(e.media);
+                        continue;
+                    }
                     const msg = e.message || '登録に失敗しました。';
                     setRowStatus(file, 'error', msg);
                     results.push({ file: file, ok: false, error: msg });
@@ -539,7 +640,9 @@
             setState('idle');
 
             const failureCount = results.filter(function (r) { return !r.ok; }).length;
-            if (failureCount === 0) {
+            // 問い合わせを打ち切ったファイルがあるときは、閉じずに結果を見せる（成功分の反映は閉じたときに読み込み直す）
+            const pendingCount = results.filter(function (r) { return r.ok && r.pending; }).length;
+            if (failureCount === 0 && pendingCount === 0) {
                 // 全成功：onComplete を呼んでから閉じる（呼出側が reload か append を判断）
                 try { currentOptions.onComplete?.(succeeded); } catch (e) { console.error(e); }
                 modal.hide();
@@ -561,6 +664,8 @@
 
         // 閉じた時：onClose 呼出、部分失敗の reload フラグが立っていれば location.reload
         modalEl.addEventListener('hidden.bs.modal', function () {
+            // 状態の問い合わせを止める（処理はサーバー側で続く。一覧を読み込み直せば、終わったものはサムネイルが出る）
+            pollAborted = true;
             try { currentOptions.onClose?.(); } catch (e) { console.error(e); }
             const shouldReload = needsReloadOnClose;
             // 次回オープンの初期状態に戻す

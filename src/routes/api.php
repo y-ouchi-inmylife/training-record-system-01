@@ -29,4 +29,6 @@ Route::domain(config('subdomain.trainer_host'))
     Route::get('/media-records/{mediaRecord}/play', [MediaRecordController::class, 'play'])->name('api.media-records.play');
     Route::post('/media-records/{mediaRecord}/convert', [MediaRecordController::class, 'convert'])->name('api.media-records.convert');
     Route::post('/media-records/{mediaRecord}/generate-thumbnail', [MediaRecordController::class, 'generateThumbnail'])->name('api.media-records.generate-thumbnail');
+    // 変換・サムネイルの状態の問い合わせ（キューで処理中のとき、登録モーダルが一定の間隔で呼ぶ。2026-10）
+    Route::get('/media-records/{mediaRecord}/status', [MediaRecordController::class, 'status'])->name('api.media-records.status');
 });
