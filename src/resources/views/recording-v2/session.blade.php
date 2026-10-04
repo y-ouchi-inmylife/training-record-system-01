@@ -304,7 +304,9 @@
                     <h5 class="modal-title">トレーニング記録の作成</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">トレーニング記録の作成を開始しました。再度ログインして確認してください。</p>
+                    {{-- 2 行で出す（見出しで何の作成かが分かるため 1 行目は短く、2 行目で確かめる内容を示す。2026-10） --}}
+                    <p class="mb-2">作成を開始しました。</p>
+                    <p class="mb-0">再度ログインして、文字起こし・要約の結果を確認してください。</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" id="btn-confirm-record-created">OK</button>
