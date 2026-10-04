@@ -10,28 +10,22 @@ use Illuminate\Support\Facades\Storage;
 /**
  * 保存期間を過ぎた音声ファイルを自動削除するコマンド
  *
- * スケジューラーから毎日午前3時に実行される。
- * 保存期間は --days オプションで指定する（デフォルト7日、範囲1〜30）。
+ * スケジューラーから毎日実行される（時刻は bootstrap/app.php の withSchedule）。
+ * 保存期間は --days の指定、なければ設定（.env の AUDIO_RETENTION_DAYS、初期値7）。有効な範囲は1〜30日。
  */
 class DeleteExpiredAudioRecords extends Command
 {
-    protected $signature = 'audio-records:delete-expired {--days=7 : 保存期間（日数）。1〜30}';
+    protected $signature = 'audio-records:delete-expired {--days= : 保存期間（日数）。省略時は設定（AUDIO_RETENTION_DAYS）。1〜30}';
     protected $description = '保存期間を過ぎた音声ファイルを自動削除';
 
     public function handle(): int
     {
         Log::info('[DeleteExpiredAudioRecords] 音声ファイル自動削除バッチを開始します');
 
-        // コマンド引数から保存期間を取得
-        $retentionDays = (int) $this->option('days');
-
-        // 保存期間の範囲チェック（1〜30日）。範囲外は削除処理に進ませず異常終了する。
-        // これは想定内のバリデーションエラーのため、例外ログ（error）ではなく warning に留める。
-        if ($retentionDays < 1 || $retentionDays > 30) {
-            $message = "[DeleteExpiredAudioRecords] 不正な保存期間が指定されました: {$retentionDays}（範囲は1〜30日）";
-            $this->error('保存期間は1〜30日の範囲で指定してください。');
-            Log::warning($message);
-
+        // 保存期間が有効な範囲の外なら、削除の処理に進まずに終わる。
+        // 設定の誤りに気づけるよう、warning ではなく error でログに残す（2026-10）
+        $retentionDays = $this->resolveDays();
+        if ($retentionDays === null) {
             return Command::FAILURE;
         }
 
@@ -70,5 +64,32 @@ class DeleteExpiredAudioRecords extends Command
 
             return Command::FAILURE;
         }
+    }
+
+    /**
+     * 使う日数を決め、有効な範囲（1〜30日）の整数かを確かめる。
+     * --days の指定がなければ、設定（config/batch.php の audio_retention_days。.env の AUDIO_RETENTION_DAYS）を使う。
+     * 範囲の外・整数でないときは、エラーをログに残して null を返す（範囲の端に丸めず、処理に進ませない。2026-10）
+     */
+    private function resolveDays(): ?int
+    {
+        $option = $this->option('days');
+        $source = $option !== null ? '--days' : 'AUDIO_RETENTION_DAYS';
+        $value = $option ?? config('batch.audio_retention_days');
+
+        // .env の true などが整数に読み替えられないよう、整数か文字列のときだけ確かめる
+        $days = (is_int($value) || is_string($value))
+            ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 30]])
+            : false;
+
+        if ($days === false) {
+            $message = "[DeleteExpiredAudioRecords] 保存期間が有効な範囲の外のため、何もせずに終了します: {$source}=" . var_export($value, true) . '（有効な範囲は1〜30日の整数）';
+            $this->error($message);
+            Log::error($message);
+
+            return null;
+        }
+
+        return $days;
     }
 }

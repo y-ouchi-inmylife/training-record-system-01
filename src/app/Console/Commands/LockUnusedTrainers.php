@@ -13,10 +13,12 @@ use Illuminate\Support\Facades\Log;
  * 使用例:
  *   php artisan trainers:lock-unused
  *   php artisan trainers:lock-unused --days=14
+ *
+ * 日数は --days の指定、なければ設定（.env の COUNSELOR_LOCK_UNUSED_DAYS、初期値7）。有効な範囲は1〜90日。
  */
 class LockUnusedTrainers extends Command
 {
-    protected $signature = 'trainers:lock-unused {--days=7 : 作成日からの経過日数のしきい値}';
+    protected $signature = 'trainers:lock-unused {--days= : 作成日からの経過日数のしきい値。省略時は設定（COUNSELOR_LOCK_UNUSED_DAYS）。1〜90}';
 
     protected $description = '発行後一度もログインがないトレーナーを作成日から指定日数経過でロックします';
 
@@ -24,8 +26,13 @@ class LockUnusedTrainers extends Command
     {
         Log::info('[LockUnusedTrainers] アカウントロック（未使用）バッチを開始します');
 
+        // 日数が有効な範囲の外なら、ロックの処理に進まずに終わる
+        $days = $this->resolveDays();
+        if ($days === null) {
+            return Command::FAILURE;
+        }
+
         try {
-            $days = (int) $this->option('days');
             $threshold = Carbon::now()->subDays($days);
 
             $this->info("発行後一度もログインがなく、作成から{$days}日以上経過したトレーナーをチェックします...");
@@ -75,5 +82,32 @@ class LockUnusedTrainers extends Command
 
             return Command::FAILURE;
         }
+    }
+
+    /**
+     * 使う日数を決め、有効な範囲（1〜90日）の整数かを確かめる。
+     * --days の指定がなければ、設定（config/batch.php の lock_unused_days。.env の COUNSELOR_LOCK_UNUSED_DAYS）を使う。
+     * 範囲の外・整数でないときは、エラーをログに残して null を返す（範囲の端に丸めず、処理に進ませない。2026-10）
+     */
+    private function resolveDays(): ?int
+    {
+        $option = $this->option('days');
+        $source = $option !== null ? '--days' : 'COUNSELOR_LOCK_UNUSED_DAYS';
+        $value = $option ?? config('batch.lock_unused_days');
+
+        // .env の true などが整数に読み替えられないよう、整数か文字列のときだけ確かめる
+        $days = (is_int($value) || is_string($value))
+            ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 90]])
+            : false;
+
+        if ($days === false) {
+            $message = "[LockUnusedTrainers] 日数が有効な範囲の外のため、何もせずに終了します: {$source}=" . var_export($value, true) . '（有効な範囲は1〜90日の整数）';
+            $this->error($message);
+            Log::error($message);
+
+            return null;
+        }
+
+        return $days;
     }
 }
