@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\MediaRecordController;
-use App\Models\AudioRecord;
 use App\Models\Client;
 use App\Models\MediaRecord;
 use App\Models\Trainer;
 use App\Models\TrainingRecord;
+use App\Services\TrainingRecordAutoCreateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -347,20 +347,8 @@ class TrainingRecordController extends Controller
         ]);
 
         try {
-            $record = DB::transaction(function () use ($validated) {
-                $audioRecord = AudioRecord::findOrFail($validated['audio_record_id']);
-
-                $record = TrainingRecord::create([
-                    'client_id' => $validated['client_id'],
-                    'training_date' => $validated['training_date'],
-                    'training_time' => $validated['training_time'] ?? null,
-                    'trainer1_id' => $validated['trainer1_id'],
-                    'trainer2_id' => $validated['trainer2_id'] ?? null,
-                    'record_content' => $audioRecord->summary_text,
-                ]);
-
-                return $record;
-            });
+            // 記録の中身は TrainingRecordAutoCreateService に取り出した（ジョブからも使うため。2026-10）
+            $record = app(TrainingRecordAutoCreateService::class)->create($validated);
 
             return response()->json([
                 'success' => true,
