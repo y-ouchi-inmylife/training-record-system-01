@@ -40,7 +40,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // ジョブが戻ってこない（ワーカーが落ちた）とみなすまでの秒数。ジョブの時間の上限（$timeout・
+            // ワーカーの --timeout の 600 秒）より長くし、長いジョブが二重に動かないようにする（2026-10）
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 660),
             'after_commit' => false,
         ],
 
