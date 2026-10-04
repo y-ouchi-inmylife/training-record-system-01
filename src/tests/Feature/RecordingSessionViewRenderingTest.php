@@ -145,18 +145,23 @@ class RecordingSessionViewRenderingTest extends TestCase
     public function test_録音の前は_停止中_と_録音開始_を出しメーターを動かさない(): void
     {
         // 2026-10：まだ録音を始めていないことを分かりやすくするため、
-        // 状態の文字を「停止中」、ボタンの文字を「録音開始」にし、録音の前はメーターを動かさない
+        // 状態の文字を「停止中」、ボタンの文字を「録音開始」にし、録音の前と一時停止中はメーターを動かさない
         $view = $this->renderSession();
         $view->assertDontSee('録音は開始されていません');
         $html = $view->__toString();
         $this->assertMatchesRegularExpression('/<h2 class="recording-title waiting-warning" id="recording-title">停止中<\/h2>/', $html);
         $this->assertMatchesRegularExpression('/<button id="btn-start-recording" class="btn btn-danger btn-control">\s*録音開始\s*<\/button>/', $html);
-        // メーターを描く処理で、録音の前（isRecording でないとき）は空の表示にして抜ける
-        $draw = substr($html, strpos($html, 'function drawLevelMeter()'), 2000);
-        $this->assertStringContainsString('if (!isRecording) {', $draw);
+        // メーターを描く処理で、録音の前（isRecording でないとき）と一時停止中（mediaRecorder.state が
+        // paused のとき）は空の表示にして抜ける。録音の前は mediaRecorder が null のため、null も判定する
+        $draw = substr($html, strpos($html, 'function drawLevelMeter()'), 2500);
+        $this->assertStringContainsString(
+            "const isPausedNow = mediaRecorder !== null && mediaRecorder.state === 'paused';",
+            $draw
+        );
+        $this->assertStringContainsString('if (!isRecording || isPausedNow) {', $draw);
         $this->assertLessThan(
             strpos($draw, 'analyser.getByteFrequencyData(dataArray);'),
-            strpos($draw, 'if (!isRecording) {')
+            strpos($draw, 'if (!isRecording || isPausedNow) {')
         );
     }
 

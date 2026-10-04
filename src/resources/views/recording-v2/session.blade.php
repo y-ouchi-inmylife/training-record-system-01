@@ -428,10 +428,12 @@
             function draw() {
                 animationId = requestAnimationFrame(draw);
 
-                // 録音の前は、メーターを空の表示（背景と枠線だけ）にする。
-                // マイクの音は画面を開いたときから拾っているが、録音の前からメーターが動くと
-                // 録音しているように見えるため（2026-10）。録音を始めたら（isRecording）動かす
-                if (!isRecording) {
+                // 録音の前と一時停止中は、メーターを空の表示（背景と枠線だけ）にする。
+                // マイクの音は画面を開いたときから拾っているが、録音していないときにメーターが動くと
+                // 録音しているように見えるため（2026-10）。録音中（一時停止中を除く）だけ動かす。
+                // 録音の前は mediaRecorder が null のため、null のときも例外にならないように判定する
+                const isPausedNow = mediaRecorder !== null && mediaRecorder.state === 'paused';
+                if (!isRecording || isPausedNow) {
                     canvasContext.fillStyle = '#f0f0f0';
                     canvasContext.fillRect(0, 0, width, height);
                     canvasContext.strokeStyle = '#dee2e6';
