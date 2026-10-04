@@ -32,7 +32,10 @@ class ConvertMediaJob implements ShouldQueue
 
     public function __construct(
         private readonly int $mediaRecordId
-    ) {}
+    ) {
+        // メディアのジョブは並び media で動かす（音声の audio と分け、文字起こしの間も待たせない。2026-10）
+        $this->onQueue('media');
+    }
 
     public function handle(MediaConversionService $conversionService): void
     {

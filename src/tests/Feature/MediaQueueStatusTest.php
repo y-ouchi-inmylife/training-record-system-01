@@ -216,6 +216,25 @@ class MediaQueueStatusTest extends TestCase
 
     // ===== ジョブ =====
 
+    public function test_変換とサムネイルのジョブの並びはmedia(): void
+    {
+        // 音声のジョブ（audio）と並びを分ける（2026-10）
+        $this->assertSame('media', (new ConvertMediaJob(1))->queue);
+        $this->assertSame('media', (new GenerateThumbnailJob(1))->queue);
+    }
+
+    public function test_キューがdatabaseのとき変換とサムネイルはmediaの並びに積む(): void
+    {
+        config(['queue.default' => 'database']);
+        Queue::fake();
+
+        app(MediaRecordController::class)->convert($this->makeMedia());
+        app(MediaRecordController::class)->generateThumbnail($this->makeMedia());
+
+        Queue::assertPushedOn('media', ConvertMediaJob::class);
+        Queue::assertPushedOn('media', GenerateThumbnailJob::class);
+    }
+
     public function test_変換とサムネイルのジョブは1回だけ試す(): void
     {
         $this->assertSame(1, (new ConvertMediaJob(1))->tries);
