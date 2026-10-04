@@ -180,7 +180,9 @@ class RecordingSessionViewRenderingTest extends TestCase
 
         // 受け付けの応答を待つ間の表示と、受け付けたあとの文言
         $this->assertStringContainsString('送信中... このまましばらくお待ちください。', $html);
-        $this->assertStringContainsString('文字起こし・要約・トレーニング記録の作成は、後ろで進めます。結果は音声記録一覧・トレーニング記録一覧で確かめてください。', $html);
+        $this->assertStringContainsString('トレーニング記録の作成を開始しました。再度ログインして確認してください。', $html);
+        // 旧い文言（作る側の言葉の「後ろで」）は使う人に見せない（2026-10）
+        $this->assertStringNotContainsString('後ろで進めます', $html);
         // 受け付けられなかったときは、音声記録一覧からやり直せることを添える
         $this->assertStringContainsString('音声は保存済みです。音声記録一覧から、文字起こし・要約をやり直せます。', $html);
     }

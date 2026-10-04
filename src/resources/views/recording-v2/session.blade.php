@@ -295,7 +295,8 @@
         </div>
     </div>
 
-    {{-- モーダル5: 受け付け（文字起こし・要約・記録の作成を後ろで進める。2026-10） --}}
+    {{-- モーダル5: 受け付け（文字起こし・要約・記録の作成を後ろで進める。2026-10）。
+         本文は使う人に分かる言葉にする（「後ろで」は使わない。時間は約束できないので書かない。2026-10） --}}
     <div class="modal fade" id="modal-record-created" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -303,7 +304,7 @@
                     <h5 class="modal-title">トレーニング記録の作成</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">文字起こし・要約・トレーニング記録の作成は、後ろで進めます。結果は音声記録一覧・トレーニング記録一覧で確かめてください。</p>
+                    <p class="mb-0">トレーニング記録の作成を開始しました。再度ログインして確認してください。</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" id="btn-confirm-record-created">OK</button>
