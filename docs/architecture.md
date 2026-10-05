@@ -18,7 +18,7 @@ flowchart TD
 
     subgraph Sakura["さくらのクラウド IaaS（trs01-prod / Ubuntu 24.04）"]
         subgraph AppServer["アプリケーションサーバー"]
-            Nginx["nginx 1.24<br/>trainer: mikan-trs01-staff.inmylife1965.com<br/>client: mikan.inmylife1965.com"]
+            Nginx["nginx 1.24<br/>trainer: miraidogwellness-trs01-staff.inmylife1965.com<br/>client: miraidogwellness.inmylife1965.com"]
             App[PHP 8.4-FPM + Laravel 12.x]
         end
         Cron[cron]
@@ -76,8 +76,8 @@ flowchart TD
 
 - HTTPS による暗号化通信（Let's Encrypt を certbot で取得・自動更新）
 - トレーナー（内部）とクライアント（外部）は別々のサブドメインから接続する
-  - トレーナー用：`mikan-trs01-staff.inmylife1965.com`
-  - クライアント用：`mikan.inmylife1965.com`
+  - トレーナー用：`miraidogwellness-trs01-staff.inmylife1965.com`
+  - クライアント用：`miraidogwellness.inmylife1965.com`
 - 両サブドメインは同一の Laravel アプリケーションに接続し、アプリ側でサブドメイン（本番）またはパス（ローカル）により経路・セッション・IP 制限を分ける（詳細は 2-4 参照）
 
 **アプリケーションサーバー（さくらのクラウド IaaS）**
@@ -178,8 +178,8 @@ flowchart TD
 トレーナー（内部）とクライアント（外部）を、別々のサブドメインで分離する。動機は、セッションタイムアウトを役割別に設定できるようにすることと、IP 制限をトレーナー機能にだけ素直に適用できるようにすること（設計の歪みの解消）。
 
 - **サブドメイン**
-  - トレーナー用：`mikan-trs01-staff.inmylife1965.com`
-  - クライアント用：`mikan.inmylife1965.com`（据え置き）
+  - トレーナー用：`miraidogwellness-trs01-staff.inmylife1965.com`
+  - クライアント用：`miraidogwellness.inmylife1965.com`
   - URL パスプレフィックスは全環境で維持する。本番はサブドメインで、開発環境はパス（`/client-portal/*` か否か）で経路を分ける。内部／外部の判定は、パス判定を維持したまま本番向けにホスト判定を足す。
   - サブドメインのホスト名は `config/subdomain.php`（`trainer_host` / `client_host`、env 経由）で管理し、環境ごとに切り替える。両キーが未設定の場合はホスト制約を掛けず、任意のホスト名を受ける。開発環境では両キーを未設定にし、`localhost` / `127.0.0.1` や LAN の IP アドレス等、任意のホスト名でアクセスできるようにする。
 - **セッション**
@@ -189,7 +189,7 @@ flowchart TD
   - IP 制限はトレーナー用サブドメインのルートにのみ適用する（クライアント用サブドメインには適用しない）。ログイン・システム管理者・ローカルホストは制限対象外。
 - **メディアの CORS**
   - メディアの署名付き URL 直アップロードはトレーナー側機能のため、オブジェクトストレージ（`trs01-media-prod`）のバケット CORS の AllowedOrigins にトレーナー用サブドメインを許可する。
-  - **会員側のトレーニー写真（S-1402 で会員がアップロードする写真、要件定義書 6-15-15）は、サーバ経由の multipart POST 方式のためバケット CORS 設定の変更は不要**。ブラウザから直接ストレージへ書き込む経路がなく、プリフライトが走らないため。会員用サブドメイン（`mikan.inmylife1965.com`）を AllowedOrigins に追加する必要はない（**将来、会員側でも署名付き URL 直アップロードを採用する場合は、この設定変更が必要になる**）。
+  - **会員側のトレーニー写真（S-1402 で会員がアップロードする写真、要件定義書 6-15-15）は、サーバ経由の multipart POST 方式のためバケット CORS 設定の変更は不要**。ブラウザから直接ストレージへ書き込む経路がなく、プリフライトが走らないため。会員用サブドメイン（`miraidogwellness.inmylife1965.com`）を AllowedOrigins に追加する必要はない（**将来、会員側でも署名付き URL 直アップロードを採用する場合は、この設定変更が必要になる**）。
 
 ### 2-5. 開発ツール
 

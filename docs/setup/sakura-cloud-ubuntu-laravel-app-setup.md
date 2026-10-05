@@ -14,13 +14,13 @@
 
 ## 前提・構成
 
-### 本番の構成（2026-09-26 確認）
+### 本番の構成（2026-10-05 確認）
 
 | 項目 | 説明 | 値 |
 |---|---|---|
 | サーバー | アプリを載せるサーバー | sakura-cloud-prod-01（さくらのクラウド 東京第2ゾーン） |
-| ドメイン（トレーナー用） | トレーナーが使う画面 | `mikan-trs01-staff.inmylife1965.com` |
-| ドメイン（会員用） | 会員が使う画面 | `mikan.inmylife1965.com` |
+| ドメイン（トレーナー用） | トレーナーが使う画面 | `miraidogwellness-trs01-staff.inmylife1965.com` |
+| ドメイン（会員用） | 会員が使う画面 | `miraidogwellness.inmylife1965.com` |
 | 配置先 | アプリのコードを置く場所 | `/var/www/training-record-system-01`（Laravel 本体は `src/` 配下） |
 | 実行ユーザー | PHP・artisan・cron を動かすユーザー（同じサーバーの他のシステムに脆弱性があり、外から PHP のコードを実行されても、このアプリの `.env`（DB のパスワード、外部サービスのキー、バックアップの暗号化キー）や `storage/` を読めないようにするため） | `trs01`（専用の PHP-FPM のプール `trs01`、ソケット `/run/php/php8.4-fpm-trs01.sock`） |
 | ブランチ | 本番に載せるブランチ | `main` |
@@ -30,6 +30,8 @@
 | 外部 API | 音声の文字起こし・要約 | OpenAI（Whisper）、Anthropic（Claude） |
 | アクセス制限 | 画面を開ける場所 | nginx で、事業所2拠点の固定 IP アドレスからだけ許可する。利用者が使う事前入力の画面だけは、どこからでも開ける |
 | メール送信 | 招待・通知メール | さくらのレンタルサーバーの SMTP（ポート 587）、送信元 `noreply@inmylife1965.com` |
+
+> 2026-10-05 にドメインを変更した（旧：`mikan-trs01-staff.inmylife1965.com`・`mikan.inmylife1965.com`。転送はせずに廃止）。
 
 1つのアプリを2つのドメインで公開し、`.env` の `TRAINER_HOST` / `CLIENT_HOST` で、トレーナー用と会員用の画面を振り分けている。
 
@@ -182,7 +184,7 @@ nano .env
 | `APP_KEY` | 秘密情報（5-3 で生成） |
 | `APP_ENV` | `production` |
 | `APP_DEBUG` | `false` |
-| `APP_URL` | `https://mikan.inmylife1965.com` |
+| `APP_URL` | `https://miraidogwellness.inmylife1965.com` |
 
 #### DB・セッション・キュー
 
@@ -212,8 +214,8 @@ nano .env
 
 | 項目 | 値 |
 |---|---|
-| `TRAINER_HOST` | `mikan-trs01-staff.inmylife1965.com` |
-| `CLIENT_HOST` | `mikan.inmylife1965.com` |
+| `TRAINER_HOST` | `miraidogwellness-trs01-staff.inmylife1965.com` |
+| `CLIENT_HOST` | `miraidogwellness.inmylife1965.com` |
 
 #### メディア（画像・動画変換とオブジェクトストレージ）
 
@@ -385,7 +387,7 @@ sudo nano /etc/nginx/sites-available/training-record-system-01
 ```nginx
 server {
     listen 80;
-    server_name mikan.inmylife1965.com;
+    server_name miraidogwellness.inmylife1965.com;
 
     root /var/www/training-record-system-01/src/public;
     index index.php;
@@ -411,7 +413,7 @@ server {
 
 server {
     listen 80;
-    server_name mikan-trs01-staff.inmylife1965.com;
+    server_name miraidogwellness-trs01-staff.inmylife1965.com;
     # 以下、上と同じ内容
 }
 ```
@@ -429,7 +431,7 @@ server {
 
 文字起こしと要約は、ブラウザからのリクエストの中で実行する（sync のとき）。60 分の録音の文字起こしは、音声の変換と外部 API の応答を合わせて 1 分半〜2 分かかり、nginx が PHP の応答を待つ時間の初期値（`fastcgi_read_timeout` 60 秒）を超える。そのため、**この2つの API だけ**、待ち時間を 300 秒に延ばす。
 
-トレーナー用ドメイン（`mikan-trs01-staff.inmylife1965.com`）の `server` ブロックの中、`location ~ \.php$` の前に、次を加える。
+トレーナー用ドメイン（`miraidogwellness-trs01-staff.inmylife1965.com`）の `server` ブロックの中、`location ~ \.php$` の前に、次を加える。
 
 ```nginx
     # 文字起こし・要約は処理に時間がかかるため、この API だけ PHP の応答を待つ時間を延ばす
@@ -468,16 +470,16 @@ inmylife1965.com の DNS はさくらインターネットで管理している�
 
 | ホスト名 | 種別 | 値 |
 |---|---|---|
-| `mikan` | A | 163.43.140.224 |
-| `mikan-trs01-staff` | A | 163.43.140.224 |
+| `miraidogwellness` | A | 163.43.140.224 |
+| `miraidogwellness-trs01-staff` | A | 163.43.140.224 |
 
 - 注意：さくらのレンタルサーバーの「ドメイン/SSL」の画面に、これらのサブドメインを追加する必要はない（追加すると、レンタルサーバー側を向く DNS 設定が作られる場合がある）。DNS のレコードだけを登録する。
 
 反映を確認する（ローカル端末から）：
 
 ```
-nslookup mikan.inmylife1965.com
-nslookup mikan-trs01-staff.inmylife1965.com
+nslookup miraidogwellness.inmylife1965.com
+nslookup miraidogwellness-trs01-staff.inmylife1965.com
 ```
 
 ### 8-2. SSL 証明書
@@ -485,8 +487,8 @@ nslookup mikan-trs01-staff.inmylife1965.com
 DNS が反映されてから、ドメインごとに証明書を取得する。nginx プラグインが、証明書の設定と HTTP→HTTPS のリダイレクトを nginx の設定ファイルに書き込む。
 
 ```bash
-sudo certbot --nginx -d mikan.inmylife1965.com
-sudo certbot --nginx -d mikan-trs01-staff.inmylife1965.com
+sudo certbot --nginx -d miraidogwellness.inmylife1965.com
+sudo certbot --nginx -d miraidogwellness-trs01-staff.inmylife1965.com
 sudo certbot renew --dry-run
 ```
 
@@ -502,7 +504,7 @@ sudo certbot renew --dry-run
 
 | 項目 | 値 |
 |---|---|
-| AllowedOrigins | `https://mikan.inmylife1965.com`、`https://mikan-trs01-staff.inmylife1965.com` |
+| AllowedOrigins | `https://miraidogwellness.inmylife1965.com`、`https://miraidogwellness-trs01-staff.inmylife1965.com` |
 | AllowedMethods | GET、POST、PUT、HEAD（DELETE は許可しない） |
 | AllowedHeaders | `*` |
 | ExposeHeaders | なし |
@@ -761,8 +763,8 @@ sudo tail -n 20 storage/logs/cron-backup.log
 ## 第12段階：動作確認
 
 - [ ] 2つのドメインが HTTPS で開く（HTTP は HTTPS に転送される）
-- [ ] トレーナーがログインできる（`mikan-trs01-staff`）
-- [ ] 会員の登録メールが届き、登録・ログインできる（`mikan`）
+- [ ] トレーナーがログインできる（`miraidogwellness-trs01-staff`）
+- [ ] 会員の登録メールが届き、登録・ログインできる（`miraidogwellness`）
 - [ ] 動画・写真をアップロードできる（オブジェクトストレージへの直接アップロード）
 - [ ] メディア変換（heic→jpeg、mov→mp4）が完了する
 - [ ] サムネイルが表示される

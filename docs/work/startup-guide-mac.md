@@ -61,7 +61,7 @@ http://trs01-dev.test
 http://trs01-dev.test/client/login
 ```
 
-本番はサブドメインで分離していますが（トレーナー = `mikan-trs01-staff.inmylife1965.com` / クライアント = `mikan.inmylife1965.com`）、開発環境では `TRAINER_HOST` 未設定によりパスベース検出で両方にアクセスできます。
+本番はサブドメインで分離していますが（トレーナー = `miraidogwellness-trs01-staff.inmylife1965.com` / クライアント = `miraidogwellness.inmylife1965.com`）、開発環境では `TRAINER_HOST` 未設定によりパスベース検出で両方にアクセスできます。
 
 ---
 

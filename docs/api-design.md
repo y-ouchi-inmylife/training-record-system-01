@@ -11,7 +11,7 @@
 
 - Laravelの標準セッション認証（Cookie + CSRFトークン）を使用する。
 - JWT（トークンベース認証）は使用しない。ブラウザ経由の利用のみのため、セッション認証で十分。
-- トレーナー（`web` ガード）とクライアント（`client` ガード）でセッションを分離する。本番ではサブドメインを分け（トレーナー用 `mikan-trs01-staff.inmylife1965.com` / クライアント用 `mikan.inmylife1965.com`）、`SESSION_DOMAIN` を各サブドメイン限定にしたうえで、セッション Cookie 名も役割別に別名化する（トレーナー用 `trs01-staff-session` / クライアント用 `trs01-client-session`）。
+- トレーナー（`web` ガード）とクライアント（`client` ガード）でセッションを分離する。本番ではサブドメインを分け（トレーナー用 `miraidogwellness-trs01-staff.inmylife1965.com` / クライアント用 `miraidogwellness.inmylife1965.com`）、`SESSION_DOMAIN` を各サブドメイン限定にしたうえで、セッション Cookie 名も役割別に別名化する（トレーナー用 `trs01-staff-session` / クライアント用 `trs01-client-session`）。
 - セッション有効期限（時間経過ログアウト）はトレーナー／クライアントで別の固定値とし、ミドルウェアがリクエストのサブドメイン（またはガード）を判定して、Cookie 名と有効期限をセットで動的に切り替える。
 - サブドメイン構成・ホスト名管理（`config/subdomain.php`）の詳細は、アーキテクチャ設計書（architecture.md 2-4 サブドメイン構成）を参照。
 
