@@ -88,13 +88,13 @@ class InitialSetupController extends Controller
         $validated = $request->validated();
 
         // 案内するログインURL。現行リクエストのホストに追従させるため `url('/')` を使う
-        // （本番の CLIENT_HOST 制約下では `https://mikan.inmylife1965.com`、開発環境では
+        // （本番の CLIENT_HOST 制約下では `https://miraidogwellness.inmylife1965.com`、開発環境では
         // localhost 等が入る）。`route('client-portal.login')` を使わない理由は、お客様に
         // 案内する URL としてルート直下の方が短く、ログイン画面へは / から自動で誘導される
         // ため。設計書：client-portal-design-plan.md §6-2 / 本コミット同梱の指示書 2-1。
         //
         // `url('/')` は末尾スラッシュを付けずに返る（Laravel 12 での実測。例：
-        // `http://localhost` / `https://mikan.inmylife1965.com`）。本文には
+        // `http://localhost` / `https://miraidogwellness.inmylife1965.com`）。本文には
         // 「ホスト + '/'」の形で見せたいため（トップ = ログイン画面に落ちることをお客様が
         // 一目で読み取れるようにするため）、`rtrim` してから明示的に '/' を付ける。
         $loginUrl = rtrim(url('/'), '/') . '/';
