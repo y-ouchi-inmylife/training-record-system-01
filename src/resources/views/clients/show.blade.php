@@ -129,6 +129,9 @@
                     @elseif($client->trainees->count() > 0)
                         alert('この会員にはトレーニーが登録されているため削除できません。');
                         return false;
+                    @elseif($client->audioRecords->count() > 0)
+                        alert('この会員には音声記録が登録されているため削除できません。');
+                        return false;
                     @else
                         return confirm('この会員を削除しますか？');
                     @endif

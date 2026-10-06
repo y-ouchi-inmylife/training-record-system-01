@@ -184,6 +184,16 @@ class Client extends Authenticatable
     }
 
     /**
+     * 音声記録（録音・アップロード・テキスト貼り付けで作られた音声記録）。
+     * 削除条件（requirements.md 6-3-5）の存在判定に使う。audio_records.client_id の
+     * 外部キーは ON DELETE RESTRICT のため、音声記録が残っている会員は削除できない。
+     */
+    public function audioRecords(): HasMany
+    {
+        return $this->hasMany(AudioRecord::class);
+    }
+
+    /**
      * メールアドレス登録用トークン（DS-0700）
      */
     public function emailRegistrationTokens(): HasMany

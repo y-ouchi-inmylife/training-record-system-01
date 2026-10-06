@@ -7,10 +7,12 @@ use App\Models\Client;
 use App\Models\Trainer;
 use App\Models\TrainingRecord;
 use App\Services\ClientInternalIdService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class ClientController extends Controller
@@ -152,12 +154,16 @@ class ClientController extends Controller
         // measurements は Trainee::measurements() で計測日時降順に並ぶため、
         // Trainee::latest_measurement アクセサが `first()` で最新 1 件を取り出せる
         // （設計書 S-0305 セクション3「最終計測」参照）。
+        // audioRecords は削除ボタンの JS 判定（音声記録があれば削除を拒否）で件数だけ使うため
+        // id のみ取り、他列は読み込まない（詳細は requirements.md 6-3-5 / S-0305 削除条件参照）。
         $client->load(['primaryTrainer', 'trainingRecords' => function ($query) {
             $query->with(['trainer1', 'trainer2'])
                 ->withCount('mediaRecords')
                 ->orderBy('training_date', 'desc')
                 ->orderBy('training_time', 'desc');
-        }, 'trainees.measurements']);
+        }, 'trainees.measurements', 'audioRecords' => function ($query) {
+            $query->select(['id', 'client_id']);
+        }]);
 
         // 状態バッジ（4 状態＋期限切れ）判定に必要な派生値を先読みする。
         // 状態別ボタン（「登録案内を発行」／「登録案内を表示」／「登録案内を取消」／
@@ -226,7 +232,36 @@ class ClientController extends Controller
                 ->with('error', 'この会員にはトレーニーが登録されているため削除できません。');
         }
 
-        $client->delete();
+        // 音声記録が登録されている場合も削除不可（2026-10 追加。
+        // audio_records.client_id は ON DELETE RESTRICT で、文字起こし・要約も残っているため、
+        // 会員と一緒に消すより止めるほうが安全。詳細は requirements.md 6-3-5 参照）
+        if ($client->audioRecords()->exists()) {
+            return redirect()
+                ->route('clients.show', $client)
+                ->with('error', 'この会員には音声記録が登録されているため削除できません。');
+        }
+
+        try {
+            $client->delete();
+        } catch (QueryException $e) {
+            // 最後の守り。画面の確かめをすり抜けて DB の外部キー（RESTRICT）に断られたとき、
+            // サーバーエラー（500）にせず会員詳細に戻す（2026-10 追加。本番で音声記録のある
+            // 会員の削除が 500 になった事例への再発防止）。
+            // MySQL 外部キー違反：SQLSTATE=23000、エラー番号=1451。
+            // errorInfo を直接見る（$e->getCode() は PDO 側で int / string が揺れるため避ける）。
+            if (($e->errorInfo[0] ?? null) === '23000' && (int) ($e->errorInfo[1] ?? 0) === 1451) {
+                Log::warning('会員の削除が外部キー制約で失敗しました', [
+                    'client_id' => $client->id,
+                    'exception' => get_class($e),
+                ]);
+
+                return redirect()
+                    ->route('clients.show', $client)
+                    ->with('error', 'この会員には関連するデータが登録されているため削除できません。');
+            }
+
+            throw $e;
+        }
 
         return redirect()
             ->route('clients.index')
