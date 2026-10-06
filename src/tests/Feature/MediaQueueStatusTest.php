@@ -207,9 +207,9 @@ class MediaQueueStatusTest extends TestCase
     public function test_未ログインでは状態を返すAPIを使えない(): void
     {
         // ルートは Route::domain(config('subdomain.trainer_host')) で囲まれているが、
-        // 開発環境・テスト環境では TRAINER_HOST を未設定にして null に倒す運用のため
+        // テストでは phpunit.xml で TRAINER_HOST を空にして null に倒しているため
         // （config/subdomain.php のコメント参照）、Route::domain は「どのホストでも受ける」
-        // 扱いになる。テストの既定ホスト（localhost）に相対パスでそのまま送って 401 を確かめる。
+        // 扱いになる。テストの既定ホスト（APP_URL のホスト）に相対パスでそのまま送って 401 を確かめる。
         $media = $this->makeMedia();
 
         $response = $this->getJson('/api/media-records/' . $media->id . '/status');

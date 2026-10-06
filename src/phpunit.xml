@@ -32,5 +32,10 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- テストではホストの制限をかけない（config/subdomain.php で空は null に倒す）。
+             手元の .env のドメインの設定（TRAINER_HOST・CLIENT_HOST・APP_URL の組み合わせ）に
+             左右されず、Mac でも Windows でも同じ条件でテストを動かすため（2026-10） -->
+        <env name="TRAINER_HOST" value="" force="true"/>
+        <env name="CLIENT_HOST" value="" force="true"/>
     </php>
 </phpunit>
