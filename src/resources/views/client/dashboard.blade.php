@@ -74,11 +74,12 @@
                                      という個別要望のため、この要素だけ align-self でオーバーライドする
                                      （align-self は align-items より個別指定として優先される。Bootstrap
                                      の align-self-* は !important 付きで確実に上書きされる）。 --}}
-                                {{-- 写真の列の幅を写真枠と同じ 180px に固定する（flex-shrink: 0 で縮まず、width: 180px で
-                                     伸びもしない）。エラーの文言は写真の列の中で 180px の幅で折り返し、グラフ側の列の
-                                     幅はエラーの有無で変わらない（flex-column のときは cross 軸の水平幅 180px、
-                                     flex-sm-row のときは main 軸の水平幅 180px）。 --}}
-                                <div class="align-self-center align-self-sm-start" style="flex-shrink: 0; width: 180px;">
+                                {{-- 写真の列の幅：パソコン（sm 以上、横並び）は 180px 固定、スマホ（<576px、
+                                     縦積み）はカード幅いっぱい（100%）。sm 以上では flex-shrink: 0 で縮まず、
+                                     width: 180px で伸びもしない。エラーの文言はこの列の幅で折り返し、グラフ側の
+                                     列の幅はエラーの有無で変わらない。幅の切り替えは `.c-trainee-photo-col` に集約
+                                    （2026-10 変更、設計書 S-1402「トレーニー写真」設計方針参照）。 --}}
+                                <div class="c-trainee-photo-col align-self-center align-self-sm-start">
                                     {{-- アップロード用フォーム：隠しファイル入力のみを持つ。
                                          写真ありの場合はモーダル内「変更」ボタンから、写真なしの場合は
                                          <label for="..."> から <input> をクリックさせる。form は
@@ -109,17 +110,19 @@
                                                onchange="document.getElementById('trainee-photo-form-{{ $chart['id'] }}').submit();">
                                     </form>
 
-                                    {{-- 写真枠（180px 四方）。クリック時の挙動は写真の有無で分かれる
-                                         （設計書 S-1402「トレーニー写真」の 2026-09 変更参照）：
+                                    {{-- 写真枠。サイズはパソコン（sm 以上）で 180px 四方、スマホ（<576px）で
+                                         カード幅いっぱいの正方形。`.c-trainee-photo-frame` に集約（2026-10 変更、
+                                         設計書 S-1402「トレーニー写真」設計方針参照）。
+                                         クリック時の挙動は写真の有無で分かれる（2026-09 変更）：
                                          - 写真あり : <button> でモーダルを開く（データ属性で Bootstrap にトリガー）
                                          - 写真なし : <label> でファイル選択を直接開く（1 クリック少ない）
-                                         見た目（枠のサイズ・色・角丸・境界）は両方で完全に同じ。 --}}
+                                         見た目（枠の色・角丸・境界）は両方で完全に同じ。 --}}
                                     @if($chart['photoUrl'])
                                         <button type="button"
-                                                class="d-flex align-items-center justify-content-center p-0"
+                                                class="c-trainee-photo-frame d-flex align-items-center justify-content-center p-0"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#trainee-photo-modal-{{ $chart['id'] }}"
-                                                style="width: 180px; height: 180px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
+                                                style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
                                                 aria-label="{{ $chart['name'] }}ちゃんの写真を操作する">
                                             {{-- 縦横比を保ったまま枠内に収める（切り抜きはしない）。
                                                  max-width/height 100% で枠を超えず、object-fit: contain で
@@ -131,8 +134,8 @@
                                         </button>
                                     @else
                                         <label for="trainee-photo-input-{{ $chart['id'] }}"
-                                               class="d-flex align-items-center justify-content-center"
-                                               style="width: 180px; height: 180px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
+                                               class="c-trainee-photo-frame d-flex align-items-center justify-content-center"
+                                               style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
                                                title="写真を登録します"
                                                aria-label="{{ $chart['name'] }}ちゃんの写真を登録する">
                                             <span class="text-muted" style="font-size: 0.875rem;">写真を登録</span>
@@ -142,9 +145,10 @@
                                     {{-- 写真枠（ファイル選択のまとまり）の下の文言（設計書 §2-7）。
                                          ファイル入力自体は display: none なので、Bootstrap の
                                          .is-invalid ~ .invalid-feedback の兄弟セレクタでは出せない。
-                                         block で独立して描画する。幅は写真枠と同じ 180px に収める
-                                         （折り返しは発生するが、カード幅ではなく枠の下に紐づく位置に
-                                         出すことで、どの入力に対するエラーかを明確にする）。 --}}
+                                         block で独立して描画する。幅は写真の列と同じ（パソコンでは
+                                         180px、スマホではカード幅いっぱい）。折り返しは発生するが、
+                                         カード幅ではなく枠の下に紐づく位置に出すことで、どの入力に
+                                         対するエラーかを明確にする。 --}}
                                     @if($shouldShowPhotoError)
                                         <x-form-error field="photo" block />
                                     @endif

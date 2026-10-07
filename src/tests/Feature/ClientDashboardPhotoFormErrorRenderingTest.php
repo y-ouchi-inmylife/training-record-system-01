@@ -70,6 +70,43 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
+    /**
+     * 2026-10 追加：スマホ（<576px、縦積み）のときだけ写真の枠をカード幅いっぱいに
+     * 広げるため、写真の列と枠に専用クラスを付ける（SCSS の @media で切り替え。
+     * パソコンの 180px 四方は維持）。描画結果に新クラスが乗ることと、以前の
+     * サイズ固定インライン style が残っていないことを確かめる。
+     */
+    public function test_スマホで幅いっぱいにするクラスが写真の列と枠に付く(): void
+    {
+        // 写真なしのトレーニー（<label> が描画される）
+        $html = $this->renderDashboard([])->__toString();
+
+        // 写真の列（<div>）に .c-trainee-photo-col、<label> に .c-trainee-photo-frame
+        $this->assertStringContainsString('c-trainee-photo-col', $html);
+        $this->assertStringContainsString('c-trainee-photo-frame', $html);
+
+        // 以前の固定サイズのインライン style が、置き換えた箇所に残っていないこと。
+        // 列：style="flex-shrink: 0; width: 180px;" → クラスに置き換え済み
+        $this->assertStringNotContainsString('flex-shrink: 0; width: 180px;', $html);
+        // 枠：style="width: 180px; height: 180px; ..." → width/height はクラスに移動済み
+        $this->assertStringNotContainsString('width: 180px; height: 180px;', $html);
+    }
+
+    public function test_写真ありのときも新クラスが写真枠に付く(): void
+    {
+        // 写真ありのトレーニー（<button> が描画される）
+        $html = $this->renderDashboard([], weightCharts: [[
+            'id' => 1,
+            'name' => 'ポチ',
+            'photoUrl' => 'https://example.com/photo.jpg',
+            'datasets' => [],
+        ]])->__toString();
+
+        $this->assertStringContainsString('c-trainee-photo-frame', $html);
+        // 枠（<button>）のインライン style から width/height が消えていること
+        $this->assertStringNotContainsString('width: 180px; height: 180px;', $html);
+    }
+
     public function test_photo入力エラーで上部案内は出ず欄下文言だけが出る(): void
     {
         // 段階 5-1：本画面は小さなフォーム（photo 1 項目のみ）のため、§2-7「画面上部の
