@@ -70,6 +70,24 @@ class TraineeFormErrorRenderingTest extends TestCase
         $view->assertDontSee('is-invalid', false);
     }
 
+    /**
+     * 性別の選択肢は「男の子／女の子／不明」で、旧文言「オス／メス」は出ない
+     *（2026-10 変更。文言は Trainee::sexLabels() の 1 か所で決まる）。
+     */
+    public function test_性別の選択肢は男の子女の子不明で旧文言は出ない(): void
+    {
+        $view = $this->renderForm([]);
+
+        $view->assertSee('男の子');
+        $view->assertSee('女の子');
+        $view->assertSee('不明');
+
+        // 旧文言は出ない（<option> の value は male/female/unknown のため、
+        // 「オス」「メス」が文字列として一致してはいけない）。
+        $view->assertDontSee('オス');
+        $view->assertDontSee('メス');
+    }
+
     /** 全項目にエラーが入っているとき：上部に 1 文の案内と各欄のエラーが出る */
     public function test_全項目にエラーが入ったとき上部に1文の案内と各欄のエラーが出る(): void
     {

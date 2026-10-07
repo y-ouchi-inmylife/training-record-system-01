@@ -101,6 +101,22 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $view->assertSee('invalid-feedback', false);
     }
 
+    /**
+     * 性別の選択肢は「男の子／女の子／不明」で、旧文言「オス／メス」は出ない
+     *（2026-10 変更。文言は Trainee::sexLabels() の 1 か所で決まる）。
+     */
+    public function test_初回設定_性別の選択肢は男の子女の子不明で旧文言は出ない(): void
+    {
+        $view = $this->renderSetup([]);
+
+        $view->assertSee('男の子');
+        $view->assertSee('女の子');
+        $view->assertSee('不明');
+
+        $view->assertDontSee('オス');
+        $view->assertDontSee('メス');
+    }
+
     public function test_初回設定_formキーはフォームの上に出て欄下にも上部案内にも出ない(): void
     {
         $view = $this->renderSetup([

@@ -32,8 +32,8 @@ class Trainee extends Model
     public static function sexLabels(): array
     {
         return [
-            self::SEX_MALE => 'オス',
-            self::SEX_FEMALE => 'メス',
+            self::SEX_MALE => '男の子',
+            self::SEX_FEMALE => '女の子',
             self::SEX_UNKNOWN => '不明',
         ];
     }
