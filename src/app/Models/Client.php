@@ -185,7 +185,7 @@ class Client extends Authenticatable
     }
 
     /**
-     * 残り回数（契約回数の合計 − 利用回数の合計）。契約が 0 件なら null。
+     * 残り回数（契約回数の合計 − 利用回数の合計）。契約も利用も 0 件なら null。
      *
      * 会員一覧（S-0304）で `ClientController::index()` の addSelect が付ける
      * `contract_total` / `usage_total`（サブクエリの合計）から求める。

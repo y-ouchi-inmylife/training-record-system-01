@@ -15,8 +15,8 @@ use Tests\TestCase;
  * 残り回数・回数カードの描画確認（設計書 screen-design.md S-0304「残り回数」列、
  * S-0305 セクション5「回数」（見出しの残り回数）、§2-4「例外：残り回数」）。
  *
- * - 会員一覧：契約 0 件は空欄、マイナスは赤字（text-danger）で「-n回」、0 は「0回」
- * - 会員詳細：回数カードの見出しの「残り n回」（契約 0 件は出さない、0 は「残り 0回」、マイナスは赤字）、
+ * - 会員一覧：契約も利用も 0 件は空欄、契約なし・利用ありは赤字の「-n回」、マイナスは赤字（text-danger）、0 は「0回」
+ * - 会員詳細：回数カードの見出しの「残り n回」（契約も利用も 0 件は出さない、0 は「残り 0回」、マイナスは赤字）、
  *   契約の見出し・マス・超過・使い切り・空の状態。ヘッダーサマリーには残り回数を出さない
  *
  * 実際の HTTP で一覧・詳細を開くため、画面が読むテーブルを列を絞って作る。
@@ -143,8 +143,10 @@ class ClientCountRenderingTest extends TestCase
 
     public function test_会員一覧の残り回数列(): void
     {
-        $none = $this->makeClient('0001', '契約なし');
-        $this->usage($none, '2026-10-01');            // 契約なしの利用だけ → 空欄
+        $this->makeClient('0005', '登録なし');         // 契約も利用もない → 空欄
+
+        $usageOnly = $this->makeClient('0001', '契約なし');
+        $this->usage($usageOnly, '2026-10-01');       // 契約がなく利用だけ → 0 − 1 = −1（赤字）
 
         $plus = $this->makeClient('0002', '残りあり');
         $this->contract($plus, '2026-10-01', 4);
@@ -162,7 +164,10 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.index'))->assertOk()->getContent();
 
         $this->assertStringContainsString('<th>残り回数</th>', $html);
-        $this->assertSame('', $this->lastCell($this->listRow($html, '契約なし')));
+        $this->assertSame('', $this->lastCell($this->listRow($html, '登録なし')));
+        $usageOnlyRow = $this->listRow($html, '契約なし');
+        $this->assertSame('-1回', $this->lastCell($usageOnlyRow));
+        $this->assertStringContainsString('text-danger', $usageOnlyRow);
         $this->assertSame('3回', $this->lastCell($this->listRow($html, '残りあり')));
         $this->assertSame('0回', $this->lastCell($this->listRow($html, '使い切り')));
 
@@ -188,7 +193,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertStringContainsString('契約・利用は登録されていません', $html);
-        // 契約 0 件は「残り n回」の表示そのものを出さない（「残り」の文字も残らない）
+        // 契約も利用も 0 件は「残り n回」の表示そのものを出さない（「残り」の文字も残らない）
         $this->assertSame('<h6 class="mb-0">回数</h6>', $this->countHeading($html));
         // ヘッダーサマリーには残り回数を出さない
         $this->assertStringNotContainsString('残り回数', $html);
@@ -267,15 +272,15 @@ class ClientCountRenderingTest extends TestCase
         );
     }
 
-    public function test_契約がなく利用だけある会員は見出しに残りが出ず超過の行が出る(): void
+    public function test_契約がなく利用だけある会員は見出しに赤字の残りマイナスと超過の行が出る(): void
     {
         $client = $this->makeClient('0001', '山田');
         $this->usage($client, '2026-10-02');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 契約 0 件なので、見出しに「残り」は出ない
-        $this->assertSame('<h6 class="mb-0">回数</h6>', $this->countHeading($html));
+        // 利用が 1 件あるので回数管理の対象の会員として、計算どおり赤字の「残り -1回」を出す
+        $this->assertStringContainsString('<h6 class="mb-0">回数<span class="ms-3">残り <span class="text-danger">-1回</span>', $this->countHeading($html));
         $this->assertStringContainsString('<span class="badge bg-danger">超過 1</span>', $html);
     }
 

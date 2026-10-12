@@ -74,7 +74,6 @@ class ContractTicketServiceTest extends TestCase
         $this->assertFalse($row['usedUp']);
         $this->assertSame([], $result['overflow']);
         $this->assertSame(4, $result['remaining']);
-        $this->assertTrue($result['hasContracts']);
         $this->assertFalse($result['isEmpty']);
     }
 
@@ -193,12 +192,12 @@ class ContractTicketServiceTest extends TestCase
         $this->assertSame([5, 3], array_map(fn ($row) => $row['contract']->id, $result['contracts']));
     }
 
-    public function test_契約が1件もないと残り回数はなしで利用はすべて超過(): void
+    public function test_契約がなく利用2回なら残り回数はマイナス2で利用はすべて超過(): void
     {
         $result = $this->build([], [$this->usage(11, '2026-10-01', 2)]);
 
-        $this->assertNull($result['remaining']);
-        $this->assertFalse($result['hasContracts']);
+        // 契約・利用が 1 件でもあれば回数管理の対象として計算どおりの値を出す（設計書 §2-4）
+        $this->assertSame(-2, $result['remaining']);
         $this->assertFalse($result['isEmpty']);
         $this->assertSame([], $result['contracts']);
         $this->assertSame([11, 11], array_map(fn ($usage) => $usage->id, $result['overflow']));
@@ -212,10 +211,15 @@ class ContractTicketServiceTest extends TestCase
         $this->assertTrue($result['isEmpty']);
     }
 
-    public function test_残り回数は契約0件ならnullで0とは区別する(): void
+    public function test_残り回数は契約も利用も0件のときだけnullで0とは区別する(): void
     {
+        // 会員一覧のサブクエリの SUM は、行がないと NULL になる
         $this->assertNull(ContractTicketService::remaining(null, null));
-        $this->assertNull(ContractTicketService::remaining(null, 3));
+        $this->assertNull(ContractTicketService::remaining(0, 0));
+        $this->assertNull(ContractTicketService::remaining(null, 0));
+        // 契約がなく利用だけ：計算どおりマイナス
+        $this->assertSame(-3, ContractTicketService::remaining(null, 3));
+        $this->assertSame(-3, ContractTicketService::remaining(0, 3));
         $this->assertSame(0, ContractTicketService::remaining(4, 4));
         $this->assertSame(4, ContractTicketService::remaining(4, null));
         $this->assertSame(-1, ContractTicketService::remaining(4, 5));

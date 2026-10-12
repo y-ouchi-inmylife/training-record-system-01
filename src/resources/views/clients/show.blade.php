@@ -333,11 +333,11 @@
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                     {{-- 見出し「回数」の右に残り回数（設計書 S-0305 セクション5「カードヘッダー」）。
-                         契約が 1 件もない会員は「残り n回」の表示そのものを出さない（§2-4 の例外）ため、
-                         「残り」の文字も含めて $ticket['hasContracts'] のときだけ出す。
+                         契約も利用も 1 件もない会員は「残り n回」の表示そのものを出さない（§2-4 の例外）ため、
+                         「残り」の文字も含めて、残り回数が null でないときだけ出す。
                          数値の表示（マイナスは赤字）は会員一覧と同じ x-remaining-count を使う。
                          狭い幅ではボタンと重ならないよう、card-header の flex-wrap で折り返す。 --}}
-                    <h6 class="mb-0">回数@if($ticket['hasContracts'])<span class="ms-3">残り <x-remaining-count :value="$ticket['remaining']" /></span>@endif</h6>
+                    <h6 class="mb-0">回数@if(! is_null($ticket['remaining']))<span class="ms-3">残り <x-remaining-count :value="$ticket['remaining']" /></span>@endif</h6>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 onclick="window.contractModal.openForCreate()">契約を追加</button>

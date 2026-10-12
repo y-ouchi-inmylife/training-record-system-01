@@ -29,8 +29,7 @@ class ContractTicketService
      *
      * 返す配列の形：
      * [
-     *   'remaining'    => ?int,  // 残り回数（契約回数の合計 − 利用回数の合計）。契約が 0 件なら null
-     *   'hasContracts' => bool,  // 契約が 1 件以上あるか
+     *   'remaining'    => ?int,  // 残り回数（契約回数の合計 − 利用回数の合計）。契約も利用も 0 件なら null
      *   'isEmpty'      => bool,  // 契約も利用も 1 件もないか（カード本文の空の状態の判定用）
      *   'overflow'     => ClientUsage[],  // 超過のマス（1 要素 = 1 マス。古い利用が先頭）
      *   'contracts'    => [               // 表示順（契約日の新しいものが先頭）
@@ -108,14 +107,9 @@ class ContractTicketService
         }
         $contractRows = array_reverse($contractRows);
 
-        $hasContracts = $sortedContracts->isNotEmpty();
-
         return [
-            'remaining' => $hasContracts
-                ? self::remaining((int) $sortedContracts->sum('count'), (int) $sortedUsages->sum('count'))
-                : null,
-            'hasContracts' => $hasContracts,
-            'isEmpty' => ! $hasContracts && $sortedUsages->isEmpty(),
+            'remaining' => self::remaining((int) $sortedContracts->sum('count'), (int) $sortedUsages->sum('count')),
+            'isEmpty' => $sortedContracts->isEmpty() && $sortedUsages->isEmpty(),
             'overflow' => $overflow,
             'contracts' => $contractRows,
         ];
@@ -124,16 +118,24 @@ class ContractTicketService
     /**
      * 残り回数を求める（契約回数の合計 − 利用回数の合計。マイナスも許す）。
      *
-     * 契約が 1 件もない会員は null（「0回」と区別して空欄で表示するため。
-     * 設計書 screen-design.md §2-4「例外：残り回数」）。会員一覧（S-0304）の
-     * サブクエリで取った合計からも同じ規則で求めるため、静的メソッドとして公開する。
+     * 契約も利用も 1 件もない会員は null（表示しない）。契約・利用が 1 件でも登録されていれば
+     * 回数管理の対象の会員として計算どおりの値を返す（契約がなく利用だけならマイナス）。
+     * 回数契約をしていない会員と、使い切った会員（0）を見分けるため
+     * （設計書 screen-design.md §2-4「例外：残り回数」）。
+     *
+     * 会員一覧（S-0304）のサブクエリで取った合計からも同じ規則で求めるため、静的メソッドとして公開する。
+     * サブクエリの SUM は対象の行がないと NULL になるため、null と 0 はどちらも「登録なし」として扱う
+     * （回数は 1 以上なので、行があれば合計は 0 にならない）。
      */
     public static function remaining(?int $contractTotal, ?int $usageTotal): ?int
     {
-        if ($contractTotal === null) {
+        $contractTotal = (int) $contractTotal;
+        $usageTotal = (int) $usageTotal;
+
+        if ($contractTotal === 0 && $usageTotal === 0) {
             return null;
         }
 
-        return $contractTotal - (int) $usageTotal;
+        return $contractTotal - $usageTotal;
     }
 }

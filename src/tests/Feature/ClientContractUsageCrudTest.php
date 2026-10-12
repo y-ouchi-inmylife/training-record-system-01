@@ -186,7 +186,7 @@ class ClientContractUsageCrudTest extends TestCase
 
     public function test_一般トレーナーが利用を登録すると会員詳細に戻り_残りがマイナスでも止めない(): void
     {
-        // 契約が 1 件もない（残り回数がマイナス側になる）状態でも登録できる
+        // 契約が 1 件もない（残り回数がマイナスになる）状態でも登録できる
         $response = $this->post(route('client-usages.store', $this->client), [
             '_form_type' => 'usage',
             'used_on' => '2026-10-12',
