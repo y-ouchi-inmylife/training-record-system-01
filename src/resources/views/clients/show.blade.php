@@ -173,21 +173,21 @@
             </div>
         </div>
         {{-- 3段目: 属性 4 項目（初回日／主担当／メールアドレス／残り回数）。
-             列の幅は 3 / 3 / 4 / 2。メールアドレス列は値・バッジ・操作ボタンが横に並ぶため、
-             もとの 3 列のときと同じ幅（col-md-4）を保ち、初回日・主担当を 1 段階ずつ狭めた。
+             列の幅は 2 / 2 / 6 / 2。メールアドレス列は値・バッジ・操作ボタンが横に並ぶため広く取り、
+             初回日・主担当は値が短いので狭めて、メールアドレスを左に寄せた。
              状態バッジはメールアドレスの値の右に横並びで置く。バッジが示すのは
              メールアドレスとパスワードの登録状況で、氏名とは関係がないため。
              未登録のときは値がなくバッジだけが同じ位置に表示される。設計書 S-0305 参照 --}}
         <div class="row g-3 mt-2 pt-2 border-top">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="text-muted small">初回日</div>
                 <div style="min-height: 1.5rem;">{{ $client->initial_consultation_date?->format('Y/m/d') }}</div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="text-muted small">主担当</div>
                 <div style="min-height: 1.5rem;">{{ $client->primaryTrainer?->name }}</div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="text-muted small">メールアドレス</div>
                 {{-- 値 → 状態バッジ → 状態別の操作ボタン、を横並び。
                      値・バッジは左寄せ、操作ボタンは右寄せにする（試行中）。
