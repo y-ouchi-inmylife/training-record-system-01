@@ -7,9 +7,11 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\Client\LoginController as ClientLoginController;
 use App\Http\Controllers\Client\LogoutController as ClientLogoutController;
+use App\Http\Controllers\ClientContractController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientEmailController;
 use App\Http\Controllers\ClientEmailRegistrationTokenController;
+use App\Http\Controllers\ClientUsageController;
 use App\Http\Controllers\TrainingRecordController;
 use App\Http\Controllers\TrainerController;
 use App\Http\Controllers\DashboardController;
@@ -112,6 +114,22 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
                 ->name('trainee-measurements.update');
             Route::delete('trainee-measurements/{measurement}', [TraineeMeasurementController::class, 'destroy'])
                 ->name('trainee-measurements.destroy');
+
+            // 契約（D-0900）・利用（D-1000）。会員詳細（S-0305）の「回数」カードのモーダルで
+            // 登録・編集・削除する（create / edit / show の画面遷移は持たない）。
+            // 計測値と同じく、登録は会員 URL 配下、それ以外はフラット URL とする（api-design.md 参照）。
+            Route::post('clients/{client}/contracts', [ClientContractController::class, 'store'])
+                ->name('client-contracts.store');
+            Route::put('client-contracts/{contract}', [ClientContractController::class, 'update'])
+                ->name('client-contracts.update');
+            Route::delete('client-contracts/{contract}', [ClientContractController::class, 'destroy'])
+                ->name('client-contracts.destroy');
+            Route::post('clients/{client}/usages', [ClientUsageController::class, 'store'])
+                ->name('client-usages.store');
+            Route::put('client-usages/{usage}', [ClientUsageController::class, 'update'])
+                ->name('client-usages.update');
+            Route::delete('client-usages/{usage}', [ClientUsageController::class, 'destroy'])
+                ->name('client-usages.destroy');
 
             Route::resource('training-records', TrainingRecordController::class);
 

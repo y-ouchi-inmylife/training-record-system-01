@@ -73,6 +73,26 @@
     white-space: pre-wrap;
     word-break: break-word;
 }
+
+/* 回数カード（設計書 S-0305 セクション5）: トレーニング記録と同じく
+   ビューポート基準の最大高さで、収まらない場合のみ縦スクロール */
+.contract-ticket-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+/* 回数券型のマス。利用済み（button）と未利用（span）で幅をそろえ、折り返して並べる */
+.ticket-slot {
+    min-width: 6.5rem;
+}
+.ticket-slot-empty {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    text-align: center;
+    color: var(--bs-secondary-color);
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius-sm);
+}
 </style>
 @endpush
 
@@ -152,16 +172,18 @@
                 <span class="font-monospace fs-5">{{ $client->internal_id }}</span>
             </div>
         </div>
-        {{-- 3段目: 属性 3 列（初回日／主担当／メールアドレス）。
+        {{-- 3段目: 属性 4 項目（初回日／主担当／メールアドレス／残り回数）。
+             列の幅は 3 / 3 / 4 / 2。メールアドレス列は値・バッジ・操作ボタンが横に並ぶため、
+             もとの 3 列のときと同じ幅（col-md-4）を保ち、初回日・主担当を 1 段階ずつ狭めた。
              状態バッジはメールアドレスの値の右に横並びで置く。バッジが示すのは
              メールアドレスとパスワードの登録状況で、氏名とは関係がないため。
              未登録のときは値がなくバッジだけが同じ位置に表示される。設計書 S-0305 参照 --}}
         <div class="row g-3 mt-2 pt-2 border-top">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="text-muted small">初回日</div>
                 <div style="min-height: 1.5rem;">{{ $client->initial_consultation_date?->format('Y/m/d') }}</div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="text-muted small">主担当</div>
                 <div style="min-height: 1.5rem;">{{ $client->primaryTrainer?->name }}</div>
             </div>
@@ -216,6 +238,12 @@
                         @endif
                     </div>
                 </div>
+            </div>
+            {{-- 残り回数（設計書 S-0305 セクション1）。契約 0 件は空欄、マイナスは赤字（§2-4 の例外）。
+                 値は ClientController::show で ContractTicketService から組み立てた $ticket['remaining']。 --}}
+            <div class="col-md-2">
+                <div class="text-muted small">残り回数</div>
+                <div style="min-height: 1.5rem;"><x-remaining-count :value="$ticket['remaining']" /></div>
             </div>
         </div>
     </div>
@@ -306,6 +334,74 @@
         {{-- 右カラム: トレーニー一覧。col-lg-5（2026-09 変更で 4→5 に広げた。詳細は
              screen-design.md S-0305 設計方針「2カラム本体の幅を 8:4 から 7:5 に」参照）。 --}}
         <div class="col-lg-5">
+            {{-- 回数カード（設計書 S-0305 セクション5）。右カラムのトレーニーカードの上に置く。
+                 契約ごとに回数ぶんのマスを並べ、利用日で埋めていく「回数券型」。
+                 割り当て（どの利用をどの契約のマスに入れるか）は ContractTicketService で計算済みで、
+                 Blade は $ticket を並べるだけ。 --}}
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0">回数</h6>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                onclick="window.contractModal.openForCreate()">契約を追加</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                onclick="window.usageModal.openForCreate()">利用を追加</button>
+                    </div>
+                </div>
+                @if($ticket['isEmpty'])
+                    <div class="card-body">
+                        <p class="text-muted mb-0">契約・利用は登録されていません</p>
+                    </div>
+                @else
+                    <div class="card-body contract-ticket-scroll">
+                        {{-- 超過の行：どの契約のマスにも入らなかった利用。あるときだけ一番上に出す --}}
+                        @if(count($ticket['overflow']) > 0)
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                    <span>（契約なし）</span>
+                                    <span class="badge bg-danger">超過 {{ count($ticket['overflow']) }}</span>
+                                </div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach($ticket['overflow'] as $usage)
+                                        @include('clients._usage-slot', ['usage' => $usage])
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                        {{-- 契約ごとの行（契約日の新しいものが上。マスは古い利用が左） --}}
+                        @foreach($ticket['contracts'] as $row)
+                            <div @class(['mb-3' => ! $loop->last])>
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                    {{-- 契約の見出し。押すとその契約の編集モーダル（S-0305-M04）を開く。
+                                         メモ・有効期限がない契約は、その部分（「期限」の語も）を出さない。 --}}
+                                    <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
+                                            data-id="{{ $row['contract']->id }}"
+                                            data-contracted-on="{{ $row['contract']->contracted_on->format('Y-m-d') }}"
+                                            data-count="{{ $row['contract']->count }}"
+                                            data-expires-on="{{ $row['contract']->expires_on?->format('Y-m-d') }}"
+                                            data-note="{{ $row['contract']->note }}"
+                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 期限 {{ $row['contract']->expires_on->format('Y/m/d') }}@endif</button>
+                                    {{-- 契約の状態。有効期限が過ぎていても表示を変えない --}}
+                                    @if($row['usedUp'])
+                                        <span class="badge bg-secondary flex-shrink-0">使い切り</span>
+                                    @else
+                                        <span class="flex-shrink-0">残り {{ $row['remaining'] }}</span>
+                                    @endif
+                                </div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach($row['slots'] as $usage)
+                                        @if($usage)
+                                            @include('clients._usage-slot', ['usage' => $usage])
+                                        @else
+                                            <span class="ticket-slot ticket-slot-empty">未利用</span>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
             <div class="card mb-3">
                 <div class="card-header">
                     <h6 class="mb-0">トレーニー（{{ $client->trainees->count() }}件）</h6>
@@ -389,6 +485,11 @@
                     @include('trainees._measurement-modal', ['trainee' => $trainee, 'returnTo' => 'client'])
                 @endforeach
             @endif
+
+            {{-- 契約・利用の登録・編集モーダル（S-0305-M04 / M05）。回数カードのボタン・見出し・マスから開く。
+                 $openModal はエラーで戻ったときに開き直すモーダルの種別（ClientController::show 参照）。 --}}
+            @include('clients._contract-modal', ['client' => $client, 'openModal' => $openModal])
+            @include('clients._usage-modal', ['client' => $client, 'openModal' => $openModal])
         </div>
     </div>
 

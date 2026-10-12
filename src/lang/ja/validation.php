@@ -330,6 +330,15 @@ return [
         'original_filename' => '元ファイル名',
         'file_size' => 'ファイルサイズ',
         'storage_key' => '保存キー',
+        // 契約・利用の登録・編集モーダル（S-0305-M04 / M05）。
+        // 回数・メモは契約と利用で同じ項目名のため共有する。
+        // note は TraineeRequest が attributes() で「備考」に上書きしている（トレーニーの画面ラベル）。
+        // 有効期限の「契約日以降」の文言は標準の after_or_equal（:date に契約日の項目名が入る）で足りる。
+        'contracted_on' => '契約日',
+        'expires_on' => '有効期限',
+        'used_on' => '利用日',
+        'count' => '回数',
+        'note' => 'メモ',
     ],
 
 ];

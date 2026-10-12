@@ -30,6 +30,13 @@ class LogAccess
         'trainee-measurements.store' => 'create_trainee_measurement',
         'trainee-measurements.update' => 'edit_trainee_measurement',
         'trainee-measurements.destroy' => 'delete_trainee_measurement',
+        // 契約（D-0900）・利用（D-1000）。参照は view_client に含めるため view_ 系は作らない。
+        'client-contracts.store' => 'create_client_contract',
+        'client-contracts.update' => 'edit_client_contract',
+        'client-contracts.destroy' => 'delete_client_contract',
+        'client-usages.store' => 'create_client_usage',
+        'client-usages.update' => 'edit_client_usage',
+        'client-usages.destroy' => 'delete_client_usage',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -73,6 +80,18 @@ class LogAccess
         } elseif (str_contains($action, 'trainee')) {
             $targetType = 'Trainee';
             $param = $request->route('trainee');
+            $targetId = is_object($param) ? $param->id : $param;
+        } elseif (str_contains($action, 'client_contract')) {
+            // 'create_client_contract' などは 'client' も含むため、会員（client）の判定より前に置く。
+            // store のとき URL パラメータは `client`（親）で、作成したレコードの ID は取れないため
+            // target_id は null にする（計測値の store と同じ扱い）。
+            $targetType = 'ClientContract';
+            $param = $request->route('contract');
+            $targetId = is_object($param) ? $param->id : $param;
+        } elseif (str_contains($action, 'client_usage')) {
+            // 同上（会員の判定より前に置く）
+            $targetType = 'ClientUsage';
+            $param = $request->route('usage');
             $targetId = is_object($param) ? $param->id : $param;
         } elseif (str_contains($action, 'client')) {
             $targetType = 'Client';

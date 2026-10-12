@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ClientRequest;
 use App\Models\Client;
+use App\Models\ClientContract;
+use App\Models\ClientUsage;
 use App\Models\Trainer;
 use App\Models\TrainingRecord;
 use App\Services\ClientInternalIdService;
+use App\Services\ContractTicketService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +44,13 @@ class ClientController extends Controller
                     ->orderBy('training_date', 'desc')
                     ->orderBy('training_time', 'desc')
                     ->limit(1),
+                // 残り回数（8 列目）の元になる契約回数・利用回数の合計。last_training_date と同じく
+                // サブクエリで取り、行ごとの追加クエリを起こさない（設計書 S-0304 設計方針「『残り回数』列を追加」）。
+                // 契約が 0 件の会員は contract_total が NULL になり、Client::remaining_count が null（空欄）になる。
+                'contract_total' => ClientContract::selectRaw('SUM(count)')
+                    ->whereColumn('client_id', 'clients.id'),
+                'usage_total' => ClientUsage::selectRaw('SUM(count)')
+                    ->whereColumn('client_id', 'clients.id'),
             ]);
 
         // 内部ID検索（部分一致）
@@ -146,7 +156,7 @@ class ClientController extends Controller
     /**
      * クライアント詳細画面（S-0305）
      */
-    public function show(Client $client): View
+    public function show(Client $client, ContractTicketService $contractTicketService): View
     {
         // trainees は id 昇順（Client::trainees() の既定）で並び、
         // 各 trainee の measurements を eager load することで、
@@ -163,7 +173,19 @@ class ClientController extends Controller
                 ->orderBy('training_time', 'desc');
         }, 'trainees.measurements', 'audioRecords' => function ($query) {
             $query->select(['id', 'client_id']);
-        }]);
+        }, 'contracts', 'usages']);
+
+        // 回数券型の表示データ（セクション5「回数」）と残り回数（セクション1）。
+        // 割り当ての計算は Blade に書かず、ContractTicketService で組み立てて渡す
+        // （設計書 S-0305 セクション5「割り当てルール」参照）。
+        $ticket = $contractTicketService->build($client->contracts, $client->usages);
+
+        // 契約・利用のモーダル（S-0305-M04 / M05）で入力エラーになって戻ったとき、
+        // 送信元のモーダルだけを開き直すための種別（'contract' / 'usage'）。
+        // 2 つのモーダルは入力欄（count / note）の名前が重なるため、hidden `_form_type` で見分ける。
+        $openModal = session('errors')?->any() && in_array(old('_form_type'), ['contract', 'usage'], true)
+            ? old('_form_type')
+            : null;
 
         // 状態バッジ（4 状態＋期限切れ）判定に必要な派生値を先読みする。
         // 状態別ボタン（「登録案内を発行」／「登録案内を表示」／「登録案内を取消」／
@@ -174,7 +196,7 @@ class ClientController extends Controller
 
         $trainers = Trainer::practitioners()->orderBy('display_order')->orderBy('name')->get();
 
-        return view('clients.show', compact('client', 'trainers'));
+        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal'));
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ContractTicketService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -181,6 +182,50 @@ class Client extends Authenticatable
     public function trainees(): HasMany
     {
         return $this->hasMany(Trainee::class)->orderBy('id');
+    }
+
+    /**
+     * 残り回数（契約回数の合計 − 利用回数の合計）。契約が 0 件なら null。
+     *
+     * 会員一覧（S-0304）で `ClientController::index()` の addSelect が付ける
+     * `contract_total` / `usage_total`（サブクエリの合計）から求める。
+     * 規則は会員詳細と同じ `ContractTicketService::remaining()` に寄せる。
+     */
+    public function getRemainingCountAttribute(): ?int
+    {
+        $contractTotal = $this->getAttribute('contract_total');
+        $usageTotal = $this->getAttribute('usage_total');
+
+        return ContractTicketService::remaining(
+            $contractTotal === null ? null : (int) $contractTotal,
+            $usageTotal === null ? null : (int) $usageTotal,
+        );
+    }
+
+    /**
+     * 契約（D-0900）
+     *
+     * 並び順は割り当てルールと同じ契約日の昇順（同じ日は `id` の昇順）。
+     * 回数券型の表示データは ContractTicketService で組み立てる
+     * （設計書 screen-design.md S-0305 セクション5「割り当てルール」）。
+     */
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(ClientContract::class)
+            ->orderBy('contracted_on')
+            ->orderBy('id');
+    }
+
+    /**
+     * 利用（D-1000）
+     *
+     * 並び順は割り当てルールと同じ利用日の昇順（同じ日は `id` の昇順）。
+     */
+    public function usages(): HasMany
+    {
+        return $this->hasMany(ClientUsage::class)
+            ->orderBy('used_on')
+            ->orderBy('id');
     }
 
     /**

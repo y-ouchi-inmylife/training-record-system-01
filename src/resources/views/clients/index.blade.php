@@ -153,6 +153,10 @@
                     {{-- メールアドレス列：状態バッジのみ表示（値は出さない）。カラムを持たない導出値のためソート不可（設計書 §S-0304）--}}
                     <th>メールアドレス</th>
                     <th>最終トレーニング日</th>
+                    {{-- 残り回数列（8 列目、設計書 S-0304 設計方針「『残り回数』列を追加」）。
+                         並び替え・検索条件の対象にしない。値は ClientController::index の addSelect
+                         （contract_total / usage_total のサブクエリ）から Client::remaining_count で求める。 --}}
+                    <th>残り回数</th>
                 </tr>
             </thead>
             <tbody>
@@ -168,10 +172,11 @@
                         <td>{{ $client->primaryTrainer?->name }}</td>
                         <td><span class="badge {{ $badge['class'] }}">{{ $badge['label'] }}</span></td>
                         <td>{{ $client->last_training_date ? \Carbon\Carbon::parse($client->last_training_date)->format('Y/m/d') : '' }}</td>
+                        <td><x-remaining-count :value="$client->remaining_count" /></td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">該当する会員がいません。</td>
+                        <td colspan="8" class="text-center text-muted py-4">該当する会員がいません。</td>
                     </tr>
                 @endforelse
             </tbody>

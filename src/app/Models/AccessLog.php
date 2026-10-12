@@ -44,6 +44,12 @@ class AccessLog extends Model
             'create_trainee_measurement' => '計測値登録',
             'edit_trainee_measurement' => '計測値編集',
             'delete_trainee_measurement' => '計測値削除',
+            'create_client_contract' => '契約登録',
+            'edit_client_contract' => '契約編集',
+            'delete_client_contract' => '契約削除',
+            'create_client_usage' => '利用登録',
+            'edit_client_usage' => '利用編集',
+            'delete_client_usage' => '利用削除',
         ];
     }
 
@@ -60,6 +66,8 @@ class AccessLog extends Model
             'TrainingRecord' => 'トレーニング記録',
             'Trainee' => 'トレーニー',
             'TraineeMeasurement' => '計測値',
+            'ClientContract' => '契約',
+            'ClientUsage' => '利用',
         ];
     }
 
