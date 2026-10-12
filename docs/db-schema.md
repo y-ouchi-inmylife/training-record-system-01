@@ -642,7 +642,7 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
 | contracted_on | DATE | NO | — | 契約日 |
-| count | SMALLINT UNSIGNED | NO | — | 契約回数（1以上） |
+| count | SMALLINT UNSIGNED | NO | — | 契約回数（1以上999以下） |
 | expires_on | DATE | YES | NULL | 有効期限。**表示するだけ**で、残り回数の計算・利用の割り当てには使わない |
 | note | VARCHAR(255) | YES | NULL | メモ（「4回コース」など。契約の名前もここに自由に書く） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
@@ -663,7 +663,7 @@ erDiagram
 |--------|------|------|-----------|------|
 | client_contracts_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時は契約も削除。**契約があっても会員の削除は拒否しない**（トレーニーの「あれば拒否」とは扱いが違う。下の注記参照） |
 | client_contracts_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
-| client_contracts_count_check | CHECK | count >= 1 | — | 契約回数の値制限（1以上） |
+| client_contracts_count_check | CHECK | count BETWEEN 1 AND 999 | — | 契約回数の値制限（1以上999以下。上限は画面の入力規則〔screen-design.md S-0305-M04〕とそろえる） |
 
 ##### 注記
 
@@ -686,7 +686,7 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
 | used_on | DATE | NO | — | 利用日 |
-| count | SMALLINT UNSIGNED | NO | 1 | 利用回数（1以上）。1 件で複数回分を登録できる（例：トレーニー 2 頭なら 2） |
+| count | SMALLINT UNSIGNED | NO | 1 | 利用回数（1以上999以下）。1 件で複数回分を登録できる（例：トレーニー 2 頭なら 2） |
 | note | VARCHAR(255) | YES | NULL | メモ（「当日キャンセル」など） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
@@ -706,7 +706,7 @@ erDiagram
 |--------|------|------|-----------|------|
 | client_usages_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時は利用も削除。**利用があっても会員の削除は拒否しない**（D-0900 の注記参照） |
 | client_usages_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
-| client_usages_count_check | CHECK | count >= 1 | — | 利用回数の値制限（1以上） |
+| client_usages_count_check | CHECK | count BETWEEN 1 AND 999 | — | 利用回数の値制限（1以上999以下。上限は画面の入力規則〔screen-design.md S-0305-M05〕とそろえる） |
 
 ##### 注記
 
