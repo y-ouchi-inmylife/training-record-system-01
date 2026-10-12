@@ -15,8 +15,10 @@ use Tests\TestCase;
  * 残り回数・回数カードの描画確認（設計書 screen-design.md S-0304「残り回数」列、
  * S-0305 セクション5「回数」（見出しの残り回数）、§2-4「例外：残り回数」）。
  *
- * - 会員一覧：契約も利用も 0 件は空欄、契約なし・利用ありは赤字の「-n回」、マイナスは赤字（text-danger）、0 は「0回」
- * - 会員詳細：回数カードの見出しの「残り n回」（契約も利用も 0 件は出さない、0 は「残り 0回」、マイナスは赤字）、
+ * - 会員一覧：値は「回」を付けず数字だけ。契約も利用も 0 件は空欄、契約なし・利用ありは赤字の「-n」、
+ *   マイナスは赤字（text-danger）、0 は「0」
+ * - 会員詳細：回数カードの見出しの「残り回数 n」（契約も利用も 0 件は出さない、0 は「残り回数 0」、
+ *   マイナスは数字の部分が赤字）、
  *   契約の見出し・マス・超過・使い切り・空の状態。ヘッダーサマリーには残り回数を出さない
  *
  * 実際の HTTP で一覧・詳細を開くため、画面が読むテーブルを列を絞って作る。
@@ -131,6 +133,12 @@ class ClientCountRenderingTest extends TestCase
         return preg_replace('/\s+/u', ' ', substr($html, $start, $end + 5 - $start));
     }
 
+    /** ヘッダーサマリーに残り回数の項目（「残り回数」のラベル）がないこと */
+    private function assertHeaderHasNoRemaining(string $html): void
+    {
+        $this->assertDoesNotMatchRegularExpression('/<div class="text-muted small">残り回数<\/div>/u', $html);
+    }
+
     /** 行の最後のセル（8 列目＝残り回数）の中身 */
     private function lastCell(string $row): string
     {
@@ -166,14 +174,15 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<th>残り回数</th>', $html);
         $this->assertSame('', $this->lastCell($this->listRow($html, '登録なし')));
         $usageOnlyRow = $this->listRow($html, '契約なし');
-        $this->assertSame('-1回', $this->lastCell($usageOnlyRow));
+        $this->assertSame('-1', $this->lastCell($usageOnlyRow));
         $this->assertStringContainsString('text-danger', $usageOnlyRow);
-        $this->assertSame('3回', $this->lastCell($this->listRow($html, '残りあり')));
-        $this->assertSame('0回', $this->lastCell($this->listRow($html, '使い切り')));
+        $this->assertSame('3', $this->lastCell($this->listRow($html, '残りあり')));
+        $this->assertSame('0', $this->lastCell($this->listRow($html, '使い切り')));
 
         $minusRow = $this->listRow($html, '超過あり');
-        $this->assertSame('-2回', $this->lastCell($minusRow));
-        $this->assertStringContainsString('text-danger', $minusRow);
+        // 値は「回」を付けず数字だけ。マイナスは数字の部分が赤字
+        $this->assertSame('-2', $this->lastCell($minusRow));
+        $this->assertStringContainsString('<span class="text-danger">-2</span>', $minusRow);
         $this->assertStringNotContainsString('text-danger', $this->listRow($html, '残りあり'));
     }
 
@@ -193,13 +202,12 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertStringContainsString('契約・利用は登録されていません', $html);
-        // 契約も利用も 0 件は「残り n回」の表示そのものを出さない（「残り」の文字も残らない）
+        // 契約も利用も 0 件は「残り回数 n」の表示そのものを出さない（「残り回数」の文字も残らない）
         $this->assertSame('<h6 class="mb-0">回数</h6>', $this->countHeading($html));
-        // ヘッダーサマリーには残り回数を出さない
         $this->assertStringNotContainsString('残り回数', $html);
     }
 
-    public function test_残りが0なら見出しに残り0回が出る(): void
+    public function test_残りが0なら見出しに残り回数0が出る(): void
     {
         $client = $this->makeClient('0001', '山田');
         $this->contract($client, '2026-10-01', 2);
@@ -208,9 +216,9 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $heading = $this->countHeading($html);
-        $this->assertStringContainsString('残り <span>0回</span>', $heading);
+        $this->assertStringContainsString('残り回数 <span>0</span>', $heading);
         $this->assertStringNotContainsString('text-danger', $heading);
-        $this->assertStringNotContainsString('残り回数', $html);
+        $this->assertHeaderHasNoRemaining($html);
     }
 
     public function test_回数カードに契約の見出し_マス_使い切り_残りが出る(): void
@@ -225,9 +233,9 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 回数カードの見出しの残り回数（6 − 4 = 2）。ヘッダーサマリーには出さない
-        $this->assertStringContainsString('<h6 class="mb-0">回数<span class="ms-3">残り <span>2回</span>', $this->countHeading($html));
-        $this->assertStringNotContainsString('残り回数', $html);
+        // 回数カードの見出しの残り回数（6 − 4 = 2）。値は「回」を付けず数字だけ。ヘッダーサマリーには出さない
+        $this->assertStringContainsString('<h6 class="mb-0">回数<span class="ms-3">残り回数 <span>2</span>', $this->countHeading($html));
+        $this->assertHeaderHasNoRemaining($html);
 
         // 契約の見出し（メモ・期限は、あるときだけ出す）。新しい契約が上
         $newPos = strpos($html, '2026/10/12 契約（4回） 4回コース');
@@ -262,8 +270,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 見出しに赤字の「残り -1回」
-        $this->assertStringContainsString('残り <span class="text-danger">-1回</span>', $this->countHeading($html));
+        // 見出しに「残り回数 -1」（数字の部分が赤字）
+        $this->assertStringContainsString('残り回数 <span class="text-danger">-1</span>', $this->countHeading($html));
         $this->assertStringContainsString('<span class="badge bg-danger">超過 1</span>', $html);
         $this->assertLessThan(
             strpos($html, '2026/10/01 契約（1回）'),
@@ -279,8 +287,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 利用が 1 件あるので回数管理の対象の会員として、計算どおり赤字の「残り -1回」を出す
-        $this->assertStringContainsString('<h6 class="mb-0">回数<span class="ms-3">残り <span class="text-danger">-1回</span>', $this->countHeading($html));
+        // 利用が 1 件あるので回数管理の対象の会員として、計算どおり「残り回数 -1」（数字の部分が赤字）を出す
+        $this->assertStringContainsString('<h6 class="mb-0">回数<span class="ms-3">残り回数 <span class="text-danger">-1</span>', $this->countHeading($html));
         $this->assertStringContainsString('<span class="badge bg-danger">超過 1</span>', $html);
     }
 
