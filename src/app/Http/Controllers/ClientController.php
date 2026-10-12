@@ -175,7 +175,7 @@ class ClientController extends Controller
             $query->select(['id', 'client_id']);
         }, 'contracts', 'usages']);
 
-        // 回数券型の表示データ（セクション5「回数」）と残り回数（セクション1）。
+        // 回数券型の表示データと残り回数（どちらもセクション5「回数」。残り回数はカードの見出しに出す）。
         // 割り当ての計算は Blade に書かず、ContractTicketService で組み立てて渡す
         // （設計書 S-0305 セクション5「割り当てルール」参照）。
         $ticket = $contractTicketService->build($client->contracts, $client->usages);

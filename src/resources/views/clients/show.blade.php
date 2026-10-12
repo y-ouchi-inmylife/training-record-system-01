@@ -172,19 +172,16 @@
                 <span class="font-monospace fs-5">{{ $client->internal_id }}</span>
             </div>
         </div>
-        {{-- 3段目: 属性 4 項目（初回日／主担当／メールアドレス／残り回数）。
-             列の幅は 2 / 2 / 4 / 4。初回日・主担当は値が短いので狭めて、メールアドレスを左に寄せた。
-             メールアドレス列は 3 列だったときと同じ幅（col-md-4）にする。操作ボタンは列の右端に
-             寄せる（ms-auto）ため、列を広げると値・バッジからボタンが離れてしまうから。
+        {{-- 3段目: 属性 3 列（初回日／主担当／メールアドレス）。
              状態バッジはメールアドレスの値の右に横並びで置く。バッジが示すのは
              メールアドレスとパスワードの登録状況で、氏名とは関係がないため。
              未登録のときは値がなくバッジだけが同じ位置に表示される。設計書 S-0305 参照 --}}
         <div class="row g-3 mt-2 pt-2 border-top">
-            <div class="col-md-2">
+            <div class="col-md-4">
                 <div class="text-muted small">初回日</div>
                 <div style="min-height: 1.5rem;">{{ $client->initial_consultation_date?->format('Y/m/d') }}</div>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-4">
                 <div class="text-muted small">主担当</div>
                 <div style="min-height: 1.5rem;">{{ $client->primaryTrainer?->name }}</div>
             </div>
@@ -239,12 +236,6 @@
                         @endif
                     </div>
                 </div>
-            </div>
-            {{-- 残り回数（設計書 S-0305 セクション1）。契約 0 件は空欄、マイナスは赤字（§2-4 の例外）。
-                 値は ClientController::show で ContractTicketService から組み立てた $ticket['remaining']。 --}}
-            <div class="col-md-4">
-                <div class="text-muted small">残り回数</div>
-                <div style="min-height: 1.5rem;"><x-remaining-count :value="$ticket['remaining']" /></div>
             </div>
         </div>
     </div>
@@ -341,7 +332,12 @@
                  Blade は $ticket を並べるだけ。 --}}
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 class="mb-0">回数</h6>
+                    {{-- 見出し「回数」の右に残り回数（設計書 S-0305 セクション5「カードヘッダー」）。
+                         契約が 1 件もない会員は「残り n回」の表示そのものを出さない（§2-4 の例外）ため、
+                         「残り」の文字も含めて $ticket['hasContracts'] のときだけ出す。
+                         数値の表示（マイナスは赤字）は会員一覧と同じ x-remaining-count を使う。
+                         狭い幅ではボタンと重ならないよう、card-header の flex-wrap で折り返す。 --}}
+                    <h6 class="mb-0">回数@if($ticket['hasContracts'])<span class="ms-3">残り <x-remaining-count :value="$ticket['remaining']" /></span>@endif</h6>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 onclick="window.contractModal.openForCreate()">契約を追加</button>
