@@ -178,6 +178,25 @@ erDiagram
 
     clients ||--o{ trainees : "トレーニングを受ける対象を持つ"
     trainees ||--o{ trainee_measurements : "計測される"
+
+
+    client_contracts {
+        bigint id PK
+        bigint client_id FK
+        date contracted_on
+        smallint count
+        date expires_on
+    }
+
+    client_usages {
+        bigint id PK
+        bigint client_id FK
+        date used_on
+        smallint count
+    }
+
+    clients ||--o{ client_contracts : "回数で契約する"
+    clients ||--o{ client_usages : "契約回数を利用する"
 ```
 
 ※ER図はテーブル間の関連と主要カラム（主キー・ユニークキー・外部キー・主な業務識別/区分カラム）のみを示す。`created_at`/`updated_at`/`updated_by` 等の共通カラムおよび非識別カラムは省略しているため、全カラムは4章のテーブル定義を参照。clientsテーブルは7カテゴリー50業務項目＋共通カラムで構成され、ER図には代表カラムのみ掲載している。
@@ -614,6 +633,91 @@ erDiagram
 
 ---
 
+#### D-0900 client_contracts（契約）
+
+##### カラム定義
+
+| カラム名 | 型 | NULL | デフォルト | 説明 |
+|---------|-----|------|----------|------|
+| id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
+| client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
+| contracted_on | DATE | NO | — | 契約日 |
+| count | SMALLINT UNSIGNED | NO | — | 契約回数（1以上） |
+| expires_on | DATE | YES | NULL | 有効期限。**表示するだけ**で、残り回数の計算・利用の割り当てには使わない |
+| note | VARCHAR(255) | YES | NULL | メモ（「4回コース」など。契約の名前もここに自由に書く） |
+| created_at | TIMESTAMP | YES | NULL | 作成日時 |
+| updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+| updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー） |
+
+##### インデックス
+
+| インデックス名 | カラム | 種類 | 目的 |
+|---------------|--------|------|------|
+| PRIMARY | id | PRIMARY KEY | 主キー |
+| client_contracts_client_id_contracted_on_idx | client_id, contracted_on | INDEX（複合） | 会員ごとの契約の一覧（契約日順）と、会員ごとの契約回数の合計に使用。`client_id` の外部キーもこのインデックスを使う。**ユニーク制約は付けない**（同じ日に複数件の契約を登録できる） |
+| client_contracts_updated_by_foreign | updated_by | INDEX | 最終更新者による検索。外部キー制約に伴い自動付与 |
+
+##### 制約
+
+| 制約名 | 種類 | 条件 | ON DELETE | 説明 |
+|--------|------|------|-----------|------|
+| client_contracts_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時は契約も削除。**契約があっても会員の削除は拒否しない**（トレーニーの「あれば拒否」とは扱いが違う。下の注記参照） |
+| client_contracts_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
+| client_contracts_count_check | CHECK | count >= 1 | — | 契約回数の値制限（1以上） |
+
+##### 注記
+
+- **契約と利用（D-1000）は互いにひも付けない**。どの契約から利用を引くかは DB に持たない。残り回数は会員ごとに「契約回数の合計 − 利用回数の合計」で求める（マイナスも許す）。画面で契約ごとに利用を並べる「回数券型」の表示は、表示のときに割り当てを計算する（割り当てルールは screen-design.md S-0305 参照）
+- **会員削除時は CASCADE で一緒に削除する**（アプリ側でも削除を拒否しない）。トレーニング記録・トレーニー・音声記録は「あれば会員削除を拒否」するのに対し、契約・利用は拒否の条件に含めない（要件定義書 6-3-5 参照）
+- **金額・支払いは持たない**
+- `expires_on`（有効期限）は任意で、期限切れでも表示を変えない
+- 預かりのコース（用語集 No.25「コース」）とは無関係。回数の契約に「コース」という語は使わない（「4回コース」などの呼び名は `note` に書く）
+- `created_by` は持たない（既存テーブルと同様、`updated_by` のみ）
+
+
+---
+
+#### D-1000 client_usages（利用）
+
+##### カラム定義
+
+| カラム名 | 型 | NULL | デフォルト | 説明 |
+|---------|-----|------|----------|------|
+| id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
+| client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
+| used_on | DATE | NO | — | 利用日 |
+| count | SMALLINT UNSIGNED | NO | 1 | 利用回数（1以上）。1 件で複数回分を登録できる（例：トレーニー 2 頭なら 2） |
+| note | VARCHAR(255) | YES | NULL | メモ（「当日キャンセル」など） |
+| created_at | TIMESTAMP | YES | NULL | 作成日時 |
+| updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+| updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー） |
+
+##### インデックス
+
+| インデックス名 | カラム | 種類 | 目的 |
+|---------------|--------|------|------|
+| PRIMARY | id | PRIMARY KEY | 主キー |
+| client_usages_client_id_used_on_idx | client_id, used_on | INDEX（複合） | 会員ごとの利用の一覧（利用日順）と、会員ごとの利用回数の合計に使用。`client_id` の外部キーもこのインデックスを使う。**ユニーク制約は付けない**（同じ日に複数件の利用を登録できる） |
+| client_usages_updated_by_foreign | updated_by | INDEX | 最終更新者による検索。外部キー制約に伴い自動付与 |
+
+##### 制約
+
+| 制約名 | 種類 | 条件 | ON DELETE | 説明 |
+|--------|------|------|-----------|------|
+| client_usages_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時は利用も削除。**利用があっても会員の削除は拒否しない**（D-0900 の注記参照） |
+| client_usages_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
+| client_usages_count_check | CHECK | count >= 1 | — | 利用回数の値制限（1以上） |
+
+##### 注記
+
+- **契約（D-0900）ともトレーニング記録（D-0200）ともひも付けない**。トレーニング記録の件数と利用回数は一致しないため
+- 残り回数がマイナスになる利用も登録できる（登録を止めない）
+- 会員削除時の扱いは D-0900 と同じ（CASCADE で一緒に削除し、アプリ側でも拒否しない）
+- `created_by` は持たない（既存テーブルと同様、`updated_by` のみ）
+
+
+---
+
 ### 4-2. システム定義データ
 
 **記載範囲**:
@@ -987,8 +1091,14 @@ erDiagram
 | create_trainee_measurement | トレーニー計測値登録 |
 | edit_trainee_measurement | トレーニー計測値編集 |
 | delete_trainee_measurement | トレーニー計測値削除 |
+| create_client_contract | 契約登録 |
+| edit_client_contract | 契約編集 |
+| delete_client_contract | 契約削除 |
+| create_client_usage | 利用登録 |
+| edit_client_usage | 利用編集 |
+| delete_client_usage | 利用削除 |
 
-`target_type` には短縮クラス名を格納する（例：会員は `'Client'`、トレーニング記録は `'TrainingRecord'`、トレーニーは `'Trainee'`、計測値は `'TraineeMeasurement'`）。トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため、参照の操作種別（`view_trainee`）は持たない（トレーニーの参照は `view_client` に含める。計測値も同様）。
+`target_type` には短縮クラス名を格納する（例：会員は `'Client'`、トレーニング記録は `'TrainingRecord'`、トレーニーは `'Trainee'`、計測値は `'TraineeMeasurement'`）。トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため、参照の操作種別（`view_trainee`）は持たない（トレーニーの参照は `view_client` に含める。計測値も同様）。契約は `'ClientContract'`、利用は `'ClientUsage'` を格納する。契約・利用も会員詳細（S-0305）の中だけで表示するため、参照の操作種別は持たない（参照は `view_client` に含める）。
 
 ### 5-17. メディア種別
 
@@ -1074,6 +1184,8 @@ D-0700 `trainees.sex` の値。犬以外への対象拡張時にも共通で使�
 | 15 | client_password_reset_tokens | clients |
 | 16 | trainees | clients, trainers |
 | 17 | trainee_measurements | trainees, trainers |
+| 18 | client_contracts | clients, trainers |
+| 19 | client_usages | clients, trainers |
 
 ---
 

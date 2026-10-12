@@ -76,6 +76,12 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 / S-0305 会員詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。**送信元は S-0305 または S-0309**（2026-09 追加、S-0305 のトレーニーカードからも登録可能）。リダイレクト先は hidden `return_to` で判別（詳細は下の「計測値エンドポイントの `return_to` 仕様」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`） | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。利用は契約とひも付けていないため残る | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/usages` | 利用を登録する（ルート名 `client-usages.store`）。残り回数がマイナスになる登録も受け付ける | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | PUT | `/client-usages/{usage}` | 利用を更新する（ルート名 `client-usages.update`）。残り回数がマイナスになる更新も受け付ける | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-usages/{usage}` | 利用を削除する（物理削除。ルート名 `client-usages.destroy`） | auth | 管理者、一般 |
 | トレーニング記録管理 | S-0401 トレーニング記録登録画面 | GET | `/training-records/create` | トレーニング記録登録画面を表示する | auth | 管理者、一般 |
 | トレーニング記録管理 | S-0401 トレーニング記録登録画面 | POST | `/training-records` | トレーニング記録を新規登録する | auth | 管理者、一般 |
 | トレーニング記録管理 | S-0402 トレーニング記録一覧画面 | GET | `/training-records` | トレーニング記録一覧画面を表示する | auth | 管理者、一般 |
@@ -179,6 +185,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 - **URL そのものは渡さない**：hidden `return_to` はルート名を決めるための**識別子**（`client` / `trainee` の 2 値）であり、リダイレクト URL 文字列そのものは受け付けない。**open redirect（未検証 URL でユーザを外部サイトへ飛ばす攻撃）を回避**するため、リダイレクト先はコントローラ側で **ルート名 → URL 生成**の形に限定する
 - **バリデーションエラー時**：Laravel の `back()` が送信元 URL に自動で戻すため、`return_to` はエラー時のリダイレクト先には影響しない（`return_to` は**成功時のリダイレクト先決定**のみに使う）。エラー画面での該当モーダル復元は hidden `_trainee_id` で行う（詳細は screen-design.md S-0309「計測値モーダルの共用（S-0305 との）」参照）
 - **今回のスコープでは `store` のみが S-0305 から呼ばれる**（S-0305 では計測値の登録のみ、編集・削除は S-0309 のみ）が、**`update` / `destroy` にも同じ `return_to` 仕組みを実装しておく**。将来 S-0305 から編集・削除もできるようにする可能性を残すため（今回のコード追加コストは各メソッドで if 分岐 1 段のみで小さい。3 メソッドで同じパターンにする方がコードの一貫性が保たれる）
+
+**契約・利用エンドポイントのリダイレクト先**：`client-contracts.*` / `client-usages.*` の 6 メソッドは、処理後（成功時）は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', …)`）に戻す。送信元は S-0305 だけのため、計測値エンドポイントのような `return_to` は持たない。認証・権限は計測値と同じ（`auth` ＋ `practitioners` ミドルウェア。一般トレーナーも削除まで可。管理者限定の操作はない）。バリデーションエラー時は `back()` で S-0305 に戻り、該当モーダルを開き直す（screen-design.md S-0305-M04 / M05 参照）。
 
 ---
 
@@ -376,6 +384,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 
 **レスポンス**:
 - view `clients.index`（各行に**クライアントの状態**〔メールアドレスなし／メールアドレス登録待ち／初回設定待ち／利用中〕を表示。状態は clients.email・clients.password と、対応する `client_email_registration_tokens` の有無から導出する。**期限判定の参照元は `client_email_registration_tokens.expires_at`**（ログイン用リンクの `expires_at` は参照しない）。判定順序と具体的なクエリ例は screen-design.md の S-0305 状態一覧を参照。**状態列は並び替え・絞り込みの対象にしない**）
+- 各行に**残り回数**（契約回数の合計 − 利用回数の合計。契約 0 件は空欄）を表示する。状態と同じく、行ごとに個別のクエリを発行しない形で取得する（N+1 を避ける）。**残り回数列は並び替え・絞り込みの対象にしない**（screen-design.md S-0304 参照）
 
 ---
 
@@ -387,6 +396,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 
 **レスポンス**:
 - view `clients.show`（クライアント情報、トレーニング記録一覧。トレーニング記録は新しい順。**各記録のメディア件数を先読みする**（`withCount('mediaRecords')`。派生カラム `media_records_count` を各記録に付与し、タイムラインの担当行の次の行に「メディア数 N」を表示する。0 件時は行ごと非表示。Blade で N+1 を発生させないため）。**クライアントの状態**〔メールアドレスなし／メールアドレス登録待ち／初回設定待ち／利用中〕はヘッダーに強調バッジで表示する。導出は clients.email・clients.password・対応する `client_email_registration_tokens` の有無から。**期限判定の参照元は `client_email_registration_tokens.expires_at`**（ログイン用リンクの `expires_at` は参照しない）。判定順序と具体的なクエリ例は screen-design.md の S-0305 状態一覧を参照。**状態別ボタンは基本 1 つだけ**（メールアドレスなし・期限切れなら「マイページ登録案内を発行」、利用中なら「メールアドレスを削除」、初回設定待ちは無し）だが、**「メールアドレス登録待ち（期限内）」のときだけ「マイページ登録案内を表示」と「マイページ登録案内を取消」の 2 つが並ぶ**（表示と取消は性質の違う操作で、どちらも必要なため）。URL 文字列・QR コード・有効期限は詳細画面には出さず、印刷ページ〔S-0307〕に集約する）
+- 同じ view に、**残り回数**（ヘッダー）と**契約・利用の一覧**（「回数」カード、回数券型の表示）も含める。利用をどの契約のマスに入れるかは表示のときに計算する（screen-design.md S-0305 セクション5「回数」参照）
 
 
 ###### POST /clients/{client}/email-registration-tokens
@@ -491,6 +501,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
   1. トレーニング記録（`training_records.client_id`。DB 側は CASCADE だがアプリで拒否）
   2. トレーニー（`trainees.client_id`。DB 側は CASCADE だがアプリで拒否）
   3. 音声記録（`audio_records.client_id`。**2026-10 追加**。DB 側は RESTRICT）
+- **契約（`client_contracts`）・利用（`client_usages`）は削除不可の条件にしない**。登録されていても削除を拒否せず、DB の外部キー（CASCADE）で会員と一緒に削除される（トレーニーの「あれば拒否」とは扱いが違う。requirements.md 6-3-5 参照）
 - 物理削除（論理削除ではない）
 - **最後の守り**：画面・サーバの条件判定をすり抜けて `$client->delete()` が DB の外部キーに断られた場合（`Illuminate\Database\QueryException` で `SQLSTATE=23000`・エラー番号 1451）は、500 を返さずに会員詳細へリダイレクトし、`Log::warning` に会員 ID と例外クラス名を残す（**2026-10 追加**）。それ以外の例外は再 throw する
 
