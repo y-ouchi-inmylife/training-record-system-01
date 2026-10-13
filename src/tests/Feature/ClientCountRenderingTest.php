@@ -276,7 +276,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<span class="badge bg-secondary flex-shrink-0">使い切り</span>', $html);
 
         // マス：未利用が 2 つ、利用済みは利用日。メモのある利用には印が付く
-        $this->assertSame(2, substr_count($html, '>未利用</span>'));
+        $this->assertSame(2, substr_count($html, '>未利用</button>'));
         $this->assertStringContainsString('data-used-on="2026-09-04"', $html);
         $this->assertSame(1, substr_count($html, 'bi-chat-left-text'));
 
@@ -438,6 +438,38 @@ class ClientCountRenderingTest extends TestCase
         $card = substr($html, strpos($html, 'contract-ticket-scroll">'), 4000);
         $this->assertStringNotContainsString('justify-content-between', $card);
         $this->assertStringContainsString('d-flex flex-wrap align-items-center column-gap-2 mb-1', $card);
+    }
+
+    public function test_未利用のマスはその契約を選んで利用の登録を開くボタン(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+        $open = $this->contract($client, '2026-10-12', 3);
+        $full = $this->contract($client, '2026-09-03', 1);
+        $this->usage($client, '2026-09-04', 1, null, $full);
+        $this->usage($client, '2026-10-13', 1, null, $open);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 未利用のマスは button。契約の id の data-* と、読み上げ用の名前を持つ。押すとその契約で登録モーダルを開く
+        $pattern = '/<button type="button" class="btn btn-sm ticket-slot ticket-slot-empty"\s+'
+            .'data-client-contract-id="'.$open->id.'"\s+'
+            .'aria-label="未利用。2026\/10\/12 の契約で利用を追加"\s+'
+            .'onclick="window\.usageModal\.openForCreate\(this\.dataset\.clientContractId\)">未利用<\/button>/u';
+        $this->assertSame(2, preg_match_all($pattern, $html), '残り 2 の契約に未利用のマスが 2 つ');
+
+        // 使い切りの契約には未利用のマスが出ない
+        $this->assertDoesNotMatchRegularExpression('/ticket-slot-empty"\s+data-client-contract-id="'.$full->id.'"/u', $html);
+        $this->assertSame(2, substr_count($html, '>未利用</button>'));
+
+        // 「利用を追加」ボタンからの開き方は今のまま（契約の指定なし）
+        $this->assertStringContainsString('onclick="window.usageModal.openForCreate()">利用を追加</button>', $html);
+        // モーダルの登録の入口は、契約の指定があればその契約を、なければ初期値を選ぶ
+        $this->assertStringContainsString('function openForCreate(contractId) {', $html);
+        $this->assertStringContainsString('contractSelect.value = String(contractId);', $html);
+        $this->assertStringContainsString("contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);", $html);
+
+        // 押せる見た目：.btn の上で、点線の枠とマウスを乗せたときの色の変化を指定している
+        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-hover-bg:[^}]*border-style:\s*dashed;/su', $html);
     }
 
     public function test_回数カードはトレーニーカードの上にある(): void

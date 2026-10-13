@@ -82,18 +82,23 @@
     max-height: 35vh;
     overflow-y: auto;
 }
-/* 回数券型のマス。利用済み（button）と未利用（span）で幅をそろえ、折り返して並べる */
+/* 回数券型のマス。利用済みと未利用（どちらも button）で幅をそろえ、折り返して並べる */
 .ticket-slot {
     min-width: 6.5rem;
 }
 .ticket-slot-empty {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    text-align: center;
-    color: var(--bs-secondary-color);
-    border: 1px dashed var(--bs-border-color);
-    border-radius: var(--bs-border-radius-sm);
+    /* 未利用のマス（btn btn-sm）。点線の枠のグレーで、実線の枠の利用済みのマスと見分ける。
+       押すとその契約で利用を登録できるので、マウスを乗せたとき・キーボードで選んだときに
+       枠と背景の色を少し変える（カーソルの指の形・フォーカスの枠は .btn が持つ） */
+    --bs-btn-color: var(--bs-secondary-color);
+    --bs-btn-border-color: var(--bs-border-color);
+    --bs-btn-hover-color: var(--bs-body-color);
+    --bs-btn-hover-bg: var(--bs-tertiary-bg);
+    --bs-btn-hover-border-color: var(--bs-secondary-color);
+    --bs-btn-active-color: var(--bs-body-color);
+    --bs-btn-active-bg: var(--bs-secondary-bg);
+    --bs-btn-active-border-color: var(--bs-secondary-color);
+    border-style: dashed;
 }
 </style>
 @endpush
@@ -407,7 +412,12 @@
                                         @if($usage)
                                             @include('clients._usage-slot', ['usage' => $usage])
                                         @else
-                                            <span class="ticket-slot ticket-slot-empty">未利用</span>
+                                            {{-- 未利用のマス。押すと、この契約を選んだ状態で利用の登録モーダル（S-0305-M05）を開く
+                                                 （何番目のマスかは関係しない）。使い切りの契約には未利用のマスがない --}}
+                                            <button type="button" class="btn btn-sm ticket-slot ticket-slot-empty"
+                                                    data-client-contract-id="{{ $row['contract']->id }}"
+                                                    aria-label="未利用。{{ $row['contract']->contracted_on->format('Y/m/d') }} の契約で利用を追加"
+                                                    onclick="window.usageModal.openForCreate(this.dataset.clientContractId)">未利用</button>
                                         @endif
                                     @endforeach
                                 </div>

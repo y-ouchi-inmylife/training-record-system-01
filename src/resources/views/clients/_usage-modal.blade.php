@@ -6,6 +6,7 @@
                 'contractOptions' => $ticket['contractOptions'], 'defaultContractId' => $ticket['defaultContractId']])
        // ボタン側:
        //   新規登録: onclick="window.usageModal.openForCreate()"
+       //            （「未利用」のマスからは openForCreate(this.dataset.clientContractId) で、その契約を選んで開く）
        //   編集   : onclick="window.usageModal.openForEdit(this.dataset)"
        //            （data-id / data-client-contract-id / data-used-on / data-note。
        //              clients/_usage-slot.blade.php）
@@ -200,12 +201,19 @@
         deleteForm.action = DESTROY_URL_TEMPLATE.replace('__ID__', encodeURIComponent(id));
     }
 
-    function openForCreate() {
+    // contractId を渡すと、その契約を選んだ状態で開く（「未利用」のマスから）。
+    // 渡さないとき（「利用を追加」ボタン）は、登録時の初期値（残りがある一番古い契約）を選ぶ。
+    // どちらも登録モードなので、使い切りの契約は無効のまま（未利用のマスは残りがある契約にしかない）。
+    function openForCreate(contractId) {
         initRefs();
         if (!modal) return;
         setCreateMode();
         applyDisabled(null);
-        contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
+        if (contractId !== undefined && contractId !== null && contractId !== '') {
+            contractSelect.value = String(contractId);
+        } else {
+            contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
+        }
         usedOnInput.value = todayString();
         noteInput.value = '';
         modal.show();
