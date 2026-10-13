@@ -110,7 +110,7 @@
 }
 
 /* 回数カード（設計書 S-0305 セクション5）のカード本文: ビューポート基準の最大高さで、
-   収まらない場合のみ縦スクロール。見出し（残り回数・追加ボタン）はこの外なので常に見える。
+   収まらない場合のみ縦スクロール。見出し（ご利用回数・追加ボタン）はこの外なので常に見える。
    契約が増えても下のトレーニーカードが画面の外に押し出されないよう、
    トレーニング記録（.training-records-scroll の 60vh）より低い 35vh にしている（ノートPCの画面に合わせた値） */
 .contract-ticket-scroll {
@@ -382,14 +382,14 @@
                  （表示のときに自動で割り当てる処理は持たない。設計書 S-0305 セクション5「マスの並べ方」）。 --}}
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    {{-- カードの見出しは「残り回数 n」（設計書 S-0305 セクション5「カードヘッダー」）。
-                         「回数」と「残り回数」が重なって読みにくいため、見出しに「回数」の語は置かない。
-                         ラベル「残り回数」は常に出し、数字は残り回数が null でないときだけ出す
+                    {{-- カードの見出しは「ご利用回数　あと n回」（設計書 S-0305 セクション5「カードヘッダー」）。
+                         言葉は会員側（S-1412）にそろえる（トレーナーが会員に聞かれたとき同じ言葉で答えられるように）。
+                         ラベル「ご利用回数」は常に出し、数は残り回数が null でないときだけ出す
                          （契約も利用も 1 件もない会員は数字を空欄にする。§2-4 の例外）。
-                         数字の表示（マイナスは赤字）は会員一覧と同じ x-remaining-count を使い、
-                         見出しでだけ fs-5 を渡して少し大きくする（ms-2 はラベルとの間の空き）。
+                         数の表示（「あと n回」、マイナスは赤字の「n回超過」）は会員一覧と同じ x-remaining-count を使い、
+                         見出しでだけ fs-5 を渡して数字の部分だけを少し大きくする（ms-2 はラベルとの間の空き）。
                          狭い幅ではボタンと重ならないよう、card-header の flex-wrap で折り返す。 --}}
-                    <h6 class="mb-0">残り回数@if(! is_null($ticket['remaining']))<x-remaining-count :value="$ticket['remaining']" class="fs-5 ms-2" />@endif</h6>
+                    <h6 class="mb-0">ご利用回数@if(! is_null($ticket['remaining']))<span class="ms-2"><x-remaining-count :value="$ticket['remaining']" class="fs-5" /></span>@endif</h6>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 onclick="window.contractModal.openForCreate()">契約を追加</button>
@@ -440,13 +440,13 @@
                                             data-note="{{ $row['contract']->note }}"
                                             data-usage-count="{{ $row['usageCount'] }}"
                                             onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 有効期限 @if($row['expired'])<span class="text-danger">{{ $row['contract']->expires_on->format('Y/m/d') }}</span>@else{{ $row['contract']->expires_on->format('Y/m/d') }}@endif @endif</button>
-                                    {{-- 契約の状態（残り n／使い切り）。見出しのボタンの外に、見出しのすぐ後ろに置く
+                                    {{-- 契約の状態（あと n回／すべてご利用済み。会員側 S-1412 と同じ言葉）。見出しのボタンの外に、見出しのすぐ後ろに置く
                                          （見出しとの間は column-gap-2）。有効期限が過ぎていても、この表示は変えない
                                          （期限切れは見出しの有効期限の日付の赤字で示す） --}}
                                     @if($row['usedUp'])
-                                        <span class="badge bg-secondary flex-shrink-0">使い切り</span>
+                                        <span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>
                                     @else
-                                        <span class="flex-shrink-0">残り {{ $row['remaining'] }}</span>
+                                        <span class="flex-shrink-0">あと {{ $row['remaining'] }}回</span>
                                     @endif
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">

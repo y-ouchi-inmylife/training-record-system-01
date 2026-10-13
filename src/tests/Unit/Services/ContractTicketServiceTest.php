@@ -223,9 +223,9 @@ class ContractTicketServiceTest extends TestCase
 
         // 契約日の古い順・同じ日は id の昇順（2 → 3 → 5）。「契約なし」は含めない（Blade で最後に足す）
         $this->assertSame([
-            ['id' => 2, 'label' => '2026/09/03 契約（1回） 残り 1', 'usedUp' => false],
-            ['id' => 3, 'label' => '2026/09/03 契約（2回） 残り 0', 'usedUp' => true],
-            ['id' => 5, 'label' => '2026/10/12 契約（4回） 残り 3（4回コース）', 'usedUp' => false],
+            ['id' => 2, 'label' => '2026/09/03 契約（1回） あと 1回', 'usedUp' => false],
+            ['id' => 3, 'label' => '2026/09/03 契約（2回） あと 0回', 'usedUp' => true],
+            ['id' => 5, 'label' => '2026/10/12 契約（4回） あと 3回（4回コース）', 'usedUp' => false],
         ], $result['contractOptions']);
     }
 
@@ -366,7 +366,7 @@ class ContractTicketServiceTest extends TestCase
 
         // 期限を過ぎていても、残りがあれば使い切り扱いにしない（選べる）。初期値にもなる
         $this->assertTrue($this->rowOf($result, 1)['expired']);
-        $this->assertSame([['id' => 1, 'label' => '2026/09/01 契約（2回） 残り 2', 'usedUp' => false]], $result['contractOptions']);
+        $this->assertSame([['id' => 1, 'label' => '2026/09/01 契約（2回） あと 2回', 'usedUp' => false]], $result['contractOptions']);
         $this->assertSame(1, $result['defaultContractId']);
         // 残り回数の計算にも使わない
         $this->assertSame(2, $result['remaining']);

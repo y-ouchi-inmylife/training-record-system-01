@@ -23,7 +23,7 @@ use Illuminate\Support\Collection;
  * 残りのない契約への割り当てと、割り当て済みの件数より少ない回数への契約の編集は
  * ClientUsageRequest / ClientContractRequest でエラーにするため、
  * 通常はマスからあふれない。万一データ上あふれていても画面が壊れないよう、
- * あふれた分も契約の行のマスとして末尾に並べ（隠さない）、契約の状態は「使い切り」として扱う。
+ * あふれた分も契約の行のマスとして末尾に並べ（隠さない）、契約の状態は使い切り（画面では「すべてご利用済み」）として扱う。
  *
  * ロジックを Blade に書かないため、ビューにそのまま渡せる配列で返す。
  */
@@ -175,13 +175,13 @@ class ContractTicketService
     /**
      * 利用モーダルの「契約」の選択肢の表示。
      *
-     * 「Y/m/d 契約（N回） 残り n」（設計書 S-0305-M05）。メモがあれば、契約どうしを
+     * 「Y/m/d 契約（N回） あと n回」（設計書 S-0305-M05。カードの契約の状態と同じ言葉）。メモがあれば、契約どうしを
      * 見分けやすいよう後ろに括弧で付ける（「メモを後ろに付けるかは実装時に決める」の判断）。
      */
     private static function optionLabel(ClientContract $contract, int $remaining): string
     {
         $label = $contract->contracted_on->format('Y/m/d')
-            ." 契約（{$contract->count}回） 残り {$remaining}";
+            ." 契約（{$contract->count}回） あと {$remaining}回";
 
         if ($contract->note !== null && $contract->note !== '') {
             $label .= "（{$contract->note}）";

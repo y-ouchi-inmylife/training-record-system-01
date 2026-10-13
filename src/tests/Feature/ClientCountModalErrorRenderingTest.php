@@ -43,8 +43,8 @@ class ClientCountModalErrorRenderingTest extends TestCase
                 'openModal' => $openModal,
                 // 利用モーダルの「契約」の選択肢（ContractTicketService::build() の contractOptions と同じ形）
                 'contractOptions' => [
-                    ['id' => 7, 'label' => '2026/09/03 契約（2回） 残り 0', 'usedUp' => true],
-                    ['id' => 8, 'label' => '2026/10/12 契約（4回） 残り 3', 'usedUp' => false],
+                    ['id' => 7, 'label' => '2026/09/03 契約（2回） あと 0回', 'usedUp' => true],
+                    ['id' => 8, 'label' => '2026/10/12 契約（4回） あと 3回', 'usedUp' => false],
                 ],
                 'defaultContractId' => 8,
             ]
@@ -171,9 +171,9 @@ class ClientCountModalErrorRenderingTest extends TestCase
     {
         $select = $this->contractSelect($this->renderModals(null, []));
 
-        $this->assertMatchesRegularExpression('/<option value="7" data-used-up="1" disabled\s*>2026\/09\/03 契約（2回） 残り 0<\/option>/u', $select);
-        $this->assertMatchesRegularExpression('/<option value="8" data-used-up="0"\s*>2026\/10\/12 契約（4回） 残り 3<\/option>/u', $select);
-        $this->assertLessThan(strrpos($select, '契約なし'), strpos($select, '残り 3'), '契約なしは最後');
+        $this->assertMatchesRegularExpression('/<option value="7" data-used-up="1" disabled\s*>2026\/09\/03 契約（2回） あと 0回<\/option>/u', $select);
+        $this->assertMatchesRegularExpression('/<option value="8" data-used-up="0"\s*>2026\/10\/12 契約（4回） あと 3回<\/option>/u', $select);
+        $this->assertLessThan(strrpos($select, '契約なし'), strpos($select, 'あと 3回'), '契約なしは最後');
         $this->assertStringNotContainsString('selected', $select, 'エラーなしではサーバー側で選ばない（JS が初期値を選ぶ）');
     }
 
