@@ -473,6 +473,12 @@ class ClientCountRenderingTest extends TestCase
 
         // 押せる見た目：.btn の上で、点線の枠とマウスを乗せたときの色の変化を指定している
         $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-hover-bg:[^}]*border-style:\s*dashed;/su', $html);
+        // 普段は文字と枠を薄く（文字は本文の色の 50%）、マウスを乗せたとき・押したときは文字を本文の色に戻す
+        // （フォーカスしたときは Bootstrap の .btn:focus-visible が hover の変数を使う）
+        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-color:\s*rgba\(var\(--bs-body-color-rgb\),\s*0\.5\);/su', $html);
+        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-border-color:\s*rgba\(var\(--bs-body-color-rgb\),\s*0\.12\);/su', $html);
+        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-hover-color:\s*var\(--bs-body-color\);/su', $html);
+        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-active-color:\s*var\(--bs-body-color\);/su', $html);
     }
 
     // ---- トレーニーカードの写真（S-0305 セクション3「写真」） ----

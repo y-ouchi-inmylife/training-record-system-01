@@ -122,11 +122,14 @@
     min-width: 6.5rem;
 }
 .ticket-slot-empty {
-    /* 未利用のマス（btn btn-sm）。点線の枠のグレーで、実線の枠の利用済みのマスと見分ける。
-       押すとその契約で利用を登録できるので、マウスを乗せたとき・キーボードで選んだときに
-       枠と背景の色を少し変える（カーソルの指の形・フォーカスの枠は .btn が持つ） */
-    --bs-btn-color: var(--bs-secondary-color);
-    --bs-btn-border-color: var(--bs-border-color);
+    /* 未利用のマス（btn btn-sm）。点線の枠で、実線の枠の利用済みのマスと見分ける。
+       普段は文字と枠を薄くし（文字は本文の色 --bs-body-color の 50%。白の上で #909294 相当、
+       コントラスト比 3.12:1。会員側 S-1412 と同じ濃さ）、利用済みの日付を浮き上がらせる。
+       押すとその契約で利用を登録できるので、マウスを乗せたとき・キーボードで選んだときは
+       文字を本文の色に戻し、枠と背景の色を少し変える（Bootstrap 5.3 の .btn:focus-visible は
+       hover の変数を使う。カーソルの指の形・フォーカスの枠は .btn が持つ） */
+    --bs-btn-color: rgba(var(--bs-body-color-rgb), 0.5);
+    --bs-btn-border-color: rgba(var(--bs-body-color-rgb), 0.12);
     --bs-btn-hover-color: var(--bs-body-color);
     --bs-btn-hover-bg: var(--bs-tertiary-bg);
     --bs-btn-hover-border-color: var(--bs-secondary-color);
