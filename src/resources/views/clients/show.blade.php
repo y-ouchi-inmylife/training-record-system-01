@@ -77,9 +77,9 @@
 /* 回数カード（設計書 S-0305 セクション5）のカード本文: ビューポート基準の最大高さで、
    収まらない場合のみ縦スクロール。見出し（残り回数・追加ボタン）はこの外なので常に見える。
    契約が増えても下のトレーニーカードが画面の外に押し出されないよう、
-   トレーニング記録（.training-records-scroll の 60vh）より低い 40vh にしている */
+   トレーニング記録（.training-records-scroll の 60vh）より低い 35vh にしている（ノートPCの画面に合わせた値） */
 .contract-ticket-scroll {
-    max-height: 40vh;
+    max-height: 35vh;
     overflow-y: auto;
 }
 /* 回数券型のマス。利用済み（button）と未利用（span）で幅をそろえ、折り返して並べる */

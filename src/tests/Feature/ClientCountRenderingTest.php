@@ -400,16 +400,16 @@ class ClientCountRenderingTest extends TestCase
         }
     }
 
-    public function test_回数カードの本文は40vhでスクロールし見出しはスクロールの外にある(): void
+    public function test_回数カードの本文は35vhでスクロールし見出しはスクロールの外にある(): void
     {
         $client = $this->makeClient('0001', '山田');
         $this->contract($client, '2026-10-01', 4);
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // カード本文にスクロールのクラス。最大の高さは 40vh（トレーニング記録の 60vh より低い）
+        // カード本文にスクロールのクラス。最大の高さは 35vh（トレーニング記録の 60vh より低い）
         $this->assertStringContainsString('<div class="card-body contract-ticket-scroll">', $html);
-        $this->assertMatchesRegularExpression('/\.contract-ticket-scroll\s*\{\s*max-height:\s*40vh;\s*overflow-y:\s*auto;/u', $html);
+        $this->assertMatchesRegularExpression('/\.contract-ticket-scroll\s*\{\s*max-height:\s*35vh;\s*overflow-y:\s*auto;/u', $html);
         $this->assertMatchesRegularExpression('/\.training-records-scroll\s*\{\s*max-height:\s*60vh;/u', $html);
         // 見出し（残り回数・追加ボタン）はスクロール領域より前（外）にある
         $this->assertLessThan(
