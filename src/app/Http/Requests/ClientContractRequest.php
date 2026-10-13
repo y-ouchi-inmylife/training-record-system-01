@@ -11,7 +11,7 @@ use Illuminate\Validation\Validator;
  * 認可はルートのミドルウェア（practitioners）で担保。
  * 一般トレーナーも操作可能（削除も含めて、設計書 requirements.md 6-17-1〜6-17-3）。
  * ルールは screen-design.md S-0305-M04 のバリデーション表のとおり。
- * 編集のときは、回数を「この契約に割り当て済みの利用回数の合計」より少なくできない
+ * 編集のときは、回数を「この契約に割り当て済みの利用の件数」より少なくできない
  * （requirements.md 6-17-2）。
  * 項目名・文言は lang/ja/validation.php に集約（§2-8）。
  */
@@ -33,7 +33,7 @@ class ClientContractRequest extends FormRequest
     }
 
     /**
-     * 編集時の「割り当て済みの利用回数以上」のチェック。回数の通常のルールで
+     * 編集時の「割り当て済みの利用の件数以上」のチェック（利用 1 件は 1 回分）。回数の通常のルールで
      * エラーがないときだけ行う。
      */
     public function withValidator(Validator $validator): void
@@ -44,7 +44,7 @@ class ClientContractRequest extends FormRequest
                 return;
             }
 
-            $assigned = (int) $contract->usages()->sum('count');
+            $assigned = $contract->usages()->count();
             if ((int) $this->input('count') < $assigned) {
                 $validator->errors()->add(
                     'count',

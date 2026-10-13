@@ -59,7 +59,6 @@ trait CreatesClientCountTables
             $table->unsignedBigInteger('client_contract_id')->nullable();
             $table->foreign('client_contract_id')->references('id')->on('client_contracts')->nullOnDelete();
             $table->date('used_on');
-            $table->unsignedSmallInteger('count')->default(1);
             $table->string('note', 255)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();

@@ -106,12 +106,21 @@ class ClientCountRenderingTest extends TestCase
     }
 
     /** 利用を作る。$contract を渡すとその契約に割り当てる（省略・null は「契約なし」） */
-    private function usage(Client $client, string $usedOn, int $count = 1, ?string $note = null, ?ClientContract $contract = null): ClientUsage
+    /**
+     * 利用を $times 件作る（利用 1 件は 1 回分。2 回分使ったときは 2 件）。最後に作った利用を返す。
+     * $contract を渡すとその契約に割り当てる（省略・null は「契約なし」）。
+     */
+    private function usage(Client $client, string $usedOn, int $times = 1, ?string $note = null, ?ClientContract $contract = null): ClientUsage
     {
-        return ClientUsage::query()->create([
-            'client_id' => $client->id, 'client_contract_id' => $contract?->id,
-            'used_on' => $usedOn, 'count' => $count, 'note' => $note,
-        ]);
+        $usage = null;
+        for ($i = 0; $i < $times; $i++) {
+            $usage = ClientUsage::query()->create([
+                'client_id' => $client->id, 'client_contract_id' => $contract?->id,
+                'used_on' => $usedOn, 'note' => $note,
+            ]);
+        }
+
+        return $usage;
     }
 
     /** 会員一覧の、指定した会員の行（<tr>…</tr>）の HTML を取り出す */
@@ -159,31 +168,31 @@ class ClientCountRenderingTest extends TestCase
 
     public function test_会員一覧の残り回数列(): void
     {
-        $this->makeClient('0005', '登録なし');         // 契約も利用もない → 空欄
+        $this->makeClient('0005', '登録なし');         // 契約も利用もない → 空欄（COUNT(*) は 0、SUM は NULL → remaining() が null）
 
         $usageOnly = $this->makeClient('0001', '契約なし');
-        $this->usage($usageOnly, '2026-10-01');       // 契約がなく利用だけ → 0 − 1 = −1（赤字）
+        $this->usage($usageOnly, '2026-10-01', 2);    // 契約がなく利用だけ 2 件 → 0 − 2 = −2（赤字）
 
         $plus = $this->makeClient('0002', '残りあり');
         $this->contract($plus, '2026-10-01', 4);
         $this->contract($plus, '2026-10-05', 2);
-        $this->usage($plus, '2026-10-02', 3);         // 6 − 3 = 3
+        $this->usage($plus, '2026-10-02', 3);         // 利用 3 件 → 6 − 3 = 3
 
         $zero = $this->makeClient('0003', '使い切り');
         $this->contract($zero, '2026-10-01', 2);
-        $this->usage($zero, '2026-10-02', 2);         // 0
+        $this->usage($zero, '2026-10-02', 2);         // 利用 2 件 → 0
 
         $minus = $this->makeClient('0004', '残りマイナス');
         $this->contract($minus, '2026-10-01', 1);
-        $this->usage($minus, '2026-10-02', 3);        // 1 − 3 = −2
+        $this->usage($minus, '2026-10-02', 3);        // 利用 3 件 → 1 − 3 = −2
 
         $html = $this->get(route('clients.index'))->assertOk()->getContent();
 
         $this->assertStringContainsString('<th>残り回数</th>', $html);
         $this->assertSame('', $this->lastCell($this->listRow($html, '登録なし')));
         $usageOnlyRow = $this->listRow($html, '契約なし');
-        $this->assertSame('-1', $this->lastCell($usageOnlyRow));
-        $this->assertStringContainsString('text-danger', $usageOnlyRow);
+        $this->assertSame('-2', $this->lastCell($usageOnlyRow));
+        $this->assertStringContainsString('<span class="text-danger">-2</span>', $usageOnlyRow);
         $this->assertSame('3', $this->lastCell($this->listRow($html, '残りあり')));
         $this->assertSame('0', $this->lastCell($this->listRow($html, '使い切り')));
 
@@ -288,13 +297,13 @@ class ClientCountRenderingTest extends TestCase
         $client = $this->makeClient('0001', '山田');
         $contract = $this->contract($client, '2026-10-01', 1);
         $this->usage($client, '2026-10-02', 1, null, $contract);
-        $this->usage($client, '2026-10-05', 2); // 契約なし（2 回分）
+        $this->usage($client, '2026-10-05', 2); // 契約なし（2 件）
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         // 見出しの残り回数は未割り当ても引く（1 − 3 = −2。数字に text-danger と fs-5 の両方が付く）
         $this->assertStringContainsString('<h6 class="mb-0">残り回数<span class="text-danger fs-5 ms-2">-2</span>', $this->countHeading($html));
-        // §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は回数の合計）。超過の bg-danger は使わない
+        // §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は未割り当ての利用の件数）。超過の bg-danger は使わない
         $this->assertStringContainsString('<span class="badge bg-warning text-dark">未割り当て 2</span>', $html);
         $this->assertStringNotContainsString('超過', $html);
         $this->assertLessThan(
@@ -326,8 +335,7 @@ class ClientCountRenderingTest extends TestCase
             ->followingRedirects()
             ->post(route('client-usages.store', $client), [
                 '_form_type' => 'usage',
-                'used_on' => '2026-10-12',
-                'count' => '0',
+                'used_on' => 'x',
             ])
             ->assertOk()
             ->getContent();
@@ -336,8 +344,8 @@ class ClientCountRenderingTest extends TestCase
         // 利用モーダルの側にだけ開き直しの JS と欄の下の文言が入る
         $this->assertStringContainsString('const oldUsageId', $html);
         $this->assertStringNotContainsString('const oldContractId', $html);
-        $this->assertStringContainsString('回数は1以上で入力してください。', $html);
-        $this->assertSame(1, substr_count($html, '回数は1以上で入力してください。'), '契約モーダルには出ない');
+        $this->assertStringContainsString('利用日の形式が正しくありません。', $html);
+        $this->assertSame(1, substr_count($html, '利用日の形式が正しくありません。'), '契約モーダルには出ない');
     }
 
     public function test_利用の入力エラーで戻ると選んでいた契約が戻り_契約なしも戻る(): void
@@ -345,19 +353,19 @@ class ClientCountRenderingTest extends TestCase
         $client = $this->makeClient('0001', '山田');
         $contract = $this->contract($client, '2026-10-01', 4);
 
-        // 契約を選んで、回数のエラーで戻る
+        // 契約を選んで、利用日のエラーで戻る
         $html = $this->from(route('clients.show', $client))->followingRedirects()
             ->post(route('client-usages.store', $client), [
                 '_form_type' => 'usage', 'client_contract_id' => (string) $contract->id,
-                'used_on' => '2026-10-12', 'count' => '0',
+                'used_on' => 'x',
             ])->assertOk()->getContent();
         $this->assertMatchesRegularExpression('/<option value="'.$contract->id.'"[^>]*selected/u', $html);
 
-        // 「契約なし」（value は空）を選んで、回数のエラーで戻る
+        // 「契約なし」（value は空）を選んで、利用日のエラーで戻る
         $html = $this->from(route('clients.show', $client))->followingRedirects()
             ->post(route('client-usages.store', $client), [
                 '_form_type' => 'usage', 'client_contract_id' => '',
-                'used_on' => '2026-10-12', 'count' => '0',
+                'used_on' => 'x',
             ])->assertOk()->getContent();
         $this->assertMatchesRegularExpression('/<option value="" data-used-up="0"\s*selected/u', $html);
         $this->assertDoesNotMatchRegularExpression('/<option value="'.$contract->id.'"[^>]*selected/u', $html);

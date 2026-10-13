@@ -7,7 +7,7 @@
        // ボタン側:
        //   新規登録: onclick="window.usageModal.openForCreate()"
        //   編集   : onclick="window.usageModal.openForEdit(this.dataset)"
-       //            （data-id / data-client-contract-id / data-used-on / data-count / data-note。
+       //            （data-id / data-client-contract-id / data-used-on / data-note。
        //              clients/_usage-slot.blade.php）
 
      期待する変数:
@@ -23,7 +23,8 @@
      - 使い切った契約（data-used-up="1"）は選べない（disabled）。ただし編集モードでは、
        その利用が今割り当てられている契約だけは使い切りでも選べる（applyDisabled() で切り替える）
      - 初期値：登録は $defaultContractId、編集はその利用の今の契約（data-client-contract-id。未割り当ては「契約なし」）
-     - 契約の残りを超える割り当てはサーバーでエラーにする（ClientUsageRequest）。会員の残り回数が
+     - 利用 1 件は 1 回分で、回数の欄は持たない。残りのない契約への割り当てはサーバーでエラーにする
+       （ClientUsageRequest。使い切りの契約は画面でも選べない）。会員の残り回数が
        マイナスになる登録・編集は止めない（「契約なし」は残りに関係なく登録できる）
 
      エラーのあとの開き直しは契約モーダルと同じ（hidden `_form_type` = 'usage'、
@@ -78,17 +79,6 @@
                                    required autocomplete="off">
                             @if($openModal === 'usage')
                                 <x-form-error field="used_on" />
-                            @endif
-                        </div>
-                        <div class="col-md-6">
-                            <label for="usage_count" class="form-label">回数 <span class="text-danger">*</span></label>
-                            <input type="number" step="1" min="1" max="999" inputmode="numeric"
-                                   class="form-control @if($openModal === 'usage') @error('count') is-invalid @enderror @endif"
-                                   id="usage_count" name="count"
-                                   value="{{ $openModal === 'usage' ? old('count') : '' }}"
-                                   required autocomplete="off">
-                            @if($openModal === 'usage')
-                                <x-form-error field="count" />
                             @endif
                         </div>
                         <div class="col-12">
@@ -148,7 +138,6 @@
     let deleteForm = null;
     let titleEl = null;
     let usedOnInput = null;
-    let countInput = null;
     let noteInput = null;
     let contractSelect = null;
 
@@ -182,7 +171,6 @@
         deleteForm = document.getElementById('usageDeleteForm');
         titleEl = document.getElementById('usageModalLabel');
         usedOnInput = document.getElementById('used_on');
-        countInput = document.getElementById('usage_count');
         noteInput = document.getElementById('usage_note');
         contractSelect = document.getElementById('client_contract_id');
 
@@ -219,14 +207,12 @@
         applyDisabled(null);
         contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
         usedOnInput.value = todayString();
-        // 回数の初期値は 1（設計書 S-0305-M05）
-        countInput.value = '1';
         noteInput.value = '';
         modal.show();
     }
 
     function openForEdit(data) {
-        // data: { id, clientContractId, usedOn, count, note }（data-* 属性はキャメルケースになる）
+        // data: { id, clientContractId, usedOn, note }（data-* 属性はキャメルケースになる）
         initRefs();
         if (!modal) return;
         setEditMode(data.id);
@@ -234,7 +220,6 @@
         applyDisabled(currentContractId);
         contractSelect.value = currentContractId === null ? '' : String(currentContractId);
         usedOnInput.value = data.usedOn || '';
-        countInput.value = data.count || '';
         noteInput.value = data.note || '';
         modal.show();
     }

@@ -185,10 +185,10 @@ class Client extends Authenticatable
     }
 
     /**
-     * 残り回数（契約回数の合計 − 利用回数の合計）。契約も利用も 0 件なら null。
+     * 残り回数（契約回数の合計 − 利用の件数）。契約も利用も 0 件なら null。
      *
      * 会員一覧（S-0304）で `ClientController::index()` の addSelect が付ける
-     * `contract_total` / `usage_total`（サブクエリの合計）から求める。
+     * `contract_total`（契約回数の SUM）/ `usage_total`（利用の COUNT(*)。利用 1 件は 1 回分）から求める。
      * 規則は会員詳細と同じ `ContractTicketService::remaining()` に寄せる。
      */
     public function getRemainingCountAttribute(): ?int

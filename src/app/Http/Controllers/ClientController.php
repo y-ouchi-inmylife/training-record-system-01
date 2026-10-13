@@ -44,12 +44,13 @@ class ClientController extends Controller
                     ->orderBy('training_date', 'desc')
                     ->orderBy('training_time', 'desc')
                     ->limit(1),
-                // 残り回数（8 列目）の元になる契約回数・利用回数の合計。last_training_date と同じく
-                // サブクエリで取り、行ごとの追加クエリを起こさない（設計書 S-0304 設計方針「『残り回数』列を追加」）。
-                // 契約も利用も 0 件の会員は両方が NULL になり、Client::remaining_count が null（空欄）になる。
+                // 残り回数（8 列目）の元になる契約回数の合計と利用の件数（利用 1 件は 1 回分）。
+                // last_training_date と同じくサブクエリで取り、行ごとの追加クエリを起こさない
+                // （設計書 S-0304 設計方針「『残り回数』列を追加」）。契約も利用も 0 件の会員は
+                // contract_total が NULL・usage_total が 0 になり、Client::remaining_count が null（空欄）になる。
                 'contract_total' => ClientContract::selectRaw('SUM(count)')
                     ->whereColumn('client_id', 'clients.id'),
-                'usage_total' => ClientUsage::selectRaw('SUM(count)')
+                'usage_total' => ClientUsage::selectRaw('COUNT(*)')
                     ->whereColumn('client_id', 'clients.id'),
             ]);
 

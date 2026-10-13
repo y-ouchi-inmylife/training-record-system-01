@@ -272,17 +272,17 @@ return [
         ],
         // 利用の「契約」（S-0305-M05）。ルール名ではなく用途を表すキーで持ち、
         // ClientUsageRequest の withValidator（after）から errors()->add() で載せる。
-        // :remaining / :shortage は呼び出し側で数を渡す（file_size.max の :limit と同じ書き方）。
+        // 利用 1 件は 1 回分のため、残りが 1 以上あれば割り当てられる（足りない回数の表示はない）。
         'client_contract_id' => [
             // 通常の操作では出ない（画面の選択肢はこの会員の契約だけ）
             'other_client' => '選んだ契約はこの会員の契約ではありません。',
-            // :shortage は「回数 − 残り」
-            'exceeds_remaining' => '選んだ契約の残りは:remaining回で、:shortage回足りません。',
+            'no_remaining' => '選んだ契約には残りがありません。',
         ],
-        // 契約の回数（S-0305-M04）。編集で、割り当て済みの利用回数より少なくしたとき。
-        // ClientContractRequest の withValidator（after）から載せる。:assigned は割り当て済みの利用回数の合計
+        // 契約の回数（S-0305-M04）。編集で、割り当て済みの利用の件数より少なくしたとき。
+        // ClientContractRequest の withValidator（after）から載せる。:assigned は割り当て済みの利用の件数
+        // （呼び出し側で数を渡す。file_size.max の :limit と同じ書き方）
         'count' => [
-            'below_assigned' => '回数は割り当て済みの利用回数（:assigned回）以上で入力してください。',
+            'below_assigned' => '回数は割り当て済みの利用の件数（:assigned件）以上で入力してください。',
         ],
     ],
 

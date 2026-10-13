@@ -9,7 +9,7 @@ use Tests\TestCase;
  * 契約・利用のモーダル（S-0305-M04 / M05）のエラー表示の描画確認。
  * TraineeMeasurementModalErrorRenderingTest にならう。
  *
- * 2 つのモーダルは入力欄（count / note）の名前が重なるため、hidden `_form_type`
+ * 2 つのモーダルは入力欄（note）の名前が重なるため、hidden `_form_type`
  * （'contract' / 'usage'）で送信元を見分ける（ClientController::show が old('_form_type') から
  * $openModal を決めて渡す）。設計書「S-0305-M04・M05 に共通の決まり」のとおり：
  *
@@ -120,7 +120,7 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $this->assertStringContainsString('is-invalid', $contract);
         $this->assertStringContainsString('value="1000"', $contract, '入力値が戻る');
 
-        // 欄の名前（count / note）が重なる利用モーダルには出ない
+        // 利用モーダルには回数の欄がなく、メモ（note）は欄の名前が重なるが、利用モーダルには出ない
         $usage = $this->usagePart($html);
         $this->assertStringNotContainsString('ERR_count', $usage);
         $this->assertStringNotContainsString('ERR_note', $usage);
@@ -134,12 +134,13 @@ class ClientCountModalErrorRenderingTest extends TestCase
 
     public function test_利用モーダルのエラーは利用モーダルにだけ出て利用モーダルだけ開き直す(): void
     {
-        $html = $this->renderModals('usage', ['count' => 'ERR_count_usage'], [
-            '_form_type' => 'usage', 'used_on' => '2026-10-01', 'count' => '0',
+        // メモ（note）は契約・利用の両方のモーダルにある欄。利用モーダルのエラーは利用モーダルにだけ出る
+        $html = $this->renderModals('usage', ['note' => 'ERR_note_usage'], [
+            '_form_type' => 'usage', 'used_on' => '2026-10-01', 'note' => str_repeat('あ', 256),
         ]);
 
-        $this->assertStringContainsString('ERR_count_usage', $this->usagePart($html));
-        $this->assertStringNotContainsString('ERR_count_usage', $this->contractPart($html));
+        $this->assertStringContainsString('ERR_note_usage', $this->usagePart($html));
+        $this->assertStringNotContainsString('ERR_note_usage', $this->contractPart($html));
         $this->assertStringNotContainsString('is-invalid', $this->contractPart($html));
 
         $this->assertStringContainsString('oldUsageId', $this->usageScript($html));
@@ -148,8 +149,8 @@ class ClientCountModalErrorRenderingTest extends TestCase
 
     public function test_編集で失敗したときは編集モードで開き直すためのidが渡る(): void
     {
-        $html = $this->renderModals('usage', ['count' => 'ERR'], [
-            '_form_type' => 'usage', '_usage_id' => '42', 'used_on' => '2026-10-01', 'count' => '0',
+        $html = $this->renderModals('usage', ['used_on' => 'ERR'], [
+            '_form_type' => 'usage', '_usage_id' => '42', 'used_on' => 'x',
         ]);
 
         $this->assertStringContainsString('const oldUsageId = "42";', $this->usageScript($html));
@@ -176,6 +177,23 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $this->assertStringNotContainsString('selected', $select, 'エラーなしではサーバー側で選ばない（JS が初期値を選ぶ）');
     }
 
+    public function test_利用モーダルに回数の欄がない(): void
+    {
+        $html = $this->renderModals(null, []);
+
+        // 利用 1 件は 1 回分。入力項目は契約・利用日・メモの 3 つ
+        $usage = $this->usagePart($html);
+        $this->assertStringNotContainsString('name="count"', $usage);
+        $this->assertStringNotContainsString('回数', $usage);
+        $this->assertStringContainsString('name="client_contract_id"', $usage);
+        $this->assertStringContainsString('name="used_on"', $usage);
+        $this->assertStringContainsString('name="note"', $usage);
+        // JS も回数を扱わない（初期値 1・data-count の受け取りがない）
+        $this->assertStringNotContainsString('countInput', $this->usageScript($html));
+        // 契約モーダルには回数の欄がある（契約回数）
+        $this->assertStringContainsString('name="count"', $this->contractPart($html));
+    }
+
     public function test_登録時の初期値は残りがある一番古い契約として渡る(): void
     {
         $html = $this->renderModals(null, []);
@@ -186,7 +204,7 @@ class ClientCountModalErrorRenderingTest extends TestCase
     public function test_エラーで開き直したとき選んでいた契約が戻る(): void
     {
         $html = $this->renderModals('usage', ['client_contract_id' => 'ERR_contract'], [
-            '_form_type' => 'usage', 'client_contract_id' => '8', 'used_on' => '2026-10-01', 'count' => '9',
+            '_form_type' => 'usage', 'client_contract_id' => '8', 'used_on' => '2026-10-01',
         ]);
 
         $select = $this->contractSelect($html);
@@ -200,8 +218,8 @@ class ClientCountModalErrorRenderingTest extends TestCase
     public function test_エラーで開き直したとき契約なしを選んでいた場合は契約なしが戻る(): void
     {
         // 「契約なし」は value が空。ConvertEmptyStringsToNull で null になって old() に入る
-        $html = $this->renderModals('usage', ['count' => 'ERR'], [
-            '_form_type' => 'usage', 'client_contract_id' => null, 'used_on' => '2026-10-01', 'count' => '0',
+        $html = $this->renderModals('usage', ['used_on' => 'ERR'], [
+            '_form_type' => 'usage', 'client_contract_id' => null, 'used_on' => 'x',
         ]);
 
         $select = $this->contractSelect($html);
@@ -211,8 +229,8 @@ class ClientCountModalErrorRenderingTest extends TestCase
 
     public function test_編集でエラーのときは今の契約の使い切りを選べるようにする処理が入る(): void
     {
-        $html = $this->renderModals('usage', ['count' => 'ERR'], [
-            '_form_type' => 'usage', '_usage_id' => '42', 'client_contract_id' => '7', 'used_on' => '2026-10-01', 'count' => '0',
+        $html = $this->renderModals('usage', ['used_on' => 'ERR'], [
+            '_form_type' => 'usage', '_usage_id' => '42', 'client_contract_id' => '7', 'used_on' => 'x',
         ]);
 
         $script = $this->usageScript($html);

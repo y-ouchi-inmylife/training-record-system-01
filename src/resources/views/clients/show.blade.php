@@ -355,7 +355,7 @@
                 @else
                     <div class="card-body contract-ticket-scroll">
                         {{-- （契約なし）の行：契約に割り当てていない利用（未割り当て）。あるときだけ一番上に出す。
-                             バッジは §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は回数の合計）。
+                             バッジは §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は未割り当ての利用の件数。利用 1 件は 1 回分）。
                              契約に割り当て直すには、マスを押して利用の編集モーダルで契約を選び直す。 --}}
                         @if($ticket['unassigned']['count'] > 0)
                             <div class="mb-3">
