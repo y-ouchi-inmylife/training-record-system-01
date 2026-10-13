@@ -263,9 +263,9 @@ class ClientCountRenderingTest extends TestCase
         $this->assertNoOldHeading($html);
         $this->assertHeaderHasNoRemaining($html);
 
-        // 契約の見出し（メモ・期限は、あるときだけ出す）。新しい契約が上
+        // 契約の見出し（メモ・有効期限は、あるときだけ出す）。新しい契約が上
         $newPos = strpos($html, '2026/10/12 契約（4回） 4回コース');
-        $oldPos = strpos($html, '2026/09/03 契約（2回）  期限 2026/12/03');
+        $oldPos = strpos($html, '2026/09/03 契約（2回）  有効期限 2026/12/03');
         $this->assertNotFalse($newPos);
         $this->assertNotFalse($oldPos);
         $this->assertLessThan($oldPos, $newPos, '契約は新しいものが上');

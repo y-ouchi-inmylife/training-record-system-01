@@ -376,7 +376,8 @@
                             <div @class(['mb-3' => ! $loop->last])>
                                 <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
                                     {{-- 契約の見出し。押すとその契約の編集モーダル（S-0305-M04）を開く。
-                                         メモ・有効期限がない契約は、その部分（「期限」の語も）を出さない。 --}}
+                                         メモ・有効期限がない契約は、その部分（「有効期限」の語も）を出さない。
+                                         「有効期限」の語は契約のモーダル（S-0305-M04）の項目名とそろえる。 --}}
                                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                                             data-id="{{ $row['contract']->id }}"
                                             data-contracted-on="{{ $row['contract']->contracted_on->format('Y-m-d') }}"
@@ -384,7 +385,7 @@
                                             data-expires-on="{{ $row['contract']->expires_on?->format('Y-m-d') }}"
                                             data-note="{{ $row['contract']->note }}"
                                             data-usage-count="{{ $row['usageCount'] }}"
-                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 期限 {{ $row['contract']->expires_on->format('Y/m/d') }}@endif</button>
+                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 有効期限 {{ $row['contract']->expires_on->format('Y/m/d') }}@endif</button>
                                     {{-- 契約の状態。有効期限が過ぎていても表示を変えない --}}
                                     @if($row['usedUp'])
                                         <span class="badge bg-secondary flex-shrink-0">使い切り</span>
