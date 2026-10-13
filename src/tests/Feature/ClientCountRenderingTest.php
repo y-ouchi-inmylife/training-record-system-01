@@ -593,6 +593,36 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(2, substr_count($html, '<dl class="row mb-0 small">'));
     }
 
+    public function test_pc幅では左のトレーニング記録カードを右の列の高さに合わせる(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 左の列・伸びる箱・カードに会員詳細専用のクラス
+        $this->assertMatchesRegularExpression(
+            '/<div class="col-lg-7 client-records-col">\s*<div class="client-records-fill">\s*<div class="card mb-3 client-records-card">/u',
+            $html
+        );
+
+        // PC 幅（lg 以上）だけに効くスタイル
+        $start = strpos($html, '@media (min-width: 992px) {');
+        $this->assertNotFalse($start, 'PC 幅用の @media がある');
+        $media = substr($html, $start, 900);
+        $this->assertMatchesRegularExpression('/\.client-records-col\s*\{\s*display: flex;\s*flex-direction: column;\s*\}/u', $media);
+        // 最低の高さ：カード 40vh ＋ 下の 1rem
+        $this->assertMatchesRegularExpression('/\.client-records-fill\s*\{\s*position: relative;\s*flex: 1 1 auto;\s*min-height: calc\(40vh \+ 1rem\);\s*\}/u', $media);
+        // カードは absolute で行の高さの計算から外す（行を押し広げない）
+        $this->assertMatchesRegularExpression('/\.client-records-card\s*\{\s*position: absolute;\s*top: 0;\s*right: 0;\s*bottom: 1rem;\s*left: 0;/u', $media);
+        // 本文は残りの高さでスクロール（PC では max-height を外す）
+        $this->assertMatchesRegularExpression('/\.client-records-card \.training-records-scroll\s*\{\s*max-height: none;\s*flex: 1 1 auto;\s*min-height: 0;\s*\}/u', $media);
+
+        // スマホ幅用の max-height: 60vh は @media の外に残る
+        $this->assertMatchesRegularExpression('/\.training-records-scroll\s*\{\s*max-height:\s*60vh;\s*overflow-y:\s*auto;\s*\}/u', substr($html, 0, $start));
+        // 回数カードの 35vh は変わらない
+        $this->assertMatchesRegularExpression('/\.contract-ticket-scroll\s*\{\s*max-height:\s*35vh;\s*overflow-y:\s*auto;/u', $html);
+    }
+
     public function test_回数カードはトレーニーカードの上にある(): void
     {
         $client = $this->makeClient('0001', '山田');

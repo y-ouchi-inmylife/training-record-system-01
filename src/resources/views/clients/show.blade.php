@@ -5,10 +5,45 @@
 @push('styles')
 <style>
 /* トレーニング記録の一覧領域: ビューポート基準の最大高さ、
-   収まらない場合のみ縦スクロール */
+   収まらない場合のみ縦スクロール（スマホ幅＝lg 未満で左右が縦に積まれるとき。
+   PC 幅は下の @media で、右の列の高さに合わせる） */
 .training-records-scroll {
     max-height: 60vh;
     overflow-y: auto;
+}
+
+/* PC 幅（lg 以上。左右が横に並ぶとき）は、左右の段組の下端をそろえる
+   （設計書 S-0305 レイアウト方針「左右の下端をそろえる」）。
+   - 行の高さは右の列（回数カード＋トレーニーカード）で決める。左のトレーニング記録カードは
+     position: absolute にして行の高さの計算から外し（記録が多くても行を押し広げない）、
+     列の高さいっぱいに広げる。bottom は右の列の最後のカードの mb-3 とそろえて 1rem 空ける。
+   - 左の列の中の .client-records-fill が列の高さいっぱいに伸び、最低の高さ（カード 40vh＋下の 1rem）を持つ。
+     右の列が短いときは、この最低の高さで行が決まる（左の方が高くなる）。
+   - カード（.card は flex の縦並び）の見出しは上に固定し、本文が残りの高さでスクロールする。
+   会員詳細の専用クラス（client-records-*）にだけ効かせる。 */
+@media (min-width: 992px) {
+    .client-records-col {
+        display: flex;
+        flex-direction: column;
+    }
+    .client-records-fill {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: calc(40vh + 1rem);
+    }
+    .client-records-card {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 1rem;
+        left: 0;
+        margin-bottom: 0 !important;
+    }
+    .client-records-card .training-records-scroll {
+        max-height: none;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
 }
 
 /* トレーニング記録タイムライン */
@@ -250,8 +285,11 @@
     <div class="row g-3">
         {{-- 左カラム: トレーニング記録（タイムライン）。col-lg-7（2026-09 変更で 8→7 に狭めた。
              詳細は screen-design.md S-0305 設計方針「2カラム本体の幅を 8:4 から 7:5 に」参照）。 --}}
-        <div class="col-lg-7">
-            <div class="card mb-3">
+        {{-- PC 幅では、右の列の高さに合わせてカードを広げ、本文をスクロールさせる
+             （client-records-* のスタイル。スマホ幅では効かず、従来どおり本文 max-height: 60vh）。 --}}
+        <div class="col-lg-7 client-records-col">
+            <div class="client-records-fill">
+            <div class="card mb-3 client-records-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">トレーニング記録（{{ $client->trainingRecords->count() }}件）</h6>
                     <a href="{{ route('training-records.create', ['client_id' => $client->id]) }}"
@@ -320,6 +358,7 @@
                         <p class="text-muted mb-0">トレーニング記録はありません</p>
                     </div>
                 @endif
+            </div>
             </div>
         </div>
 
