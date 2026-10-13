@@ -10,9 +10,9 @@ return new class extends Migration
     /**
      * 利用は 1 件＝1 回分にし、利用の回数（count）を持たない（D-1000 注記）。
      *
-     * 順序：CHECK 制約 client_usages_count_check が count を参照しているため、
-     * MySQL では先に CHECK を外さないと列を落とせない（列を参照する CHECK が残っていると
-     * DROP COLUMN がエラーになる）。CHECK → 列の順に外す。
+     * 順序：MySQL 8 では、1 つの列だけを参照する CHECK 制約は、その列を落とすと一緒に
+     * 削除される（client_usages_count_check は count だけを参照。開発環境で確認済み）。
+     * それでも、外す対象をはっきりさせるため、CHECK を先に明示して外してから列を外す。
      */
     public function up(): void
     {
