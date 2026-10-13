@@ -932,6 +932,99 @@ input[type="tel"] {
 //   ワードマーク左に画像スロット（max-height 48px）を追加できる余白を予約
 // -----------------------------------------------------------------------------
 
+
+// -----------------------------------------------------------------------------
+// ご利用回数（S-1412）と、ダッシュボード（S-1402）のご利用回数の入口
+// トレーナー側の回数カード（S-0305。clients/show.blade.php の @push('styles')）と同じ内容を、
+// 会員側の決まりで見るだけ表示する。カードは mat 面＋罫線＋影（§2-1）、色は既存のトークンだけを使う。
+// マスは押せない（読むだけ）ので、ホバーの変化やカーソルの指の形は付けない。
+// -----------------------------------------------------------------------------
+// 全体の数（x-client-remaining-count）。マイナスのときの文も通常の文字色（赤字にしない）
+.c-remaining {
+    color: $ink;
+}
+// S-1412 の全体の数：「あと n回」を大きめに
+.c-ticket-total {
+    margin-bottom: 1.5rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: $ink;
+}
+.c-ticket-total .c-remaining-num {
+    font-size: 2rem;
+    line-height: 1.2;
+    color: $brand-deep;
+}
+// マイナスのときの文は、ほかの数と同じ大きさの通常の文にする（目立たせない）
+.c-ticket-total .c-remaining--over {
+    font-size: 1rem;
+    font-weight: 400;
+}
+// 契約ごとのカード・「契約に含まれないご利用」のカード
+.c-ticket {
+    background-color: $mat;
+    border: 1px solid rgba(15, 26, 46, 0.08);
+    box-shadow: $card-shadow;
+    border-radius: $radius-card;
+    padding: 1.25rem 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+}
+// 見出し（ご契約・有効期限・状態）は左から並べ、狭い幅では折り返す
+.c-ticket-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    row-gap: 0.25rem;
+    margin-bottom: 0.875rem;
+}
+.c-ticket-title {
+    font-weight: 700;
+    color: $ink;
+}
+.c-ticket-expires,
+.c-ticket-status {
+    font-size: 0.875rem;
+    color: $ink;
+}
+// マス：折り返して並べる（スマホ幅でも横にはみ出さない）
+.c-ticket-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.c-ticket-slot {
+    display: inline-block;
+    min-width: 6.5rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    text-align: center;
+    color: $ink;
+    background-color: $mat;
+    border: 1px solid rgba(15, 26, 46, 0.2);
+    border-radius: $border-radius-sm;
+}
+// 未利用のマス：点線の枠と薄い文字（利用済みと見分ける）
+.c-ticket-slot--empty {
+    color: rgba(15, 26, 46, 0.65);
+    border-style: dashed;
+}
+// ダッシュボードの入口：あいさつのすぐ下の小さなまとまり
+.c-ticket-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    row-gap: 0.25rem;
+    margin-bottom: 0;
+}
+.c-ticket-entry-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: $ink;
+}
+
 .c-login {
     max-width: 26rem;
     margin: 0 auto;

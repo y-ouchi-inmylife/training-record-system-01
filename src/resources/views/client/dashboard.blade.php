@@ -17,6 +17,17 @@
          （詳細は client-portal-design-plan.md §6 書き換え表の「呼称の経緯」参照）。 --}}
     <h1 class="c-greeting" style="font-size: 1.1rem;">{{ auth('client')->user()->full_name }} さん、こんにちは</h1>
 
+    {{-- ご利用回数の入口（設計書 S-1402「ご利用回数（入口）」、要件定義書 6-15-3・6-15-16）。
+         回数の契約も利用もない会員（$contractRemaining が null）には出さない。
+         数の表示（あと n回／マイナスのときの文）は S-1412 と共用の x-client-remaining-count。 --}}
+    @if(! is_null($contractRemaining))
+        <p class="c-ticket-entry">
+            <span class="c-ticket-entry-label">ご利用回数</span>
+            <x-client-remaining-count :value="$contractRemaining" />
+            <a href="{{ route('client-portal.contracts') }}">詳しく見る</a>
+        </p>
+    @endif
+
     {{-- 犬の名前・写真の予約領域（設計書 §8-4）。
          将来 Client に dog リレーションが入ったら hidden を外して差し込む。 --}}
     <div class="c-dog-placeholder" hidden></div>

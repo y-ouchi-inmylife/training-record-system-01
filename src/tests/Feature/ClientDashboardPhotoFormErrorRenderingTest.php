@@ -53,6 +53,8 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         return $this->withViewErrors($errors)->view('client.dashboard', [
             'sessions' => new Collection([]),
             'weightCharts' => $weightCharts ?? $this->dummyWeightCharts([1]),
+            // ご利用回数の入口（S-1412 への導線）は、このテストの対象外のため出さない
+            'contractRemaining' => null,
         ]);
     }
 

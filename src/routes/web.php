@@ -283,6 +283,10 @@ Route::domain(config('subdomain.client_host'))->group(function () {
         Route::middleware('auth:client')->group(function () {
             Route::post('/logout', [ClientLogoutController::class, 'logout'])->name('logout');
             Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
+            // ご利用回数（S-1412、6-15-16）— ログイン中の会員自身の契約・利用を見るだけ。
+            // URL に会員の id を取らない（auth('client')->user() の分だけを出す）。
+            Route::get('/contracts', [\App\Http\Controllers\Client\ContractController::class, 'index'])
+                ->name('contracts');
             Route::get('/training-records/{trainingRecord}', [\App\Http\Controllers\Client\TrainingRecordController::class, 'show'])
                 ->name('training-records.show');
             Route::get('/media/{mediaRecord}/play', [\App\Http\Controllers\Client\MediaRecordController::class, 'play'])

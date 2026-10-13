@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MediaRecordController as TrainerMediaRecordController;
+use App\Services\ContractTicketService;
 use Illuminate\Contracts\View\View;
 
 /**
@@ -69,7 +70,16 @@ class DashboardController extends Controller
         // Blade には完成した配列を渡す（Blade 内での再計算・並べ替えは行わない）。
         $weightCharts = $this->buildWeightCharts($client);
 
-        return view('client.dashboard', compact('sessions', 'weightCharts'));
+        // ご利用回数の入口（設計書 S-1402「ご利用回数（入口）」、要件定義書 6-15-3）。
+        // ダッシュボードのために契約・利用を全件読み込まず、契約の回数の合計と利用の件数だけを
+        // 集計クエリで取り、トレーナー側と同じ ContractTicketService::remaining() に渡す
+        // （利用 1 件は 1 回分）。契約も利用もないときは null（入口を出さない）。
+        $contractRemaining = ContractTicketService::remaining(
+            (int) $client->contracts()->sum('count'),
+            $client->usages()->count(),
+        );
+
+        return view('client.dashboard', compact('sessions', 'weightCharts', 'contractRemaining'));
     }
 
     /**
