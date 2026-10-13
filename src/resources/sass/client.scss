@@ -934,7 +934,7 @@ input[type="tel"] {
 
 
 // -----------------------------------------------------------------------------
-// ご利用回数（S-1412）と、ダッシュボード（S-1402）のご利用回数の入口
+// ご利用回数（S-1412）
 // トレーナー側の回数カード（S-0305。clients/show.blade.php の @push('styles')）と同じ内容を、
 // 会員側の決まりで見るだけ表示する。カードは mat 面＋罫線＋影（§2-1）、色は既存のトークンだけを使う。
 // マスは押せない（読むだけ）ので、ホバーの変化やカーソルの指の形は付けない。
@@ -1008,21 +1008,6 @@ input[type="tel"] {
 .c-ticket-slot--empty {
     color: rgba(15, 26, 46, 0.65);
     border-style: dashed;
-}
-// ダッシュボードの入口：あいさつのすぐ下の小さなまとまり
-.c-ticket-entry {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 0.75rem;
-    row-gap: 0.25rem;
-    margin-bottom: 0;
-}
-.c-ticket-entry-label {
-    font-size: 0.875rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: $ink;
 }
 
 .c-login {

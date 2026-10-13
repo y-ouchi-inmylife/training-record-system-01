@@ -7,7 +7,10 @@
       - config('app.client_portal_logo') が設定されていれば <img> を出力
       - なければテキスト（config('app.client_portal_name')）を出力
     右のメニュー：
-      - $authed=true のときのみ「登録情報」「ログアウト」を出す（post-auth）
+      - $authed=true のときのみ「ご利用回数」「登録情報」「ログアウト」を出す（post-auth）
+      - 「ご利用回数」（S-1412）は項目名だけで、回数の数字は出さない（どの画面を人に見せても
+        回数が見えないようにするため）。契約・利用の有無にかかわらず常に出す（出し分けると
+        どの画面でも毎回データを引くことになるため。契約がなければ S-1412 の空の状態が出る）
       - pre-auth は左のブランドのみ
 
     ブランドリンクの遷移先：
@@ -48,6 +51,9 @@
             </button>
             <div class="collapse navbar-collapse justify-content-end" id="clientNav">
                 <ul class="navbar-nav align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="btn btn-link btn-sm" href="{{ route('client-portal.contracts') }}">ご利用回数</a>
+                    </li>
                     <li class="nav-item">
                         <a class="btn btn-link btn-sm" href="{{ route('client-portal.profile.show') }}">登録情報</a>
                     </li>
