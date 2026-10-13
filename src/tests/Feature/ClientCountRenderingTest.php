@@ -537,10 +537,40 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, substr_count($html, 'width: 96px; height: 96px;'));
         $this->assertStringContainsString('alt="ポチの写真"', $html);
         $this->assertStringNotContainsString('alt="たまの写真"', $html);
-        // 写真はポチのまとまりの中（たまの名前より前）にある
+        // 写真はポチのまとまりの左（ポチの名前より前）にあり、たまのまとまりには入らない
+        $this->assertLessThan(strpos($html, '>ポチ</a>'), strpos($html, 'alt="ポチの写真"'));
         $this->assertLessThan(strpos($html, '>たま</a>'), strpos($html, 'alt="ポチの写真"'));
-        $this->assertGreaterThan(strpos($html, '>ポチ</a>'), strpos($html, 'alt="ポチの写真"'));
         $this->assertStringContainsString('<a href="'.route('trainees.show', $withPhoto).'" class="flex-shrink-0">', $html);
+    }
+
+    public function test_写真は名前と項目の左にあり計測を追加は写真の有無にかかわらず同じ並べ方(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $withPhoto = $this->trainee($client, 'ポチ', 'trainees/202610/pochi.jpg');
+        $this->trainee($client, 'たま');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 写真のまとまり：横並びの中で、写真のリンクが先（左）、名前・項目の列が後（右）
+        $pattern = '/<div class="d-flex align-items-start gap-3">\s*'
+            .'<a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'" class="flex-shrink-0">.*?<\/a>\s*'
+            .'<div class="flex-grow-1" style="min-width: 0;">\s*'
+            .'<h6 class="mb-2"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
+        $this->assertMatchesRegularExpression($pattern, $html);
+
+        // 写真がないまとまり：左に何も置かず、名前・項目の列から始まる
+        $this->assertMatchesRegularExpression(
+            '/<div class="d-flex align-items-start gap-3">\s*<div class="flex-grow-1" style="min-width: 0;">\s*<h6 class="mb-2"><a href="[^"]+">たま<\/a><\/h6>/u',
+            $html
+        );
+
+        // 「計測を追加」ボタンは写真の有無にかかわらず同じ並べ方（写真を置く前と同じクラス）
+        $ddPattern = '/<dd class="col-8 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2">/u';
+        $this->assertSame(2, preg_match_all($ddPattern, $html));
+        $this->assertSame(2, substr_count($html, '<button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0"'));
+        // 項目の dl は写真の有無で変わらない（flex-grow-1 などを持たない）
+        $this->assertSame(2, substr_count($html, '<dl class="row mb-0 small">'));
     }
 
     public function test_回数カードはトレーニーカードの上にある(): void

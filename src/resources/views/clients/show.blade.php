@@ -438,16 +438,37 @@
                                  「クリック可能」を伝える（Bootstrap の <a> 既定の下線を維持する
                                  ため text-decoration-none は付けない）。 --}}
                             <div class="list-group-item">
+                                {{-- 左：写真（あるときだけ）、右：名前・項目・「計測を追加」ボタン の横並び
+                                     （設計書 S-0305 セクション3「写真」）。align-items-start で写真の上端を
+                                     名前の行の上端にそろえる。右の列は flex-grow-1 で残りの幅いっぱいに広げ、
+                                     min-width: 0 で長い値でも横にはみ出さない。右の列の中身は写真を置く前と同じ作りで、
+                                     「計測を追加」ボタンは写真の有無にかかわらず右の列の右端にそろう。 --}}
+                                <div class="d-flex align-items-start gap-3">
+                                    {{-- トレーニーの写真（左、96px 四方。上端は名前の行の上端にそろう）。写真がないときは何も出さず、
+                                         左に場所も空けない（名前と項目がまとまりの左端から始まる）。
+                                         押すとトレーニー詳細（S-0309）を開く（名前のリンクと同じ行き先）。
+                                         URL はトレーニー詳細と同じ Trainee::photo_url（media ディスクの署名付き一時 URL を
+                                         手元で作る。外部ストレージへの問い合わせはしない）。photo_path は trainees の列なので、
+                                         ClientController::show の trainees の読み込みで足り、追加のクエリは出ない。
+                                         枠の見た目はトレーニー詳細（trainees/show.blade.php）の写真の枠と同じ指定で、
+                                         大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。 --}}
+                                    @if($trainee->photo_path)
+                                        <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0">
+                                            <div class="d-flex align-items-center justify-content-center"
+                                                 style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
+                                                <img src="{{ $trainee->photo_url }}"
+                                                     alt="{{ $trainee->name }}の写真"
+                                                     style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
+                                            </div>
+                                        </a>
+                                    @endif
+                                    <div class="flex-grow-1" style="min-width: 0;">
                                 <h6 class="mb-2"><a href="{{ route('trainees.show', $trainee) }}">{{ $trainee->name }}</a></h6>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。備考は改行を保持（S-0309 と同じ）。
                                      x-detail-cell は使わない（3 列グリッド前提のコンポーネントで
-                                     右カラム col-lg-5 の中の縦並び表示には合わないため）。
-                                     写真（設計書 S-0305 セクション3「写真」）は項目の右側に置くため、
-                                     項目（dl）と写真を横並びの flex にする。項目は左に残し（flex-grow-1。
-                                     min-width: 0 で長い値でも横にはみ出さない）、写真は 96px のまま縮めない。 --}}
-                                <div class="d-flex align-items-start gap-3">
-                                <dl class="row mb-0 small flex-grow-1" style="min-width: 0;">
+                                     右カラム col-lg-5 の中の縦並び表示には合わないため）。 --}}
+                                <dl class="row mb-0 small">
                                     <dt class="col-4 fw-normal text-muted">犬種</dt>
                                     <dd class="col-8 mb-1">{{ $trainee->breed }}</dd>
                                     <dt class="col-4 fw-normal text-muted">性別</dt>
@@ -482,23 +503,7 @@
                                                 onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()">計測を追加</button>
                                     </dd>
                                 </dl>
-                                {{-- トレーニーの写真（右上、96px 四方）。写真がないときは何も出さない。
-                                     押すとトレーニー詳細（S-0309）を開く（名前のリンクと同じ行き先）。
-                                     URL はトレーニー詳細と同じ Trainee::photo_url（media ディスクの署名付き一時 URL を
-                                     手元で作る。外部ストレージへの問い合わせはしない）。photo_path は trainees の列なので、
-                                     ClientController::show の trainees の読み込みで足り、追加のクエリは出ない。
-                                     枠の見た目はトレーニー詳細（trainees/show.blade.php）の写真の枠と同じ指定で、
-                                     大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。 --}}
-                                @if($trainee->photo_path)
-                                    <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0">
-                                        <div class="d-flex align-items-center justify-content-center"
-                                             style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
-                                            <img src="{{ $trainee->photo_url }}"
-                                                 alt="{{ $trainee->name }}の写真"
-                                                 style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
-                                        </div>
-                                    </a>
-                                @endif
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
