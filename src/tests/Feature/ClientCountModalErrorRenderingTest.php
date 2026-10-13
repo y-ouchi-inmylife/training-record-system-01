@@ -194,6 +194,18 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $this->assertStringContainsString('name="count"', $this->contractPart($html));
     }
 
+    public function test_利用モーダルの項目は利用日_契約_メモの順(): void
+    {
+        $usage = $this->usagePart($this->renderModals(null, []));
+
+        $usedOn = strpos($usage, 'name="used_on"');
+        $contract = strpos($usage, 'name="client_contract_id"');
+        $note = strpos($usage, 'name="note"');
+        $this->assertNotFalse($usedOn);
+        $this->assertLessThan($contract, $usedOn, '利用日が契約より前');
+        $this->assertLessThan($note, $contract, '契約がメモより前');
+    }
+
     public function test_登録時の初期値は残りがある一番古い契約として渡る(): void
     {
         $html = $this->renderModals(null, []);

@@ -50,7 +50,19 @@
 
                 <div class="modal-body">
                     <div class="row g-3">
-                        {{-- 契約（最初の項目。任意）。エラーで開き直したときは選んでいた値を選び直す。
+                        <div class="col-md-6">
+                            <label for="used_on" class="form-label">利用日 <span class="text-danger">*</span></label>
+                            {{-- 入力部品は計測値モーダルの計測日と同じ（Flatpickr の .datepicker） --}}
+                            <input type="text" class="form-control datepicker @if($openModal === 'usage') @error('used_on') is-invalid @enderror @endif"
+                                   id="used_on" name="used_on"
+                                   value="{{ $openModal === 'usage' ? old('used_on') : '' }}"
+                                   placeholder="例: 2026-09-15" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
+                                   required autocomplete="off">
+                            @if($openModal === 'usage')
+                                <x-form-error field="used_on" />
+                            @endif
+                        </div>
+                        {{-- 契約（利用日の次の項目。任意）。エラーで開き直したときは選んでいた値を選び直す。
                              disabled（使い切り）の付け外しはモードに合わせて JS の applyDisabled() で行う。 --}}
                         <div class="col-12">
                             <label for="client_contract_id" class="form-label">契約</label>
@@ -67,18 +79,6 @@
                             </select>
                             @if($openModal === 'usage')
                                 <x-form-error field="client_contract_id" />
-                            @endif
-                        </div>
-                        <div class="col-md-6">
-                            <label for="used_on" class="form-label">利用日 <span class="text-danger">*</span></label>
-                            {{-- 入力部品は計測値モーダルの計測日と同じ（Flatpickr の .datepicker） --}}
-                            <input type="text" class="form-control datepicker @if($openModal === 'usage') @error('used_on') is-invalid @enderror @endif"
-                                   id="used_on" name="used_on"
-                                   value="{{ $openModal === 'usage' ? old('used_on') : '' }}"
-                                   placeholder="例: 2026-09-15" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
-                                   required autocomplete="off">
-                            @if($openModal === 'usage')
-                                <x-form-error field="used_on" />
                             @endif
                         </div>
                         <div class="col-12">
