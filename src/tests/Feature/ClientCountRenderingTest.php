@@ -501,46 +501,65 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $pattern = '/<a href="'.preg_quote(route('trainees.show', $id), '/').'" class="flex-shrink-0">\s*'
+        // 写真があるときは img の代替テキストで伝わるため、リンクに読み上げ用の名前は付けない
+        $pattern = '/<a href="'.preg_quote(route('trainees.show', $id), '/').'" class="flex-shrink-0 text-decoration-none"\s*>\s*'
             .'<div class="d-flex align-items-center justify-content-center"\s*'
-            .'style="width: 96px; height: 96px;[^"]*border-radius: 0\.5rem; overflow: hidden;">\s*'
+            .'style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba\(15, 26, 46, 0\.08\); border-radius: 0\.5rem; overflow: hidden;">\s*'
             .'<img src="https:\/\/media\.example\.test\/trainees\/202610\/abc\.jpg\?signed=1"\s*'
             .'alt="ポチの写真"\s*'
             .'style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">/u';
         $this->assertMatchesRegularExpression($pattern, $html);
-    }
-
-    public function test_写真がないトレーニーには写真を出さない(): void
-    {
-        $this->fakeMediaDisk();
-        $client = $this->makeClient('0001', '山田');
-        $this->trainee($client, 'たま');
-
-        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
-
-        $this->assertStringContainsString('>たま</a>', $html);
-        $this->assertStringNotContainsString('の写真"', $html);
-        $this->assertStringNotContainsString('width: 96px; height: 96px;', $html);
-        // 代わりの画像・文言も出さない
         $this->assertStringNotContainsString('写真なし', $html);
     }
 
-    public function test_トレーニーが2人で片方だけ写真があるとき写真のある方にだけ出る(): void
+    public function test_写真がないトレーニーには同じ枠に写真なしを出しトレーニー詳細へのリンクにする(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'たま');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 写真があるときと同じ 96px の枠に、S-0309 と同じ見た目の「写真なし」。読み上げ用の名前を付ける
+        $pattern = '/<a href="'.preg_quote(route('trainees.show', $id), '/').'" class="flex-shrink-0 text-decoration-none"\s*'
+            .'aria-label="たまの写真なし。トレーニー詳細へ"\s*>\s*'
+            .'<div class="d-flex align-items-center justify-content-center"\s*'
+            .'style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba\(15, 26, 46, 0\.08\); border-radius: 0\.5rem; overflow: hidden;">\s*'
+            .'<span class="text-muted" style="font-size: 0\.875rem;">写真なし<\/span>\s*<\/div>\s*<\/a>/u';
+        $this->assertMatchesRegularExpression($pattern, $html);
+        // 写真の img は出さない
+        $this->assertStringNotContainsString('alt="たまの写真"', $html);
+        $this->assertStringNotContainsString('media.example.test', $html);
+    }
+
+    public function test_トレーニーが2人で片方だけ写真があるとき両方とも左に枠右に名前と項目の同じ組み方(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $withPhoto = $this->trainee($client, 'ポチ', 'trainees/202610/pochi.jpg');
-        $this->trainee($client, 'たま');
+        $noPhoto = $this->trainee($client, 'たま');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertSame(1, substr_count($html, 'width: 96px; height: 96px;'));
-        $this->assertStringContainsString('alt="ポチの写真"', $html);
+        // 枠は 2 人とも出る。写真はポチだけ、「写真なし」はたまだけ
+        $this->assertSame(2, substr_count($html, 'width: 96px; height: 96px;'));
+        $this->assertSame(1, substr_count($html, 'alt="ポチの写真"'));
+        $this->assertSame(1, substr_count($html, '>写真なし</span>'));
         $this->assertStringNotContainsString('alt="たまの写真"', $html);
-        // 写真はポチのまとまりの左（ポチの名前より前）にあり、たまのまとまりには入らない
-        $this->assertLessThan(strpos($html, '>ポチ</a>'), strpos($html, 'alt="ポチの写真"'));
-        $this->assertLessThan(strpos($html, '>たま</a>'), strpos($html, 'alt="ポチの写真"'));
-        $this->assertStringContainsString('<a href="'.route('trainees.show', $withPhoto).'" class="flex-shrink-0">', $html);
+
+        // どちらのまとまりも「左に枠のリンク、右に名前・項目の列」の同じ組み方
+        foreach ([[$withPhoto, 'ポチ'], [$noPhoto, 'たま']] as [$id, $name]) {
+            $url = preg_quote(route('trainees.show', $id), '/');
+            $this->assertMatchesRegularExpression(
+                '/<div class="d-flex align-items-start gap-3">\s*<a href="'.$url.'" class="flex-shrink-0 text-decoration-none"[^>]*>.*?<\/a>\s*'
+                .'<div class="flex-grow-1" style="min-width: 0;">\s*<h6 class="mb-2"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
+                $html,
+                $name
+            );
+        }
+        // 「写真なし」はたまのまとまりの中（ポチの名前より後、たまの名前より前）
+        $this->assertGreaterThan(strpos($html, '>ポチ</a>'), strpos($html, '>写真なし</span>'));
+        $this->assertLessThan(strpos($html, '>たま</a>'), strpos($html, '>写真なし</span>'));
     }
 
     public function test_写真は名前と項目の左にあり計測を追加は写真の有無にかかわらず同じ並べ方(): void
@@ -554,14 +573,15 @@ class ClientCountRenderingTest extends TestCase
 
         // 写真のまとまり：横並びの中で、写真のリンクが先（左）、名前・項目の列が後（右）
         $pattern = '/<div class="d-flex align-items-start gap-3">\s*'
-            .'<a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'" class="flex-shrink-0">.*?<\/a>\s*'
+            .'<a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'" class="flex-shrink-0 text-decoration-none"\s*>.*?<\/a>\s*'
             .'<div class="flex-grow-1" style="min-width: 0;">\s*'
             .'<h6 class="mb-2"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
         $this->assertMatchesRegularExpression($pattern, $html);
 
-        // 写真がないまとまり：左に何も置かず、名前・項目の列から始まる
+        // 写真がないまとまりも、左に「写真なし」の枠のリンク、右に名前・項目の列（位置がそろう）
         $this->assertMatchesRegularExpression(
-            '/<div class="d-flex align-items-start gap-3">\s*<div class="flex-grow-1" style="min-width: 0;">\s*<h6 class="mb-2"><a href="[^"]+">たま<\/a><\/h6>/u',
+            '/<div class="d-flex align-items-start gap-3">\s*<a href="[^"]+" class="flex-shrink-0 text-decoration-none"\s*aria-label="たまの写真なし。トレーニー詳細へ"\s*>.*?写真なし<\/span>\s*<\/div>\s*<\/a>\s*'
+            .'<div class="flex-grow-1" style="min-width: 0;">\s*<h6 class="mb-2"><a href="[^"]+">たま<\/a><\/h6>/su',
             $html
         );
 

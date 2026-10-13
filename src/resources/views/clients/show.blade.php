@@ -444,24 +444,30 @@
                                      min-width: 0 で長い値でも横にはみ出さない。右の列の中身は写真を置く前と同じ作りで、
                                      「計測を追加」ボタンは写真の有無にかかわらず右の列の右端にそろう。 --}}
                                 <div class="d-flex align-items-start gap-3">
-                                    {{-- トレーニーの写真（左、96px 四方。上端は名前の行の上端にそろう）。写真がないときは何も出さず、
-                                         左に場所も空けない（名前と項目がまとまりの左端から始まる）。
-                                         押すとトレーニー詳細（S-0309）を開く（名前のリンクと同じ行き先）。
+                                    {{-- トレーニーの写真（左、96px 四方。上端は名前の行の上端にそろう）。
+                                         写真がないときも同じ枠を出し、中に「写真なし」を出す（トレーニー詳細 S-0309 の
+                                         写真なしの表示と同じ文言・text-muted・0.875rem）。枠は写真の有無で共通にし、
+                                         中身だけを切り替える。これで写真の有無にかかわらず名前・項目・「計測を追加」の位置がそろう。
+                                         押すとトレーニー詳細（S-0309）を開く（写真の有無にかかわらず。名前のリンクと同じ行き先）。
+                                         写真がないときは img の代替テキストがないため、リンクに読み上げ用の名前を付ける。
                                          URL はトレーニー詳細と同じ Trainee::photo_url（media ディスクの署名付き一時 URL を
                                          手元で作る。外部ストレージへの問い合わせはしない）。photo_path は trainees の列なので、
                                          ClientController::show の trainees の読み込みで足り、追加のクエリは出ない。
                                          枠の見た目はトレーニー詳細（trainees/show.blade.php）の写真の枠と同じ指定で、
                                          大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。 --}}
-                                    @if($trainee->photo_path)
-                                        <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0">
-                                            <div class="d-flex align-items-center justify-content-center"
-                                                 style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
+                                    <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0 text-decoration-none"
+                                       @if(! $trainee->photo_path) aria-label="{{ $trainee->name }}の写真なし。トレーニー詳細へ" @endif>
+                                        <div class="d-flex align-items-center justify-content-center"
+                                             style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
+                                            @if($trainee->photo_path)
                                                 <img src="{{ $trainee->photo_url }}"
                                                      alt="{{ $trainee->name }}の写真"
                                                      style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
-                                            </div>
-                                        </a>
-                                    @endif
+                                            @else
+                                                <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
+                                            @endif
+                                        </div>
+                                    </a>
                                     <div class="flex-grow-1" style="min-width: 0;">
                                 <h6 class="mb-2"><a href="{{ route('trainees.show', $trainee) }}">{{ $trainee->name }}</a></h6>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
