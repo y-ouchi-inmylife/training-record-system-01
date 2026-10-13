@@ -17,9 +17,9 @@
         HOME
     </a>
 
-    <h1 class="c-detail-title">ご利用回数</h1>
-
     @if($isEmpty)
+        <h1 class="c-detail-title">ご利用回数</h1>
+
         {{-- 契約も利用も 1 件もないとき（会員側の空の状態の書き方：.c-empty-card） --}}
         <section class="c-section c-empty-state" aria-label="空状態">
             <div class="c-empty-card">
@@ -27,10 +27,15 @@
             </div>
         </section>
     @else
-        {{-- 全体の数：「あと n回」を大きめに。マイナスのときは文で伝える（赤字にしない） --}}
-        <p class="c-ticket-total">
-            <x-client-remaining-count :value="$remaining" />
-        </p>
+        {{-- 見出しと全体の数を 1 行に並べる（ベースラインでそろえる。幅が足りなければ数は次の行へ折り返す）。
+             数は h1 の外に置き、読み上げでは見出しを「ご利用回数」だけにする。
+             全体の数は「あと n回」を大きめに。マイナスのときは文で伝える（赤字にしない） --}}
+        <div class="c-ticket-heading">
+            <h1 class="c-detail-title">ご利用回数</h1>
+            <p class="c-ticket-total">
+                <x-client-remaining-count :value="$remaining" />
+            </p>
+        </div>
 
         {{-- 契約ごとのカード（新しい契約が上）。押せない（読むだけ） --}}
         @foreach($contracts as $row)

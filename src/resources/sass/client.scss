@@ -943,9 +943,22 @@ input[type="tel"] {
 .c-remaining {
     color: $ink;
 }
+// S-1412 の見出しと全体の数の行：ベースラインでそろえて 1 行に並べる。
+// 幅が足りないとき（マイナスの長い文など）は、数を見出しの次の行に折り返す（横にはみ出さない）
+.c-ticket-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 1rem;
+    row-gap: 0.25rem;
+    margin-bottom: 1.5rem;
+}
+.c-ticket-heading .c-detail-title {
+    margin-bottom: 0;
+}
 // S-1412 の全体の数：「あと n回」を大きめに
 .c-ticket-total {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
     font-size: 1.125rem;
     font-weight: 700;
     color: $ink;

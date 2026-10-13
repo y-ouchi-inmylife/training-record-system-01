@@ -114,6 +114,26 @@ class ClientPortalContractRenderingTest extends TestCase
         $this->assertStringContainsString(route('client-portal.dashboard'), $html);
     }
 
+    public function test_見出しと全体の数を1行のまとまりに並べ見出しはご利用回数だけにする(): void
+    {
+        $client = $this->makeClient();
+        $c = $this->contract($client, '2026-09-01', 4);
+        $this->usage($client, '2026-09-10', $c);
+        $this->usage($client, '2026-09-20', $c);
+
+        $html = $this->open($client);
+
+        // 見出しと数のまとまり（.c-ticket-heading）の中に、h1「ご利用回数」と、その後に「あと 2回」が続く
+        $start = strpos($html, '<div class="c-ticket-heading">');
+        $this->assertNotFalse($start, '見出しと数のまとまりが見出しの行に見つからない');
+        $end = strpos($html, '</div>', $start);
+        $heading = substr($html, $start, $end - $start);
+        $this->assertMatchesRegularExpression('#<h1 class="c-detail-title">ご利用回数</h1>\s*<p class="c-ticket-total">#u', $heading);
+        $this->assertStringContainsString('あと 2回', $this->text($heading));
+        // 数は h1 の外（読み上げの見出しは「ご利用回数」だけ）。h1 は 1 つだけ
+        $this->assertSame(1, substr_count($html, '<h1'));
+    }
+
     public function test_新しい契約が上に並ぶ(): void
     {
         $client = $this->makeClient();
@@ -188,6 +208,9 @@ class ClientPortalContractRenderingTest extends TestCase
         $html = $this->open($this->makeClient());
 
         $this->assertStringContainsString('回数のご契約はありません。', $html);
+        // 空の状態は見出しだけ（数のまとまりは出さない）
+        $this->assertStringContainsString('<h1 class="c-detail-title">ご利用回数</h1>', $html);
+        $this->assertStringNotContainsString('c-ticket-heading', $html);
         $this->assertStringNotContainsString('c-ticket-total', $html);
         $this->assertStringNotContainsString('class="c-ticket"', $html);
     }
