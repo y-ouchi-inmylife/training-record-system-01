@@ -7,6 +7,7 @@ use App\Models\ClientContract;
 use App\Models\ClientUsage;
 use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
@@ -369,6 +370,34 @@ class ClientCountRenderingTest extends TestCase
             ])->assertOk()->getContent();
         $this->assertMatchesRegularExpression('/<option value="" data-used-up="0"\s*selected/u', $html);
         $this->assertDoesNotMatchRegularExpression('/<option value="'.$contract->id.'"[^>]*selected/u', $html);
+    }
+
+    public function test_有効期限を過ぎて残りがある契約は有効期限の日付だけが赤字になる(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-13 09:00:00', config('app.timezone')));
+        try {
+            $client = $this->makeClient('0001', '山田');
+            $expired = $this->contract($client, '2026-08-01', 2, null, '2026-10-12');     // 昨日・残りあり → 赤字
+            $today = $this->contract($client, '2026-08-02', 2, null, '2026-10-13');       // 今日 → 赤字にしない
+            $usedUp = $this->contract($client, '2026-08-03', 1, null, '2026-10-01');      // 期限切れ・使い切り → 赤字にしない
+            $this->usage($client, '2026-09-01', 1, null, $usedUp);
+
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+            // 日付の部分だけが text-danger。「有効期限」の文字は赤字の span の外
+            $this->assertStringContainsString('有効期限 <span class="text-danger">2026/10/12</span>', $html);
+            $this->assertStringNotContainsString('<span class="text-danger">有効期限', $html);
+            // 当日・使い切りの契約は赤字にしない
+            $this->assertStringContainsString('有効期限 2026/10/13', $html);
+            $this->assertStringNotContainsString('<span class="text-danger">2026/10/13</span>', $html);
+            $this->assertStringContainsString('有効期限 2026/10/01', $html);
+            $this->assertStringNotContainsString('<span class="text-danger">2026/10/01</span>', $html);
+
+            // 期限を過ぎた契約も、利用モーダルの選択肢では今までどおり選べる（disabled にならない）
+            $this->assertMatchesRegularExpression('/<option value="'.$expired->id.'"\s+data-used-up="0"\s*>/u', $html);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_回数カードはトレーニーカードの上にある(): void

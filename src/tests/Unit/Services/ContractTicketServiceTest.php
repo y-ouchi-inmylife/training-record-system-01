@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\ClientContract;
 use App\Models\ClientUsage;
 use App\Services\ContractTicketService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 
@@ -21,12 +22,13 @@ use Tests\TestCase;
  */
 class ContractTicketServiceTest extends TestCase
 {
-    private function contract(int $id, string $contractedOn, int $count, ?string $note = null): ClientContract
+    private function contract(int $id, string $contractedOn, int $count, ?string $note = null, ?string $expiresOn = null): ClientContract
     {
         $contract = new ClientContract([
             'contracted_on' => $contractedOn,
             'count' => $count,
             'note' => $note,
+            'expires_on' => $expiresOn,
         ]);
         $contract->id = $id;
 
@@ -296,5 +298,77 @@ class ContractTicketServiceTest extends TestCase
         $this->assertSame(0, ContractTicketService::remaining(4, 4));
         $this->assertSame(4, ContractTicketService::remaining(4, null));
         $this->assertSame(-1, ContractTicketService::remaining(4, 5));
+    }
+    // ---- 有効期限を過ぎていて残りがあるか（expired） ----
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    /** 今日を 2026-10-13（アプリのタイムゾーン）に固定して、契約 1 件（回数 2）の expired を返す */
+    private function expiredOf(?string $expiresOn, int $usages = 0): bool
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-13 09:00:00', config('app.timezone')));
+
+        $usageModels = [];
+        for ($i = 0; $i < $usages; $i++) {
+            $usageModels[] = $this->usage(100 + $i, 1, '2026-10-01');
+        }
+        $result = $this->build([$this->contract(1, '2026-09-01', 2, null, $expiresOn)], $usageModels);
+
+        return $this->rowOf($result, 1)['expired'];
+    }
+
+    public function test_有効期限が昨日で残りがあれば期限切れ(): void
+    {
+        $this->assertTrue($this->expiredOf('2026-10-12'));
+        // 残り 1（2 回のうち 1 件使用）でも期限切れ
+        $this->assertTrue($this->expiredOf('2026-10-12', 1));
+    }
+
+    public function test_有効期限が今日ならまだ期限切れではない(): void
+    {
+        $this->assertFalse($this->expiredOf('2026-10-13'));
+    }
+
+    public function test_有効期限が明日なら期限切れではない(): void
+    {
+        $this->assertFalse($this->expiredOf('2026-10-14'));
+    }
+
+    public function test_有効期限がなければ期限切れではない(): void
+    {
+        $this->assertFalse($this->expiredOf(null));
+    }
+
+    public function test_有効期限が昨日でも使い切りなら期限切れにしない(): void
+    {
+        $this->assertFalse($this->expiredOf('2026-10-12', 2));
+    }
+
+    public function test_今日の日付はアプリのタイムゾーンで判定する(): void
+    {
+        // UTC では 10/12 15:30 だが、アプリのタイムゾーン（Asia/Tokyo）では 10/13 00:30。
+        // 有効期限 10/12 は「今日（10/13）より前」なので期限切れ
+        $this->assertSame('Asia/Tokyo', config('app.timezone'));
+        Carbon::setTestNow(Carbon::parse('2026-10-12 15:30:00', 'UTC'));
+        $result = $this->build([$this->contract(1, '2026-09-01', 2, null, '2026-10-12')], []);
+
+        $this->assertTrue($this->rowOf($result, 1)['expired']);
+    }
+
+    public function test_期限切れの契約も選択肢では今までどおり選べる(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-13 09:00:00', config('app.timezone')));
+        $result = $this->build([$this->contract(1, '2026-09-01', 2, null, '2026-10-01')], []);
+
+        // 期限を過ぎていても、残りがあれば使い切り扱いにしない（選べる）。初期値にもなる
+        $this->assertTrue($this->rowOf($result, 1)['expired']);
+        $this->assertSame([['id' => 1, 'label' => '2026/09/01 契約（2回） 残り 2', 'usedUp' => false]], $result['contractOptions']);
+        $this->assertSame(1, $result['defaultContractId']);
+        // 残り回数の計算にも使わない
+        $this->assertSame(2, $result['remaining']);
     }
 }

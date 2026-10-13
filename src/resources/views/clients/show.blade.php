@@ -377,7 +377,9 @@
                                 <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
                                     {{-- 契約の見出し。押すとその契約の編集モーダル（S-0305-M04）を開く。
                                          メモ・有効期限がない契約は、その部分（「有効期限」の語も）を出さない。
-                                         「有効期限」の語は契約のモーダル（S-0305-M04）の項目名とそろえる。 --}}
+                                         「有効期限」の語は契約のモーダル（S-0305-M04）の項目名とそろえる。
+                                         有効期限を過ぎていて残りがある契約（$row['expired']。判定は ContractTicketService）は、
+                                         有効期限の日付の部分だけを赤字にする（「有効期限」の文字は赤字にしない）。 --}}
                                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                                             data-id="{{ $row['contract']->id }}"
                                             data-contracted-on="{{ $row['contract']->contracted_on->format('Y-m-d') }}"
@@ -385,8 +387,9 @@
                                             data-expires-on="{{ $row['contract']->expires_on?->format('Y-m-d') }}"
                                             data-note="{{ $row['contract']->note }}"
                                             data-usage-count="{{ $row['usageCount'] }}"
-                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 有効期限 {{ $row['contract']->expires_on->format('Y/m/d') }}@endif</button>
-                                    {{-- 契約の状態。有効期限が過ぎていても表示を変えない --}}
+                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 有効期限 @if($row['expired'])<span class="text-danger">{{ $row['contract']->expires_on->format('Y/m/d') }}</span>@else{{ $row['contract']->expires_on->format('Y/m/d') }}@endif @endif</button>
+                                    {{-- 契約の状態（残り n／使い切り）。有効期限が過ぎていても、この表示は変えない
+                                         （期限切れは見出しの有効期限の日付の赤字で示す） --}}
                                     @if($row['usedUp'])
                                         <span class="badge bg-secondary flex-shrink-0">使い切り</span>
                                     @else
