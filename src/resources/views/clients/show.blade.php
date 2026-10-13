@@ -386,7 +386,7 @@
                          言葉は会員側（S-1412）にそろえる（トレーナーが会員に聞かれたとき同じ言葉で答えられるように）。
                          ラベル「ご利用回数」は常に出し、数は残り回数が null でないときだけ出す
                          （契約も利用も 1 件もない会員は数字を空欄にする。§2-4 の例外）。
-                         数の表示（「あと n回」、マイナスは赤字の「n回超過」）は会員一覧と同じ x-remaining-count を使い、
+                         数の表示（「あと n回」、マイナスは赤字の「契約 n回分不足」）は会員一覧と同じ x-remaining-count を使い、
                          見出しでだけ fs-5 を渡して数字の部分だけを少し大きくする（ms-2 はラベルとの間の空き）。
                          狭い幅ではボタンと重ならないよう、card-header の flex-wrap で折り返す。 --}}
                     <h6 class="mb-0">ご利用回数@if(! is_null($ticket['remaining']))<span class="ms-2"><x-remaining-count :value="$ticket['remaining']" class="fs-5" /></span>@endif</h6>

@@ -17,12 +17,12 @@ use Tests\TestCase;
 /**
  * 残り回数・回数カードの描画確認（設計書 screen-design.md S-0304「ご利用回数」列、
  * S-0305 セクション5「回数」（見出しの残り回数）、§2-4「例外：残り回数」）。
- * 画面の言葉は会員側（S-1412）にそろえる：「ご利用回数　あと n回」「n回超過」（赤字）「すべてご利用済み」。
+ * 画面の言葉は会員側（S-1412）にそろえる：「ご利用回数　あと n回」「契約 n回分不足」（赤字）「すべてご利用済み」。
  *
  * - 会員一覧：列の見出しは「ご利用回数」、値は「あと n回」。契約も利用も 0 件は空欄、契約なし・利用ありは
- *   赤字の「n回超過」、マイナスは赤字（text-danger）の「n回超過」、0 は「あと 0回」。fs-5 は付けない
+ *   赤字の「契約 n回分不足」、マイナスは赤字（text-danger）の「契約 n回分不足」、0 は「あと 0回」。fs-5 は付けない
  * - 会員詳細：回数カードの見出しは「ご利用回数　あと n回」（数字の部分だけ fs-5 で少し大きく、
- *   マイナスは「n回超過」の全体が赤字。契約も利用も 0 件はラベル「ご利用回数」だけで数字は空欄）、
+ *   マイナスは「契約 n回分不足」の全体が赤字。契約も利用も 0 件はラベル「ご利用回数」だけで数字は空欄）、
  *   契約の見出し・マス・未割り当て（「未割り当て n」は変えない）・すべてご利用済み・空の状態。
  *   ヘッダーサマリーには残り回数を出さない
  *
@@ -198,16 +198,18 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('<th>残り回数</th>', $html);
         $this->assertSame('', $this->lastCell($this->listRow($html, '登録なし')));
         $usageOnlyRow = $this->listRow($html, '契約なし');
-        $this->assertSame('2回超過', $this->lastCell($usageOnlyRow));
-        $this->assertStringContainsString('<span class="text-danger">2回超過</span>', $usageOnlyRow);
+        $this->assertSame('契約 2回分不足', $this->lastCell($usageOnlyRow));
+        $this->assertStringContainsString('<span class="text-danger">契約 2回分不足</span>', $usageOnlyRow);
         $this->assertSame('あと 3回', $this->lastCell($this->listRow($html, '残りあり')));
         $this->assertSame('あと 0回', $this->lastCell($this->listRow($html, '使い切り')));
 
         $minusRow = $this->listRow($html, '残りマイナス');
-        // 値は「あと n回」。マイナスは赤字の「n回超過」（n は絶対値。「-2」は出さない）
-        $this->assertSame('2回超過', $this->lastCell($minusRow));
-        $this->assertStringContainsString('<span class="text-danger">2回超過</span>', $minusRow);
+        // 値は「あと n回」。マイナスは赤字の「契約 n回分不足」（n は絶対値。「-2」は出さない）
+        $this->assertSame('契約 2回分不足', $this->lastCell($minusRow));
+        $this->assertStringContainsString('<span class="text-danger">契約 2回分不足</span>', $minusRow);
         $this->assertStringNotContainsString('-2', $this->lastCell($minusRow));
+        // 以前の言い方「n回超過」は出さない
+        $this->assertStringNotContainsString('回超過', $html);
         $this->assertStringNotContainsString('text-danger', $this->listRow($html, '残りあり'));
 
         // 会員一覧の出力は見出し用の大きさに影響されない（fs-5 が付かず、数字を要素で囲まない）
@@ -312,10 +314,11 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 見出しの残り回数は未割り当ても引く（1 − 3 = −2）。赤字の「2回超過」（赤字は「n回超過」の全体、数字の部分に fs-5）
-        $this->assertSame('<h6 class="mb-0">ご利用回数<span class="ms-2"><span class="text-danger"><span class="fs-5">2</span>回超過</span></span></h6>', $this->countHeading($html));
-        // §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は未割り当ての利用の件数。変えない）。超過のバッジ（bg-danger）は使わない
+        // 見出しの残り回数は未割り当ても引く（1 − 3 = −2）。赤字の「契約 2回分不足」（赤字は「契約 n回分不足」の全体、数字の部分に fs-5）
+        $this->assertSame('<h6 class="mb-0">ご利用回数<span class="ms-2"><span class="text-danger">契約 <span class="fs-5">2</span>回分不足</span></span></h6>', $this->countHeading($html));
+        // §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は未割り当ての利用の件数。変えない）。bg-danger のバッジは使わない
         $this->assertStringContainsString('<span class="badge bg-warning text-dark">未割り当て 2</span>', $html);
+        $this->assertStringNotContainsString('回超過', $html);
         $this->assertStringNotContainsString('badge bg-danger', $html);
         $this->assertLessThan(
             strpos($html, '2026/10/01 契約（1回）'),
@@ -333,8 +336,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 利用が 1 件あるので回数管理の対象の会員として、計算どおり赤字の「ご利用回数　1回超過」を出す
-        $this->assertSame('<h6 class="mb-0">ご利用回数<span class="ms-2"><span class="text-danger"><span class="fs-5">1</span>回超過</span></span></h6>', $this->countHeading($html));
+        // 利用が 1 件あるので回数管理の対象の会員として、計算どおり赤字の「ご利用回数　契約 1回分不足」を出す
+        $this->assertSame('<h6 class="mb-0">ご利用回数<span class="ms-2"><span class="text-danger">契約 <span class="fs-5">1</span>回分不足</span></span></h6>', $this->countHeading($html));
         $this->assertStringContainsString('<span class="badge bg-warning text-dark">未割り当て 1</span>', $html);
     }
 
