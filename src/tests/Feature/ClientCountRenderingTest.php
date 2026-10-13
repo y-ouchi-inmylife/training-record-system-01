@@ -418,6 +418,28 @@ class ClientCountRenderingTest extends TestCase
         );
     }
 
+    public function test_契約の状態は見出しのボタンの外ですぐ後ろに並ぶ(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+        $open = $this->contract($client, '2026-10-12', 4, '4回コース');
+        $full = $this->contract($client, '2026-09-03', 1);
+        $this->usage($client, '2026-09-04', 1, null, $full);
+        $this->usage($client, '2026-10-20'); // 契約なし
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 見出しのボタン（</button>）の直後に状態が続く＝ボタンの外で、見出しのすぐ後ろ
+        $this->assertMatchesRegularExpression('/2026\/10\/12 契約（4回） 4回コース\s*<\/button>\s*<span class="flex-shrink-0">残り 4<\/span>/u', $html);
+        $this->assertMatchesRegularExpression('/2026\/09\/03 契約（1回）\s*<\/button>\s*<span class="badge bg-secondary flex-shrink-0">使い切り<\/span>/u', $html);
+        // 「未割り当て n」も「（契約なし）」のすぐ後ろ
+        $this->assertMatchesRegularExpression('/<span>（契約なし）<\/span>\s*<span class="badge bg-warning text-dark">未割り当て 1<\/span>/u', $html);
+
+        // 行は左から並べる（右端に寄せる justify-content-between を使わない）。狭い幅では折り返す
+        $card = substr($html, strpos($html, 'contract-ticket-scroll">'), 4000);
+        $this->assertStringNotContainsString('justify-content-between', $card);
+        $this->assertStringContainsString('d-flex flex-wrap align-items-center column-gap-2 mb-1', $card);
+    }
+
     public function test_回数カードはトレーニーカードの上にある(): void
     {
         $client = $this->makeClient('0001', '山田');

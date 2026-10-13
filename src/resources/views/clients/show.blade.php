@@ -361,7 +361,8 @@
                              契約に割り当て直すには、マスを押して利用の編集モーダルで契約を選び直す。 --}}
                         @if($ticket['unassigned']['count'] > 0)
                             <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                {{-- 「未割り当て n」は「（契約なし）」のすぐ後ろ（契約の状態と同じ並べ方。右端には寄せない） --}}
+                                <div class="d-flex flex-wrap align-items-center column-gap-2 mb-1">
                                     <span>（契約なし）</span>
                                     <span class="badge bg-warning text-dark">未割り当て {{ $ticket['unassigned']['count'] }}</span>
                                 </div>
@@ -376,7 +377,9 @@
                              data-usage-count は割り当てた利用の件数（削除の確認ダイアログの文言に使う。回数ではない） --}}
                         @foreach($ticket['contracts'] as $row)
                             <div @class(['mb-3' => ! $loop->last])>
-                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                {{-- 見出しと状態を左から並べる（状態は見出しのすぐ後ろ。右端には寄せない）。
+                                     狭い幅で見出しが長いときは、状態が次の行に折り返す（flex-wrap） --}}
+                                <div class="d-flex flex-wrap align-items-center column-gap-2 mb-1">
                                     {{-- 契約の見出し。押すとその契約の編集モーダル（S-0305-M04）を開く。
                                          メモ・有効期限がない契約は、その部分（「有効期限」の語も）を出さない。
                                          「有効期限」の語は契約のモーダル（S-0305-M04）の項目名とそろえる。
@@ -390,7 +393,8 @@
                                             data-note="{{ $row['contract']->note }}"
                                             data-usage-count="{{ $row['usageCount'] }}"
                                             onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 有効期限 @if($row['expired'])<span class="text-danger">{{ $row['contract']->expires_on->format('Y/m/d') }}</span>@else{{ $row['contract']->expires_on->format('Y/m/d') }}@endif @endif</button>
-                                    {{-- 契約の状態（残り n／使い切り）。有効期限が過ぎていても、この表示は変えない
+                                    {{-- 契約の状態（残り n／使い切り）。見出しのボタンの外に、見出しのすぐ後ろに置く
+                                         （見出しとの間は column-gap-2）。有効期限が過ぎていても、この表示は変えない
                                          （期限切れは見出しの有効期限の日付の赤字で示す） --}}
                                     @if($row['usedUp'])
                                         <span class="badge bg-secondary flex-shrink-0">使い切り</span>
