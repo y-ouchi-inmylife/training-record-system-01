@@ -16,7 +16,9 @@ use Illuminate\Http\RedirectResponse;
  * - destroy は物理削除。**権限は一般トレーナーも可**（設計書 requirements.md 6-17-6）
  * - 処理後は常に会員詳細（S-0305）へ戻す（`return_to` は持たない）
  *
- * 残り回数がマイナスになる登録・編集も止めない（警告も出さない。設計書 6-17-4）。
+ * 割り当てる契約（client_contract_id。空は「契約なし」）は validated() のまま保存する。
+ * 所属と契約の残りのチェックは ClientUsageRequest で行う。会員の残り回数がマイナスになる
+ * 登録・編集は止めない（警告も出さない。設計書 6-17-4）。
  */
 class ClientUsageController extends Controller
 {

@@ -35,9 +35,19 @@ class ClientCountModalErrorRenderingTest extends TestCase
 
         $view = $this->withViewErrors($errors)->blade(
             "@include('clients._contract-modal', ['client' => \$client, 'openModal' => \$openModal])\n"
-            ."@include('clients._usage-modal', ['client' => \$client, 'openModal' => \$openModal])\n"
+            ."@include('clients._usage-modal', ['client' => \$client, 'openModal' => \$openModal,"
+            ." 'contractOptions' => \$contractOptions, 'defaultContractId' => \$defaultContractId])\n"
             ."@stack('scripts')",
-            ['client' => $client, 'openModal' => $openModal]
+            [
+                'client' => $client,
+                'openModal' => $openModal,
+                // 利用モーダルの「契約」の選択肢（ContractTicketService::build() の contractOptions と同じ形）
+                'contractOptions' => [
+                    ['id' => 7, 'label' => '2026/09/03 契約（2回） 残り 0', 'usedUp' => true],
+                    ['id' => 8, 'label' => '2026/10/12 契約（4回） 残り 3', 'usedUp' => false],
+                ],
+                'defaultContractId' => 8,
+            ]
         );
 
         return $view->__toString();
@@ -143,5 +153,71 @@ class ClientCountModalErrorRenderingTest extends TestCase
         ]);
 
         $this->assertStringContainsString('const oldUsageId = "42";', $this->usageScript($html));
+    }
+
+    // ---- 利用モーダルの「契約」の選択（S-0305-M05） ----
+
+    /** 利用モーダルの「契約」の <select> の HTML */
+    private function contractSelect(string $html): string
+    {
+        $start = strpos($html, '<select', strpos($html, 'id="usageModal"'));
+        $end = strpos($html, '</select>', $start);
+
+        return preg_replace('/\s+/u', ' ', substr($html, $start, $end - $start));
+    }
+
+    public function test_契約の選択肢は使い切りが無効で最後に契約なしが来る(): void
+    {
+        $select = $this->contractSelect($this->renderModals(null, []));
+
+        $this->assertMatchesRegularExpression('/<option value="7" data-used-up="1" disabled\s*>2026\/09\/03 契約（2回） 残り 0<\/option>/u', $select);
+        $this->assertMatchesRegularExpression('/<option value="8" data-used-up="0"\s*>2026\/10\/12 契約（4回） 残り 3<\/option>/u', $select);
+        $this->assertLessThan(strrpos($select, '契約なし'), strpos($select, '残り 3'), '契約なしは最後');
+        $this->assertStringNotContainsString('selected', $select, 'エラーなしではサーバー側で選ばない（JS が初期値を選ぶ）');
+    }
+
+    public function test_登録時の初期値は残りがある一番古い契約として渡る(): void
+    {
+        $html = $this->renderModals(null, []);
+
+        $this->assertStringContainsString('const DEFAULT_CONTRACT_ID = 8;', $this->usageScript($html));
+    }
+
+    public function test_エラーで開き直したとき選んでいた契約が戻る(): void
+    {
+        $html = $this->renderModals('usage', ['client_contract_id' => 'ERR_contract'], [
+            '_form_type' => 'usage', 'client_contract_id' => '8', 'used_on' => '2026-10-01', 'count' => '9',
+        ]);
+
+        $select = $this->contractSelect($html);
+        $this->assertMatchesRegularExpression('/<option value="8"[^>]*selected/u', $select);
+        $this->assertDoesNotMatchRegularExpression('/<option value=""[^>]*selected/u', $select);
+        // 契約の欄の下に文言、欄に赤枠（利用モーダルの中だけ）
+        $this->assertStringContainsString('ERR_contract', $this->usagePart($html));
+        $this->assertStringContainsString('is-invalid', $select);
+    }
+
+    public function test_エラーで開き直したとき契約なしを選んでいた場合は契約なしが戻る(): void
+    {
+        // 「契約なし」は value が空。ConvertEmptyStringsToNull で null になって old() に入る
+        $html = $this->renderModals('usage', ['count' => 'ERR'], [
+            '_form_type' => 'usage', 'client_contract_id' => null, 'used_on' => '2026-10-01', 'count' => '0',
+        ]);
+
+        $select = $this->contractSelect($html);
+        $this->assertMatchesRegularExpression('/<option value="" data-used-up="0"\s*selected/u', $select);
+        $this->assertDoesNotMatchRegularExpression('/<option value="8"[^>]*selected/u', $select);
+    }
+
+    public function test_編集でエラーのときは今の契約の使い切りを選べるようにする処理が入る(): void
+    {
+        $html = $this->renderModals('usage', ['count' => 'ERR'], [
+            '_form_type' => 'usage', '_usage_id' => '42', 'client_contract_id' => '7', 'used_on' => '2026-10-01', 'count' => '0',
+        ]);
+
+        $script = $this->usageScript($html);
+        // 編集モードでは、マスの data-client-contract-id から今の契約を読んで、その契約だけ無効を外す
+        $this->assertStringContainsString('applyDisabled(currentContractOf(oldUsageId));', $script);
+        $this->assertMatchesRegularExpression('/<option value="7"[^>]*selected/u', $this->contractSelect($html));
     }
 }

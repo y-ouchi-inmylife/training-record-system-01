@@ -117,22 +117,27 @@ class ClientContractUsageCrudTest extends TestCase
         $this->assertSame($contract->id, (int) $log->target_id);
     }
 
-    public function test_一般トレーナーが契約を削除すると会員詳細に戻る(): void
+    public function test_一般トレーナーが契約を削除すると会員詳細に戻り_割り当てた利用は契約なしで残る(): void
     {
         $contract = ClientContract::query()->create([
             'client_id' => $this->client->id, 'contracted_on' => '2026-10-12', 'count' => 4,
         ]);
-        // 利用は契約とひも付けていないため、契約を削除しても残る
-        ClientUsage::query()->create([
-            'client_id' => $this->client->id, 'used_on' => '2026-10-13', 'count' => 1,
+        $other = ClientContract::query()->create([
+            'client_id' => $this->client->id, 'contracted_on' => '2026-10-01', 'count' => 2,
         ]);
+        $assigned = $this->usage($contract, '2026-10-13', 2);
+        $otherUsage = $this->usage($other, '2026-10-02');
 
         $response = $this->delete(route('client-contracts.destroy', $contract));
 
         $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionHas('success', '契約を削除しました。');
-        $this->assertFalse(ClientContract::query()->exists());
-        $this->assertSame(1, ClientUsage::query()->count());
+        $this->assertFalse(ClientContract::query()->whereKey($contract->id)->exists());
+        // DB の外部キー（ON DELETE SET NULL）で、削除した契約の利用は「契約なし」になって残る
+        $this->assertSame(2, ClientUsage::query()->count());
+        $this->assertNull($assigned->fresh()->client_contract_id);
+        // ほかの契約の利用はそのまま
+        $this->assertSame($other->id, (int) $otherUsage->fresh()->client_contract_id);
 
         $log = $this->lastLog();
         $this->assertSame('delete_client_contract', $log->action);
@@ -269,6 +274,172 @@ class ClientContractUsageCrudTest extends TestCase
         ]);
         $this->assertSame('usage', session('_old_input._form_type'));
         $this->assertFalse(ClientUsage::query()->exists());
+    }
+
+    // ---- 利用の契約の割り当て（S-0305-M05） ----
+
+    private function contractOf(Client $client, int $count, string $contractedOn = '2026-10-01'): ClientContract
+    {
+        return ClientContract::query()->create([
+            'client_id' => $client->id, 'contracted_on' => $contractedOn, 'count' => $count,
+        ]);
+    }
+
+    private function usage(?ClientContract $contract, string $usedOn, int $count = 1): ClientUsage
+    {
+        return ClientUsage::query()->create([
+            'client_id' => $this->client->id,
+            'client_contract_id' => $contract?->id,
+            'used_on' => $usedOn,
+            'count' => $count,
+        ]);
+    }
+
+    public function test_契約を選んで利用を登録できる(): void
+    {
+        $contract = $this->contractOf($this->client, 4);
+
+        $this->post(route('client-usages.store', $this->client), [
+            '_form_type' => 'usage',
+            'client_contract_id' => (string) $contract->id,
+            'used_on' => '2026-10-12',
+            'count' => '2',
+        ])->assertRedirect(route('clients.show', $this->client))->assertSessionHasNoErrors();
+
+        $this->assertSame($contract->id, (int) ClientUsage::query()->sole()->client_contract_id);
+    }
+
+    public function test_契約なしで利用を登録できる(): void
+    {
+        $this->contractOf($this->client, 1);
+
+        // 「契約なし」の option は value が空。残りに関係なく登録できる
+        $this->post(route('client-usages.store', $this->client), [
+            '_form_type' => 'usage',
+            'client_contract_id' => '',
+            'used_on' => '2026-10-12',
+            'count' => '5',
+        ])->assertRedirect(route('clients.show', $this->client))->assertSessionHasNoErrors();
+
+        $this->assertNull(ClientUsage::query()->sole()->client_contract_id);
+    }
+
+    public function test_契約の残りを超える割り当てはエラーで文言に残りと不足の回数が入る(): void
+    {
+        $contract = $this->contractOf($this->client, 4);
+        $this->usage($contract, '2026-10-02', 2); // 残り 2
+
+        $this->from(route('clients.show', $this->client))
+            ->post(route('client-usages.store', $this->client), [
+                '_form_type' => 'usage',
+                'client_contract_id' => (string) $contract->id,
+                'used_on' => '2026-10-12',
+                'count' => '3',
+            ])
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionHasErrors(['client_contract_id' => '選んだ契約の残りは2回で、1回足りません。']);
+
+        $this->assertSame(1, ClientUsage::query()->count());
+        // 選んでいた契約が old() で戻せるようにフラッシュされている
+        $this->assertSame((string) $contract->id, (string) session('_old_input.client_contract_id'));
+    }
+
+    public function test_契約の残りちょうどの割り当ては通る(): void
+    {
+        $contract = $this->contractOf($this->client, 4);
+        $this->usage($contract, '2026-10-02', 2);
+
+        $this->post(route('client-usages.store', $this->client), [
+            '_form_type' => 'usage',
+            'client_contract_id' => (string) $contract->id,
+            'used_on' => '2026-10-12',
+            'count' => '2',
+        ])->assertSessionHasNoErrors();
+    }
+
+    public function test_編集で同じ契約のまま回数を増やすときは自分の分を除いて判定する(): void
+    {
+        $contract = $this->contractOf($this->client, 3);
+        $target = $this->usage($contract, '2026-10-02', 1);
+        $this->usage($contract, '2026-10-03', 1); // ほかの利用で 1 回分。自分を除いた残りは 2
+
+        // 1 → 2 回：自分の 1 回を除いた残り 2 に収まる
+        $this->put(route('client-usages.update', $target), [
+            '_form_type' => 'usage', '_usage_id' => (string) $target->id,
+            'client_contract_id' => (string) $contract->id,
+            'used_on' => '2026-10-02', 'count' => '2',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(2, $target->fresh()->count);
+
+        // 2 → 3 回：残り 2 を 1 回超える
+        $this->put(route('client-usages.update', $target), [
+            '_form_type' => 'usage', '_usage_id' => (string) $target->id,
+            'client_contract_id' => (string) $contract->id,
+            'used_on' => '2026-10-02', 'count' => '3',
+        ])->assertSessionHasErrors(['client_contract_id' => '選んだ契約の残りは2回で、1回足りません。']);
+        $this->assertSame(2, $target->fresh()->count);
+    }
+
+    public function test_編集で別の契約に移すときは移す先の残りで判定する(): void
+    {
+        $from = $this->contractOf($this->client, 4, '2026-09-01');
+        $to = $this->contractOf($this->client, 2, '2026-10-01');
+        $target = $this->usage($from, '2026-10-02', 2);
+        $this->usage($to, '2026-10-03', 1); // 移す先の残りは 1
+
+        $this->put(route('client-usages.update', $target), [
+            '_form_type' => 'usage', '_usage_id' => (string) $target->id,
+            'client_contract_id' => (string) $to->id,
+            'used_on' => '2026-10-02', 'count' => '2',
+        ])->assertSessionHasErrors(['client_contract_id' => '選んだ契約の残りは1回で、1回足りません。']);
+        $this->assertSame($from->id, (int) $target->fresh()->client_contract_id);
+
+        // 1 回にすれば移せる
+        $this->put(route('client-usages.update', $target), [
+            '_form_type' => 'usage', '_usage_id' => (string) $target->id,
+            'client_contract_id' => (string) $to->id,
+            'used_on' => '2026-10-02', 'count' => '1',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame($to->id, (int) $target->fresh()->client_contract_id);
+    }
+
+    public function test_別の会員の契約を選ぶとエラー(): void
+    {
+        $otherClient = Client::query()->create([
+            'internal_id' => '0002', 'initial_consultation_date' => '2026-01-20', 'last_name' => '鈴木',
+        ]);
+        $otherContract = $this->contractOf($otherClient, 4);
+
+        $this->post(route('client-usages.store', $this->client), [
+            '_form_type' => 'usage',
+            'client_contract_id' => (string) $otherContract->id,
+            'used_on' => '2026-10-12',
+            'count' => '1',
+        ])->assertSessionHasErrors(['client_contract_id' => '選んだ契約はこの会員の契約ではありません。']);
+
+        $this->assertFalse(ClientUsage::query()->exists());
+    }
+
+    // ---- 契約の回数を減らす編集（S-0305-M04） ----
+
+    public function test_割り当て済みの利用回数より少ない回数への契約の編集はエラー(): void
+    {
+        $contract = $this->contractOf($this->client, 4);
+        $this->usage($contract, '2026-10-02', 2);
+        $this->usage($contract, '2026-10-03', 1); // 割り当て済み 3 回
+
+        $this->put(route('client-contracts.update', $contract), [
+            '_form_type' => 'contract', '_contract_id' => (string) $contract->id,
+            'contracted_on' => '2026-10-01', 'count' => '2',
+        ])->assertSessionHasErrors(['count' => '回数は割り当て済みの利用回数（3回）以上で入力してください。']);
+        $this->assertSame(4, $contract->fresh()->count);
+
+        // ちょうど 3 回には減らせる
+        $this->put(route('client-contracts.update', $contract), [
+            '_form_type' => 'contract', '_contract_id' => (string) $contract->id,
+            'contracted_on' => '2026-10-01', 'count' => '3',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(3, $contract->fresh()->count);
     }
 
     // ---- アクセスログのラベル ----

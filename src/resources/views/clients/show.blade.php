@@ -327,9 +327,10 @@
              screen-design.md S-0305 設計方針「2カラム本体の幅を 8:4 から 7:5 に」参照）。 --}}
         <div class="col-lg-5">
             {{-- 回数カード（設計書 S-0305 セクション5）。右カラムのトレーニーカードの上に置く。
-                 契約ごとに回数ぶんのマスを並べ、利用日で埋めていく「回数券型」。
-                 割り当て（どの利用をどの契約のマスに入れるか）は ContractTicketService で計算済みで、
-                 Blade は $ticket を並べるだけ。 --}}
+                 契約ごとに回数ぶんのマスを並べ、その契約に割り当てた利用（client_contract_id）の
+                 利用日で埋めていく「回数券型」。並べ方・契約ごとの残り・未割り当ての回数は
+                 ContractTicketService で組み立て済みで、Blade は $ticket を並べるだけ
+                 （表示のときに自動で割り当てる処理は持たない。設計書 S-0305 セクション5「マスの並べ方」）。 --}}
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                     {{-- カードの見出しは「残り回数 n」（設計書 S-0305 セクション5「カードヘッダー」）。
@@ -353,21 +354,24 @@
                     </div>
                 @else
                     <div class="card-body contract-ticket-scroll">
-                        {{-- 超過の行：どの契約のマスにも入らなかった利用。あるときだけ一番上に出す --}}
-                        @if(count($ticket['overflow']) > 0)
+                        {{-- （契約なし）の行：契約に割り当てていない利用（未割り当て）。あるときだけ一番上に出す。
+                             バッジは §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は回数の合計）。
+                             契約に割り当て直すには、マスを押して利用の編集モーダルで契約を選び直す。 --}}
+                        @if($ticket['unassigned']['count'] > 0)
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
                                     <span>（契約なし）</span>
-                                    <span class="badge bg-danger">超過 {{ count($ticket['overflow']) }}</span>
+                                    <span class="badge bg-warning text-dark">未割り当て {{ $ticket['unassigned']['count'] }}</span>
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">
-                                    @foreach($ticket['overflow'] as $usage)
+                                    @foreach($ticket['unassigned']['slots'] as $usage)
                                         @include('clients._usage-slot', ['usage' => $usage])
                                     @endforeach
                                 </div>
                             </div>
                         @endif
-                        {{-- 契約ごとの行（契約日の新しいものが上。マスは古い利用が左） --}}
+                        {{-- 契約ごとの行（契約日の新しいものが上。マスはその契約に割り当てた利用で、古い利用が左）。
+                             data-usage-count は割り当てた利用の件数（削除の確認ダイアログの文言に使う。回数ではない） --}}
                         @foreach($ticket['contracts'] as $row)
                             <div @class(['mb-3' => ! $loop->last])>
                                 <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
@@ -379,6 +383,7 @@
                                             data-count="{{ $row['contract']->count }}"
                                             data-expires-on="{{ $row['contract']->expires_on?->format('Y-m-d') }}"
                                             data-note="{{ $row['contract']->note }}"
+                                            data-usage-count="{{ $row['usageCount'] }}"
                                             onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 期限 {{ $row['contract']->expires_on->format('Y/m/d') }}@endif</button>
                                     {{-- 契約の状態。有効期限が過ぎていても表示を変えない --}}
                                     @if($row['usedUp'])
@@ -488,7 +493,12 @@
             {{-- 契約・利用の登録・編集モーダル（S-0305-M04 / M05）。回数カードのボタン・見出し・マスから開く。
                  $openModal はエラーで戻ったときに開き直すモーダルの種別（ClientController::show 参照）。 --}}
             @include('clients._contract-modal', ['client' => $client, 'openModal' => $openModal])
-            @include('clients._usage-modal', ['client' => $client, 'openModal' => $openModal])
+            @include('clients._usage-modal', [
+                'client' => $client,
+                'openModal' => $openModal,
+                'contractOptions' => $ticket['contractOptions'],
+                'defaultContractId' => $ticket['defaultContractId'],
+            ])
         </div>
     </div>
 

@@ -9,34 +9,32 @@ use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 /**
- * 回数券型の割り当て（ContractTicketService）のテスト。
+ * 回数券型の表示データと利用モーダルの選択肢（ContractTicketService）のテスト。
  *
- * 割り当てルールは設計書 screen-design.md S-0305 セクション5「割り当てルール」：
- *   1. 契約を契約日の昇順（同じ日は id の昇順）に並べ、回数ぶんのマスを用意する
- *   2. 利用を利用日の昇順（同じ日は id の昇順）に並べ、古い契約の空いているマスから埋める
- *   3. 入らなかった分は超過（マス単位）
- *   4. 利用日と契約日の前後・有効期限は見ない
+ * 利用は client_contract_id で割り当てた契約を持ち（NULL は「契約なし」）、表示はその割り当てのとおりに
+ * 並べる（設計書 screen-design.md S-0305 セクション5「マスの並べ方」）。表示のときに古い契約から
+ * 自動で割り当てる処理は持たない。
  *
  * DB は使わず、モデルを new して id と値だけをセットする
  * （日付のキャストに Laravel のアプリケーションが要るため Tests\TestCase を使う）。
  */
 class ContractTicketServiceTest extends TestCase
 {
-    private function contract(int $id, string $contractedOn, int $count, ?string $expiresOn = null): ClientContract
+    private function contract(int $id, string $contractedOn, int $count, ?string $note = null): ClientContract
     {
         $contract = new ClientContract([
             'contracted_on' => $contractedOn,
             'count' => $count,
-            'expires_on' => $expiresOn,
+            'note' => $note,
         ]);
         $contract->id = $id;
 
         return $contract;
     }
 
-    private function usage(int $id, string $usedOn, int $count = 1): ClientUsage
+    private function usage(int $id, ?int $contractId, string $usedOn, int $count = 1): ClientUsage
     {
-        $usage = new ClientUsage(['used_on' => $usedOn, 'count' => $count]);
+        $usage = new ClientUsage(['client_contract_id' => $contractId, 'used_on' => $usedOn, 'count' => $count]);
         $usage->id = $id;
 
         return $usage;
@@ -53,7 +51,7 @@ class ContractTicketServiceTest extends TestCase
         return array_map(fn ($slot) => $slot?->id, $slots);
     }
 
-    /** 表示順（新しい契約が先頭）の行から、契約 id をキーにした行を取り出す */
+    /** 表示順（新しい契約が先頭）の行から、契約 id の行を取り出す */
     private function rowOf(array $result, int $contractId): array
     {
         foreach ($result['contracts'] as $row) {
@@ -72,23 +70,26 @@ class ContractTicketServiceTest extends TestCase
         $this->assertSame([null, null, null, null], $this->slotIds($row['slots']));
         $this->assertSame(4, $row['remaining']);
         $this->assertFalse($row['usedUp']);
-        $this->assertSame([], $result['overflow']);
+        $this->assertSame(0, $row['usageCount']);
+        $this->assertSame(['slots' => [], 'count' => 0], $result['unassigned']);
         $this->assertSame(4, $result['remaining']);
         $this->assertFalse($result['isEmpty']);
     }
 
-    public function test_一部利用と使い切り(): void
+    public function test_割り当てた契約のマスに利用日の順で入る(): void
     {
+        // 引数の並びはばらばらに渡し、サービス側で利用日の昇順（同じ日は id の昇順）に並べ直すことを確かめる
         $result = $this->build(
             [
                 $this->contract(1, '2026-09-03', 2),
                 $this->contract(2, '2026-10-12', 4),
             ],
             [
-                $this->usage(11, '2026-09-04'),
-                $this->usage(12, '2026-09-06'),
-                $this->usage(13, '2026-10-12'),
-                $this->usage(14, '2026-10-13'),
+                $this->usage(14, 2, '2026-10-13'),
+                $this->usage(13, 2, '2026-10-12'),
+                $this->usage(12, 1, '2026-09-06'),
+                $this->usage(11, 1, '2026-09-04'),
+                $this->usage(15, 2, '2026-10-12'),
             ]
         );
 
@@ -99,108 +100,94 @@ class ContractTicketServiceTest extends TestCase
         $this->assertSame([11, 12], $this->slotIds($old['slots']));
         $this->assertTrue($old['usedUp']);
         $this->assertSame(0, $old['remaining']);
+        $this->assertSame(2, $old['usageCount']);
 
+        // 同じ利用日（10/12）は id の昇順（13 → 15）
         $new = $this->rowOf($result, 2);
-        $this->assertSame([13, 14, null, null], $this->slotIds($new['slots']));
+        $this->assertSame([13, 15, 14, null], $this->slotIds($new['slots']));
         $this->assertFalse($new['usedUp']);
-        $this->assertSame(2, $new['remaining']);
+        $this->assertSame(1, $new['remaining']);
+        $this->assertSame(3, $new['usageCount']);
 
-        $this->assertSame(2, $result['remaining']);
+        $this->assertSame(1, $result['remaining']);
     }
 
-    public function test_2回分の利用が2つの契約にまたがる(): void
+    public function test_自動割り当てはしない_古い契約に空きがあっても割り当てたとおりに並ぶ(): void
     {
+        // 古い契約（1）に空きがあっても、新しい契約（2）に割り当てた利用は 2 に入る
         $result = $this->build(
             [
                 $this->contract(1, '2026-09-01', 2),
                 $this->contract(2, '2026-10-01', 2),
             ],
-            [
-                $this->usage(11, '2026-09-02'),
-                $this->usage(12, '2026-09-10', 2),
-            ]
+            [$this->usage(11, 2, '2026-09-02')]
         );
 
-        // 利用 12 の 2 回分は、古い契約の残り 1 マスと、新しい契約の先頭 1 マスに入る
-        $this->assertSame([11, 12], $this->slotIds($this->rowOf($result, 1)['slots']));
-        $this->assertSame([12, null], $this->slotIds($this->rowOf($result, 2)['slots']));
-        $this->assertSame(1, $result['remaining']);
+        $this->assertSame([null, null], $this->slotIds($this->rowOf($result, 1)['slots']));
+        $this->assertSame([11, null], $this->slotIds($this->rowOf($result, 2)['slots']));
     }
 
-    public function test_超過はマス単位で一部だけが超過になり残り回数はマイナス(): void
+    public function test_2回分の利用は1つの契約のマスを2つ使う(): void
     {
         $result = $this->build(
-            [$this->contract(1, '2026-10-01', 2)],
+            [$this->contract(1, '2026-10-01', 4)],
             [
-                $this->usage(11, '2026-10-02'),
-                // 2 回分のうち 1 回分だけが契約のマスに入り、残り 1 回分が超過
-                $this->usage(12, '2026-10-03', 2),
-                $this->usage(13, '2026-10-04'),
+                $this->usage(11, 1, '2026-10-02', 2),
+                $this->usage(12, 1, '2026-10-03'),
             ]
         );
 
         $row = $this->rowOf($result, 1);
-        $this->assertSame([11, 12], $this->slotIds($row['slots']));
-        $this->assertTrue($row['usedUp']);
-
-        // 超過のマスは古い利用が先頭
-        $this->assertSame([12, 13], array_map(fn ($usage) => $usage->id, $result['overflow']));
-        // 超過があるとき、残り回数は −（超過のマスの数）
-        $this->assertSame(-2, $result['remaining']);
+        $this->assertSame([11, 11, 12, null], $this->slotIds($row['slots']));
+        $this->assertSame(1, $row['remaining']);
+        // 件数は利用の件数（回数ではない）
+        $this->assertSame(2, $row['usageCount']);
     }
 
-    public function test_契約日より前の日付の利用もマスに入る(): void
+    public function test_未割り当ての利用は利用日の順に並び回数の合計を持つ(): void
     {
         $result = $this->build(
-            [$this->contract(1, '2026-10-12', 2)],
-            [$this->usage(11, '2026-10-01')]
-        );
-
-        $this->assertSame([11, null], $this->slotIds($this->rowOf($result, 1)['slots']));
-        $this->assertSame([], $result['overflow']);
-        $this->assertSame(1, $result['remaining']);
-    }
-
-    public function test_有効期限は割り当てに使わない(): void
-    {
-        $result = $this->build(
-            [$this->contract(1, '2026-01-01', 2, '2026-03-31')],
-            [$this->usage(11, '2026-10-01')]
-        );
-
-        $this->assertSame([11, null], $this->slotIds($this->rowOf($result, 1)['slots']));
-    }
-
-    public function test_同じ日の契約と利用はidの昇順で並ぶ(): void
-    {
-        // 引数の並びはばらばらに渡し、サービス側で並べ直すことを確かめる
-        $result = $this->build(
+            [$this->contract(1, '2026-10-01', 2)],
             [
-                $this->contract(5, '2026-10-01', 1),
-                $this->contract(3, '2026-10-01', 1),
-            ],
-            [
-                $this->usage(22, '2026-10-02'),
-                $this->usage(21, '2026-10-02'),
+                $this->usage(13, null, '2026-10-20'),
+                $this->usage(12, null, '2026-10-05', 2),
+                $this->usage(11, 1, '2026-10-02'),
             ]
         );
 
-        // 同じ契約日：id の小さい契約 3 が先に埋まる。同じ利用日：id の小さい利用 21 が先
-        $this->assertSame([21], $this->slotIds($this->rowOf($result, 3)['slots']));
-        $this->assertSame([22], $this->slotIds($this->rowOf($result, 5)['slots']));
-        // 表示順は割り当ての並びの逆（新しいもの＝後に並ぶものが先頭）
-        $this->assertSame([5, 3], array_map(fn ($row) => $row['contract']->id, $result['contracts']));
+        // 未割り当てのマスは利用日の昇順。2 回分の利用は 2 マス
+        $this->assertSame([12, 12, 13], $this->slotIds($result['unassigned']['slots']));
+        $this->assertSame(3, $result['unassigned']['count']);
+        // 契約のマスには割り当てた利用だけが入る
+        $this->assertSame([11, null], $this->slotIds($this->rowOf($result, 1)['slots']));
     }
 
-    public function test_契約がなく利用2回なら残り回数はマイナス2で利用はすべて超過(): void
+    public function test_全体の残り回数は未割り当ての利用も引く(): void
     {
-        $result = $this->build([], [$this->usage(11, '2026-10-01', 2)]);
+        // 契約 4 回、割り当て 1 回、未割り当て 3 回 → 4 − 4 = 0（契約の残りは 3 のまま）
+        $result = $this->build(
+            [$this->contract(1, '2026-10-01', 4)],
+            [
+                $this->usage(11, 1, '2026-10-02'),
+                $this->usage(12, null, '2026-10-03', 3),
+            ]
+        );
 
-        // 契約・利用が 1 件でもあれば回数管理の対象として計算どおりの値を出す（設計書 §2-4）
+        $this->assertSame(3, $this->rowOf($result, 1)['remaining']);
+        $this->assertSame(0, $result['remaining']);
+    }
+
+    public function test_契約がなく利用だけなら残り回数はマイナスですべて未割り当て(): void
+    {
+        $result = $this->build([], [$this->usage(11, null, '2026-10-01', 2)]);
+
         $this->assertSame(-2, $result['remaining']);
         $this->assertFalse($result['isEmpty']);
         $this->assertSame([], $result['contracts']);
-        $this->assertSame([11, 11], array_map(fn ($usage) => $usage->id, $result['overflow']));
+        $this->assertSame([11, 11], $this->slotIds($result['unassigned']['slots']));
+        $this->assertSame(2, $result['unassigned']['count']);
+        $this->assertSame([], $result['contractOptions']);
+        $this->assertNull($result['defaultContractId']);
     }
 
     public function test_契約も利用もないと空の状態(): void
@@ -209,6 +196,81 @@ class ContractTicketServiceTest extends TestCase
 
         $this->assertNull($result['remaining']);
         $this->assertTrue($result['isEmpty']);
+    }
+
+    public function test_選択肢は契約日の古い順で表示と使い切りを持つ(): void
+    {
+        $result = $this->build(
+            [
+                $this->contract(5, '2026-10-12', 4, '4回コース'),
+                $this->contract(3, '2026-09-03', 2),
+                $this->contract(2, '2026-09-03', 1),
+            ],
+            [
+                $this->usage(11, 3, '2026-09-04', 2),
+                $this->usage(12, 5, '2026-10-13'),
+            ]
+        );
+
+        // 契約日の古い順・同じ日は id の昇順（2 → 3 → 5）。「契約なし」は含めない（Blade で最後に足す）
+        $this->assertSame([
+            ['id' => 2, 'label' => '2026/09/03 契約（1回） 残り 1', 'usedUp' => false],
+            ['id' => 3, 'label' => '2026/09/03 契約（2回） 残り 0', 'usedUp' => true],
+            ['id' => 5, 'label' => '2026/10/12 契約（4回） 残り 3（4回コース）', 'usedUp' => false],
+        ], $result['contractOptions']);
+    }
+
+    public function test_登録時の初期値は残りがある一番古い契約(): void
+    {
+        $result = $this->build(
+            [
+                $this->contract(1, '2026-09-01', 1),
+                $this->contract(2, '2026-10-01', 2),
+                $this->contract(3, '2026-11-01', 2),
+            ],
+            // 一番古い契約（1）は使い切り → 残りがある一番古い契約は 2
+            [$this->usage(11, 1, '2026-09-02')]
+        );
+
+        $this->assertSame(2, $result['defaultContractId']);
+    }
+
+    public function test_残りのある契約がなければ登録時の初期値は契約なし(): void
+    {
+        $result = $this->build(
+            [$this->contract(1, '2026-09-01', 1)],
+            [$this->usage(11, 1, '2026-09-02')]
+        );
+
+        $this->assertNull($result['defaultContractId']);
+    }
+
+    public function test_データ上マスからあふれていても壊れずにすべてのマスを出し使い切りにする(): void
+    {
+        // 通常はバリデーションで起きない（契約の残りを超える割り当て）。直接 DB を書き換えた場合などの保険
+        $result = $this->build(
+            [$this->contract(1, '2026-10-01', 2)],
+            [$this->usage(11, 1, '2026-10-02', 3)]
+        );
+
+        $row = $this->rowOf($result, 1);
+        $this->assertSame([11, 11, 11], $this->slotIds($row['slots']), 'あふれた分も隠さず並べる');
+        $this->assertSame(0, $row['remaining']);
+        $this->assertTrue($row['usedUp']);
+        // 全体の残り回数は合計どおり（2 − 3 = −1）
+        $this->assertSame(-1, $result['remaining']);
+    }
+
+    public function test_渡された契約にない契約idを持つ利用は未割り当てとして扱う(): void
+    {
+        // 通常は起きない（別会員の契約を指すなどのデータの不整合）。表示から利用が消えないようにする
+        $result = $this->build(
+            [$this->contract(1, '2026-10-01', 2)],
+            [$this->usage(11, 99, '2026-10-02')]
+        );
+
+        $this->assertSame([11], $this->slotIds($result['unassigned']['slots']));
+        $this->assertSame([null, null], $this->slotIds($this->rowOf($result, 1)['slots']));
     }
 
     public function test_残り回数は契約も利用も0件のときだけnullで0とは区別する(): void

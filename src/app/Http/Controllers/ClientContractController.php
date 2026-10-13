@@ -53,7 +53,9 @@ class ClientContractController extends Controller
     /**
      * 契約の削除（物理削除、一般トレーナーも可）
      *
-     * 利用は契約とひも付けていないため、契約を削除しても利用は残る。
+     * この契約に割り当てられていた利用は、DB の外部キー（ON DELETE SET NULL）で
+     * 「契約なし」（client_contract_id = NULL）になる。利用そのものは消さない。
+     * DB の処理のため、アクセスログには契約の削除の 1 行だけが残る（設計書 D-1000 注記）。
      */
     public function destroy(ClientContract $contract): RedirectResponse
     {

@@ -54,6 +54,10 @@ trait CreatesClientCountTables
         Schema::create('client_usages', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('client_id');
+            // 割り当てた契約（NULL は「契約なし」）。本番と同じく、契約の削除で NULL に戻る外部キーを付ける。
+            // SQLite は接続設定 foreign_key_constraints（config/database.php、既定 true）で外部キーが効く。
+            $table->unsignedBigInteger('client_contract_id')->nullable();
+            $table->foreign('client_contract_id')->references('id')->on('client_contracts')->nullOnDelete();
             $table->date('used_on');
             $table->unsignedSmallInteger('count')->default(1);
             $table->string('note', 255)->nullable();

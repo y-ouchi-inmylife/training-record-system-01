@@ -176,8 +176,9 @@ class ClientController extends Controller
         }, 'contracts', 'usages']);
 
         // 回数券型の表示データと残り回数（どちらもセクション5「回数」。残り回数はカードの見出しに出す）。
-        // 割り当ての計算は Blade に書かず、ContractTicketService で組み立てて渡す
-        // （設計書 S-0305 セクション5「割り当てルール」参照）。
+        // マスの並べ方（利用に持たせた割り当てのとおり）・契約ごとの残り・利用モーダルの「契約」の
+        // 選択肢と初期値は Blade に書かず、ContractTicketService で組み立てて渡す
+        // （設計書 S-0305 セクション5「マスの並べ方」・S-0305-M05 参照）。
         $ticket = $contractTicketService->build($client->contracts, $client->usages);
 
         // 契約・利用のモーダル（S-0305-M04 / M05）で入力エラーになって戻ったとき、

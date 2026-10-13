@@ -140,6 +140,15 @@
     let countInput = null;
     let expiresOnInput = null;
     let noteInput = null;
+    // 編集中の契約に割り当てられた利用の件数（削除の確認ダイアログの文言に使う。回数ではない）
+    let editingUsageCount = 0;
+
+    // 契約の見出し（data-usage-count を持つ button）から、割り当てられた利用の件数を読む。
+    // エラーで編集モードに開き直したときも、見出しから同じ値を取れる。
+    function usageCountOf(id) {
+        const heading = document.querySelector('button[data-usage-count][data-id="' + CSS.escape(String(id)) + '"]');
+        return heading ? (parseInt(heading.dataset.usageCount, 10) || 0) : 0;
+    }
 
     function initRefs() {
         if (modalEl) return;
@@ -158,8 +167,14 @@
         expiresOnInput = document.getElementById('expires_on');
         noteInput = document.getElementById('contract_note');
 
+        // 割り当てられた利用があるときだけ、「契約なし」になる件数を添える（設計書 S-0305-M04）。
+        // 利用が「契約なし」になるのは DB の外部キー（ON DELETE SET NULL）の処理。
         deleteBtn.addEventListener('click', function () {
-            if (confirm('この契約を削除しますか？')) {
+            let message = 'この契約を削除しますか？';
+            if (editingUsageCount > 0) {
+                message += '\n割り当てられている利用 ' + editingUsageCount + '件は『契約なし』になります。';
+            }
+            if (confirm(message)) {
                 deleteForm.submit();
             }
         });
@@ -174,6 +189,7 @@
         submitBtn.textContent = '登録';
         deleteBtn.classList.add('d-none');
         deleteForm.action = '';
+        editingUsageCount = 0;
     }
     function setEditMode(id) {
         formEl.action = UPDATE_URL_TEMPLATE.replace('__ID__', encodeURIComponent(id));
@@ -183,6 +199,7 @@
         submitBtn.textContent = '更新';
         deleteBtn.classList.remove('d-none');
         deleteForm.action = DESTROY_URL_TEMPLATE.replace('__ID__', encodeURIComponent(id));
+        editingUsageCount = usageCountOf(id);
     }
 
     function openForCreate() {
@@ -197,7 +214,8 @@
     }
 
     function openForEdit(data) {
-        // data: { id, contractedOn, count, expiresOn, note }（data-* 属性はキャメルケースになる）
+        // data: { id, contractedOn, count, expiresOn, note, usageCount }（data-* 属性はキャメルケースになる）
+        //   usageCount は setEditMode() が見出しから読み直す
         initRefs();
         if (!modal) return;
         setEditMode(data.id);

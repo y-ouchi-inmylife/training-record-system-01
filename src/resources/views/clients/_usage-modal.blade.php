@@ -2,19 +2,33 @@
      作りは契約モーダル（clients/_contract-modal.blade.php）と同じで、計測値モーダルをなぞる。
 
      利用方法（S-0305 会員詳細）:
-       @include('clients._usage-modal', ['client' => $client, 'openModal' => $openModal])
+       @include('clients._usage-modal', ['client' => $client, 'openModal' => $openModal,
+                'contractOptions' => $ticket['contractOptions'], 'defaultContractId' => $ticket['defaultContractId']])
        // ボタン側:
        //   新規登録: onclick="window.usageModal.openForCreate()"
        //   編集   : onclick="window.usageModal.openForEdit(this.dataset)"
-       //            （data-id / data-used-on / data-count / data-note。clients/_usage-slot.blade.php）
+       //            （data-id / data-client-contract-id / data-used-on / data-count / data-note。
+       //              clients/_usage-slot.blade.php）
 
      期待する変数:
-       - $client    : App\Models\Client（store URL の生成に使う）
-       - $openModal : ?string エラーで戻ったときに開き直すモーダル（'contract' / 'usage' / null）
+       - $client            : App\Models\Client（store URL の生成に使う）
+       - $openModal         : ?string エラーで戻ったときに開き直すモーダル（'contract' / 'usage' / null）
+       - $contractOptions   : 「契約」の選択肢（ContractTicketService::build() の contractOptions。
+                              契約日の古い順。[id, label, usedUp]）
+       - $defaultContractId : ?int 登録時の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
+
+     ## 「契約」の選択（設計書 S-0305-M05）
+
+     - 選択肢はサーバーで組み立てたものを出し、最後に「契約なし」（value は空）を置く
+     - 使い切った契約（data-used-up="1"）は選べない（disabled）。ただし編集モードでは、
+       その利用が今割り当てられている契約だけは使い切りでも選べる（applyDisabled() で切り替える）
+     - 初期値：登録は $defaultContractId、編集はその利用の今の契約（data-client-contract-id。未割り当ては「契約なし」）
+     - 契約の残りを超える割り当てはサーバーでエラーにする（ClientUsageRequest）。会員の残り回数が
+       マイナスになる登録・編集は止めない（「契約なし」は残りに関係なく登録できる）
 
      エラーのあとの開き直しは契約モーダルと同じ（hidden `_form_type` = 'usage'、
-     編集で失敗したときは old('_usage_id') で編集モードに戻す）。
-     残り回数がマイナスになる登録・編集も止めない（警告も出さない。設計書 S-0305-M05）。
+     編集で失敗したときは old('_usage_id') で編集モードに戻す）。選んでいた契約は
+     old('client_contract_id') で選び直す（「契約なし」を選んでいた場合は null で戻るので「契約なし」を選ぶ）。
 --}}
 
 <div class="modal fade" id="usageModal" tabindex="-1" aria-labelledby="usageModalLabel" aria-hidden="true">
@@ -35,6 +49,25 @@
 
                 <div class="modal-body">
                     <div class="row g-3">
+                        {{-- 契約（最初の項目。任意）。エラーで開き直したときは選んでいた値を選び直す。
+                             disabled（使い切り）の付け外しはモードに合わせて JS の applyDisabled() で行う。 --}}
+                        <div class="col-12">
+                            <label for="client_contract_id" class="form-label">契約</label>
+                            <select class="form-select @if($openModal === 'usage') @error('client_contract_id') is-invalid @enderror @endif"
+                                    id="client_contract_id" name="client_contract_id">
+                                @foreach($contractOptions as $option)
+                                    <option value="{{ $option['id'] }}"
+                                            data-used-up="{{ $option['usedUp'] ? '1' : '0' }}"
+                                            @disabled($option['usedUp'])
+                                            @selected($openModal === 'usage' && (string) old('client_contract_id') === (string) $option['id'])>{{ $option['label'] }}</option>
+                                @endforeach
+                                <option value="" data-used-up="0"
+                                        @selected($openModal === 'usage' && old('client_contract_id') === null)>契約なし</option>
+                            </select>
+                            @if($openModal === 'usage')
+                                <x-form-error field="client_contract_id" />
+                            @endif
+                        </div>
                         <div class="col-md-6">
                             <label for="used_on" class="form-label">利用日 <span class="text-danger">*</span></label>
                             {{-- 入力部品は計測値モーダルの計測日と同じ（Flatpickr の .datepicker） --}}
@@ -95,6 +128,8 @@
     const STORE_URL = @json(route('client-usages.store', $client));
     const UPDATE_URL_TEMPLATE = @json(route('client-usages.update', ['usage' => '__ID__']));
     const DESTROY_URL_TEMPLATE = @json(route('client-usages.destroy', ['usage' => '__ID__']));
+    // 登録時の「契約」の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
+    const DEFAULT_CONTRACT_ID = @json($defaultContractId);
 
     // 登録時の初期値「今日」はモーダルを開いた瞬間のブラウザの日付を使う
     function pad2(n) { return String(n).padStart(2, '0'); }
@@ -115,6 +150,24 @@
     let usedOnInput = null;
     let countInput = null;
     let noteInput = null;
+    let contractSelect = null;
+
+    // 使い切った契約を選べなくする。currentContractId（編集中の利用が今割り当てられている契約）
+    // だけは使い切りでも選べるようにする。登録モードでは null を渡す。
+    function applyDisabled(currentContractId) {
+        Array.from(contractSelect.options).forEach(function (option) {
+            if (option.dataset.usedUp === '1') {
+                option.disabled = currentContractId === null || String(option.value) !== String(currentContractId);
+            }
+        });
+    }
+
+    // 利用済みのマス（data-client-contract-id を持つ）から、その利用の今の契約を読む。
+    // エラーで編集モードに開き直したときに使う（未割り当ては null）。
+    function currentContractOf(usageId) {
+        const slot = document.querySelector('button.ticket-slot[data-id="' + CSS.escape(String(usageId)) + '"]');
+        return slot && slot.dataset.clientContractId ? slot.dataset.clientContractId : null;
+    }
 
     function initRefs() {
         if (modalEl) return;
@@ -131,6 +184,7 @@
         usedOnInput = document.getElementById('used_on');
         countInput = document.getElementById('usage_count');
         noteInput = document.getElementById('usage_note');
+        contractSelect = document.getElementById('client_contract_id');
 
         deleteBtn.addEventListener('click', function () {
             if (confirm('この利用を削除しますか？')) {
@@ -162,6 +216,8 @@
         initRefs();
         if (!modal) return;
         setCreateMode();
+        applyDisabled(null);
+        contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
         usedOnInput.value = todayString();
         // 回数の初期値は 1（設計書 S-0305-M05）
         countInput.value = '1';
@@ -170,10 +226,13 @@
     }
 
     function openForEdit(data) {
-        // data: { id, usedOn, count, note }（data-* 属性はキャメルケースになる）
+        // data: { id, clientContractId, usedOn, count, note }（data-* 属性はキャメルケースになる）
         initRefs();
         if (!modal) return;
         setEditMode(data.id);
+        const currentContractId = data.clientContractId || null;
+        applyDisabled(currentContractId);
+        contractSelect.value = currentContractId === null ? '' : String(currentContractId);
         usedOnInput.value = data.usedOn || '';
         countInput.value = data.count || '';
         noteInput.value = data.note || '';
@@ -187,10 +246,14 @@
         initRefs();
         @if($openModal === 'usage')
             const oldUsageId = @json(old('_usage_id'));
+            // 選んでいた契約は Blade の old('client_contract_id') で選び直し済み。ここでは
+            // 送信先・タイトルと、使い切りの契約の disabled をモードに合わせるだけ。
             if (oldUsageId) {
                 setEditMode(oldUsageId);
+                applyDisabled(currentContractOf(oldUsageId));
             } else {
                 setCreateMode();
+                applyDisabled(null);
             }
             modal.show();
         @endif

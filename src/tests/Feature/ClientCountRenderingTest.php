@@ -19,7 +19,7 @@ use Tests\TestCase;
  *   マイナスは赤字（text-danger）、0 は「0」
  * - 会員詳細：回数カードの見出しは「残り回数 n」（「回数」の語は置かない。数字は fs-5 で少し大きく、
  *   マイナスは数字の部分が赤字。契約も利用も 0 件はラベル「残り回数」だけで数字は空欄）、
- *   契約の見出し・マス・超過・使い切り・空の状態。ヘッダーサマリーには残り回数を出さない
+ *   契約の見出し・マス・未割り当て・使い切り・空の状態。ヘッダーサマリーには残り回数を出さない
  *
  * 実際の HTTP で一覧・詳細を開くため、画面が読むテーブルを列を絞って作る。
  */
@@ -105,10 +105,12 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    private function usage(Client $client, string $usedOn, int $count = 1, ?string $note = null): ClientUsage
+    /** 利用を作る。$contract を渡すとその契約に割り当てる（省略・null は「契約なし」） */
+    private function usage(Client $client, string $usedOn, int $count = 1, ?string $note = null, ?ClientContract $contract = null): ClientUsage
     {
         return ClientUsage::query()->create([
-            'client_id' => $client->id, 'used_on' => $usedOn, 'count' => $count, 'note' => $note,
+            'client_id' => $client->id, 'client_contract_id' => $contract?->id,
+            'used_on' => $usedOn, 'count' => $count, 'note' => $note,
         ]);
     }
 
@@ -171,7 +173,7 @@ class ClientCountRenderingTest extends TestCase
         $this->contract($zero, '2026-10-01', 2);
         $this->usage($zero, '2026-10-02', 2);         // 0
 
-        $minus = $this->makeClient('0004', '超過あり');
+        $minus = $this->makeClient('0004', '残りマイナス');
         $this->contract($minus, '2026-10-01', 1);
         $this->usage($minus, '2026-10-02', 3);        // 1 − 3 = −2
 
@@ -185,7 +187,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame('3', $this->lastCell($this->listRow($html, '残りあり')));
         $this->assertSame('0', $this->lastCell($this->listRow($html, '使い切り')));
 
-        $minusRow = $this->listRow($html, '超過あり');
+        $minusRow = $this->listRow($html, '残りマイナス');
         // 値は「回」を付けず数字だけ。マイナスは数字の部分が赤字
         $this->assertSame('-2', $this->lastCell($minusRow));
         $this->assertStringContainsString('<span class="text-danger">-2</span>', $minusRow);
@@ -193,7 +195,7 @@ class ClientCountRenderingTest extends TestCase
 
         // 会員一覧の出力は見出し用の大きさに影響されない（fs-5 が付かない）
         $this->assertStringContainsString('<td><span>3</span></td>', preg_replace('/\s+/u', '', $this->listRow($html, '残りあり')));
-        foreach (['登録なし', '契約なし', '残りあり', '使い切り', '超過あり'] as $name) {
+        foreach (['登録なし', '契約なし', '残りあり', '使い切り', '残りマイナス'] as $name) {
             $this->assertStringNotContainsString('fs-5', $this->listRow($html, $name), $name);
         }
     }
@@ -239,10 +241,10 @@ class ClientCountRenderingTest extends TestCase
         $client = $this->makeClient('0001', '山田');
         $old = $this->contract($client, '2026-09-03', 2, null, '2026-12-03');
         $new = $this->contract($client, '2026-10-12', 4, '4回コース');
-        $this->usage($client, '2026-09-04');
-        $this->usage($client, '2026-09-06');
-        $this->usage($client, '2026-10-12', 1, 'メモあり利用');
-        $this->usage($client, '2026-10-13');
+        $this->usage($client, '2026-09-04', 1, null, $old);
+        $this->usage($client, '2026-09-06', 1, null, $old);
+        $this->usage($client, '2026-10-12', 1, 'メモあり利用', $new);
+        $this->usage($client, '2026-10-13', 1, null, $new);
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
@@ -270,32 +272,41 @@ class ClientCountRenderingTest extends TestCase
 
         // 見出し・マスは編集モーダルを開く button
         $this->assertStringContainsString('data-id="'.$new->id.'"', $html);
+        // 契約の見出しに、割り当てた利用の件数（削除の確認ダイアログ用）
+        $this->assertMatchesRegularExpression('/data-id="'.$new->id.'"[^>]*data-usage-count="2"/u', $html);
+        // 利用のマスに、今割り当てられている契約の id（編集モーダルの初期値用）
+        $this->assertStringContainsString('data-client-contract-id="'.$old->id.'"', $html);
         $this->assertStringContainsString('onclick="window.contractModal.openForEdit(this.dataset)"', $html);
         $this->assertStringContainsString('onclick="window.usageModal.openForEdit(this.dataset)"', $html);
 
-        // 超過はないので出ない
+        // 未割り当ての利用はないので「（契約なし）」の行は出ない
         $this->assertStringNotContainsString('（契約なし）', $html);
     }
 
-    public function test_超過があると一番上に超過の行が出て残り回数は赤字(): void
+    public function test_未割り当ての利用があると一番上に契約なしの行が出て未割り当ての回数のバッジが出る(): void
     {
         $client = $this->makeClient('0001', '山田');
-        $this->contract($client, '2026-10-01', 1);
-        $this->usage($client, '2026-10-02', 2);
+        $contract = $this->contract($client, '2026-10-01', 1);
+        $this->usage($client, '2026-10-02', 1, null, $contract);
+        $this->usage($client, '2026-10-05', 2); // 契約なし（2 回分）
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 見出しに「残り回数 -1」（数字に text-danger と fs-5 の両方が付く）
-        $this->assertStringContainsString('<h6 class="mb-0">残り回数<span class="text-danger fs-5 ms-2">-1</span>', $this->countHeading($html));
-        $this->assertStringContainsString('<span class="badge bg-danger">超過 1</span>', $html);
+        // 見出しの残り回数は未割り当ても引く（1 − 3 = −2。数字に text-danger と fs-5 の両方が付く）
+        $this->assertStringContainsString('<h6 class="mb-0">残り回数<span class="text-danger fs-5 ms-2">-2</span>', $this->countHeading($html));
+        // §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は回数の合計）。超過の bg-danger は使わない
+        $this->assertStringContainsString('<span class="badge bg-warning text-dark">未割り当て 2</span>', $html);
+        $this->assertStringNotContainsString('超過', $html);
         $this->assertLessThan(
             strpos($html, '2026/10/01 契約（1回）'),
             strpos($html, '（契約なし）'),
-            '超過の行は契約の行より上'
+            '（契約なし）の行は契約の行より上'
         );
+        // 契約の行は割り当てたとおり：使い切り
+        $this->assertStringContainsString('<span class="badge bg-secondary flex-shrink-0">使い切り</span>', $html);
     }
 
-    public function test_契約がなく利用だけある会員は見出しに赤字の残りマイナスと超過の行が出る(): void
+    public function test_契約がなく利用だけある会員は見出しに赤字の残りマイナスと未割り当ての行が出る(): void
     {
         $client = $this->makeClient('0001', '山田');
         $this->usage($client, '2026-10-02');
@@ -304,7 +315,7 @@ class ClientCountRenderingTest extends TestCase
 
         // 利用が 1 件あるので回数管理の対象の会員として、計算どおり「残り回数 -1」（数字の部分が赤字）を出す
         $this->assertStringContainsString('<h6 class="mb-0">残り回数<span class="text-danger fs-5 ms-2">-1</span>', $this->countHeading($html));
-        $this->assertStringContainsString('<span class="badge bg-danger">超過 1</span>', $html);
+        $this->assertStringContainsString('<span class="badge bg-warning text-dark">未割り当て 1</span>', $html);
     }
 
     public function test_利用モーダルの入力エラーで戻ると利用モーダルだけが開き直す(): void
@@ -327,6 +338,29 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('const oldContractId', $html);
         $this->assertStringContainsString('回数は1以上で入力してください。', $html);
         $this->assertSame(1, substr_count($html, '回数は1以上で入力してください。'), '契約モーダルには出ない');
+    }
+
+    public function test_利用の入力エラーで戻ると選んでいた契約が戻り_契約なしも戻る(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+        $contract = $this->contract($client, '2026-10-01', 4);
+
+        // 契約を選んで、回数のエラーで戻る
+        $html = $this->from(route('clients.show', $client))->followingRedirects()
+            ->post(route('client-usages.store', $client), [
+                '_form_type' => 'usage', 'client_contract_id' => (string) $contract->id,
+                'used_on' => '2026-10-12', 'count' => '0',
+            ])->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/<option value="'.$contract->id.'"[^>]*selected/u', $html);
+
+        // 「契約なし」（value は空）を選んで、回数のエラーで戻る
+        $html = $this->from(route('clients.show', $client))->followingRedirects()
+            ->post(route('client-usages.store', $client), [
+                '_form_type' => 'usage', 'client_contract_id' => '',
+                'used_on' => '2026-10-12', 'count' => '0',
+            ])->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/<option value="" data-used-up="0"\s*selected/u', $html);
+        $this->assertDoesNotMatchRegularExpression('/<option value="'.$contract->id.'"[^>]*selected/u', $html);
     }
 
     public function test_回数カードはトレーニーカードの上にある(): void
