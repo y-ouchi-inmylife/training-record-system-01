@@ -191,12 +191,14 @@ erDiagram
     client_usages {
         bigint id PK
         bigint client_id FK
+        bigint client_contract_id FK
         date used_on
         smallint count
     }
 
     clients ||--o{ client_contracts : "回数で契約する"
     clients ||--o{ client_usages : "契約回数を利用する"
+    client_contracts |o--o{ client_usages : "割り当てる（NULL は契約なし）"
 ```
 
 ※ER図はテーブル間の関連と主要カラム（主キー・ユニークキー・外部キー・主な業務識別/区分カラム）のみを示す。`created_at`/`updated_at`/`updated_by` 等の共通カラムおよび非識別カラムは省略しているため、全カラムは4章のテーブル定義を参照。clientsテーブルは7カテゴリー50業務項目＋共通カラムで構成され、ER図には代表カラムのみ掲載している。
@@ -643,7 +645,7 @@ erDiagram
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
 | contracted_on | DATE | NO | — | 契約日 |
 | count | SMALLINT UNSIGNED | NO | — | 契約回数（1以上999以下） |
-| expires_on | DATE | YES | NULL | 有効期限。**表示するだけ**で、残り回数の計算・利用の割り当てには使わない |
+| expires_on | DATE | YES | NULL | 有効期限。**表示するだけ**で、残り回数の計算にも、利用の割り当てのチェックにも使わない |
 | note | VARCHAR(255) | YES | NULL | メモ（「4回コース」など。契約の名前もここに自由に書く） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
@@ -667,7 +669,8 @@ erDiagram
 
 ##### 注記
 
-- **契約と利用（D-1000）は互いにひも付けない**。どの契約から利用を引くかは DB に持たない。残り回数は会員ごとに「契約回数の合計 − 利用回数の合計」で求める（マイナスも許す）。画面で契約ごとに利用を並べる「回数券型」の表示は、表示のときに割り当てを計算する（割り当てルールは screen-design.md S-0305 参照）
+- **利用（D-1000）は、どの契約に割り当てたかを `client_usages.client_contract_id` で持つ**（NULL は「契約なし」）。利用の登録・編集のときにトレーナーが契約を選ぶ。**契約ごとの残り ＝ 契約の回数 − その契約に割り当てた利用の回数の合計**。契約の残りを超える割り当てと、割り当て済みの利用回数より少ない回数への契約の編集は、アプリ側でエラーにする（screen-design.md S-0305-M04 / M05 参照）。会員ごとの残り回数は、これまでどおり「契約回数の合計 − 利用回数の合計」（未割り当ての利用も引く。マイナスも許す）
+- **契約を削除すると、その契約に割り当てられていた利用は「契約なし」になる**（`client_usages.client_contract_id` の外部キーの ON DELETE SET NULL。利用そのものは消えない）
 - **会員削除時は CASCADE で一緒に削除する**（アプリ側でも削除を拒否しない）。トレーニング記録・トレーニー・音声記録は「あれば会員削除を拒否」するのに対し、契約・利用は拒否の条件に含めない（要件定義書 6-3-5 参照）
 - **金額・支払いは持たない**
 - `expires_on`（有効期限）は任意で、期限切れでも表示を変えない
@@ -685,6 +688,7 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
+| client_contract_id | BIGINT UNSIGNED | YES | NULL | 割り当てた契約のID（外部キー）。**NULL は「契約なし」（未割り当て）**。割り当てる契約は、利用と同じ会員の契約に限る（アプリ側でチェック。下の注記参照） |
 | used_on | DATE | NO | — | 利用日 |
 | count | SMALLINT UNSIGNED | NO | 1 | 利用回数（1以上999以下）。1 件で複数回分を登録できる（例：トレーニー 2 頭なら 2） |
 | note | VARCHAR(255) | YES | NULL | メモ（「当日キャンセル」など） |
@@ -698,6 +702,7 @@ erDiagram
 |---------------|--------|------|------|
 | PRIMARY | id | PRIMARY KEY | 主キー |
 | client_usages_client_id_used_on_idx | client_id, used_on | INDEX（複合） | 会員ごとの利用の一覧（利用日順）と、会員ごとの利用回数の合計に使用。`client_id` の外部キーもこのインデックスを使う。**ユニーク制約は付けない**（同じ日に複数件の利用を登録できる） |
+| client_usages_client_contract_id_foreign | client_contract_id | INDEX | 契約ごとに割り当てた利用の検索・合計。外部キー制約に伴い自動付与 |
 | client_usages_updated_by_foreign | updated_by | INDEX | 最終更新者による検索。外部キー制約に伴い自動付与 |
 
 ##### 制約
@@ -705,13 +710,17 @@ erDiagram
 | 制約名 | 種類 | 条件 | ON DELETE | 説明 |
 |--------|------|------|-----------|------|
 | client_usages_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時は利用も削除。**利用があっても会員の削除は拒否しない**（D-0900 の注記参照） |
+| client_usages_client_contract_id_foreign | FOREIGN KEY | client_contract_id → client_contracts(id) | SET NULL | 契約削除時は、その契約に割り当てられていた利用を「契約なし」（NULL）にする。利用そのものは消さない |
 | client_usages_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
 | client_usages_count_check | CHECK | count BETWEEN 1 AND 999 | — | 利用回数の値制限（1以上999以下。上限は画面の入力規則〔screen-design.md S-0305-M05〕とそろえる） |
 
 ##### 注記
 
-- **契約（D-0900）ともトレーニング記録（D-0200）ともひも付けない**。トレーニング記録の件数と利用回数は一致しないため
-- 残り回数がマイナスになる利用も登録できる（登録を止めない）
+- **契約（D-0900）には `client_contract_id` でひも付ける**（NULL は「契約なし」）。割り当ての決まりは D-0900 の注記と screen-design.md S-0305-M05 参照
+- **割り当てる契約は、利用と同じ会員（`client_id` が同じ）の契約に限る**。この一致は DB の制約としては持たず、アプリ側（登録・編集のバリデーション）でチェックする
+- **トレーニング記録（D-0200）とはひも付けない**。トレーニング記録の件数と利用回数は一致しないため
+- 契約の削除で利用が「契約なし」になる処理は DB（ON DELETE SET NULL）で行うため、アクセスログ（DS-0500）には契約の削除の 1 行だけが残り、利用ごとの記録は残らない
+- 会員の残り回数がマイナスになる利用も登録できる（「契約なし」の利用は契約の残りに関係なく登録できる）
 - 会員削除時の扱いは D-0900 と同じ（CASCADE で一緒に削除し、アプリ側でも拒否しない）
 - `created_by` は持たない（既存テーブルと同様、`updated_by` のみ）
 
@@ -1185,7 +1194,7 @@ D-0700 `trainees.sex` の値。犬以外への対象拡張時にも共通で使�
 | 16 | trainees | clients, trainers |
 | 17 | trainee_measurements | trainees, trainers |
 | 18 | client_contracts | clients, trainers |
-| 19 | client_usages | clients, trainers |
+| 19 | client_usages | clients, client_contracts, trainers |
 
 ---
 
