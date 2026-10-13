@@ -8,7 +8,9 @@ use App\Models\ClientUsage;
 use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -64,6 +66,7 @@ class ClientCountRenderingTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('client_id');
             $table->string('name')->nullable();
+            $table->string('photo_path', 500)->nullable();
         });
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();
@@ -470,6 +473,74 @@ class ClientCountRenderingTest extends TestCase
 
         // 押せる見た目：.btn の上で、点線の枠とマウスを乗せたときの色の変化を指定している
         $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-hover-bg:[^}]*border-style:\s*dashed;/su', $html);
+    }
+
+    // ---- トレーニーカードの写真（S-0305 セクション3「写真」） ----
+
+    /** 写真の URL を作る media ディスクを偽物にし、一時 URL を決まった形で返すようにする */
+    private function fakeMediaDisk(): void
+    {
+        Storage::fake('media');
+        Storage::disk('media')->buildTemporaryUrlsUsing(
+            fn (string $path) => 'https://media.example.test/'.$path.'?signed=1'
+        );
+    }
+
+    private function trainee(Client $client, string $name, ?string $photoPath = null): int
+    {
+        return DB::table('trainees')->insertGetId([
+            'client_id' => $client->id, 'name' => $name, 'photo_path' => $photoPath,
+        ]);
+    }
+
+    public function test_写真があるトレーニーにはトレーニー詳細へのリンクの中に写真が出る(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ', 'trainees/202610/abc.jpg');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $pattern = '/<a href="'.preg_quote(route('trainees.show', $id), '/').'" class="flex-shrink-0">\s*'
+            .'<div class="d-flex align-items-center justify-content-center"\s*'
+            .'style="width: 96px; height: 96px;[^"]*border-radius: 0\.5rem; overflow: hidden;">\s*'
+            .'<img src="https:\/\/media\.example\.test\/trainees\/202610\/abc\.jpg\?signed=1"\s*'
+            .'alt="ポチの写真"\s*'
+            .'style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">/u';
+        $this->assertMatchesRegularExpression($pattern, $html);
+    }
+
+    public function test_写真がないトレーニーには写真を出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'たま');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('>たま</a>', $html);
+        $this->assertStringNotContainsString('の写真"', $html);
+        $this->assertStringNotContainsString('width: 96px; height: 96px;', $html);
+        // 代わりの画像・文言も出さない
+        $this->assertStringNotContainsString('写真なし', $html);
+    }
+
+    public function test_トレーニーが2人で片方だけ写真があるとき写真のある方にだけ出る(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $withPhoto = $this->trainee($client, 'ポチ', 'trainees/202610/pochi.jpg');
+        $this->trainee($client, 'たま');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($html, 'width: 96px; height: 96px;'));
+        $this->assertStringContainsString('alt="ポチの写真"', $html);
+        $this->assertStringNotContainsString('alt="たまの写真"', $html);
+        // 写真はポチのまとまりの中（たまの名前より前）にある
+        $this->assertLessThan(strpos($html, '>たま</a>'), strpos($html, 'alt="ポチの写真"'));
+        $this->assertGreaterThan(strpos($html, '>ポチ</a>'), strpos($html, 'alt="ポチの写真"'));
+        $this->assertStringContainsString('<a href="'.route('trainees.show', $withPhoto).'" class="flex-shrink-0">', $html);
     }
 
     public function test_回数カードはトレーニーカードの上にある(): void
