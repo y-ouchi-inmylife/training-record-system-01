@@ -331,6 +331,16 @@ return [
         'login_id' => 'ログインID',
         // 画面のラベル（画面ラベル「名前」。トレーナー氏名・トレーニー名の両方で「名前」）
         'name' => '名前',
+        // 受付アンケート（S-1413。2026-10 追加）。犬種・性別・去勢・避妊は画面のラベル。
+        // 自由記述 4 欄は設問の短い呼び名（要件定義書 D-1100 の項目名。TraineeIntakeSurveyResponse::questions()
+        // の label と同じ。食い違わないことをテストで確かめる）
+        'breed' => '犬種',
+        'sex' => '性別',
+        'neuter_status' => '去勢・避妊',
+        'wish' => 'こうなったらいいな',
+        'recent_events' => '最近の様子',
+        'ideal_days' => '理想の毎日',
+        'health_concerns' => '体のこと',
         'password' => 'パスワード',
         'password_confirmation' => 'パスワード（確認）',
         'current_password' => '現在のパスワード',

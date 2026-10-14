@@ -256,13 +256,15 @@ Route::domain(config('subdomain.client_host'))->group(function () {
     Route::post('client-portal/email-registration/{token}', [\App\Http\Controllers\Client\EmailRegistrationController::class, 'storeByToken'])
         ->name('client-portal.email-registration.store');
 
-    // 受付アンケート回答画面（S-1413、公開URL、認証不要。2026-10 追加）。
-    // 段階3b では、S-0311 受付アンケート案内画面に載せる URL を route() で作るため（会員側のホストが付く）
-    // ルートだけを先に定義し、中身は仮の画面にしている。回答の画面・送信（POST）は段階4で作る。
-    // 段階4で回答完了画面 client-portal/intake-survey/thanks（S-1414）を足すときは、`thanks` が {token} と
-    // して解釈されないよう、このルートより**先に**定義すること（api-design.md 4-1-15）
+    // 受付アンケート（S-1413 回答画面・S-1414 回答完了画面、公開URL、認証不要。2026-10 追加）。
+    // 回答完了画面 client-portal/intake-survey/thanks は、`thanks` が {token} として解釈されないよう、
+    // {token} のルートより**先に**定義すること（api-design.md 4-1-15）
+    Route::get('client-portal/intake-survey/thanks', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'thanks'])
+        ->name('client-portal.intake-survey.thanks');
     Route::get('client-portal/intake-survey/{token}', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'show'])
         ->name('client-portal.intake-survey.show');
+    Route::post('client-portal/intake-survey/{token}', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'store'])
+        ->name('client-portal.intake-survey.store');
 
     // メールアドレス確認リンク（S-1406 派生、公開URL、認証不要）。段階 4-3。
     // ログイン状態を問わず、切替 → ログアウト → ログイン画面へ遷移する。

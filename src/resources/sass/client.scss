@@ -1035,8 +1035,8 @@ input[type="tel"] {
     padding-bottom: 2rem;
 }
 
-// 初回設定画面（S-1403）用の幅広モディファイア。
-// パスワード＋氏名 4 欄＋電話 2 欄＋住所 6 欄が乗るため、md 以上で 40rem まで拡張する。
+// 初回設定画面（S-1403）・受付アンケート回答画面（S-1413。2026-10）用の幅広モディファイア。
+// パスワード＋氏名 4 欄＋電話 2 欄＋住所 6 欄が乗るため、576px（sm）以上で 40rem まで拡張する。
 // モバイルは container 幅で自然に縦積みになる（.c-login 側の 26rem はモバイル未満で有効）。
 // 設計書: client-portal-design-plan.md §4-7
 .c-login--wide {
@@ -1047,7 +1047,8 @@ input[type="tel"] {
     // まとまりの区切り線を ink 20% に濃くする（2026-09、設計書 §4-7 経緯 6）。
     // Bootstrap の .border-bottom は $border-color = ink 8%（カードの罫線と同じ）
     // を使うが、S-1403 のような入力欄が多い画面ではまとまりの境目としての強度が
-    // 弱く、「区切りが分かりにくい」という指摘があった。S-1403 に限って濃くする。
+    // 弱く、「区切りが分かりにくい」という指摘があった。.c-login--wide の画面
+    // （S-1403・S-1413〔2026-10〕）に限って濃くする。
     // 濃さは 8% → 15% → 20% と 2 段階で調整（15% でもまだ切れ目として弱かった。
     // 20% に上げて着地）。paper 上のコントラスト比: 1.10:1 → 1.22:1 → 1.34:1。
     // - .c-login--wide のスコープに閉じるため、他画面（ログイン・パスワード再設定等）
@@ -1057,6 +1058,43 @@ input[type="tel"] {
     //   !important が必要。
     .border-bottom {
         border-bottom-color: rgba(15, 26, 46, 0.20) !important;
+    }
+}
+
+// ラジオボタンのまとまり（受付アンケート回答画面 S-1413 の性別・去勢・避妊。2026-10 追加）。
+// 会員側で初めて使う部品のため、押せる範囲を会員側の基準（44px 相当）にそろえる
+// （設計書 S-1413「ラジオボタン」）：
+// - 1 つの選択肢を min-height 2.75rem（44px）の横並びにし、ラベル全体を押せる範囲にする
+//   （ラベルの上下の余白で高さを確保する）
+// - Bootstrap の .form-check の左の余白（丸を絶対位置で置く作り）はやめ、丸とラベルを flex で並べる
+// - フォーカスの輪郭は入力欄と同じ二重の輪郭（$input-btn-focus-box-shadow と同じ値）。
+//   Bootstrap の .form-check-input は $input-btn-focus-box-shadow を使わないため、ここで指定する
+// Blade：<div class="c-choice" role="radiogroup" aria-labelledby="…"> の中に .form-check を並べる
+.c-choice {
+    .form-check {
+        display: flex;
+        align-items: center;
+        min-height: 2.75rem;
+        padding-left: 0;
+        margin-bottom: 0;
+    }
+
+    .form-check-input {
+        float: none;
+        flex-shrink: 0;
+        width: 1.25em;
+        height: 1.25em;
+        margin: 0 0.5rem 0 0;
+
+        &:focus {
+            box-shadow: 0 0 0 3px $mat, 0 0 0 5px $ink;
+        }
+    }
+
+    .form-check-label {
+        flex: 1;
+        padding: 0.5rem 0;
+        cursor: pointer;
     }
 }
 
