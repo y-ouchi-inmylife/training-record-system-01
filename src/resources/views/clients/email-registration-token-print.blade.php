@@ -17,10 +17,12 @@
     @if($url)
         {{-- 文面はコントローラで組み立て、data-copy-text で受け取る（画面の文字を
              JavaScript で拾って組み立てる方式は取らない — 画面の見た目と文面を
-             独立させるため。設計書 S-0307「案内文面のコピー」参照）。 --}}
+             独立させるため。設計書 S-0307「案内文面のコピー」参照）。
+             ボタンの属性 data-copy-message は、S-0311 受付アンケート案内画面と共用の
+             copy-message.js が拾う（2026-10 に data-copy-registration-message から変えた）。 --}}
         <button type="button"
                 class="btn btn-outline-primary btn-sm"
-                data-copy-registration-message
+                data-copy-message
                 data-copy-text="{{ $copyText }}">文面をコピー</button>
     @endif
 </div>
@@ -71,6 +73,6 @@
 
 @if($url)
     @push('scripts')
-        @vite(['resources/js/qr-code.js', 'resources/js/copy-registration-message.js'])
+        @vite(['resources/js/qr-code.js', 'resources/js/copy-message.js'])
     @endpush
 @endif

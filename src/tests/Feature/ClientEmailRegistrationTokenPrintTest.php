@@ -101,10 +101,11 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>', $html);
         // 操作エリアは印刷では出さない
         $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
-        // 文面をコピーのボタン（今の属性名のまま）と QR の JS
-        $this->assertMatchesRegularExpression('/<button type="button"\\s+class="btn btn-outline-primary btn-sm"\\s+data-copy-registration-message\\s+data-copy-text="[^"]*">文面をコピー<\\/button>/u', $html);
+        // 文面をコピーのボタン（2026-10 に属性名を data-copy-registration-message から data-copy-message に変えた）と QR の JS
+        $this->assertMatchesRegularExpression('/<button type="button"\\s+class="btn btn-outline-primary btn-sm"\\s+data-copy-message\\s+data-copy-text="[^"]*">文面をコピー<\\/button>/u', $html);
         $this->assertStringContainsString('qr-code', $html);
-        $this->assertStringContainsString('copy-registration-message', $html);
+        $this->assertStringContainsString('copy-message', $html);
+        $this->assertStringNotContainsString('copy-registration-message', $html);
     }
 
     public function test_文面_事業者名が設定されているとき(): void
