@@ -1,0 +1,61 @@
+{
+  "description": "トレーニーの誕生日（年・月・日の 3 つの欄）の入力の判定の固定データ。PHP（App\\Support\\TraineeBirthdayInput・TraineeRequest）と JS（resources/js/trainee-age.js）の両方のテストで同じものを使う。ref は基準日（Y-m-d）。year・month・day は欄に入った文字列のまま（未入力は null）。state は判定の状態の記号（screen-design.md §2-8 の表。ok／empty／not_numeric／month_out_of_range／month_without_year／day_without_year／day_without_month／invalid_date／future／too_old）",
+  "cases": [
+    { "label": "空", "ref": "2026-10-20", "year": null, "month": null, "day": null, "state": "empty" },
+    { "label": "空白だけ（半角・全角）は空", "ref": "2026-10-20", "year": " ", "month": "　", "day": null, "state": "empty" },
+
+    { "label": "正しい：年だけ", "ref": "2026-10-20", "year": "2020", "month": null, "day": null, "state": "ok" },
+    { "label": "正しい：年月", "ref": "2026-10-20", "year": "2020", "month": "3", "day": null, "state": "ok" },
+    { "label": "正しい：年月日", "ref": "2026-10-20", "year": "2020", "month": "3", "day": "15", "state": "ok" },
+    { "label": "正しい：先頭が0の月日", "ref": "2026-10-20", "year": "2020", "month": "03", "day": "05", "state": "ok" },
+    { "label": "正しい：うるう年の2月29日", "ref": "2026-10-20", "year": "2024", "month": "2", "day": "29", "state": "ok" },
+    { "label": "正しい：今日", "ref": "2026-10-20", "year": "2026", "month": "10", "day": "20", "state": "ok" },
+    { "label": "正しい：今月（年月）", "ref": "2026-10-20", "year": "2026", "month": "10", "day": null, "state": "ok" },
+    { "label": "正しい：今年（年だけ）", "ref": "2026-10-20", "year": "2026", "month": null, "day": null, "state": "ok" },
+
+    { "label": "全角の数字（年月日）", "ref": "2026-10-20", "year": "２０２０", "month": "０３", "day": "１５", "state": "ok" },
+    { "label": "全角と半角の混在", "ref": "2026-10-20", "year": "20２0", "month": "3", "day": "1５", "state": "ok" },
+    { "label": "前後の半角の空白", "ref": "2026-10-20", "year": " 2020 ", "month": " 3", "day": "15 ", "state": "ok" },
+    { "label": "前後の全角の空白", "ref": "2026-10-20", "year": "　２０２０　", "month": "　３", "day": null, "state": "ok" },
+
+    { "label": "1. 数字でない：年に文字", "ref": "2026-10-20", "year": "20a0", "month": null, "day": null, "state": "not_numeric" },
+    { "label": "1. 数字でない：負の数", "ref": "2026-10-20", "year": "2020", "month": "3", "day": "-1", "state": "not_numeric" },
+    { "label": "1. 数字でない：数字の間の空白", "ref": "2026-10-20", "year": "20 20", "month": null, "day": null, "state": "not_numeric" },
+    { "label": "1. 数字でない：漢数字", "ref": "2026-10-20", "year": "2020", "month": "三", "day": null, "state": "not_numeric" },
+    { "label": "1. 数字でない：小数点", "ref": "2026-10-20", "year": "2020", "month": "3.5", "day": null, "state": "not_numeric" },
+
+    { "label": "2. 月の範囲外：13", "ref": "2026-10-20", "year": "2020", "month": "13", "day": null, "state": "month_out_of_range" },
+    { "label": "2. 月の範囲外：0", "ref": "2026-10-20", "year": "2020", "month": "0", "day": null, "state": "month_out_of_range" },
+    { "label": "2. 月の範囲外：全角の１３", "ref": "2026-10-20", "year": "2020", "month": "１３", "day": null, "state": "month_out_of_range" },
+
+    { "label": "3. 月に年がない：月だけ", "ref": "2026-10-20", "year": null, "month": "3", "day": null, "state": "month_without_year" },
+    { "label": "3. 月に年がない：月日", "ref": "2026-10-20", "year": null, "month": "3", "day": "15", "state": "month_without_year" },
+
+    { "label": "4. 日に年がない：日だけ", "ref": "2026-10-20", "year": null, "month": null, "day": "15", "state": "day_without_year" },
+    { "label": "4. 日に月がない：年と日", "ref": "2026-10-20", "year": "2020", "month": null, "day": "15", "state": "day_without_month" },
+
+    { "label": "5. 実在しない日付：2月30日", "ref": "2026-10-20", "year": "2020", "month": "2", "day": "30", "state": "invalid_date" },
+    { "label": "5. 実在しない日付：うるう年でない年の2月29日", "ref": "2026-10-20", "year": "2021", "month": "2", "day": "29", "state": "invalid_date" },
+    { "label": "5. 実在しない日付：32日", "ref": "2026-10-20", "year": "2020", "month": "3", "day": "32", "state": "invalid_date" },
+    { "label": "5. 実在しない日付：0日", "ref": "2026-10-20", "year": "2020", "month": "3", "day": "0", "state": "invalid_date" },
+
+    { "label": "6. 未来：年だけで来年", "ref": "2026-10-20", "year": "2027", "month": null, "day": null, "state": "future" },
+    { "label": "6. 未来：年月で来月", "ref": "2026-10-20", "year": "2026", "month": "11", "day": null, "state": "future" },
+    { "label": "6. 未来：年月で来年の1月", "ref": "2026-10-20", "year": "2027", "month": "1", "day": null, "state": "future" },
+    { "label": "6. 未来：年月日で明日", "ref": "2026-10-20", "year": "2026", "month": "10", "day": "21", "state": "future" },
+
+    { "label": "7. 古すぎる：31年前", "ref": "2026-10-20", "year": "1995", "month": null, "day": null, "state": "too_old" },
+    { "label": "7. 古すぎる：年が0", "ref": "2026-10-20", "year": "0", "month": null, "day": null, "state": "too_old" },
+    { "label": "正しい：ちょうど30年前", "ref": "2026-10-20", "year": "1996", "month": null, "day": null, "state": "ok" },
+    { "label": "正しい：ちょうど30年前の1月1日", "ref": "2026-10-20", "year": "1996", "month": "1", "day": "1", "state": "ok" },
+
+    { "label": "複数：数字でない（1）と月の範囲外（2）→ 1", "ref": "2026-10-20", "year": "abc", "month": "13", "day": null, "state": "not_numeric" },
+    { "label": "複数：月の範囲外（2）と月に年がない（3）→ 2", "ref": "2026-10-20", "year": null, "month": "13", "day": "40", "state": "month_out_of_range" },
+    { "label": "複数：月に年がない（3）と日に年がない（4）→ 3", "ref": "2026-10-20", "year": null, "month": "3", "day": "15", "state": "month_without_year" },
+    { "label": "複数：実在しない（5）と未来（6）→ 5", "ref": "2026-10-20", "year": "2027", "month": "2", "day": "30", "state": "invalid_date" },
+    { "label": "複数：未来（6）は古すぎる（7）より先", "ref": "2026-10-20", "year": "9999", "month": null, "day": null, "state": "future" },
+
+    { "label": "基準日がうるう日：2月29日は今日", "ref": "2024-02-29", "year": "2024", "month": "2", "day": "29", "state": "ok" },
+    { "label": "基準日が年の初め：前年の12月は過去", "ref": "2027-01-01", "year": "2026", "month": "12", "day": null, "state": "ok" }
+  ]
+}

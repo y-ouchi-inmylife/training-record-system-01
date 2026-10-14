@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\TraineeBirthdayInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -18,6 +19,7 @@ use Illuminate\Validation\Validator;
  *
  * 誕生日（2026-10 変更）：年・月・日の 3 項目（birth_year・birth_month・birth_day）で受け、
  * 分かるところだけ入る。入力のルールは要件定義書 6-16「年齢の表示規則」の「入力のルール」。
+ * 全角の数字は prepareForValidation で半角に直してから判定する。
  * 判定は withValidator（after）で上から順に行い、最初の 1 つだけをキー `birth_date` に載せる
  * （3 つの欄のまとまりの下に 1 つだけ出すため。screen-design.md §2-7 の但し書き・S-0308）。
  */
@@ -62,91 +64,41 @@ class TraineeRequest extends FormRequest
     }
 
     /**
-     * 誕生日（年・月・日）の判定。screen-design.md S-0308「バリデーションチェック」の表の
-     * 上から順に判定し、最初に当てはまった 1 つだけをキー `birth_date` に載せる。
+     * 誕生日の 3 つの欄を、判定の前に直す：全角の数字を半角に、前後の空白（全角を含む）を取り、
+     * 空になったら null（要件定義書 6-16「入力のルール」。2026-10 追加）。保存される値も直したあとの値になる。
+     */
+    protected function prepareForValidation(): void
+    {
+        $normalized = [];
+        foreach (['birth_year', 'birth_month', 'birth_day'] as $key) {
+            if ($this->has($key)) {
+                $normalized[$key] = TraineeBirthdayInput::normalize($this->input($key));
+            }
+        }
+        $this->merge($normalized);
+    }
+
+    /**
+     * 誕生日（年・月・日）の判定。screen-design.md §2-8 の表の上から順に判定し、最初に当てはまった
+     * 1 つだけをキー `birth_date` に載せる。判定の本体は App\Support\TraineeBirthdayInput（入力中の
+     * 表示の JS と同じ手順・同じ状態の記号）。状態の記号を、lang の custom.birth_date の文言に対応させる。
      *
      * 基準日（今日・今年）は now() から取る（テストでは Carbon::setTestNow で固定する）。
-     * 入力中の年齢表示（JS。段階2b）も同じ順・同じルールで判定する。
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            $error = $this->birthDateError(
+            $today = now();
+            $state = TraineeBirthdayInput::state(
                 $this->input('birth_year'),
                 $this->input('birth_month'),
                 $this->input('birth_day'),
+                $today->year, $today->month, $today->day,
             );
 
-            if ($error !== null) {
-                $validator->errors()->add('birth_date', __('validation.custom.birth_date.'.$error));
+            if (! in_array($state, [TraineeBirthdayInput::OK, TraineeBirthdayInput::EMPTY], true)) {
+                $validator->errors()->add('birth_date', __('validation.custom.birth_date.'.$state));
             }
         });
-    }
-
-    /**
-     * 誕生日の判定の本体。当てはまったルールの名前（lang の custom.birth_date のキー）を返す。
-     * 問題がなければ null。値は空欄なら null（ConvertEmptyStringsToNull）、それ以外は文字列で届く。
-     */
-    private function birthDateError(mixed $year, mixed $month, mixed $day): ?string
-    {
-        // 1. 数字であること（半角の数字だけ）
-        foreach ([$year, $month, $day] as $value) {
-            if ($value === null) {
-                continue;
-            }
-            // 配列などが送られた場合も「数字ではない」として扱う
-            if (! is_string($value) && ! is_int($value)) {
-                return 'numeric';
-            }
-            if (! preg_match('/^\d+$/', (string) $value)) {
-                return 'numeric';
-            }
-        }
-
-        $y = $year === null ? null : (int) $year;
-        $m = $month === null ? null : (int) $month;
-        $d = $day === null ? null : (int) $day;
-
-        // 2. 月は 1〜12
-        if ($m !== null && ($m < 1 || $m > 12)) {
-            return 'month_range';
-        }
-
-        // 3. 月があるなら年がある
-        if ($m !== null && $y === null) {
-            return 'month_without_year';
-        }
-
-        // 4. 日があるなら年・月がある
-        if ($d !== null && ($y === null || $m === null)) {
-            return 'day_without_year_month';
-        }
-
-        if ($y === null) {
-            return null; // 未入力
-        }
-
-        // 5. 3 つそろったら実在する日付
-        if ($d !== null && ! checkdate($m, $d, $y)) {
-            return 'invalid_date';
-        }
-
-        // 6. 未来でない（年だけなら今年以前、年・月までなら今月以前、年・月・日なら今日以前）
-        $today = now();
-        $future = match (true) {
-            $m === null => $y > $today->year,
-            $d === null => [$y, $m] > [$today->year, $today->month],
-            default => [$y, $m, $d] > [$today->year, $today->month, $today->day],
-        };
-        if ($future) {
-            return 'future';
-        }
-
-        // 7. 年は今年から 30 年前まで
-        if ($y < $today->year - 30) {
-            return 'year_range';
-        }
-
-        return null;
     }
 }

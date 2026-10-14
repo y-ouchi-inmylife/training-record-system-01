@@ -287,14 +287,17 @@ return [
         // トレーニーの誕生日（年・月・日の 3 つの欄。S-0308／S-0310。2026-10 追加）。
         // TraineeRequest の withValidator（after）で上から順に判定し、最初の 1 つだけを
         // キー birth_date に載せる（screen-design.md §2-8「誕生日（年・月・日の 3 つの欄）の文言」）。
+        // キーは判定の状態の記号（App\Support\TraineeBirthdayInput の定数。入力中の表示の JS と共通）。
+        // 日の 2 つの状態（年がない／月がない）は、入力中の案内だけを分け、送信時の文言は同じ。
         'birth_date' => [
-            'numeric' => '誕生日は数字で入力してください。',
-            'month_range' => '誕生日の月は1〜12で入力してください。',
+            'not_numeric' => '誕生日は数字で入力してください。',
+            'month_out_of_range' => '誕生日の月は1〜12で入力してください。',
             'month_without_year' => '誕生日の月を入れる場合は、年も入力してください。',
-            'day_without_year_month' => '誕生日の日を入れる場合は、年と月も入力してください。',
+            'day_without_year' => '誕生日の日を入れる場合は、年と月も入力してください。',
+            'day_without_month' => '誕生日の日を入れる場合は、年と月も入力してください。',
             'invalid_date' => '誕生日の日付を確認してください。',
             'future' => '誕生日が未来になっています。',
-            'year_range' => '誕生日の年を確認してください。',
+            'too_old' => '誕生日の年を確認してください。',
         ],
     ],
 
