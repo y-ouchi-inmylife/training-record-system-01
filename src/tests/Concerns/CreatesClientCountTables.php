@@ -78,4 +78,19 @@ trait CreatesClientCountTables
             $table->timestamps();
         });
     }
+
+    /**
+     * 受付アンケート用 URL のトークン（DS-1000。2026-10 追加）。trainees の表は各テストで作る
+     */
+    protected function createTraineeIntakeSurveyTokensTable(): void
+    {
+        Schema::create('trainee_intake_survey_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->string('token', 64)->unique();
+            $table->unsignedBigInteger('trainee_id');
+            $table->timestamp('answered_at')->nullable();
+            $table->timestamps();
+            $table->unsignedBigInteger('created_by')->nullable();
+        });
+    }
 }

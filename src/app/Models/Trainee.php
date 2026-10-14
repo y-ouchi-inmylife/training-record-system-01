@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Support\TraineeAge;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -64,6 +66,19 @@ class Trainee extends Model
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | 受付アンケートの状態（2026-10 追加。要件定義書 6-16-8）
+    |--------------------------------------------------------------------------
+    | 判定の順は「回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行」。
+    | 段階3では回答（D-1100）がまだないため、回答済みの判定はない（段階4で intake_survey_status の
+    | 先頭に足す）。定数は 3 つとも先に定義しておく。
+    */
+
+    public const INTAKE_NOT_ISSUED = 'not_issued';
+    public const INTAKE_AWAITING = 'awaiting';
+    public const INTAKE_ANSWERED = 'answered';
+
     // 写真保存先の Filesystem ディスク名。
     // 既存メディアと同じ `media` ディスク（S3 互換）を共用し、キーの名前空間だけ
     // `trainees/` に分けて保存する（詳細は db-schema.md D-0700 注記「トレーニー写真の扱い」参照）。
@@ -118,6 +133,24 @@ class Trainee extends Model
         return $this->hasMany(TraineeMeasurement::class)
             ->orderBy('measured_date', 'desc')
             ->orderBy('measured_time', 'desc');
+    }
+
+    /**
+     * 受付アンケート用 URL のトークン（DS-1000。回答済みのものを含む）
+     */
+    public function intakeSurveyTokens(): HasMany
+    {
+        return $this->hasMany(TraineeIntakeSurveyToken::class);
+    }
+
+    /**
+     * 有効な（まだ回答されていない）受付アンケート用 URL のトークン。同じトレーニーに 1 つまで
+     * （発行のサービスで守る）。会員詳細（S-0305）でトレーニーをまとめて読むときは
+     * `trainees.activeIntakeSurveyToken` を eager load しておく（N+1 にしないため）
+     */
+    public function activeIntakeSurveyToken(): HasOne
+    {
+        return $this->hasOne(TraineeIntakeSurveyToken::class)->whereNull('answered_at');
     }
 
     /**
@@ -215,6 +248,32 @@ class Trainee extends Model
             $this->birth_year, $this->birth_month, $this->birth_day,
             $today->year, $today->month, $today->day,
         );
+    }
+
+    /**
+     * 受付アンケートの状態（INTAKE_* の定数）。要件定義書 6-16-8 の判定の順
+     * （回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行）。
+     *
+     * 段階3では回答（D-1100）がまだないため、回答済みの判定はない。段階4で、この先頭に
+     * 「回答があれば INTAKE_ANSWERED」を足す。呼び出し側は activeIntakeSurveyToken を
+     * eager load しておくこと（会員詳細でトレーニーごとに追加のクエリを出さないため）
+     */
+    public function getIntakeSurveyStatusAttribute(): string
+    {
+        return $this->activeIntakeSurveyToken !== null ? self::INTAKE_AWAITING : self::INTAKE_NOT_ISSUED;
+    }
+
+    /**
+     * 受付アンケートの状態の文字（「未発行」「回答待ち（2026/10/15 発行）」）。日付は Y/m/d
+     * （アプリのタイムゾーン）。S-0305 のトレーニーカード・S-0309 の受付アンケートの欄で使う。
+     * 状態はバッジにしない（screen-design.md S-0305「バッジにしない理由」）
+     */
+    public function getIntakeSurveyStatusLabelAttribute(): string
+    {
+        return match ($this->intake_survey_status) {
+            self::INTAKE_AWAITING => '回答待ち（'.$this->activeIntakeSurveyToken->created_at->format('Y/m/d').' 発行）',
+            default => '未発行',
+        };
     }
 
     /**
