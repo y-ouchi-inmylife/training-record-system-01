@@ -78,8 +78,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 / S-0305 会員詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。**送信元は S-0305 または S-0309**（2026-09 追加、S-0305 のトレーニーカードからも登録可能）。リダイレクト先は hidden `return_to` で判別（詳細は下の「計測値エンドポイントの `return_to` 仕様」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
-| トレーニー管理 | S-0305 会員詳細画面 / S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。リダイレクト先は hidden `return_to` で判別（下の「受付アンケート案内エンドポイントの `return_to`」参照） | auth | 管理者、一般 |
-| トレーニー管理 | S-0305 会員詳細画面 / S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-intake-survey-tokens.destroy`。**2026-10 追加**）。リダイレクト先は発行と同じ | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。成功後は常に S-0305 に戻す（下の「受付アンケート案内エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-intake-survey-tokens.destroy`。**2026-10 追加**）。リダイレクト先は発行と同じ | auth | 管理者、一般 |
 | トレーニー管理 | S-0311 受付アンケート案内画面 | GET | `/trainees/{trainee}/intake-survey-tokens/print` | 受付アンケート案内画面を表示する（ルート名 `trainee-intake-survey-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
@@ -194,7 +194,9 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 - **バリデーションエラー時**：Laravel の `back()` が送信元 URL に自動で戻すため、`return_to` はエラー時のリダイレクト先には影響しない（`return_to` は**成功時のリダイレクト先決定**のみに使う）。エラー画面での該当モーダル復元は hidden `_trainee_id` で行う（詳細は screen-design.md S-0309「計測値モーダルの共用（S-0305 との）」参照）
 - **今回のスコープでは `store` のみが S-0305 から呼ばれる**（S-0305 では計測値の登録のみ、編集・削除は S-0309 のみ）が、**`update` / `destroy` にも同じ `return_to` 仕組みを実装しておく**。将来 S-0305 から編集・削除もできるようにする可能性を残すため（今回のコード追加コストは各メソッドで if 分岐 1 段のみで小さい。3 メソッドで同じパターンにする方がコードの一貫性が保たれる）
 
-**受付アンケート案内エンドポイントの `return_to`**（**2026-10 追加**）：`POST /trainees/{trainee}/intake-survey-tokens`（発行）と `DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、計測値エンドポイントと同じく hidden `return_to`（`client` / `trainee` の 2 値、既定は `trainee`）で送信元を判別し、成功時のリダイレクト先を切り替える（要件定義書 6-16-8・6-16-9「操作した画面に戻る」）。
+**受付アンケート案内エンドポイントのリダイレクト先**（**2026-10 変更**）：`POST /trainees/{trainee}/intake-survey-tokens`（発行）と `DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、成功後は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', $trainee->client_id)`）に戻し、完了メッセージはフラッシュ `success`（画面の上端）で出す。受付アンケート案内の発行・表示・取消を会員詳細だけで行う形にしたため（requirements.md 6-16-8 備考「操作を会員詳細に寄せた理由」）、`return_to` は持たない（送られても使わない）。
+
+**経緯：当初の `return_to`**（**2026-10 追加**。同じ 2026-10 に、操作を会員詳細に寄せたため廃止。経緯として残す）：当初は発行・取消を S-0305 と S-0309 の両方から行えるようにし、計測値エンドポイントと同じく hidden `return_to`（`client` / `trainee` の 2 値、既定は `trainee`）で送信元を判別し、成功時のリダイレクト先を切り替えていた（当時の要件定義書 6-16-8・6-16-9「操作した画面に戻る」）。S-0309 に戻るときの完了メッセージは、受付アンケートの欄の中に出すための別のキー（`intake_survey_success`）で渡していた。
 
 - `return_to=client`：S-0305 会員詳細画面（`redirect()->route('clients.show', $trainee->client_id)`）に戻す
 - `return_to=trainee`（**既定**）：S-0309 トレーニー詳細画面の受付アンケートの欄（`redirect()->to(route('trainees.show', $trainee) . '#intake-survey')`）に戻す。受付アンケートの欄は画面の下のほうにあるため、状態が変わったことが目に入る位置に戻す
@@ -2056,17 +2058,13 @@ POST /training-records に以下を追加する。
 - バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ
 
 
-##### S-0305 会員詳細画面 / S-0309 トレーニー詳細画面
+##### S-0305 会員詳細画面
 
 ###### POST /trainees/{trainee}/intake-survey-tokens
 
 **概要**: 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。requirements.md 6-16-8）。
 
-**リクエスト**:
-
-| パラメータ | 型 | 必須 | バリデーション | 説明 |
-|-----------|-----|------|---------------|------|
-| return_to | string | | — | 成功時の戻り先（`client` / `trainee`。既定は `trainee`。§3 の「受付アンケート案内エンドポイントの `return_to`」参照） |
+**リクエスト**: パラメータなし（**2026-10 変更**：当初は `return_to` を受け取っていた。§3 の「受付アンケート案内エンドポイントのリダイレクト先」参照）
 
 **処理**:
 - 以下を 1 つのトランザクションで実行する
@@ -2076,7 +2074,7 @@ POST /training-records に以下を追加する。
 - **発行し直しはしない**（未回答のトークンがあれば発行できない。マイページ登録案内の発行と違い、既存のトークンを消して作り直す処理は持たない。requirements.md 6-16-8 備考）
 
 **レスポンス**:
-- 成功：`return_to` に従ってリダイレクトする（§3「受付アンケート案内エンドポイントの `return_to`」のとおり。`client` なら S-0305〔フラグメントなし〕、それ以外は S-0309 の `#intake-survey`）。完了メッセージは「受付アンケートの案内を発行しました。」。S-0305 へ戻るときはフラッシュ `success`（画面の上端）、S-0309 へ戻るときは受付アンケートの欄の中に出すための別のキー（**2026-10 変更**。screen-design.md S-0309 の受付アンケートの欄）
+- 成功：`redirect()->route('clients.show', $trainee->client_id)`（S-0305）。フラッシュ `success`（画面の上端）に「受付アンケートの案内を発行しました。」（**2026-10 変更**：当初は `return_to` に従い、S-0309 の `#intake-survey` へ戻すときは欄の中に出すための別のキーで渡していた）
 - 状態が「未発行」でない：409（UI 側でボタンを出し分けているため通常は到達しない）
 - S-0311 は自動で開かない（マイページ登録案内と同じ。requirements.md 6-16-1 備考）
 
@@ -2089,16 +2087,14 @@ POST /training-records に以下を追加する。
 
 **リクエスト**:
 
-| パラメータ | 型 | 必須 | バリデーション | 説明 |
-|-----------|-----|------|---------------|------|
-| return_to | string | | — | 成功時の戻り先（発行と同じ） |
+パラメータなし（**2026-10 変更**：当初は `return_to` を受け取っていた）
 
 **処理**:
 - 対象トレーニーの状態が「回答待ち」（回答がなく、`answered_at` が NULL のトークンがある）であることを確かめる。当てはまらない場合は 409
 - `answered_at` が NULL のトークンを物理削除する。**回答済みのトークンと回答には触らない**
 
 **レスポンス**:
-- 成功：`return_to` に従ってリダイレクトする（発行と同じ。§3 のとおり）。完了メッセージは「受付アンケートの案内を取り消しました。」。S-0305 へ戻るときはフラッシュ `success`、S-0309 へ戻るときは受付アンケートの欄の中に出すための別のキー（**2026-10 変更**）
+- 成功：S-0305 へリダイレクトし、フラッシュ `success` に「受付アンケートの案内を取り消しました。」（発行と同じ。**2026-10 変更**：当初は `return_to` に従っていた）
 - 状態が「回答待ち」でない：409
 - 押下時に確認モーダルを挟む（screen-design.md「受付アンケート案内の取消モーダル」）
 
