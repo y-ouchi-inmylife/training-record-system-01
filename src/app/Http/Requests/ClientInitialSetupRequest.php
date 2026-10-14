@@ -11,6 +11,10 @@ use Illuminate\Foundation\Http\FormRequest;
  * トレーナー側の [[ClientRequest]] と必須項目が異なる（電話番号・住所が必須）ため、
  * 別に用意する。ルールは設計書 api-design.md `POST /client-portal/setup/{token}`。
  *
+ * 愛犬（トレーニー）の項目は 2026-10 に外した（受付アンケートに分離。requirements.md 6-15-5）。
+ * それに伴い、trainee_* の属性名だけを定義していた attributes() も外した（他の項目の
+ * 属性名は lang/ja/validation.php の attributes で足りる）。
+ *
  * 認可はルートの公開設定・トークン検証で担保しており、本 FormRequest では常に true を返す。
  */
 class ClientInitialSetupRequest extends FormRequest
@@ -43,32 +47,6 @@ class ClientInitialSetupRequest extends FormRequest
             'address2' => 'required|string|max:50',
             'address3' => 'required|string|max:100',
             'address4' => 'nullable|string|max:100',
-
-            // 愛犬（トレーニー）— TraineeRequest と同じルール（S-0308 と揃える）。
-            // フィールド名の `trainee_` プレフィックスは、会員自身の項目
-            // （last_name など）と区別するため（api-design.md 参照）。
-            'trainee_name' => 'required|string|max:50',
-            'trainee_breed' => 'nullable|string|max:100',
-            'trainee_sex' => 'nullable|in:male,female,unknown',
-            'trainee_birth_date' => 'nullable|date|before_or_equal:today',
-            'trainee_note' => 'nullable|string',
-        ];
-    }
-
-    /**
-     * 属性名の日本語ラベル。`in` / `date` / `before_or_equal` などの汎用ルールで
-     * 自動生成されるメッセージ内の `:attribute` を日本語にするために定義する。
-     * 他の規則の文言は lang/ja/validation.php に集約する（段階 2 で messages() を
-     * 削除した。設計書 §2-8「文言の置き場所」）。
-     */
-    public function attributes(): array
-    {
-        return [
-            'trainee_name' => '愛犬の名前',
-            'trainee_breed' => '犬種',
-            'trainee_sex' => '性別',
-            'trainee_birth_date' => '誕生日',
-            'trainee_note' => '備考',
         ];
     }
 }

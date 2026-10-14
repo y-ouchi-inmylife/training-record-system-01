@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Mail;
  *
  * トークン付き公開 URL（ログイン用リンク）からアクセスする。
  * GET でトークン検証と同時に client guard で自動ログインさせ、
- * POST でパスワード＋基本情報を保存する。
+ * POST でパスワード＋基本情報を保存する（愛犬〔トレーニー〕の情報は扱わない。2026-10 変更）。
  *
  * ログイン用リンクのトークンは `client_login_link_tokens` テーブル（DS-0600）を使う。
  *
@@ -57,17 +57,11 @@ class InitialSetupController extends Controller
         Auth::guard('client')->login($tokenRecord->client);
         request()->session()->regenerate();
 
-        // 既存のトレーニーを 1 頭目（id 昇順の先頭）だけ Blade に渡す。
-        // 2 頭目以降は初回設定で扱わない（requirements.md 6-15-5 / 6-16 参照）。
-        // trainees リレーションは Client モデルで orderBy('id') 済みのため、
-        // first() で 1 頭目が取れる。存在しなければ null（Blade で空欄扱い）。
-        $tokenRecord->client->load('trainees');
-        $existingTrainee = $tokenRecord->client->trainees->first();
-
+        // 愛犬（トレーニー）の情報は初回設定では扱わない（2026-10 変更。受付アンケートに
+        // 分離した。requirements.md 6-15-5）。トレーニーは読み込まない。
         return view('client.setup.index', [
             'token' => $token,
             'client' => $tokenRecord->client,
-            'existingTrainee' => $existingTrainee,
         ]);
     }
 
@@ -120,29 +114,9 @@ class InitialSetupController extends Controller
                     'address4' => $validated['address4'] ?? null,
                 ]);
 
-                // 愛犬（トレーニー）の情報を登録・更新する（requirements.md 6-15-5 / 6-16 参照）。
-                //   - 既存のトレーニーが 1 件以上あれば `id` 昇順の先頭（1 頭目）を更新
-                //   - なければ新規作成
-                //   - 2 頭目以降のレコードには一切手を触れない（削除も更新もしない）
-                //
-                // `updated_by` は null にする：trainees.updated_by は trainers.id への FK で、
-                // 会員（clients）由来の更新ではトレーナーIDが存在しないため（実装上も FK 制約違反を避けるため
-                // null 一択）。会員自身の更新であることは「初回設定でだけ会員が編集できる」設計方針で
-                // 特定される（requirements.md 6-16 の「会員による編集」参照）。
-                $traineeData = [
-                    'name' => $validated['trainee_name'],
-                    'breed' => $validated['trainee_breed'] ?? null,
-                    'sex' => $validated['trainee_sex'] ?? null,
-                    'birth_date' => $validated['trainee_birth_date'] ?? null,
-                    'note' => $validated['trainee_note'] ?? null,
-                    'updated_by' => null,
-                ];
-                $existingTrainee = $tokenRecord->client->trainees()->orderBy('id')->first();
-                if ($existingTrainee) {
-                    $existingTrainee->update($traineeData);
-                } else {
-                    $tokenRecord->client->trainees()->create($traineeData);
-                }
+                // 愛犬（トレーニー）の情報は扱わない（2026-10 変更。以前はここで 1 頭目を
+                // 登録・更新していたが、受付アンケートに分離した。requirements.md 6-15-5）。
+                // 送信に古い trainee_* の項目が含まれていても、validated() に入らないため使われない。
 
                 // ログイン用リンクを使い切りにする
                 $tokenRecord->update(['is_used' => true]);

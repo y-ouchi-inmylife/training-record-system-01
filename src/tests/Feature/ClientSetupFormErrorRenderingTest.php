@@ -35,7 +35,6 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         return $this->withViewErrors($errors)->view('client.setup.index', [
             'token' => 'dummy-token',
             'client' => $client,
-            'existingTrainee' => null,
         ]);
     }
 
@@ -55,7 +54,7 @@ class ClientSetupFormErrorRenderingTest extends TestCase
 
     public function test_初回設定_全項目の入力エラーで上部案内と欄下文言が出る(): void
     {
-        // 全項目にエラーを入れる（本体＋愛犬の情報）。
+        // 全項目にエラーを入れる（2026-10 に愛犬の情報を外したため、会員の項目だけ）。
         $view = $this->renderSetup([
             'password' => 'ERR_password',
             'last_name' => 'ERR_last_name',
@@ -69,11 +68,6 @@ class ClientSetupFormErrorRenderingTest extends TestCase
             'address2' => 'ERR_address2',
             'address3' => 'ERR_address3',
             'address4' => 'ERR_address4',
-            'trainee_name' => 'ERR_trainee_name',
-            'trainee_breed' => 'ERR_trainee_breed',
-            'trainee_sex' => 'ERR_trainee_sex',
-            'trainee_birth_date' => 'ERR_trainee_birth_date',
-            'trainee_note' => 'ERR_trainee_note',
         ]);
 
         $view->assertSee('入力内容に誤りがあります。');
@@ -91,30 +85,27 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $view->assertSee('ERR_address2');
         $view->assertSee('ERR_address3');
         $view->assertSee('ERR_address4');
-        $view->assertSee('ERR_trainee_name');
-        $view->assertSee('ERR_trainee_breed');
-        $view->assertSee('ERR_trainee_sex');
-        $view->assertSee('ERR_trainee_birth_date');
-        $view->assertSee('ERR_trainee_note');
 
         $view->assertSee('is-invalid', false);
         $view->assertSee('invalid-feedback', false);
     }
 
     /**
-     * 性別の選択肢は「男の子／女の子／不明」で、旧文言「オス／メス」は出ない
-     *（2026-10 変更。文言は Trainee::sexLabels() の 1 か所で決まる）。
+     * 2026-10 変更：愛犬（トレーニー）の情報は初回設定では扱わない（受付アンケートに分離。
+     * requirements.md 6-15-5）。小見出し・入力欄・多頭飼いの案内文が出ないこと。
      */
-    public function test_初回設定_性別の選択肢は男の子女の子不明で旧文言は出ない(): void
+    public function test_初回設定_愛犬の情報の欄が出ない(): void
     {
         $view = $this->renderSetup([]);
 
-        $view->assertSee('男の子');
-        $view->assertSee('女の子');
-        $view->assertSee('不明');
-
-        $view->assertDontSee('オス');
-        $view->assertDontSee('メス');
+        $view->assertDontSee('愛犬の情報');
+        foreach (['trainee_name', 'trainee_breed', 'trainee_sex', 'trainee_birth_date', 'trainee_note'] as $field) {
+            $view->assertDontSee('name="'.$field.'"', false);
+        }
+        $view->assertDontSee('ほかにもトレーニングを受ける愛犬がいる場合は');
+        // 性別の選択肢（男の子／女の子／不明）も出ない
+        $view->assertDontSee('男の子');
+        $view->assertDontSee('女の子');
     }
 
     public function test_初回設定_formキーはフォームの上に出て欄下にも上部案内にも出ない(): void
@@ -142,29 +133,27 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     }
 
     /**
-     * 2026-10 変更：ログイン情報（パスワード・パスワード確認）を 4 まとまりの最後
-     *（愛犬の情報の後、登録ボタンの直前）に移した。入力エラーで戻ったとき、
-     * 一番上まで戻ってパスワードを入れ直す必要がなくなるようにするため。
+     * 2026-10 変更：ログイン情報（パスワード・パスワード確認）をまとまりの最後
+     *（登録ボタンの直前）に移した。入力エラーで戻ったとき、一番上まで戻って
+     * パスワードを入れ直す必要がなくなるようにするため。同じ 2026-10 に愛犬の情報を
+     * 外したため、ログイン情報はご連絡先（建物名・部屋番号）の後に来る。
      */
     public function test_初回設定_ログイン情報はまとまりの最後に描画される(): void
     {
         $html = $this->renderSetup([])->__toString();
 
-        // 「愛犬の情報」小見出し／備考（trainee_note）の位置より後に、
+        // 「ご連絡先」の最後の欄（建物名・部屋番号）より後に、
         // 「ログイン情報」小見出しとパスワード欄が来ること。
-        $posTraineeHeading = mb_strpos($html, '愛犬の情報');
-        $posTraineeNote = mb_strpos($html, 'name="trainee_note"');
+        $posAddress4 = mb_strpos($html, 'name="address4"');
         $posLoginHeading = mb_strpos($html, 'ログイン情報');
         $posPassword = mb_strpos($html, 'id="password"');
 
-        $this->assertNotFalse($posTraineeHeading);
-        $this->assertNotFalse($posTraineeNote);
+        $this->assertNotFalse($posAddress4);
         $this->assertNotFalse($posLoginHeading);
         $this->assertNotFalse($posPassword);
 
-        $this->assertGreaterThan($posTraineeHeading, $posLoginHeading);
-        $this->assertGreaterThan($posTraineeNote, $posLoginHeading);
-        $this->assertGreaterThan($posTraineeNote, $posPassword);
+        $this->assertGreaterThan($posAddress4, $posLoginHeading);
+        $this->assertGreaterThan($posAddress4, $posPassword);
 
         // 「ログイン情報」まとまりの中にメールアドレスの表示行（text-muted small ラベル）
         // が入っていること。owner@example.com は hidden の username input（フォーム冒頭）
@@ -173,6 +162,24 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $this->assertNotFalse($posEmailLabel);
         $this->assertGreaterThan($posLoginHeading, $posEmailLabel);
         $this->assertGreaterThan($posEmailLabel, $posPassword);
+    }
+
+    /**
+     * 小見出しは「お名前」「ご連絡先」「ログイン情報」の 3 か所（2026-10 に「愛犬の情報」を外した）。
+     */
+    public function test_初回設定_小見出しは3か所(): void
+    {
+        $html = $this->renderSetup([])->__toString();
+
+        $this->assertSame(3, substr_count($html, '<h2 class="fs-6 fw-bold mb-2">'));
+        $posName = mb_strpos($html, '<h2 class="fs-6 fw-bold mb-2">お名前</h2>');
+        $posContact = mb_strpos($html, '<h2 class="fs-6 fw-bold mb-2">ご連絡先</h2>');
+        $posLogin = mb_strpos($html, '<h2 class="fs-6 fw-bold mb-2">ログイン情報</h2>');
+        $this->assertNotFalse($posName);
+        $this->assertNotFalse($posContact);
+        $this->assertNotFalse($posLogin);
+        $this->assertGreaterThan($posName, $posContact);
+        $this->assertGreaterThan($posContact, $posLogin);
     }
 
     /**
@@ -206,50 +213,22 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     }
 
     /**
-     * 2026-10 変更：まとまりの区切り線は 1 本（愛犬の情報／ログイン情報の境目）だけに絞った。
-     * 他 2 本（お名前／ご連絡先、ご連絡先／愛犬の情報）は、各まとまりの小見出しで内容の区切りが
-     * 伝わるため削除。
+     * 2026-10 変更：まとまりの区切り線は 1 本（お客様のプロフィール／ログイン情報の境目）だけ。
+     * 愛犬の情報を外したため、線は愛犬の備考の下から、建物名・部屋番号の下に移った。
      */
-    public function test_初回設定_区切り線は1本だけ描画される(): void
+    public function test_初回設定_区切り線は建物名部屋番号の下の1本だけ(): void
     {
         $html = $this->renderSetup([])->__toString();
         $this->assertSame(1, substr_count($html, 'border-bottom'));
-    }
 
-    /**
-     * 2026-10 変更：備考の注意書きを入力欄の下（テキストエリアと欄下エラーの後）に戻し、
-     * 文言を「ほかにもトレーニングを受ける愛犬がいる場合は、名前・犬種などをこの欄に
-     * ご記入ください。」にした。パスワード欄の「8 文字以上で…」の説明と同じ並び。
-     * 欄下エラーは Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」
-     * セレクタで、注意書きが挟まっても入力欄のすぐ下に出る（並び順で手前にあるため）。
-     */
-    public function test_初回設定_備考の注意書きがテキストエリアより後に描画される(): void
-    {
-        $html = $this->renderSetup([])->__toString();
+        $posLine = mb_strpos($html, 'border-bottom');
+        $posAddress4 = mb_strpos($html, 'name="address4"');
+        $posAddress3 = mb_strpos($html, 'name="address3"');
+        $posLoginHeading = mb_strpos($html, 'ログイン情報');
 
-        $posTextarea = mb_strpos($html, 'id="trainee_note"');
-        $posHelp = mb_strpos($html, 'ほかにもトレーニングを受ける愛犬がいる場合は、名前・犬種などをこの欄にご記入ください。');
-
-        $this->assertNotFalse($posTextarea);
-        $this->assertNotFalse($posHelp);
-        $this->assertGreaterThan($posTextarea, $posHelp);
-    }
-
-    public function test_初回設定_備考の注意書きの旧文言が残っていない(): void
-    {
-        $view = $this->renderSetup([]);
-        $view->assertDontSee('備考にご記入ください');
-        $view->assertDontSee('こちらにご記入ください');
-    }
-
-    /**
-     * 2026-10 追加：備考のテキストエリアと注意書きを aria-describedby で紐付け、
-     * 読み上げでも案内が入力の説明として伝わるようにする。
-     */
-    public function test_初回設定_備考のaria_describedbyが注意書きのidを指す(): void
-    {
-        $view = $this->renderSetup([]);
-        $view->assertSee('aria-describedby="trainee_note-help"', false);
-        $view->assertSee('id="trainee_note-help"', false);
+        // 線は建物名・部屋番号の欄を包む div に付く（町名・番地より後、建物名・部屋番号の直前、ログイン情報より前）
+        $this->assertGreaterThan($posAddress3, $posLine);
+        $this->assertLessThan($posAddress4, $posLine);
+        $this->assertLessThan($posLoginHeading, $posLine);
     }
 }

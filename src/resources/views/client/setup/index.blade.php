@@ -34,7 +34,6 @@
                 'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
                 'phone1', 'phone2',
                 'postal_code', 'address1', 'address2', 'address3', 'address4',
-                'trainee_name', 'trainee_breed', 'trainee_sex', 'trainee_birth_date', 'trainee_note',
             ]))
                 <x-form-error-summary />
             @endif
@@ -65,7 +64,7 @@
                      するために fs-6（= 1rem = 本文サイズ）で明示的に落とす。**fs-6 を外さないこと**
                      （後から「不要」と見て消されると見た目が変わる）。
                      パスワードのまとまりにも小見出しを置く：当初は「同じ語の重複」を避けて
-                     置かない方針だったが、他 3 か所との非対称で構造把握が難しいため、
+                     置かない方針だったが、他の小見出しとの非対称で構造把握が難しいため、
                      「ログイン情報」の文言で置いた（2026-09 追加。詳しくは下の「ログイン情報」
                      小見出し直前のコメントを参照）。
                      区切り線と小見出しの役割は違う：線＝「ここで切れる」、小見出し＝「次が何か」。
@@ -93,7 +92,7 @@
                 </div>
                 {{-- せい・めい行とご連絡先小見出しの間はまとまりの境目だが、区切り線は引かない
                      （2026-10 変更）。各まとまりの小見出しで内容の区切りが伝わるため、線は
-                     「入力の性格が変わる境目」（お客様プロフィール／ログイン情報）だけに絞った。
+                     「入力の性格が変わる境目」（お客様プロフィール／ログイン情報。建物名・部屋番号の下）だけに絞った。
                      余白は mb-3（セクション内の mb-2 より少し広い）で、小見出しの前で詰まりすぎない。
                      設計書 S-1403 備考 / §4-7 参照。 --}}
                 <div class="row g-2 mb-3">
@@ -178,11 +177,15 @@
                            value="{{ old('address3', $client->address3) }}">
                     <x-form-error field="address3" />
                 </div>
-                {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素だが、次の「愛犬の情報」との
-                     境目には区切り線を引かない（2026-10 変更。せい・めい行の下と同じ考え方で、
-                     小見出しで内容の区切りが伝わるため線を外した）。余白は mb-3 だけで、
-                     小見出しの前で詰まりすぎない。設計書 S-1403 / §4-7 参照。 --}}
-                <div class="mb-3">
+                {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素。下に区切り線を引く
+                     （ご連絡先／ログイン情報の境目＝お客様のプロフィールとログイン情報の境目で、
+                     入力の性格が変わるため）。カード内の区切り線はこの 1 本だけ。
+                     経緯：2026-10 に線を「入力の性格が変わる境目」の 1 本に絞ったときは、
+                     愛犬の備考の下（愛犬の情報／ログイン情報の境目）に引いていた。同じ 2026-10 に
+                     愛犬の情報を受付アンケート（S-1413）に分離して外したため、線をここに移した。
+                     線の濃さは client.scss の .c-login--wide .border-bottom（ink 20%）。
+                     設計書 S-1403 備考 / §4-7 参照。 --}}
+                <div class="mb-3 pb-3 border-bottom">
                     <label for="address4" class="form-label">建物名・部屋番号</label>
                     <input type="text" class="form-control @error('address4') is-invalid @enderror"
                            id="address4" name="address4" maxlength="100"
@@ -190,72 +193,8 @@
                     <x-form-error field="address4" />
                 </div>
 
-                {{-- 「愛犬の情報」小見出し。位置と装飾の考え方は「お名前」「ご連絡先」小見出しと同じ
-                     （<h2 fs-6> の理由・fs-6 を外さない旨は上のコメント参照）。**fs-6 を外さないこと**。 --}}
-                <h2 class="fs-6 fw-bold mb-2">愛犬の情報</h2>
-                <div class="mb-2">
-                    <label for="trainee_name" class="form-label">名前 <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control @error('trainee_name') is-invalid @enderror"
-                           id="trainee_name" name="trainee_name" required maxlength="50"
-                           value="{{ old('trainee_name', $existingTrainee?->name) }}">
-                    <x-form-error field="trainee_name" />
-                </div>
-                <div class="mb-2">
-                    <label for="trainee_breed" class="form-label">犬種</label>
-                    <input type="text" class="form-control @error('trainee_breed') is-invalid @enderror"
-                           id="trainee_breed" name="trainee_breed" maxlength="100"
-                           value="{{ old('trainee_breed', $existingTrainee?->breed) }}">
-                    <x-form-error field="trainee_breed" />
-                </div>
-                <div class="mb-2">
-                    <label for="trainee_sex" class="form-label">性別</label>
-                    <select class="form-select @error('trainee_sex') is-invalid @enderror"
-                            id="trainee_sex" name="trainee_sex">
-                        <option value=""></option>
-                        @foreach(\App\Models\Trainee::sexLabels() as $value => $label)
-                            <option value="{{ $value }}" @selected(old('trainee_sex', $existingTrainee?->sex) === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <x-form-error field="trainee_sex" />
-                </div>
-                {{-- 誕生日は type="date"（ブラウザ標準の日付入力）を使う。会員側レイアウト
-                     （layouts.client-public）には Flatpickr の CSS が読み込まれていないため、
-                     `.datepicker` クラスで Flatpickr を呼び出すとレイアウトが崩れる
-                     （2026-09 に発生した不具合の修正）。トレーナー側は Flatpickr の CSS を
-                     読み込む layouts.app を使うのでそちらは変えない。会員側で日付入力を追加する
-                     場合は type="date" を使うこと。 --}}
-                <div class="mb-2">
-                    <label for="trainee_birth_date" class="form-label">誕生日</label>
-                    <input type="date" class="form-control @error('trainee_birth_date') is-invalid @enderror"
-                           id="trainee_birth_date" name="trainee_birth_date"
-                           value="{{ old('trainee_birth_date', $existingTrainee?->birth_date?->format('Y-m-d')) }}"
-                           autocomplete="off">
-                    <x-form-error field="trainee_birth_date" />
-                </div>
-                {{-- 備考：多頭飼い向けの案内（.form-text）は入力欄の下に置く
-                     （パスワードの「8 文字以上で…」の説明と同じ並び。ラベル → テキストエリア →
-                     欄下エラー → 注意書き）。欄下エラーは Bootstrap の
-                     .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで表示されるため、
-                     注意書きが挟まっても赤字は入力欄のすぐ下に出る（並び順で手前にあるため）。
-                     textarea とは aria-describedby で紐付けて読み上げでも案内が入力の説明として伝わる。
-                     備考の下には区切り線を引く（愛犬の情報／ログイン情報の境目。
-                     2026-10 変更でログイン情報を末尾に移したため、ここに境目の線が入る。
-                     他 2 本の区切り線は 2026-10 に削除した）。
-                     経緯：2026-10 にいったんラベルの右に移したが、ブラウザで確認したうえで
-                     入力欄の下に戻した。文言は何度か見直し、現在は「ほかにもトレーニングを受ける
-                     愛犬がいる場合は、名前・犬種などをこの欄にご記入ください。」。
-                     （何を書けばよいかを示し、トレーニングを受ける犬に対象を絞るため）
-                     設計書 S-1403 の「多頭飼いの運用」参照。 --}}
-                <div class="mb-3 pb-3 border-bottom">
-                    <label for="trainee_note" class="form-label">備考</label>
-                    <textarea class="form-control @error('trainee_note') is-invalid @enderror"
-                              id="trainee_note" name="trainee_note" rows="3"
-                              aria-describedby="trainee_note-help">{{ old('trainee_note', $existingTrainee?->note) }}</textarea>
-                    <x-form-error field="trainee_note" />
-                    <div id="trainee_note-help" class="form-text">ほかにもトレーニングを受ける愛犬がいる場合は、名前・犬種などをこの欄にご記入ください。</div>
-                </div>
-
-                {{-- 「ログイン情報」小見出し（4 か所の最後、2026-10 に末尾へ移した）。
+                {{-- 「ログイン情報」小見出し（3 か所の最後、2026-10 に末尾へ移した。同じ 2026-10 に
+                     「愛犬の情報」の小見出しを外したため、4 か所から 3 か所になった）。
                      メール表示・パスワード・パスワード（確認）の 3 つを 1 つのまとまりとして扱う。
                      <h2 fs-6> を使う理由・fs-6 を外さない旨は上の「お名前」小見出しの
                      コメント参照。**fs-6 を外さないこと**。
@@ -281,7 +220,6 @@
                     'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
                     'phone1', 'phone2',
                     'postal_code', 'address1', 'address2', 'address3', 'address4',
-                    'trainee_name', 'trainee_breed', 'trainee_sex', 'trainee_birth_date', 'trainee_note',
                 ]))
                     <div class="form-text mb-2">確認のため、パスワードをもう一度入力してください。</div>
                 @endif
