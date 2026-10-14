@@ -47,13 +47,13 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->createTraineeIntakeSurveyResponsesTable();
     }
 
-    private function traineeWithToken(?string $name, ?string $answeredAt = null): Trainee
+    private function traineeWithToken(?string $name, ?string $answeredAt = null, array $attributes = []): Trainee
     {
         $client = Client::query()->create([
             'internal_id' => '0001', 'last_name' => '山田', 'first_name' => '花子',
             'phone1' => '090-1111-2222', 'address3' => '桜町1-2-3',
         ]);
-        $trainee = Trainee::query()->create(['client_id' => $client->id, 'name' => $name]);
+        $trainee = Trainee::query()->create(array_merge(['client_id' => $client->id, 'name' => $name], $attributes));
         DB::table('trainee_intake_survey_tokens')->insert([
             'token' => self::TOKEN, 'trainee_id' => $trainee->id, 'answered_at' => $answeredAt,
             'created_at' => now(), 'updated_at' => now(),
@@ -96,7 +96,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->get($this->showPath())->assertOk()->assertSee('受付アンケート');
     }
 
-    public function test_名前が登録済みでも説明文に名前を使わず名前は表示だけ(): void
+    public function test_名前が登録済みでも説明文に名前を使わず名前は初期値の入った必須の入力欄(): void
     {
         $this->traineeWithToken('モモ');
 
@@ -106,11 +106,13 @@ class ClientIntakeSurveyShowTest extends TestCase
         // 説明文に愛犬の名前は使わない（2026-10 変更。設計書 S-1413）
         $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>', $html);
         $this->assertStringNotContainsString('モモちゃん', $html);
-        $this->assertMatchesRegularExpression('/<div class="text-muted small">名前<\/div>\s*<div>モモ<\/div>/u', $html);
-        $this->assertStringNotContainsString('name="name"', $html);
+        // 名前は表示だけの行ではなく、常に必須の入力欄（2026-10 変更）。初期値はトレーニーの名前
+        $this->assertMatchesRegularExpression('/<label for="name" class="form-label">名前 <span class="text-danger">\*<\/span><\/label>/u', $html);
+        $this->assertMatchesRegularExpression('/id="name" name="name" required maxlength="50" autocomplete="off"\s*value="モモ"/u', $html);
+        $this->assertStringNotContainsString('<div class="text-muted small">名前</div>', $html);
     }
 
-    public function test_名前が未登録なら説明文は愛犬で名前は必須の入力欄(): void
+    public function test_名前が未登録なら説明文は愛犬で名前は空の必須の入力欄(): void
     {
         $this->traineeWithToken(null);
 
@@ -119,7 +121,64 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringContainsString('愛犬のことを教えてください。', $html);
         $this->assertStringNotContainsString('愛犬ちゃん', $html);
         $this->assertMatchesRegularExpression('/<label for="name" class="form-label">名前 <span class="text-danger">\*<\/span><\/label>/u', $html);
-        $this->assertMatchesRegularExpression('/id="name" name="name" required maxlength="50"/u', $html);
+        $this->assertMatchesRegularExpression('/id="name" name="name" required maxlength="50" autocomplete="off"\s*value=""/u', $html);
+    }
+
+    public function test_トレーナーが入れた犬種と誕生日を初期値で出す(): void
+    {
+        $this->traineeWithToken('モモ', null, ['breed' => 'トイプードル', 'birth_year' => 2020, 'birth_month' => 3, 'birth_day' => 15]);
+
+        $html = $this->get($this->showPath())->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/id="breed" name="breed" maxlength="100" autocomplete="off"\s*value="トイプードル"/u', $html);
+        $this->assertMatchesRegularExpression('/data-birthday-part="year"[^>]*value="2020"/u', $html);
+        $this->assertMatchesRegularExpression('/data-birthday-part="month"[^>]*value="3"/u', $html);
+        $this->assertMatchesRegularExpression('/data-birthday-part="day"[^>]*value="15"/u', $html);
+    }
+
+    /**
+     * 誕生日の 3 つの欄の初期値（年月日／年月／年／未登録）
+     */
+    public function test_誕生日の初期値は登録されている部分だけ(): void
+    {
+        $cases = [
+            [[2020, 3, 15], ['2020', '3', '15']],
+            [[2020, 3, null], ['2020', '3', '']],
+            [[2020, null, null], ['2020', '', '']],
+            [[null, null, null], ['', '', '']],
+        ];
+        $this->traineeWithToken('モモ');
+        foreach ($cases as [$stored, $expected]) {
+            DB::table('trainees')->update(['birth_year' => $stored[0], 'birth_month' => $stored[1], 'birth_day' => $stored[2]]);
+
+            $html = $this->get($this->showPath())->assertOk()->getContent();
+
+            foreach (['year', 'month', 'day'] as $i => $part) {
+                $this->assertMatchesRegularExpression('/data-birthday-part="'.$part.'"[^>]*value="'.$expected[$i].'"/u', $html, json_encode($stored));
+            }
+        }
+    }
+
+    /**
+     * 性別・去勢・避妊の初期値：トレーニーの値を選んだ状態。未登録ならどれも選ばない
+     */
+    public function test_性別と去勢避妊の初期値はトレーニーの値を選んだ状態(): void
+    {
+        $this->traineeWithToken('モモ');
+        $cases = [
+            'sex' => ['male', 'female', 'unknown', null],
+            'neuter_status' => ['neutered', 'not_neutered', 'unknown', null],
+        ];
+        foreach ($cases as $column => $values) {
+            foreach ($values as $stored) {
+                DB::table('trainees')->update(['sex' => null, 'neuter_status' => null, $column => $stored]);
+
+                $html = $this->get($this->showPath())->assertOk()->getContent();
+
+                preg_match_all('/name="'.$column.'" id="[^"]+" value="([^"]+)"\s*checked/u', $html, $m);
+                $this->assertSame($stored === null ? [] : [$stored], $m[1], $column.'='.var_export($stored, true));
+            }
+        }
     }
 
     public function test_小見出しと区切り線と送信先(): void
@@ -140,7 +199,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringContainsString('<button type="submit" class="btn btn-primary">送信する</button>', $html);
     }
 
-    public function test_性別と去勢避妊はラジオボタンで不明を置かない(): void
+    public function test_性別と去勢避妊はラジオボタンで不明を置き分からないは置かない(): void
     {
         $this->traineeWithToken('モモ');
 
@@ -148,15 +207,15 @@ class ClientIntakeSurveyShowTest extends TestCase
 
         $this->assertStringContainsString('<div class="c-choice" role="radiogroup" aria-labelledby="sex-label">', $html);
         $this->assertStringContainsString('<div class="c-choice" role="radiogroup" aria-labelledby="neuter_status-label">', $html);
-        foreach (['sex' => ['male' => '男の子', 'female' => '女の子'], 'neuter_status' => ['neutered' => 'している', 'not_neutered' => 'していない', 'dont_know' => '分からない']] as $name => $options) {
+        foreach (['sex' => ['male' => '男の子', 'female' => '女の子', 'unknown' => '不明'], 'neuter_status' => ['neutered' => 'している', 'not_neutered' => 'していない', 'unknown' => '不明']] as $name => $options) {
             foreach ($options as $value => $label) {
                 $this->assertMatchesRegularExpression('/type="radio"\s+name="'.$name.'" id="'.$name.'-'.$value.'" value="'.$value.'"/u', $html);
                 $this->assertStringContainsString('<label class="form-check-label" for="'.$name.'-'.$value.'">'.$label.'</label>', $html);
             }
         }
-        $this->assertStringNotContainsString('value="unknown"', $html);
-        $this->assertStringNotContainsString('不明', $html);
-        // 初めて開いたときは何も選ばれていない
+        $this->assertStringNotContainsString('dont_know', $html);
+        $this->assertStringNotContainsString('分からない', $html);
+        // トレーニーの性別・去勢・避妊が未登録なら、何も選ばれていない
         $this->assertStringNotContainsString('checked', $html);
     }
 

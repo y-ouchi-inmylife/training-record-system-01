@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * 受付アンケートの回答（D-1100。2026-10 追加）。
  *
  * お客様が受付アンケート（S-1413）で答えた内容を、トレーニーの属性とは別に「答えたとおり」に残す
- * （トレーニーには空欄の項目だけ反映する。要件定義書 6-15-17）。1 頭に複数件持てる（第1段階では 1 件）。
+ * （回答の基本情報でトレーニーを上書きする。空・未選択の項目は変えない。要件定義書 6-15-17）。1 頭に複数件持てる（第1段階では 1 件）。
  * トレーナー側では閲覧のみ（S-0309。要件定義書 6-16-10）。お客様の操作で作られるため、
  * created_by / updated_by は持たない。
  */
@@ -18,60 +18,14 @@ class TraineeIntakeSurveyResponse extends Model
 {
     /*
     |--------------------------------------------------------------------------
-    | 性別（回答では「不明」を置かない。要件定義書 6-15-17 備考）
+    | 性別・去勢・避妊の値とラベル
     |--------------------------------------------------------------------------
+    | トレーニー（D-0700。5-20.・5-21.）と同じ値・同じラベルを使う（2026-10 変更。お客様の回答でトレーニーを
+    | 上書きするため、選択肢をトレーナー側にそろえた）。二重に定義しないよう、値と対応表は Trainee の定数と
+    | Trainee::sexLabels()・Trainee::neuterStatusLabels() をそのまま使う。
+    | 経緯：当初は性別に「不明」を置かず（男の子・女の子だけ）、去勢・避妊は「分からない」（dont_know）を
+    | トレーニーの「不明」（unknown）と別の値で持ち、反映のときに読み替えていた（db-schema.md 5-22。廃止）。
     */
-
-    /**
-     * 回答の性別のコード → 日本語ラベル（Trainee::sexLabels() のうち男の子・女の子だけ）
-     */
-    public static function sexLabels(): array
-    {
-        return [
-            Trainee::SEX_MALE => Trainee::sexLabels()[Trainee::SEX_MALE],
-            Trainee::SEX_FEMALE => Trainee::sexLabels()[Trainee::SEX_FEMALE],
-        ];
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 去勢・避妊（db-schema.md 5-22）
-    |--------------------------------------------------------------------------
-    | 「分からない」（dont_know）は、トレーナーが選ぶトレーニーの「不明」（unknown）とは別の値で持つ
-    | （答えたとおりを残すため）。トレーニーに反映するときは unknown に読み替える。
-    */
-
-    public const NEUTER_NEUTERED = 'neutered';
-
-    public const NEUTER_NOT_NEUTERED = 'not_neutered';
-
-    public const NEUTER_DONT_KNOW = 'dont_know';
-
-    /**
-     * 回答の去勢・避妊のコード → 日本語ラベル
-     */
-    public static function neuterStatusLabels(): array
-    {
-        return [
-            self::NEUTER_NEUTERED => 'している',
-            self::NEUTER_NOT_NEUTERED => 'していない',
-            self::NEUTER_DONT_KNOW => '分からない',
-        ];
-    }
-
-    /**
-     * 回答の去勢・避妊の値を、トレーニー（D-0700。5-21）の値に読み替える。
-     * 「分からない」はトレーニーの「不明」として反映する（要件定義書 D-1100）。未回答は null
-     */
-    public static function neuterStatusForTrainee(?string $value): ?string
-    {
-        return match ($value) {
-            self::NEUTER_NEUTERED => Trainee::NEUTER_NEUTERED,
-            self::NEUTER_NOT_NEUTERED => Trainee::NEUTER_NOT_NEUTERED,
-            self::NEUTER_DONT_KNOW => Trainee::NEUTER_UNKNOWN,
-            default => null,
-        };
-    }
 
     /*
     |--------------------------------------------------------------------------
@@ -170,15 +124,15 @@ class TraineeIntakeSurveyResponse extends Model
      */
     public function getSexLabelAttribute(): ?string
     {
-        return $this->sex ? (self::sexLabels()[$this->sex] ?? $this->sex) : null;
+        return $this->sex ? (Trainee::sexLabels()[$this->sex] ?? $this->sex) : null;
     }
 
     /**
-     * 去勢・避妊の日本語表示（答えたとおり。「分からない」はそのまま）。未回答なら null
+     * 去勢・避妊の日本語表示（答えたとおり）。未回答なら null
      */
     public function getNeuterStatusLabelAttribute(): ?string
     {
-        return $this->neuter_status ? (self::neuterStatusLabels()[$this->neuter_status] ?? $this->neuter_status) : null;
+        return $this->neuter_status ? (Trainee::neuterStatusLabels()[$this->neuter_status] ?? $this->neuter_status) : null;
     }
 
     /**

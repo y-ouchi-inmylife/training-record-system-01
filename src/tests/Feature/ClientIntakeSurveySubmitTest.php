@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Requests\ClientIntakeSurveyRequest;
 use App\Models\Client;
 use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyResponse;
@@ -17,7 +16,8 @@ use Tests\TestCase;
 /**
  * 受付アンケートの回答の送信（POST /client-portal/intake-survey/{token}。2026-10 追加。要件定義書 6-15-17）。
  *
- * - 回答を答えたとおりに保存し、トレーニーの空欄の項目だけに反映し、案内を使い切りにして完了画面へ（PRG）
+ * - 回答を送られてきたとおりに保存し、回答の基本情報でトレーニーを上書きし（空・未選択の項目は変えない。
+ *   2026-10 変更。当初は空欄の項目だけに反映していた）、案内を使い切りにして完了画面へ（PRG）
  * - 2 回目の送信は回答済みの画面になる
  *
  * 注意：テストの DB（SQLite）では lockForUpdate() は何もしないため、同時送信の排他（MySQL の行ロック）は
@@ -76,20 +76,29 @@ class ClientIntakeSurveySubmitTest extends TestCase
         return $trainee->fresh();
     }
 
+    /**
+     * 回答を送る。名前は常に必須なので、$data に name がなければトレーニーの初期値と同じ「モモ」を送る
+     * （名前の欄はトレーニーの名前が初期値で入っているため、お客様が触らなければその値が送られる）
+     */
     private function submit(array $data = [])
     {
+        if (! array_key_exists('name', $data)) {
+            $data = ['name' => 'モモ'] + $data;
+        }
+
         return $this->post('/client-portal/intake-survey/'.self::TOKEN, $data);
     }
 
     private function fullAnswer(): array
     {
         return [
+            'name' => 'モモ',
             'breed' => 'トイプードル',
             'sex' => 'female',
             'birth_year' => '2022',
             'birth_month' => '3',
             'birth_day' => '',
-            'neuter_status' => 'dont_know',
+            'neuter_status' => 'unknown',
             'wish' => "留守番中に鳴き続けてしまう\nのを直したい",
             'recent_events' => '',
             'ideal_days' => 'ドッグランで遊びたい',
@@ -112,29 +121,30 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertSame($token->id, (int) $saved->trainee_intake_survey_token_id);
         $this->assertSame('2026-10-16 14:32:00', $saved->answered_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-10-16 14:32:00', $token->answered_at->format('Y-m-d H:i:s'));
-        // 答えたとおり
+        // 送られてきたとおり
         $this->assertSame('モモ', $saved->name);
         $this->assertSame('トイプードル', $saved->breed);
         $this->assertSame('female', $saved->sex);
         $this->assertSame(2022, $saved->birth_year);
         $this->assertSame(3, $saved->birth_month);
         $this->assertNull($saved->birth_day);
-        $this->assertSame('dont_know', $saved->neuter_status);
+        $this->assertSame('unknown', $saved->neuter_status);
         $this->assertSame("留守番中に鳴き続けてしまう\nのを直したい", $saved->wish);
         $this->assertNull($saved->recent_events);
         $this->assertSame('ドッグランで遊びたい', $saved->ideal_days);
         $this->assertNull($saved->health_concerns);
     }
 
-    public function test_何も答えなくても名前が登録済みなら送信できる(): void
+    public function test_名前のほかに何も答えなくても送信できる(): void
     {
         $this->traineeWithToken();
 
-        $this->submit([])->assertRedirect(route('client-portal.intake-survey.thanks'));
+        $this->submit(['name' => 'モモ'])->assertRedirect(route('client-portal.intake-survey.thanks'));
 
         $saved = TraineeIntakeSurveyResponse::query()->sole();
         $this->assertSame('モモ', $saved->name);
         $this->assertNull($saved->breed);
+        $this->assertNull($saved->sex);
     }
 
     public function test_2回目の送信は回答済みの画面になり回答は1件のまま(): void
@@ -148,6 +158,8 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $response->assertSee('このアンケートはすでにご回答いただいています。');
         $this->assertSame(1, TraineeIntakeSurveyResponse::query()->count());
         $this->assertSame('トイプードル', TraineeIntakeSurveyResponse::query()->value('breed'));
+        // 2 回目の送信ではトレーニーも変わらない
+        $this->assertSame('トイプードル', Trainee::query()->value('breed'));
         // 回答済みの案内を開いても回答済みの画面
         $this->get('/client-portal/intake-survey/'.self::TOKEN)->assertOk()->assertSee('このアンケートはすでにご回答いただいています。');
     }
@@ -176,74 +188,87 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertNull(DB::table('trainee_intake_survey_tokens')->value('answered_at'));
     }
 
-    // ---- トレーニーへの反映 ----
+    // ---- トレーニーへの反映（2026-10 変更：回答で上書きする。空・未選択の項目は変えない） ----
 
-    public function test_空欄の項目だけに反映しdont_knowは不明に読み替える(): void
+    public function test_未登録の項目は回答の値で埋まる(): void
     {
-        $trainee = $this->traineeWithToken();
+        $trainee = $this->traineeWithToken(['name' => null]);
 
-        $this->submit($this->fullAnswer());
+        $this->submit(['name' => 'ハナ'] + $this->fullAnswer())->assertRedirect(route('client-portal.intake-survey.thanks'));
 
         $trainee->refresh();
-        $this->assertSame('モモ', $trainee->name);
+        $this->assertSame('ハナ', $trainee->name);
         $this->assertSame('トイプードル', $trainee->breed);
         $this->assertSame('female', $trainee->sex);
-        $this->assertSame(2022, (int) $trainee->birth_year);
-        $this->assertSame(3, (int) $trainee->birth_month);
+        $this->assertSame([2022, 3], [(int) $trainee->birth_year, (int) $trainee->birth_month]);
         $this->assertNull($trainee->birth_day);
         $this->assertSame('unknown', $trainee->neuter_status);
     }
 
-    public function test_入力済みの項目は変えない(): void
+    public function test_登録済みの項目も回答の値で上書きする(): void
     {
         $trainee = $this->traineeWithToken([
             'breed' => '柴', 'sex' => 'male', 'neuter_status' => 'neutered',
             'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1,
         ]);
 
-        $this->submit($this->fullAnswer());
+        $this->submit([
+            'name' => 'モモ子', 'breed' => 'トイプードル', 'sex' => 'female', 'neuter_status' => 'not_neutered',
+            'birth_year' => '2021', 'birth_month' => '6', 'birth_day' => '7',
+        ]);
 
         $trainee->refresh();
-        $this->assertSame('柴', $trainee->breed);
-        $this->assertSame('male', $trainee->sex);
-        $this->assertSame('neutered', $trainee->neuter_status);
-        $this->assertSame([2020, 5, 1], [(int) $trainee->birth_year, (int) $trainee->birth_month, (int) $trainee->birth_day]);
-        // 回答は答えたとおりに残る
-        $this->assertSame('トイプードル', TraineeIntakeSurveyResponse::query()->value('breed'));
+        $this->assertSame('モモ子', $trainee->name);
+        $this->assertSame('トイプードル', $trainee->breed);
+        $this->assertSame('female', $trainee->sex);
+        $this->assertSame('not_neutered', $trainee->neuter_status);
+        $this->assertSame([2021, 6, 7], [(int) $trainee->birth_year, (int) $trainee->birth_month, (int) $trainee->birth_day]);
     }
 
-    public function test_トレーナーが選んだ不明は上書きしない(): void
+    public function test_不明を選ぶと不明で上書きする(): void
     {
-        $trainee = $this->traineeWithToken(['sex' => 'unknown', 'neuter_status' => 'unknown']);
+        $trainee = $this->traineeWithToken(['sex' => 'male', 'neuter_status' => 'neutered']);
 
-        $this->submit(['sex' => 'female', 'neuter_status' => 'neutered']);
+        $this->submit(['sex' => 'unknown', 'neuter_status' => 'unknown']);
 
         $trainee->refresh();
         $this->assertSame('unknown', $trainee->sex);
         $this->assertSame('unknown', $trainee->neuter_status);
     }
 
-    public function test_誕生日は3つとも空のときだけ3つまとめて反映する(): void
+    public function test_空や未選択の項目は変えない(): void
     {
-        // 年だけ入っているトレーニーには反映しない（一部だけ入っている場合）
-        $trainee = $this->traineeWithToken(['birth_year' => 2021]);
+        // トレーナーが選んだ「不明」も、未選択ならそのまま
+        $trainee = $this->traineeWithToken([
+            'breed' => '柴', 'sex' => 'unknown', 'neuter_status' => 'unknown',
+            'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1,
+        ]);
 
-        $this->submit(['birth_year' => '2022', 'birth_month' => '3', 'birth_day' => '15']);
+        $this->submit(['breed' => '', 'birth_year' => '', 'birth_month' => '', 'birth_day' => ''])
+            ->assertRedirect(route('client-portal.intake-survey.thanks'));
+
+        $trainee->refresh();
+        $this->assertSame('柴', $trainee->breed);
+        $this->assertSame('unknown', $trainee->sex);
+        $this->assertSame('unknown', $trainee->neuter_status);
+        $this->assertSame([2020, 5, 1], [(int) $trainee->birth_year, (int) $trainee->birth_month, (int) $trainee->birth_day]);
+        // 回答には送られてきたとおり（空）が残る
+        $saved = TraineeIntakeSurveyResponse::query()->sole();
+        $this->assertNull($saved->breed);
+        $this->assertNull($saved->sex);
+        $this->assertNull($saved->birth_year);
+    }
+
+    public function test_誕生日は年だけ入れて送ると年だけに上書きする(): void
+    {
+        $trainee = $this->traineeWithToken(['birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1]);
+
+        $this->submit(['birth_year' => '2021', 'birth_month' => '', 'birth_day' => '']);
 
         $trainee->refresh();
         $this->assertSame(2021, (int) $trainee->birth_year);
         $this->assertNull($trainee->birth_month);
         $this->assertNull($trainee->birth_day);
-    }
-
-    public function test_誕生日が3つとも空なら年月日をそのまま反映する(): void
-    {
-        $trainee = $this->traineeWithToken();
-
-        $this->submit(['birth_year' => '2022', 'birth_month' => '3', 'birth_day' => '15']);
-
-        $trainee->refresh();
-        $this->assertSame([2022, 3, 15], [(int) $trainee->birth_year, (int) $trainee->birth_month, (int) $trainee->birth_day]);
     }
 
     public function test_自由記述は反映しない(): void
@@ -261,36 +286,54 @@ class ClientIntakeSurveySubmitTest extends TestCase
 
         $this->submit($this->fullAnswer());
 
-        $this->assertSame(100, (int) $trainee->fresh()->updated_by);
+        $fresh = $trainee->fresh();
+        $this->assertSame('トイプードル', $fresh->breed);
+        $this->assertSame(100, (int) $fresh->updated_by);
     }
 
-    public function test_反映するものがなければトレーニーを更新しない(): void
+    public function test_反映で値が変わらなければトレーニーを更新しない(): void
     {
-        $trainee = $this->traineeWithToken(['breed' => '柴']);
+        // 初期値のまま送った場合（誕生日は文字列で送られるが、整数の値と同じとみなす）
+        $trainee = $this->traineeWithToken([
+            'breed' => '柴', 'sex' => 'male', 'neuter_status' => 'neutered',
+            'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1,
+        ]);
 
-        $this->submit(['breed' => 'トイプードル']);
+        $this->submit([
+            'name' => 'モモ', 'breed' => '柴', 'sex' => 'male', 'neuter_status' => 'neutered',
+            'birth_year' => '2020', 'birth_month' => '05', 'birth_day' => '1',
+        ])->assertRedirect(route('client-portal.intake-survey.thanks'));
 
         $this->assertSame('2026-10-01 00:00:00', $trainee->fresh()->updated_at->format('Y-m-d H:i:s'));
         $this->assertSame(1, TraineeIntakeSurveyResponse::query()->count());
     }
 
-    // ---- 名前 ----
+    // ---- 名前（2026-10 変更：常に必須で、回答の値で上書きする） ----
 
-    public function test_名前が未登録なら名前が必須(): void
+    public function test_名前は必須でトレーナーが名前を入れていても空ならエラー(): void
     {
-        $this->traineeWithToken(['name' => null]);
+        $trainee = $this->traineeWithToken();
 
-        $response = $this->submit(['breed' => 'トイプードル']);
+        $response = $this->submit(['name' => '', 'breed' => 'トイプードル']);
 
         $response->assertRedirect();
         $response->assertSessionHasErrors(['name' => '名前を入力してください。']);
         $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
         $this->assertNull(DB::table('trainee_intake_survey_tokens')->value('answered_at'));
+        $this->assertSame('モモ', $trainee->fresh()->name);
     }
 
-    public function test_名前が未登録なら回答の名前をトレーニーに反映する(): void
+    public function test_名前が未登録でも空ならエラー(): void
     {
-        $trainee = $this->traineeWithToken(['name' => null]);
+        $this->traineeWithToken(['name' => null]);
+
+        $this->submit(['name' => ''])->assertSessionHasErrors(['name' => '名前を入力してください。']);
+        $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
+    }
+
+    public function test_名前を直すと上書きする(): void
+    {
+        $trainee = $this->traineeWithToken();
 
         $this->submit(['name' => 'ハナ'])->assertRedirect(route('client-portal.intake-survey.thanks'));
 
@@ -300,42 +343,24 @@ class ClientIntakeSurveySubmitTest extends TestCase
 
     public function test_名前は50文字以内(): void
     {
-        $this->traineeWithToken(['name' => null]);
+        $this->traineeWithToken();
 
         $this->submit(['name' => str_repeat('あ', 51)])
             ->assertSessionHasErrors(['name' => '名前は50文字以内で入力してください。']);
     }
 
-    public function test_名前が登録済みなら名前を送っても使わない(): void
+    public function test_開いてから送るまでにトレーナーが値を変えてもお客様の回答で上書きする(): void
     {
-        $trainee = $this->traineeWithToken();
+        $trainee = $this->traineeWithToken(['breed' => '柴']);
+        // 回答画面を開いたあとに、トレーナーが犬種と名前を直した
+        DB::table('trainees')->where('id', $trainee->id)->update(['name' => 'モモタロウ', 'breed' => '豆柴']);
 
-        $this->submit(['name' => 'ハナ'])->assertRedirect(route('client-portal.intake-survey.thanks'));
+        $this->submit(['name' => 'モモ', 'breed' => '柴']);
 
-        $this->assertSame('モモ', $trainee->fresh()->name);
-        $this->assertSame('モモ', TraineeIntakeSurveyResponse::query()->value('name'));
+        $fresh = $trainee->fresh();
+        $this->assertSame('モモ', $fresh->name);
+        $this->assertSame('柴', $fresh->breed);
     }
-
-    public function test_検証のあとに名前が消されていたら名前の入力エラーで戻す(): void
-    {
-        // 検証（ロックの前）では名前があり、ロックのあとでは名前がない、という食い違いを作る：
-        // フォームリクエストの検証（afterResolving で動く）の直後に名前を消す。検証で名前のエラーに
-        // なった場合は、前の画面（from がないため /）へ戻るので、下の戻り先の確かめで区別できる
-        $trainee = $this->traineeWithToken();
-        $this->app->afterResolving(ClientIntakeSurveyRequest::class, function () use ($trainee) {
-            DB::table('trainees')->where('id', $trainee->id)->update(['name' => null]);
-        });
-
-        $response = $this->submit(['breed' => 'トイプードル']);
-
-        $response->assertRedirect('/client-portal/intake-survey/'.self::TOKEN);
-        $response->assertSessionHasErrors(['name' => '名前を入力してください。']);
-        $response->assertSessionHasInput('breed', 'トイプードル');
-        $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
-        $this->assertNull(DB::table('trainee_intake_survey_tokens')->value('answered_at'));
-    }
-
-    // ---- 入力のルール ----
 
     public function test_全角の数字の誕生日を受け付ける(): void
     {
@@ -357,18 +382,21 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
     }
 
-    public function test_性別に不明は受け付けない(): void
+    public function test_性別はトレーナー側と同じ値だけを受け付ける(): void
     {
         $this->traineeWithToken();
 
-        $this->submit(['sex' => 'unknown'])->assertSessionHasErrors(['sex' => '選択された性別は有効ではありません。']);
+        $this->submit(['sex' => 'other'])->assertSessionHasErrors(['sex' => '選択された性別は有効ではありません。']);
+        $this->submit(['sex' => 'unknown'])->assertRedirect(route('client-portal.intake-survey.thanks'));
     }
 
-    public function test_去勢避妊はトレーニーの不明の値を受け付けない(): void
+    public function test_去勢避妊のdont_knowはエラー(): void
     {
+        // 2026-10 に「分からない」（dont_know）をやめ、トレーナー側と同じ「不明」（unknown）にした
         $this->traineeWithToken();
 
-        $this->submit(['neuter_status' => 'unknown'])->assertSessionHasErrors(['neuter_status' => '選択された去勢・避妊は有効ではありません。']);
+        $this->submit(['neuter_status' => 'dont_know'])->assertSessionHasErrors(['neuter_status' => '選択された去勢・避妊は有効ではありません。']);
+        $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
     }
 
     public function test_犬種は100文字以内(): void
@@ -460,10 +488,11 @@ class ClientIntakeSurveySubmitTest extends TestCase
         }
     }
 
-    public function test_検証エラーで戻ったとき入力が残る(): void
+    public function test_検証エラーで戻ったとき入力が残りトレーニーの値より優先される(): void
     {
-        $this->traineeWithToken(['name' => null]);
-        $data = $this->fullAnswer();
+        // トレーニーの値（柴・男の子・していない・2019年）と違う値を入れ、名前を空にして送る
+        $this->traineeWithToken(['breed' => '柴', 'sex' => 'male', 'neuter_status' => 'not_neutered', 'birth_year' => 2019]);
+        $data = ['name' => ''] + $this->fullAnswer();
 
         $this->from('/client-portal/intake-survey/'.self::TOKEN)->submit($data)
             ->assertRedirect('/client-portal/intake-survey/'.self::TOKEN);
@@ -473,8 +502,12 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertStringContainsString('名前を入力してください。', $html);
         $this->assertMatchesRegularExpression('/id="breed" name="breed" maxlength="100" autocomplete="off"\s*value="トイプードル"/u', $html);
         $this->assertMatchesRegularExpression('/id="sex-female" value="female"\s*checked/u', $html);
-        $this->assertMatchesRegularExpression('/id="neuter_status-dont_know" value="dont_know"\s*checked/u', $html);
+        $this->assertMatchesRegularExpression('/id="neuter_status-unknown" value="unknown"\s*checked/u', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="sex-male" value="male"\s*checked/u', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="neuter_status-not_neutered" value="not_neutered"\s*checked/u', $html);
         $this->assertMatchesRegularExpression('/data-birthday-part="year"[^>]*value="2022"/u', $html);
+        // 空で送った名前は空のまま（トレーニーの名前に戻さない）
+        $this->assertMatchesRegularExpression('/id="name" name="name" required maxlength="50" autocomplete="off"\s*value=""/u', $html);
         $this->assertStringContainsString(">留守番中に鳴き続けてしまう\nのを直したい</textarea>", $html);
     }
 }

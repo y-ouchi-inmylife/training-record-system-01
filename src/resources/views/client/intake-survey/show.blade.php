@@ -2,8 +2,15 @@
 
 @php
     $companyName = config('app.client_portal_company');
-    $sexLabels = \App\Models\TraineeIntakeSurveyResponse::sexLabels();
-    $neuterStatusLabels = \App\Models\TraineeIntakeSurveyResponse::neuterStatusLabels();
+    // 性別・去勢・避妊の選択肢はトレーナー側と同じ（2026-10 変更。当初は性別に「不明」がなく、
+    // 去勢・避妊は「分からない」だった）
+    $sexLabels = \App\Models\Trainee::sexLabels();
+    $neuterStatusLabels = \App\Models\Trainee::neuterStatusLabels();
+    // 「愛犬のこと」の 5 項目の初期値（2026-10 追加。設計書 S-1413「初期値」）：ページを開いた時点の
+    // トレーニーの値。入力エラーで戻ったときは、お客様が入力した値だけを使う（old()。消した欄・選ばなかった
+    // ラジオボタンにトレーニーの値を戻さないため、old() の第 2 引数にトレーニーの値を渡す形にはしない）
+    $hasOldInput = session()->hasOldInput();
+    $initial = fn (string $key) => $hasOldInput ? old($key) : $trainee->{$key};
 @endphp
 
 @section('title', '受付アンケート')
@@ -35,30 +42,24 @@
 
                 <h2 class="fs-6 fw-bold mb-2">愛犬のこと</h2>
 
-                {{-- 名前：登録済みなら表示のみ（入力済みの値は上書きしないため、書き直せる形にすると
-                     「書き直したのに反映されない」食い違いが起きる。要件定義書 6-15-17 備考）。表示の行は
-                     S-1403 のメールアドレスの表示行と同じマークアップ。未登録ならテキスト入力で必須。
-                     ラベルは「名前」（「お名前」は飼い主の氏名に使っているため） --}}
-                @if($trainee->has_name)
-                    <div class="mb-3">
-                        <div class="text-muted small">名前</div>
-                        <div>{{ $trainee->name }}</div>
-                    </div>
-                @else
-                    <div class="mb-3">
-                        <label for="name" class="form-label">名前 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control @error('name') is-invalid @enderror"
-                               id="name" name="name" required maxlength="50" autocomplete="off"
-                               value="{{ old('name') }}">
-                        <x-form-error field="name" />
-                    </div>
-                @endif
+                {{-- 「愛犬のこと」の 5 項目は、トレーナーが入れた値を初期値にした入力欄。お客様が直して送ると、
+                     回答の値でトレーニーを上書きする（空・未選択の項目は変えない。要件定義書 6-15-17。2026-10 変更）。
+                     名前は常にテキスト入力で必須。ラベルは「名前」（「お名前」は飼い主の氏名に使っているため）。
+                     経緯：当初は、名前が登録済みなら表示のみ（S-1403 のメールアドレスの表示行と同じマークアップ）、
+                     未登録ならテキスト入力で必須にしていた（入力済みの値は上書きしない反映のルールだったため） --}}
+                <div class="mb-3">
+                    <label for="name" class="form-label">名前 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control @error('name') is-invalid @enderror"
+                           id="name" name="name" required maxlength="50" autocomplete="off"
+                           value="{{ $initial('name') }}">
+                    <x-form-error field="name" />
+                </div>
 
                 <div class="mb-3">
                     <label for="breed" class="form-label">犬種</label>
                     <input type="text" class="form-control @error('breed') is-invalid @enderror"
                            id="breed" name="breed" maxlength="100" autocomplete="off"
-                           value="{{ old('breed') }}">
+                           value="{{ $initial('breed') }}">
                     <x-form-error field="breed" />
                 </div>
 
@@ -72,7 +73,7 @@
                             <div class="form-check">
                                 <input class="form-check-input @error('sex') is-invalid @enderror" type="radio"
                                        name="sex" id="sex-{{ $value }}" value="{{ $value }}"
-                                       @checked(old('sex') === $value)>
+                                       @checked($initial('sex') === $value)>
                                 <label class="form-check-label" for="sex-{{ $value }}">{{ $label }}</label>
                             </div>
                         @endforeach
@@ -82,7 +83,8 @@
 
                 {{-- 誕生日：トレーナー側（trainees/_form.blade.php）と同じ 3 つの欄・同じ説明文・入力中の年齢の表示
                      （trainee-birthday-input.js。欄と表示先は data-birthday-* 属性で見つける）。
-                     エラーは 3 つの欄のまとまりの下に 1 つだけ（キー birth_date） --}}
+                     エラーは 3 つの欄のまとまりの下に 1 つだけ（キー birth_date）。初期値（トレーニーの年・月・日）が
+                     入っているときも、ページを開いたときに JS が一度表示するので、年齢が出る --}}
                 <div class="mb-3">
                     <label for="birth_year" id="birth_date-label" class="form-label">誕生日</label>
                     <div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-labelledby="birth_date-label" data-birthday-input>
@@ -90,21 +92,21 @@
                             <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
                                    id="birth_year" name="birth_year" inputmode="numeric" maxlength="4" data-birthday-part="year"
                                    style="width: 5.5rem;" aria-label="誕生日の年" aria-describedby="birth_date-help"
-                                   value="{{ old('birth_year') }}" autocomplete="off">
+                                   value="{{ $initial('birth_year') }}" autocomplete="off">
                             <span>年</span>
                         </div>
                         <div class="d-flex align-items-center gap-1">
                             <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
                                    id="birth_month" name="birth_month" inputmode="numeric" maxlength="2" data-birthday-part="month"
                                    style="width: 4rem;" aria-label="誕生日の月" aria-describedby="birth_date-help"
-                                   value="{{ old('birth_month') }}" autocomplete="off">
+                                   value="{{ $initial('birth_month') }}" autocomplete="off">
                             <span>月</span>
                         </div>
                         <div class="d-flex align-items-center gap-1">
                             <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
                                    id="birth_day" name="birth_day" inputmode="numeric" maxlength="2" data-birthday-part="day"
                                    style="width: 4rem;" aria-label="誕生日の日" aria-describedby="birth_date-help"
-                                   value="{{ old('birth_day') }}" autocomplete="off">
+                                   value="{{ $initial('birth_day') }}" autocomplete="off">
                             <span>日</span>
                         </div>
                         {{-- 入力中の年齢（または入力中の案内）。JS が書き込む --}}
@@ -122,7 +124,7 @@
                             <div class="form-check">
                                 <input class="form-check-input @error('neuter_status') is-invalid @enderror" type="radio"
                                        name="neuter_status" id="neuter_status-{{ $value }}" value="{{ $value }}"
-                                       @checked(old('neuter_status') === $value)>
+                                       @checked($initial('neuter_status') === $value)>
                                 <label class="form-check-label" for="neuter_status-{{ $value }}">{{ $label }}</label>
                             </div>
                         @endforeach

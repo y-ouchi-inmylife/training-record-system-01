@@ -2,46 +2,40 @@
 
 namespace Tests\Unit\Models;
 
-use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyResponse;
 use Tests\TestCase;
 
 /**
  * 受付アンケートの回答のモデル（D-1100。2026-10 追加）。
  *
- * 答えたとおりの表示（性別・去勢・避妊・誕生日）、トレーニーへの反映のときの去勢・避妊の読み替え、
+ * 答えたとおりの表示（性別・去勢・避妊・誕生日。性別・去勢・避妊はトレーニーと同じ値・同じ対応表）と、
  * 自由記述の設問文と例文（要件定義書 D-1100）を確かめる。
  */
 class TraineeIntakeSurveyResponseTest extends TestCase
 {
-    public function test_性別は男の子と女の子だけで不明を置かない(): void
+    public function test_性別の表示はトレーニーと同じ対応表で不明もある(): void
     {
-        $this->assertSame(['male' => '男の子', 'female' => '女の子'], TraineeIntakeSurveyResponse::sexLabels());
-    }
-
-    public function test_性別の表示(): void
-    {
+        // 値とラベルは Trainee::sexLabels() をそのまま使う（2026-10 変更。当初は男の子・女の子だけ）
         $this->assertSame('男の子', (new TraineeIntakeSurveyResponse(['sex' => 'male']))->sex_label);
         $this->assertSame('女の子', (new TraineeIntakeSurveyResponse(['sex' => 'female']))->sex_label);
+        $this->assertSame('不明', (new TraineeIntakeSurveyResponse(['sex' => 'unknown']))->sex_label);
         $this->assertNull((new TraineeIntakeSurveyResponse)->sex_label);
     }
 
-    public function test_去勢避妊は分からないをトレーニーの不明とは別の値で持つ(): void
+    public function test_去勢避妊の表示はトレーニーと同じ対応表(): void
     {
-        $this->assertSame(
-            ['neutered' => 'している', 'not_neutered' => 'していない', 'dont_know' => '分からない'],
-            TraineeIntakeSurveyResponse::neuterStatusLabels()
-        );
-        $this->assertSame('分からない', (new TraineeIntakeSurveyResponse(['neuter_status' => 'dont_know']))->neuter_status_label);
+        // 値とラベルは Trainee::neuterStatusLabels() をそのまま使う（2026-10 変更。当初は「分からない」〔dont_know〕）
+        $this->assertSame('している', (new TraineeIntakeSurveyResponse(['neuter_status' => 'neutered']))->neuter_status_label);
+        $this->assertSame('していない', (new TraineeIntakeSurveyResponse(['neuter_status' => 'not_neutered']))->neuter_status_label);
+        $this->assertSame('不明', (new TraineeIntakeSurveyResponse(['neuter_status' => 'unknown']))->neuter_status_label);
         $this->assertNull((new TraineeIntakeSurveyResponse)->neuter_status_label);
     }
 
-    public function test_トレーニーに反映するときは分からないを不明に読み替える(): void
+    public function test_回答独自の対応表や読み替えは持たない(): void
     {
-        $this->assertSame(Trainee::NEUTER_NEUTERED, TraineeIntakeSurveyResponse::neuterStatusForTrainee('neutered'));
-        $this->assertSame(Trainee::NEUTER_NOT_NEUTERED, TraineeIntakeSurveyResponse::neuterStatusForTrainee('not_neutered'));
-        $this->assertSame(Trainee::NEUTER_UNKNOWN, TraineeIntakeSurveyResponse::neuterStatusForTrainee('dont_know'));
-        $this->assertNull(TraineeIntakeSurveyResponse::neuterStatusForTrainee(null));
+        $this->assertFalse(method_exists(TraineeIntakeSurveyResponse::class, 'sexLabels'));
+        $this->assertFalse(method_exists(TraineeIntakeSurveyResponse::class, 'neuterStatusLabels'));
+        $this->assertFalse(method_exists(TraineeIntakeSurveyResponse::class, 'neuterStatusForTrainee'));
     }
 
     public function test_誕生日の表示は年齢を付けない(): void

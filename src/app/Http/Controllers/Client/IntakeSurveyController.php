@@ -58,7 +58,8 @@ class IntakeSurveyController extends Controller
      * トークンの行 → トレーニーの行の順に SELECT ... FOR UPDATE でロックしてから確かめる（初回設定
      * S-1403 の二重開封の扱いにならう。設計書 S-1413 備考「同時送信」）。後から来た送信は、ロックが
      * 解けるのを待ってから「回答済み」と判定され、回答済みの画面になる。トレーニーの行もロックするのは、
-     * トレーナーが同時にトレーニーを編集・削除しても、空欄の判定と反映がずれないようにするため。
+     * トレーナーが同時にトレーニーを編集・削除しても、反映がずれないようにするため（送信の時点では、お客様の
+     * 回答を優先して上書きする）。
      * ロックの順は、ほかの処理（発行のサービスはトレーニーの行だけをロックする）と食い違わない。
      * 注意：テストの DB（SQLite）では lockForUpdate() は何もしないため、排他はテストでは確かめられない。
      */
@@ -79,21 +80,16 @@ class IntakeSurveyController extends Controller
                 return self::UNAVAILABLE;
             }
 
-            // 名前の確かめ直し：検証（ロックの前）のあとにトレーナーが名前を消した場合、名前のない回答に
-            // なってしまうため、ロックしたあとの状態でもう一度確かめる。登録済みなら、そのときの名前を記録する
-            if (! $trainee->has_name && blank($validated['name'] ?? null)) {
-                return null;
-            }
-            $name = $trainee->has_name ? $trainee->name : $validated['name'];
-
+            // 回答には送られてきた値をそのまま記録する。名前は常に必須なので、トレーニーの名前の有無で
+            // 分けない（2026-10 変更。当初は、トレーニーの名前が登録済みならそのときの名前を記録し、未登録なのに
+            // 回答の名前が空ならロックのあとに確かめ直して入力エラーにしていた）
             $answeredAt = now();
             $response = [
                 'trainee_id' => $trainee->id,
                 'trainee_intake_survey_token_id' => $tokenRecord->id,
                 'answered_at' => $answeredAt,
-                'name' => $name,
             ];
-            foreach (['breed', 'sex', 'birth_year', 'birth_month', 'birth_day', 'neuter_status'] as $key) {
+            foreach (['name', 'breed', 'sex', 'birth_year', 'birth_month', 'birth_day', 'neuter_status'] as $key) {
                 $response[$key] = $validated[$key] ?? null;
             }
             foreach (array_keys(TraineeIntakeSurveyResponse::questions()) as $column) {
@@ -108,12 +104,6 @@ class IntakeSurveyController extends Controller
             return true;
         });
 
-        if ($result === null) {
-            return redirect()
-                ->route('client-portal.intake-survey.show', ['token' => $token])
-                ->withInput()
-                ->withErrors(['name' => __('validation.required', ['attribute' => __('validation.attributes.name')])]);
-        }
         if ($result !== true) {
             return $this->unavailableView($result);
         }
@@ -131,43 +121,40 @@ class IntakeSurveyController extends Controller
     }
 
     /**
-     * 回答の基本情報を、トレーニーの空欄の項目だけに反映する（要件定義書 6-15-17「トレーニーへの反映」）。
+     * 回答の基本情報で、トレーニーの値を上書きする（要件定義書 6-15-17「トレーニーへの反映」。2026-10 変更）。
      *
-     * - 名前：未登録のときだけ
-     * - 犬種・性別・去勢・避妊：NULL のときだけ（「不明」〔unknown〕は入力済みとみなす）。
-     *   去勢・避妊の「分からない」（dont_know）はトレーニーの「不明」（unknown）に読み替える
-     * - 誕生日：3 つとも NULL のときだけ、3 つまとめて（一部だけ埋めると組み合わせが崩れるため）
+     * - 名前：回答の値で上書き（必須なので必ず入る）
+     * - 犬種・性別・去勢・避妊：回答に値があれば上書き（「不明」〔unknown〕も上書き）。空・未選択なら変えない
+     *   （お客様が答えなかったときに、トレーナーが入れた値を消さないため）
+     * - 誕生日：年・月・日をひとまとまりで扱う。3 つとも空なら変えない。どれかが入っていれば、3 つまとめて
+     *   回答の値で上書きする（空の欄は空で上書き。一部だけ上書きすると組み合わせが崩れるため）
      * - 自由記述：反映しない（トレーニーに対応する項目がない）
      *
      * updated_by（最終更新者のトレーナー）は変えない（お客様の操作のため。写真の登録と同じ）。
-     * 反映するものがなければ update() を呼ばない（更新日時も変えない）
+     * 反映で値が変わらなければ保存しない（更新日時も変えない）。変わったかどうかは Eloquent の isDirty() で
+     * 見る（誕生日の整数のキャストを踏まえて比べるため。'2020' と 2020 は同じとみなされる）。
+     *
+     * 経緯：当初はトレーニーの空欄の項目だけに反映していた（名前は未登録のときだけ、犬種・性別・去勢・避妊は
+     * NULL のときだけ〔「不明」は入力済みとみなす〕、去勢・避妊の「分からない」は「不明」に読み替え、誕生日は
+     * 3 つとも NULL のときだけ）。
      */
     private function reflectToTrainee(Trainee $trainee, array $response): void
     {
-        $changes = [];
-
-        if (! $trainee->has_name) {
-            $changes['name'] = $response['name'];
+        $changes = ['name' => $response['name']];
+        foreach (['breed', 'sex', 'neuter_status'] as $key) {
+            if ($response[$key] !== null) {
+                $changes[$key] = $response[$key];
+            }
         }
-        if ($trainee->breed === null && $response['breed'] !== null) {
-            $changes['breed'] = $response['breed'];
-        }
-        if ($trainee->sex === null && $response['sex'] !== null) {
-            $changes['sex'] = $response['sex'];
-        }
-        $neuterStatus = TraineeIntakeSurveyResponse::neuterStatusForTrainee($response['neuter_status']);
-        if ($trainee->neuter_status === null && $neuterStatus !== null) {
-            $changes['neuter_status'] = $neuterStatus;
-        }
-        $traineeHasNoBirthday = $trainee->birth_year === null && $trainee->birth_month === null && $trainee->birth_day === null;
-        if ($traineeHasNoBirthday && $response['birth_year'] !== null) {
+        if ($response['birth_year'] !== null || $response['birth_month'] !== null || $response['birth_day'] !== null) {
             $changes['birth_year'] = $response['birth_year'];
             $changes['birth_month'] = $response['birth_month'];
             $changes['birth_day'] = $response['birth_day'];
         }
 
-        if ($changes !== []) {
-            $trainee->update($changes);
+        $trainee->fill($changes);
+        if ($trainee->isDirty()) {
+            $trainee->save();
         }
     }
 

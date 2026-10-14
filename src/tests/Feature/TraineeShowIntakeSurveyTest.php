@@ -259,7 +259,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         // トレーニーの現在の値（犬種なし）と違う、答えたとおりの内容を出す
         $this->addResponse('2026-10-16 14:32:00', [
             'name' => 'モモ', 'breed' => 'トイプードル', 'sex' => 'female',
-            'birth_year' => 2022, 'birth_month' => 3, 'neuter_status' => 'dont_know',
+            'birth_year' => 2022, 'birth_month' => 3, 'neuter_status' => 'unknown',
             'wish' => '留守番中に鳴き続けてしまうのを直したい',
         ]);
 
@@ -272,8 +272,17 @@ class TraineeShowIntakeSurveyTest extends TestCase
         // 誕生日は日付の部分だけ（年齢を付けない）
         $this->assertBasicRow($html, '誕生日', '2022年3月生まれ');
         $this->assertStringNotContainsString('2022年3月生まれ（', $html);
-        // 「分からない」はトレーニーの「不明」に置き換えない
-        $this->assertBasicRow($html, '去勢・避妊', '分からない');
+        // 去勢・避妊の「不明」はそのまま（2026-10 変更。当初は「分からない」〔dont_know〕を出していた）
+        $this->assertBasicRow($html, '去勢・避妊', '不明');
+    }
+
+    public function test_性別の不明も出せる(): void
+    {
+        $this->addResponse('2026-10-16 14:32:00', ['name' => 'モモ', 'sex' => 'unknown']);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertBasicRow($html, '性別', '不明');
     }
 
     public function test_答えなかった基本情報は未回答と出す(): void
