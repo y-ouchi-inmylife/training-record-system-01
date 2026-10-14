@@ -583,7 +583,7 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
-| name | VARCHAR(50) | YES | NULL | 名前。**任意**（2026-10 に NOT NULL から NULL 許容に変更。受付アンケート案内だけを先に発行する運用のため）。未登録のときの表示は要件定義書 6-16「名前が未登録のときの表示」（トレーナー側は「名前未登録」、会員側は「愛犬」）。受付アンケートの回答で、未登録のときだけ埋まる。犬の名前はひらがな・カタカナが多く、よみ（かな）は持たない |
+| name | VARCHAR(50) | YES | NULL | 名前。**任意**（2026-10 に NOT NULL から NULL 許容に変更。受付アンケート案内だけを先に発行する運用のため）。未登録のときの表示は要件定義書 6-16「名前が未登録のときの表示」（トレーナー側は「名前未登録」、会員側は「愛犬」）。受付アンケートの回答で上書きされる（**2026-10 変更**：当初は未登録のときだけ埋まるとしていた）。犬の名前はひらがな・カタカナが多く、よみ（かな）は持たない |
 | breed | VARCHAR(100) | YES | NULL | 犬種。自由入力（「ミックス」等の表記に対応するためマスタは持たない） |
 | sex | VARCHAR(20) | YES | NULL | 性別。値は 5-20. 参照 |
 | birth_year | SMALLINT UNSIGNED | YES | NULL | 誕生日の年（2026-10 新設。旧 `birth_date` を年・月・日に分けた。下の注記参照）。誕生日は分かるところだけ入れる |
@@ -625,7 +625,7 @@ erDiagram
   - `birth_year` に**固定の下限（例：1900）は付けない**。「今年から30年前まで」の制限はアプリ側で見ており、業務上の意味のない固定値を DB に足すと、ルールが 2 か所に分かれるため
 - **既存データの移行**（2026-10）：`name` の NULL 許容化、`birth_date` の3カラムへの分割、`neuter_status` の追加は、既存の `create_trainees_table` マイグレーションを書き換えず、**移行用のマイグレーションを新しく足して**行う。既存の `birth_date` の値は、年・月・日に分けて `birth_year` / `birth_month` / `birth_day` に移してから `birth_date` を削除する。`down()` では `birth_date` を作り直し、**誕生日の 3 項目がそろっている行は `birth_date` に戻す**。年だけ・年月だけの行は日付にできないため `birth_date` を空（NULL）にする。**名前が未登録の行は空文字で埋めてから NOT NULL に戻す**（戻すのは開発中の作業がほとんどで、失敗して止まるより戻せる方が扱いやすいため）
   - **理由**：本番の反映手順は `migrate --force` で、お客様の確認用のデータが本番に残っているため。追加のマイグレーションなら、既存のデータを移しながら適用できる。2026-10 の契約・利用の変更（`client_usages` への `client_contract_id` の追加、`count` の削除）も、既存のマイグレーションを書き換えず追加のマイグレーションで行っている
-- **受付アンケートの回答の反映**（2026-10 追加、要件定義書 6-15-17 参照）：お客様が受付アンケート（D-1100）に回答すると、回答の保存と同じトランザクションで、本テーブルの**空欄の項目だけ**に回答の基本情報（`name` / `breed` / `sex` / `birth_year`・`birth_month`・`birth_day` / `neuter_status`）を反映する。反映の条件（`sex`・`neuter_status` が `unknown` なら入力済みとみなす、誕生日は年・月・日のすべてが NULL のときだけ反映する、回答の `dont_know` は `unknown` として反映する等）は要件定義書 6-15-17 を正とする。反映は**お客様の操作のため `updated_by` は触らない**（写真の登録・削除と同じ扱い）
+- **受付アンケートの回答の反映**（2026-10 追加、要件定義書 6-15-17 参照）：お客様が受付アンケート（D-1100）に回答すると、回答の保存と同じトランザクションで、回答の基本情報（`name` / `breed` / `sex` / `birth_year`・`birth_month`・`birth_day` / `neuter_status`）で本テーブルの値を**上書きする**（回答が空・未選択の項目は変えない。誕生日は年・月・日をひとまとまりで扱い、どれかが入っていれば 3 つまとめて上書きする）。反映の条件は要件定義書 6-15-17 を正とする。**2026-10 変更**：当初は本テーブルの**空欄の項目だけ**に反映していた（`sex`・`neuter_status` が `unknown` なら入力済みとみなす、誕生日は年・月・日のすべてが NULL のときだけ反映する、回答の `dont_know` は `unknown` として反映する）。反映は**お客様の操作のため `updated_by` は触らない**（写真の登録・削除と同じ扱い）
 - 将来的にトレーニングの対象を犬以外（人間等）に広げる可能性を見据え、テーブル名・カラム名は犬に限定しない命名としている。ただし `breed` は犬固有の項目であり、対象を広げる際は使用しないカラムとして残すか別テーブルへの切り出しを検討する
 - `created_by` は持たない（`training_records` 等の既存テーブルと同様、`updated_by` のみ）
 - **トレーニー写真の扱い**（2026-09 追加、要件定義書 6-15-15 参照）：
@@ -778,13 +778,13 @@ erDiagram
 | trainee_id | BIGINT UNSIGNED | NO | — | 回答の対象のトレーニーのID（外部キー） |
 | trainee_intake_survey_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った受付アンケート用 URL のトークン（DS-1000）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も回答は残すため NULL 許容（下の制約参照） |
 | answered_at | TIMESTAMP | NO | — | 回答日時。送信時に自動設定する。回答の記録を兼ねる（お客様の回答はアクセスログに記録しない。5-16. の注記参照） |
-| name | VARCHAR(50) | YES | NULL | 名前。トレーニーの名前が未登録のときだけ入力欄を出し、必須（アプリ側で検証）。登録済みのときは**回答時点のトレーニーの名前**を記録する。型は `trainees.name` と同じ |
+| name | VARCHAR(50) | YES | NULL | 名前。回答では常に必須（アプリ側で検証）。型は `trainees.name` と同じ。**2026-10 変更**：当初はトレーニーの名前が未登録のときだけ入力欄を出して必須とし、登録済みのときは回答時点のトレーニーの名前を記録していた。NULL 許容は変えない（列の定義を変える追加のマイグレーションを避けるため。値は常に入る） |
 | breed | VARCHAR(100) | YES | NULL | 犬種。答えたとおりの内容。型は `trainees.breed` と同じ |
-| sex | VARCHAR(20) | YES | NULL | 性別。値は 5-20. のうち `male` / `female` だけ（回答には「不明」を置かない。要件定義書 6-15-17 備考） |
+| sex | VARCHAR(20) | YES | NULL | 性別。値は 5-20. と同じ（`male` / `female` / `unknown`）。**2026-10 変更**：当初は `male` / `female` だけ（回答には「不明」を置かなかった） |
 | birth_year | SMALLINT UNSIGNED | YES | NULL | 誕生日の年。型・入力のルールは `trainees.birth_year` と同じ |
 | birth_month | TINYINT UNSIGNED | YES | NULL | 誕生日の月（1〜12）。入れる場合は `birth_year` が必須 |
 | birth_day | TINYINT UNSIGNED | YES | NULL | 誕生日の日（1〜31）。入れる場合は `birth_year`・`birth_month` が必須 |
-| neuter_status | VARCHAR(20) | YES | NULL | 去勢・避妊。値は 5-22. 参照（「分からない」を `dont_know` で持ち、トレーニーの「不明」〔`unknown`〕とは別の値にする） |
+| neuter_status | VARCHAR(20) | YES | NULL | 去勢・避妊。値は 5-21. と同じ（`neutered` / `not_neutered` / `unknown`）。**2026-10 変更**：当初は 5-22. の値（「分からない」を `dont_know` で持ち、トレーニーの「不明」とは別の値）にしていた |
 | wish | TEXT | YES | NULL | 自由記述「こうなったらいいな」の回答（設問文は要件定義書 D-1100） |
 | recent_events | TEXT | YES | NULL | 自由記述「最近の様子」の回答 |
 | ideal_days | TEXT | YES | NULL | 自由記述「理想の毎日」の回答 |
@@ -806,17 +806,19 @@ erDiagram
 |--------|------|------|-----------|------|
 | trainee_intake_survey_responses_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時は回答も削除する（要件定義書 D-1100。削除確認で回答も一緒に削除される旨を提示する。要件定義書 6-16-4） |
 | trainee_intake_survey_responses_token_id_foreign | FOREIGN KEY | trainee_intake_survey_token_id → trainee_intake_survey_tokens(id) | SET NULL | トークンが削除されても回答は残す。回答済みのトークンは取消（物理削除）の対象にならないため、通常は起きない |
-| trainee_intake_survey_responses_sex_check | CHECK | sex IN ('male', 'female') | — | 性別の値制限（5-20. のうち `male` / `female` だけ） |
+| trainee_intake_survey_responses_sex_check | CHECK | sex IN ('male', 'female', 'unknown') | — | 性別の値制限（5-20. と同じ。**2026-10 変更**：当初は `male` / `female` だけ） |
 | trainee_intake_survey_responses_birth_month_check | CHECK | birth_month IS NULL OR (birth_year IS NOT NULL AND birth_month BETWEEN 1 AND 12) | — | 誕生日の月の値制限。`trainees_birth_month_check` と同じ |
 | trainee_intake_survey_responses_birth_day_check | CHECK | birth_day IS NULL OR (birth_month IS NOT NULL AND birth_day BETWEEN 1 AND 31) | — | 誕生日の日の値制限。`trainees_birth_day_check` と同じ |
-| trainee_intake_survey_responses_neuter_status_check | CHECK | neuter_status IN ('neutered', 'not_neutered', 'dont_know') | — | 去勢・避妊の値制限（5-22. 参照） |
+| trainee_intake_survey_responses_neuter_status_check | CHECK | neuter_status IN ('neutered', 'not_neutered', 'unknown') | — | 去勢・避妊の値制限（5-21. と同じ。**2026-10 変更**：当初は `('neutered', 'not_neutered', 'dont_know')`） |
 
 ##### 注記
 
-- **答えたとおりの内容を残す**：トレーニー（D-0700）には空欄の項目だけ反映する（D-0700 の注記「受付アンケートの回答の反映」）が、本テーブルには反映の有無にかかわらず回答の内容をそのまま保存する。トレーニーの現在の値と違うことがある。回答はトレーナー側では閲覧のみで、更新・削除の操作は持たない（要件定義書 6-16-10）
+- **答えたとおりの内容を残す**：トレーニー（D-0700）は回答で上書きする（空・未選択の項目は変えない。D-0700 の注記「受付アンケートの回答の反映」）が、本テーブルには反映の有無にかかわらず、送られてきた内容をそのまま保存する。トレーニーの現在の値と違うことがある（反映されなかった空・未選択の項目、回答のあとにトレーナーが直した項目）。回答はトレーナー側では閲覧のみで、更新・削除の操作は持たない（要件定義書 6-16-10）
 - **1頭に複数件持てる**（ユニーク制約を付けない）。第1段階では1頭につき1件（回答済みのトレーニーには案内を発行できないため。DS-1000 の備考参照）。複数件ある場合は `answered_at` の新しい順に並べる。第2段階で、50問の診断の回答・採点結果・AI の下書きを本テーブルにひも付けて加える予定（要件定義書 D-1100）
   - `(trainee_id, answered_at)` の**複合インデックスは付けない**。第1段階では1頭1件のため。件数が増える第2段階で必要になれば足す
-- **去勢・避妊の「分からない」をトレーニーの「不明」と別の値（`dont_know`）で持つ理由**：答えたとおりを残すため。トレーナーが確かめたうえで選ぶ「不明」（`unknown`）と、お客様が「分からない」と答えたことを区別できるようにする。トレーニーに反映するときに `unknown` に置き換える
+- **性別・去勢・避妊の値をトレーニーと同じにする**（**2026-10 変更**）：お客様の回答でトレーニーを上書きするようになったため、選択肢と値をトレーニー（5-20.・5-21.）にそろえた（要件定義書 6-15-17 備考）
+  - 経緯：当初は、去勢・避妊の「分からない」をトレーニーの「不明」と別の値（`dont_know`）で持っていた（答えたとおりを残し、トレーナーが確かめたうえで選ぶ「不明」と、お客様が「分からない」と答えたことを区別するため。トレーニーに反映するときに `unknown` に置き換えていた）。性別には「不明」を置いていなかった
+  - **値の変更は追加のマイグレーションで行う**（`2026_10_15_000003_align_sex_and_neuter_status_on_trainee_intake_survey_responses_table`）：本テーブルは本番には出ていないが開発環境では作ってあるため、既存の `create_trainee_intake_survey_responses_table` を書き換えない（D-0700 の注記「既存データの移行」と同じ考え方）。`up()` は `neuter_status = 'dont_know'` の行を `unknown` に移してから 2 つの CHECK 制約を作り直す。`down()` は `unknown` の行を、性別は NULL に、去勢・避妊は `dont_know` に戻してから元の CHECK 制約に戻す
 - **誕生日の値の制限**は D-0700 と同じ（CHECK 制約で書けない「実在する日付」「未来でない」「今年から30年前まで」はアプリ側の検証で担保する。§3-3 の例外）。`birth_year` に固定の下限は付けない（理由は D-0700 の注記と同じ）
 - **`created_by` / `updated_by` は持たない**：回答はお客様の操作で作られ、トレーナーが作成・更新することはないため（トレーナーのidを入れる場面がない）。誰の回答かは `trainee_id`（とトークン）で分かり、回答の記録は `answered_at` が兼ねる
 - **インデックス名・制約名の短縮**：`trainee_intake_survey_token_id` の外部キーとインデックスは、命名規則どおりの `trainee_intake_survey_responses_trainee_intake_survey_token_id_foreign`（70 文字）・`..._idx`（66 文字）が MySQL の識別子の上限（64 文字）を超えるため、`trainee_intake_survey_responses_token_id_foreign` / `trainee_intake_survey_responses_token_id_idx` に縮める（`login_attempts_trainer_idx`・`trainee_measurements_trainee_date_unique` と同じく、名前を縮める例は既存にもある）。マイグレーションでは名前を明示して作る
@@ -1195,7 +1197,7 @@ erDiagram
   1. トークンの行を**排他ロック**する（`SELECT ... FOR UPDATE`。後から来た送信は、先の送信のトランザクションが終わるまで待つ）
   2. `answered_at` が NULL であることを確かめる（NULL でなければ、回答を保存せず「すでに回答済み」の画面を返す）
   3. 回答（D-1100）を保存する
-  4. トレーニー（D-0700）の空欄の項目に回答を反映する（D-0700 の注記「受付アンケートの回答の反映」）
+  4. 回答でトレーニー（D-0700）を上書きする（空・未選択の項目は変えない。D-0700 の注記「受付アンケートの回答の反映」。**2026-10 変更**：当初は空欄の項目だけに反映していた）。トレーニーの行も排他ロックしてから行う
   5. トークンの `answered_at` に回答日時を記録する（D-1100 の `answered_at` と同じ値）
 - お客様の回答はアクセスログ（DS-0500）に記録しない（5-16. の注記参照）。発行・取消はトレーナーの操作として記録する（`create_trainee_intake_survey_token` / `delete_trainee_intake_survey_token`）
 
@@ -1304,7 +1306,7 @@ D-0700 `trainees.sex` の値。犬以外への対象拡張時にも共通で使�
 
 > **表示の文言の変更（2026-10）**：お客様（ドッグトレーナー）の要望により、画面に出す性別の文言を「オス／メス」から「男の子／女の子」に変更した。DB に保存する値（`male` / `female` / `unknown`）は変えておらず、Blade からは `Trainee::sexLabels()` の 1 か所で対応表を参照する。
 
-D-1100 `trainee_intake_survey_responses.sex`（受付アンケートの回答）は、このうち `male` / `female` だけを使う（回答には「不明」を置かない。要件定義書 6-15-17 備考）。
+D-1100 `trainee_intake_survey_responses.sex`（受付アンケートの回答）も、同じ値を使う（**2026-10 変更**：当初は `male` / `female` だけを使い、回答には「不明」を置いていなかった。要件定義書 6-15-17 備考）。
 
 ### 5-21. 去勢・避妊
 
@@ -1314,11 +1316,17 @@ D-0700 `trainees.neuter_status` の値（2026-10 追加）。値の持ち方は 
 |----|------|
 | neutered | している |
 | not_neutered | していない |
-| unknown | 不明。受付アンケートの回答の反映では、NULL（未登録）と違い入力済みとみなす（要件定義書 6-15-17） |
+| unknown | 不明 |
 
-### 5-22. 受付アンケートの去勢・避妊
+D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケートの回答）も、同じ値を使う（**2026-10 変更**。当初は 5-22. の値を使っていた）。
 
-D-1100 `trainee_intake_survey_responses.neuter_status` の値（2026-10 追加）。お客様が**答えたとおり**を残すため、「分からない」を 5-21. の「不明」（`unknown`）とは別の値で持つ。
+- 経緯：当初は、`unknown` を「受付アンケートの回答の反映では、NULL（未登録）と違い入力済みとみなす」としていた。2026-10 に、回答で上書きする形に変えたため、この扱いはなくなった（回答で「不明」が選ばれれば「不明」で上書きし、未選択なら変えない。要件定義書 6-15-17）
+
+### 5-22. 受付アンケートの去勢・避妊（廃止）
+
+**2026-10 に廃止**。D-1100 `trainee_intake_survey_responses.neuter_status` は 5-21. と同じ値を使う（D-1100 の注記「性別・去勢・避妊の値をトレーニーと同じにする」）。以下は経緯として残す。
+
+当初（2026-10 追加）は、お客様が**答えたとおり**を残すため、「分からない」を 5-21. の「不明」（`unknown`）とは別の値で持っていた。
 
 | 値 | 説明 |
 |----|------|
