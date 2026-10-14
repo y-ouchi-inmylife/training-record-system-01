@@ -136,6 +136,51 @@ class Trainee extends Model
         return $this->sex ? (self::sexLabels()[$this->sex] ?? $this->sex) : null;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | 名前の表示（2026-10 追加。screen-design.md §2-4 の例外・要件定義書 6-16）
+    |--------------------------------------------------------------------------
+    | 名前は任意（D-0700）で、未登録でも空欄にしない（名前はトレーニーを指し示す目印のため）。
+    | 未登録のときの言い方がトレーナー側と会員側で違うため、Blade に条件式を散らさないよう
+    | アクセサにまとめる。名前の登録の有無は blank() で見る（空文字も未登録として扱う。
+    | マイグレーションの down() で NULL を空文字で埋めた行も、未登録として出るように）。
+    */
+
+    /**
+     * 名前が登録されているか
+     */
+    public function getHasNameAttribute(): bool
+    {
+        return ! blank($this->name);
+    }
+
+    /**
+     * トレーナー側の表示名。名前があれば名前、なければ「名前未登録」。
+     * 「名前未登録」を薄い文字（text-muted）にするかは画面ごとに決める（has_name で判定する）。
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->has_name ? $this->name : '名前未登録';
+    }
+
+    /**
+     * 会員側の表示名。名前があれば名前、なければ「愛犬」。
+     */
+    public function getClientDisplayNameAttribute(): string
+    {
+        return $this->has_name ? $this->name : '愛犬';
+    }
+
+    /**
+     * 会員側の呼び名。名前があれば「{名前}ちゃん」、なければ「愛犬」（「ちゃん」を付けない）。
+     * 会員ダッシュボード（S-1402）で名前のあとに「ちゃん」を付けている箇所（見出し・写真の
+     * alt・aria-label・モーダルの題名）で使う。「ちゃん」の付け外しを Blade に散らさないため。
+     */
+    public function getClientCallNameAttribute(): string
+    {
+        return $this->has_name ? $this->name.'ちゃん' : '愛犬';
+    }
+
     /**
      * 去勢・避妊の日本語表示。未登録なら null
      */
@@ -222,7 +267,9 @@ class Trainee extends Model
      * 「体重推移」設計方針の 2026-09 変更参照）:
      * [
      *   'id'       => (int) トレーニーID,
-     *   'name'     => (string) トレーニー名,
+     *   'callName' => (string) 会員側の呼び名（「モモちゃん」／名前が未登録なら「愛犬」。
+     *                 client_call_name。2026-10 に 'name'〔名前そのもの〕から置き換えた。
+     *                 会員ダッシュボードで「ちゃん」を Blade に書かずに済むようにするため）,
      *   'photoUrl' => (?string) 写真の presigned URL または null,
      *   'datasets' => [                          // 常に 0 or 1 本（線の分割を廃止）
      *     [
@@ -275,7 +322,7 @@ class Trainee extends Model
             // 設計書 S-1402「体重推移」設計方針の 2026-09 変更参照。
             return [
                 'id' => $this->id,
-                'name' => $this->name,
+                'callName' => $this->client_call_name,
                 'photoUrl' => $this->photo_url,
                 'datasets' => [],
             ];
@@ -295,7 +342,7 @@ class Trainee extends Model
 
         return [
             'id' => $this->id,
-            'name' => $this->name,
+            'callName' => $this->client_call_name,
             // トレーニー写真の presigned URL（写真未登録なら null）。
             // photo_url アクセサは trainee 1 件で 1 回だけ presigned URL を発行するため、
             // 追加のクエリは走らない（photo_path はそのカラム値を使うだけ）。

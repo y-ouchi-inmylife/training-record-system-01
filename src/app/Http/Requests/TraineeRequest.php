@@ -31,7 +31,8 @@ class TraineeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:50',
+            // 名前は任意（2026-10 変更。受付アンケートの案内だけを先に発行する運用のため）
+            'name' => 'nullable|string|max:50',
             'breed' => 'nullable|string|max:100',
             'sex' => 'nullable|in:male,female,unknown',
             // 誕生日は年・月・日の 3 項目。形式・範囲・組み合わせは withValidator でまとめて判定する

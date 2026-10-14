@@ -34,7 +34,8 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
     {
         return array_map(fn ($id) => [
             'id' => $id,
-            'name' => 'ポチ' . $id,
+            // 会員側の呼び名（Trainee::client_call_name。2026-10 に 'name' から置き換えた）
+            'callName' => 'ポチ' . $id . 'ちゃん',
             'photoUrl' => null,
             'datasets' => [],
         ], $ids);
@@ -97,7 +98,7 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         // 写真ありのトレーニー（<button> が描画される）
         $html = $this->renderDashboard([], weightCharts: [[
             'id' => 1,
-            'name' => 'ポチ',
+            'callName' => 'ポチちゃん',
             'photoUrl' => 'https://example.com/photo.jpg',
             'datasets' => [],
         ]])->__toString();
@@ -161,5 +162,39 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
 
         $view->assertSee('ERR_form_message');
         $this->assertSame(1, substr_count($view->__toString(), 'ERR_form_message'));
+    }
+
+    /**
+     * 名前が未登録のトレーニー（2026-10 追加）：見出し・写真の読み上げ・モーダルの題名を「愛犬」とし、
+     * 「ちゃん」を付けない（呼び名は Trainee::client_call_name で組み立てて callName に入れる）
+     */
+    public function test_名前が未登録のトレーニーは愛犬と出してちゃんを付けない(): void
+    {
+        $html = $this->renderDashboard([], weightCharts: [[
+            'id' => 1,
+            'callName' => '愛犬',
+            'photoUrl' => 'https://example.com/photo.jpg',
+            'datasets' => [],
+        ]])->__toString();
+
+        $this->assertMatchesRegularExpression('/<h2 class="mb-2" style="font-size: 1.1rem;">愛犬<\/h2>/u', $html);
+        $this->assertStringContainsString('aria-label="愛犬の写真を操作する"', $html);
+        $this->assertStringContainsString('alt="愛犬の写真"', $html);
+        $this->assertMatchesRegularExpression('/<h5 class="modal-title"[^>]*>愛犬の写真<\/h5>/u', $html);
+        $this->assertStringNotContainsString('愛犬ちゃん', $html);
+        $this->assertStringNotContainsString('名前未登録', $html);
+    }
+
+    public function test_名前があるトレーニーは名前にちゃんを付ける(): void
+    {
+        $html = $this->renderDashboard([], weightCharts: [[
+            'id' => 1,
+            'callName' => 'ポチちゃん',
+            'photoUrl' => null,
+            'datasets' => [],
+        ]])->__toString();
+
+        $this->assertMatchesRegularExpression('/<h2 class="mb-2" style="font-size: 1.1rem;">ポチちゃん<\/h2>/u', $html);
+        $this->assertStringContainsString('aria-label="ポチちゃんの写真を登録する"', $html);
     }
 }

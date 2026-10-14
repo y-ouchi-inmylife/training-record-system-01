@@ -149,11 +149,13 @@ class Client extends Authenticatable
             // 犬種と性別（日本語ラベル）を空でないものだけに絞る。
             // 「アイ（—）」のような空の括弧を作らないため、未登録の要素は落とす。
             $parts = array_filter([$trainee->breed, $trainee->sex_label]);
+            // 名前が未登録なら「名前未登録」（§2-4 の例外。2026-10 追加）。一覧のセルでは他の文字と
+            // 同じ色で出す（一部だけ薄くすると読みにくいため）。括弧は重ねない（「名前未登録（トイプードル、男の子）」）
             if (empty($parts)) {
                 // 犬種も性別もなし → 括弧ごと省略して名前だけ
-                return $trainee->name;
+                return $trainee->display_name;
             }
-            return $trainee->name . '（' . implode('、', $parts) . '）';
+            return $trainee->display_name . '（' . implode('、', $parts) . '）';
         })->implode('／');
     }
 

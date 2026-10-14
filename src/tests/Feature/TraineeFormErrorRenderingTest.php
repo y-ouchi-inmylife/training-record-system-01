@@ -228,4 +228,13 @@ class TraineeFormErrorRenderingTest extends TestCase
 
         $this->assertMatchesRegularExpression('/<option value="not_neutered" selected>/', $html);
     }
+
+    /** 名前は任意（2026-10 変更）：必須の印（*）と required 属性を付けない */
+    public function test_名前に必須の印とrequired属性を付けない(): void
+    {
+        $html = $this->renderForm([])->__toString();
+
+        $this->assertMatchesRegularExpression('/<label for="name"[^>]*>\s*名前\s*<\/label>/u', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="name" name="name"[^>]*required/s', $html);
+    }
 }

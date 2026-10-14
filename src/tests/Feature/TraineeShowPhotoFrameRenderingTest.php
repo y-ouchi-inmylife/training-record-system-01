@@ -57,7 +57,7 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
             'trainee' => $trainee,
             'weightChart' => [
                 'id' => 1,
-                'name' => 'ポチ',
+                'callName' => 'ポチちゃん',
                 'photoUrl' => $photoUrl,
                 'datasets' => [],
             ],

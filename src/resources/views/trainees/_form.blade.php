@@ -46,19 +46,21 @@
 
                 {{-- 行2: 名前を単独の段に置く（col-md-5）。幅は行3 の先頭（犬種、col-md-5）と
                      揃え、1 段目と 2 段目で左端の項目の入力欄の右端が縦に揃うようにする。
-                     名前は必須項目で他の任意項目より目立たせたく、値が短い（犬名はひらがな
-                     数文字程度）ため単独段でも入力欄が間延びしすぎない。
+                     値が短い（犬名はひらがな数文字程度）ため単独段でも入力欄が間延びしすぎない。
+                     経緯：当初は名前が必須項目で、他の任意項目より目立たせるために単独の段にした。
+                     2026-10 に名前を任意にした（受付アンケートの案内だけを先に発行する運用のため）が、
+                     トレーニーを指し示す目印として目立たせる意味は変わらないため、単独の段のままにする。
                      会員フォーム clients/_form.blade.php の項目ごとの幅調整と同じ慣例。
                      md 未満では col-12 相当で全幅（Bootstrap の grid 既定挙動）。 --}}
                 <div class="row g-3 mb-2">
                     <div class="col-md-5">
                         <div class="row g-2 align-items-center">
                             <label for="name" class="col-md-auto col-form-label text-md-end form-label-fixed">
-                                名前 <span class="text-danger">*</span>
+                                名前
                             </label>
                             <div class="col-12 col-md">
                                 <input type="text" class="form-control @error('name') is-invalid @enderror"
-                                       id="name" name="name" maxlength="50" required
+                                       id="name" name="name" maxlength="50"
                                        value="{{ old('name', $trainee?->name) }}" autocomplete="off">
                                 <x-form-error field="name" />
                             </div>

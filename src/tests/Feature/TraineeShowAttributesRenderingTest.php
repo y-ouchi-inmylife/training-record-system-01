@@ -45,7 +45,7 @@ class TraineeShowAttributesRenderingTest extends TestCase
 
         return $this->withViewErrors([])->view('trainees.show', [
             'trainee' => $trainee,
-            'weightChart' => ['id' => 1, 'name' => $trainee->name, 'photoUrl' => null, 'datasets' => []],
+            'weightChart' => ['id' => 1, 'callName' => $trainee->client_call_name, 'photoUrl' => null, 'datasets' => []],
             'deleteConfirmMessage' => 'このトレーニーを削除しますか？',
             'measurementCount' => 0,
         ])->__toString();
@@ -100,5 +100,26 @@ class TraineeShowAttributesRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/誕生日<\/div>\s*<div style="min-height: 1.5rem;">\s*<\/div>/u', $html);
         $this->assertMatchesRegularExpression('/去勢・避妊<\/div>\s*<div style="min-height: 1.5rem;">\s*<\/div>/u', $html);
         $this->assertStringNotContainsString('生まれ', $html);
+    }
+
+    /** 名前が未登録なら、見出しに「名前未登録」を薄い文字で出し、写真の代替テキストも同じ名前にする */
+    public function test_名前が未登録なら見出しに名前未登録を薄い文字で出す(): void
+    {
+        $trainee = new Trainee;
+        $trainee->name = null;
+
+        $html = $this->renderTraineeShow($trainee);
+
+        $this->assertMatchesRegularExpression('/<h2 class="mb-0 text-muted">名前未登録<\/h2>/u', $html);
+    }
+
+    public function test_名前があるなら見出しは通常の文字(): void
+    {
+        $trainee = new Trainee;
+        $trainee->name = 'モモ';
+
+        $html = $this->renderTraineeShow($trainee);
+
+        $this->assertMatchesRegularExpression('/<h2 class="mb-0">モモ<\/h2>/u', $html);
     }
 }

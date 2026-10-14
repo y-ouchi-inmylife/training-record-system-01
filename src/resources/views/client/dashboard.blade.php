@@ -44,7 +44,9 @@
                 <article class="c-session" style="margin-bottom: 1rem;">
                     <div class="c-session-body">
                         <div class="c-session-content">
-                            <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['name'] }}ちゃん</h2>
+                            {{-- 呼び名は「モモちゃん」、名前が未登録なら「愛犬」（「ちゃん」を付けない）。
+                                 Trainee::client_call_name（weight_chart_data の callName）。2026-10 変更 --}}
+                            <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
 
                             {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7
                                  「入力エラー以外の失敗を入力の項目のキーで返さないルール」）。
@@ -123,13 +125,13 @@
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#trainee-photo-modal-{{ $chart['id'] }}"
                                                 style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
-                                                aria-label="{{ $chart['name'] }}ちゃんの写真を操作する">
+                                                aria-label="{{ $chart['callName'] }}の写真を操作する">
                                             {{-- 縦横比を保ったまま枠内に収める（切り抜きはしない）。
                                                  max-width/height 100% で枠を超えず、object-fit: contain で
                                                  余白は枠の背景色（白）で埋まる（設計書「トレーニー写真」の
                                                  切り抜きしない方針）。 --}}
                                             <img src="{{ $chart['photoUrl'] }}"
-                                                 alt="{{ $chart['name'] }}ちゃんの写真"
+                                                 alt="{{ $chart['callName'] }}の写真"
                                                  style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
                                         </button>
                                     @else
@@ -137,7 +139,7 @@
                                                class="c-trainee-photo-frame d-flex align-items-center justify-content-center"
                                                style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
                                                title="写真を登録します"
-                                               aria-label="{{ $chart['name'] }}ちゃんの写真を登録する">
+                                               aria-label="{{ $chart['callName'] }}の写真を登録する">
                                             <span class="text-muted" style="font-size: 0.875rem;">写真を登録</span>
                                         </label>
                                     @endif
@@ -201,7 +203,7 @@
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="trainee-photo-modal-label-{{ $chart['id'] }}">{{ $chart['name'] }}ちゃんの写真</h5>
+                                    <h5 class="modal-title" id="trainee-photo-modal-label-{{ $chart['id'] }}">{{ $chart['callName'] }}の写真</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
                                 </div>
                                 {{-- modal-body は置かない（設計書 S-1402「操作モーダルの構成と経緯」の

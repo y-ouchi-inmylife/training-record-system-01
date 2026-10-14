@@ -502,7 +502,7 @@ class ClientCountRenderingTest extends TestCase
         );
     }
 
-    private function trainee(Client $client, string $name, ?string $photoPath = null): int
+    private function trainee(Client $client, ?string $name, ?string $photoPath = null): int
     {
         return DB::table('trainees')->insertGetId([
             'client_id' => $client->id, 'name' => $name, 'photo_path' => $photoPath,
@@ -649,5 +649,35 @@ class ClientCountRenderingTest extends TestCase
             strpos($html, '<h6 class="mb-0">トレーニー（'),
             strpos($html, '<h6 class="mb-0">ご利用回数')
         );
+    }
+
+    /**
+     * 名前が未登録のトレーニー（2026-10 追加。§2-4 の例外）：カードの名前のリンクは「名前未登録」を
+     * 薄い文字で出し、リンクは張ったまま（文字が空にならない）。写真なしの枠の読み上げ用の名前も同じ
+     */
+    public function test_名前が未登録のトレーニーはカードに名前未登録を薄い文字のリンクで出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, null);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $url = preg_quote(route('trainees.show', $id), '/');
+        $this->assertMatchesRegularExpression('/<h6 class="mb-2"><a href="'.$url.'" class="text-muted">名前未登録<\/a><\/h6>/u', $html);
+        $this->assertStringContainsString('aria-label="名前未登録の写真なし。トレーニー詳細へ"', $html);
+        // リンクの文字が空にならない
+        $this->assertDoesNotMatchRegularExpression('/<a href="'.$url.'"[^>]*><\/a>/u', $html);
+    }
+
+    public function test_名前があるトレーニーのリンクには薄い文字のクラスを付けない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<h6 class="mb-2"><a href="'.route('trainees.show', $id).'">ポチ</a></h6>', $html);
     }
 }

@@ -34,7 +34,8 @@
              書式は S-0305 の氏名見出し行と同じ（h2 の右横に text-muted small ラベル +
              font-monospace fs-5 値）。会員名は S-0305 へのリンクで、これが戻り導線を兼ねる。 --}}
         <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-            <h2 class="mb-0">{{ $trainee->name }}</h2>
+            {{-- 名前が未登録なら「名前未登録」を薄い文字で出す（§2-4 の例外。2026-10 追加） --}}
+            <h2 @class(['mb-0', 'text-muted' => ! $trainee->has_name])>{{ $trainee->display_name }}</h2>
             <div class="d-flex align-items-baseline gap-2 ms-3">
                 <span class="text-muted small">会員</span>
                 <a href="{{ route('clients.show', $trainee->client) }}">{{ $trainee->client->full_name }}</a>
@@ -90,7 +91,7 @@
                             {{-- object-fit: contain で枠を超えず、余白は白で埋まる（切り抜かない）。
                                  会員側 S-1402 と同じ扱い。 --}}
                             <img src="{{ $weightChart['photoUrl'] }}"
-                                 alt="{{ $trainee->name }}の写真"
+                                 alt="{{ $trainee->display_name }}の写真"
                                  style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
                         @else
                             {{-- 写真なしのプレースホルダ。会員側は「写真を登録」（登録操作への案内）

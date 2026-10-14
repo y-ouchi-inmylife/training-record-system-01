@@ -498,12 +498,12 @@
                                          枠の見た目はトレーニー詳細（trainees/show.blade.php）の写真の枠と同じ指定で、
                                          大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。 --}}
                                     <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0 text-decoration-none"
-                                       @if(! $trainee->photo_path) aria-label="{{ $trainee->name }}の写真なし。トレーニー詳細へ" @endif>
+                                       @if(! $trainee->photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーニー詳細へ" @endif>
                                         <div class="d-flex align-items-center justify-content-center"
                                              style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
                                             @if($trainee->photo_path)
                                                 <img src="{{ $trainee->photo_url }}"
-                                                     alt="{{ $trainee->name }}の写真"
+                                                     alt="{{ $trainee->display_name }}の写真"
                                                      style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
                                             @else
                                                 <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
@@ -511,7 +511,9 @@
                                         </div>
                                     </a>
                                     <div class="flex-grow-1" style="min-width: 0;">
-                                <h6 class="mb-2"><a href="{{ route('trainees.show', $trainee) }}">{{ $trainee->name }}</a></h6>
+                                {{-- 名前のリンク。名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
+                                     （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
+                                <h6 class="mb-2"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。備考は改行を保持（S-0309 と同じ）。
                                      x-detail-cell は使わない（3 列グリッド前提のコンポーネントで
