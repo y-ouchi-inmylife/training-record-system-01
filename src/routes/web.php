@@ -118,11 +118,13 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
 
             // 受付アンケート案内（受付アンケート用 URL のトークン。DS-1000。2026-10 追加）。
             // 発行と取消は同じリソース URL に対する POST / DELETE（マイページ登録案内と同じ考え方）。
-            // 案内画面（S-0311、GET …/print）は段階3b で足す
             Route::post('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'store'])
                 ->name('trainee-intake-survey-tokens.store');
             Route::delete('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'destroy'])
                 ->name('trainee-intake-survey-tokens.destroy');
+            // 受付アンケート案内画面（S-0311）。会員詳細の「案内を表示」から別タブで開く
+            Route::get('trainees/{trainee}/intake-survey-tokens/print', [TraineeIntakeSurveyTokenController::class, 'print'])
+                ->name('trainee-intake-survey-tokens.print');
 
             // 契約（D-0900）・利用（D-1000）。会員詳細（S-0305）の「回数」カードのモーダルで
             // 登録・編集・削除する（create / edit / show の画面遷移は持たない）。

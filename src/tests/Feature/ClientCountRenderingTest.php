@@ -712,7 +712,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('案内を表示', $html);
     }
 
-    public function test_受付アンケートが回答待ちなら発行日と案内を取消のボタンを出し案内を表示は出さない(): void
+    public function test_受付アンケートが回答待ちなら発行日と案内を表示と案内を取消のボタンを出す(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -728,8 +728,12 @@ class ClientCountRenderingTest extends TestCase
             $html
         );
         $this->assertStringNotContainsString('>案内を発行<', $html);
-        // 「案内を表示」（S-0311）は段階3b で足す
-        $this->assertStringNotContainsString('案内を表示', $html);
+        // 「案内を表示」は S-0311 を別タブで開き、「案内を取消」の左に置く（2026-10、段階3b）
+        $printUrl = preg_quote(route('trainee-intake-survey-tokens.print', $id), '/');
+        $this->assertMatchesRegularExpression(
+            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger"/u',
+            $html
+        );
     }
 
     public function test_回答済みの案内しかなければ段階3では未発行として扱う(): void

@@ -565,7 +565,8 @@
                                      状態で、トレーナーが対応する状態ではないため）。
                                      状態は Trainee::intake_survey_status（ClientController::show で
                                      trainees.activeIntakeSurveyToken を先読み済み）。
-                                     「案内を表示」（S-0311）は段階3b で足す。 --}}
+                                     「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
+                                     「登録案内を表示」と同じ）。 --}}
                                 <div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small">
                                     <span>受付アンケート：{{ $trainee->intake_survey_status_label }}</span>
                                     <div class="d-flex flex-wrap gap-2 ms-auto">
@@ -575,6 +576,8 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
                                             </form>
                                         @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
+                                            <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
+                                               class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示</a>
                                             <button type="button" class="btn btn-sm btn-outline-danger"
                                                     data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
                                                     data-intake-survey-trainee-id="{{ $trainee->id }}">案内を取消</button>
