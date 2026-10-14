@@ -222,6 +222,42 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringNotContainsString('checked', $html);
     }
 
+    /**
+     * 性別・去勢・避妊の選択肢は 1 行に横並び（2026-10 変更。設計書 S-1413「選択肢の並び」）。
+     * 見た目はブラウザで確かめる。ここではマークアップ（.c-choice の直下に選択肢が並ぶこと）と、
+     * ビルドした CSS に横並び・折り返しの指定があることだけを確かめる
+     */
+    public function test_選択肢はc_choiceの直下に横並びで並び折り返せる(): void
+    {
+        $this->traineeWithToken('モモ');
+
+        $html = $this->get($this->showPath())->assertOk()->getContent();
+
+        foreach (['sex', 'neuter_status'] as $name) {
+            // 選択肢（.form-check）が 3 つ、.c-choice の直下に並ぶ（行や列で囲まない）
+            $group = $this->radioGroup($html, $name);
+            $this->assertSame(3, substr_count($group, '<div class="form-check">'), $name);
+            $this->assertMatchesRegularExpression('/aria-labelledby="'.$name.'-label">\s*<div class="form-check">/u', $group);
+        }
+
+        // ビルドした会員側の CSS に、横並び・折り返し・選択肢の間隔の指定がある
+        $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+        $css = file_get_contents(public_path('build/'.$manifest['resources/sass/client.scss']['file']));
+        $this->assertStringContainsString('.c-choice{display:flex;flex-wrap:wrap;column-gap:1.5rem}', $css);
+        $this->assertMatchesRegularExpression('/\.c-choice \.form-check\{[^}]*min-height:2\.75rem/', $css);
+        $this->assertMatchesRegularExpression('/\.c-choice \.form-check-label\{[^}]*white-space:nowrap/', $css);
+    }
+
+    /** ラジオボタンのまとまり（.c-choice）の中身 */
+    private function radioGroup(string $html, string $name): string
+    {
+        $start = strpos($html, '<div class="c-choice" role="radiogroup" aria-labelledby="'.$name.'-label">');
+        $this->assertNotFalse($start, $name);
+        $end = strpos($html, '<div id="', $start + 1);
+
+        return substr($html, $start, ($end === false ? strlen($html) : $end) - $start);
+    }
+
     public function test_誕生日はトレーナー側と同じ3つの欄と入力中の表示の部品(): void
     {
         $this->traineeWithToken('モモ');

@@ -1064,13 +1064,21 @@ input[type="tel"] {
 // ラジオボタンのまとまり（受付アンケート回答画面 S-1413 の性別・去勢・避妊。2026-10 追加）。
 // 会員側で初めて使う部品のため、押せる範囲を会員側の基準（44px 相当）にそろえる
 // （設計書 S-1413「ラジオボタン」）：
-// - 1 つの選択肢を min-height 2.75rem（44px）の横並びにし、ラベル全体を押せる範囲にする
+// - 1 つの選択肢（丸とラベル）を min-height 2.75rem（44px）の横並びにし、ラベル全体を押せる範囲にする
 //   （ラベルの上下の余白で高さを確保する）
+// - 選択肢どうしも 1 行に横並びにする（2026-10 変更。設計書 S-1413「選択肢の並び」。当初は縦に 1 つずつ）。
+//   間は column-gap 1.5rem で押し間違えない程度に空け、幅が足りないとき（スマホの狭い幅など）は
+//   flex-wrap で選択肢ごと次の行に折り返す（横にはみ出さない）。ラベルの文字は途中で折り返さない（nowrap）
+// - 会員側で .c-choice を使うのは S-1413 だけのため、横並び用のクラスは足さず、.c-choice を直接変えた
 // - Bootstrap の .form-check の左の余白（丸を絶対位置で置く作り）はやめ、丸とラベルを flex で並べる
 // - フォーカスの輪郭は入力欄と同じ二重の輪郭（$input-btn-focus-box-shadow と同じ値）。
 //   Bootstrap の .form-check-input は $input-btn-focus-box-shadow を使わないため、ここで指定する
 // Blade：<div class="c-choice" role="radiogroup" aria-labelledby="…"> の中に .form-check を並べる
 .c-choice {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1.5rem;
+
     .form-check {
         display: flex;
         align-items: center;
@@ -1092,8 +1100,8 @@ input[type="tel"] {
     }
 
     .form-check-label {
-        flex: 1;
         padding: 0.5rem 0;
+        white-space: nowrap;
         cursor: pointer;
     }
 }
