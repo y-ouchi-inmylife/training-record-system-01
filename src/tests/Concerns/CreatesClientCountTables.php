@@ -93,4 +93,29 @@ trait CreatesClientCountTables
             $table->unsignedBigInteger('created_by')->nullable();
         });
     }
+
+    /**
+     * 受付アンケートの回答（D-1100。2026-10 追加）。trainees の表は各テストで作る
+     */
+    protected function createTraineeIntakeSurveyResponsesTable(): void
+    {
+        Schema::create('trainee_intake_survey_responses', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('trainee_id');
+            $table->unsignedBigInteger('trainee_intake_survey_token_id')->nullable();
+            $table->timestamp('answered_at');
+            $table->string('name', 50)->nullable();
+            $table->string('breed', 100)->nullable();
+            $table->string('sex', 20)->nullable();
+            $table->unsignedSmallInteger('birth_year')->nullable();
+            $table->unsignedTinyInteger('birth_month')->nullable();
+            $table->unsignedTinyInteger('birth_day')->nullable();
+            $table->string('neuter_status', 20)->nullable();
+            $table->text('wish')->nullable();
+            $table->text('recent_events')->nullable();
+            $table->text('ideal_days')->nullable();
+            $table->text('health_concerns')->nullable();
+            $table->timestamps();
+        });
+    }
 }
