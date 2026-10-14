@@ -237,4 +237,21 @@ class TraineeFormErrorRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<label for="name"[^>]*>\s*名前\s*<\/label>/u', $html);
         $this->assertDoesNotMatchRegularExpression('/id="name" name="name"[^>]*required/s', $html);
     }
+
+    /**
+     * 誕生日の入力中の年齢表示（2026-10 追加）：欄と表示先を data-birthday-* 属性で見つける。
+     * 表示先は「日」の右に置き、aria-live="polite" で読み上げにも伝える。JS は trainee-birthday-input.js
+     */
+    public function test_誕生日の入力中の表示先と欄にdata属性が付く(): void
+    {
+        $html = $this->renderForm([])->__toString();
+
+        $this->assertMatchesRegularExpression('/role="group" aria-labelledby="birth_date-label" data-birthday-input>/', $html);
+        foreach (['year', 'month', 'day'] as $part) {
+            $this->assertMatchesRegularExpression('/id="birth_'.$part.'"[^>]*data-birthday-part="'.$part.'"/s', $html);
+        }
+        $this->assertStringContainsString('<span class="ms-2" data-birthday-display aria-live="polite"></span>', $html);
+        $this->assertGreaterThan(mb_strpos($html, '<span>日</span>'), mb_strpos($html, 'data-birthday-display'));
+        $this->assertStringContainsString('trainee-birthday-input', $html);
+    }
 }

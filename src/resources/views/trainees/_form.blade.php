@@ -132,34 +132,40 @@
                      - エラーは 3 つの欄のまとまりの下に 1 つだけ（キー birth_date。§2-7 の但し書き）。
                        エラーがあるときは 3 つの欄すべてを赤枠にする。欄の兄弟の位置ではないので block を付ける
                      - flatpickr（.datepicker）は使わない（以前は 1 つの日付の欄で使っていた）
-                     - 入力中の年齢表示は段階2b で、単位の右に足す --}}
+                     - 入力中の年齢（または入力中の案内）を「日」の右に出す（trainee-birthday-input.js。2026-10 追加）。
+                       欄と表示先は data-birthday-* 属性で見つける。aria-live="polite" で読み上げにも伝える。
+                       年齢は本文と同じ色、入力中の案内は控えめな色（text-muted。JS で付け外し）で、
+                       送信時のエラー（下の赤字・赤枠）とは別に出す
+                     - 全角の数字は、欄から離れたとき（blur）に半角に書き換える（送信時も半角に直して受け付ける） --}}
                 <div class="row g-3 mb-2">
                     <div class="col-12">
                         <div class="row g-2 align-items-start">
                             <label for="birth_year" id="birth_date-label" class="col-md-auto col-form-label text-md-end form-label-fixed">誕生日</label>
                             <div class="col-12 col-md">
-                                <div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-labelledby="birth_date-label">
+                                <div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-labelledby="birth_date-label" data-birthday-input>
                                     <div class="d-flex align-items-center gap-1">
                                         <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
-                                               id="birth_year" name="birth_year" inputmode="numeric" maxlength="4"
+                                               id="birth_year" name="birth_year" inputmode="numeric" maxlength="4" data-birthday-part="year"
                                                style="width: 5.5rem;" aria-label="誕生日の年" aria-describedby="birth_date-help"
                                                value="{{ old('birth_year', $trainee?->birth_year) }}" autocomplete="off">
                                         <span>年</span>
                                     </div>
                                     <div class="d-flex align-items-center gap-1">
                                         <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
-                                               id="birth_month" name="birth_month" inputmode="numeric" maxlength="2"
+                                               id="birth_month" name="birth_month" inputmode="numeric" maxlength="2" data-birthday-part="month"
                                                style="width: 4rem;" aria-label="誕生日の月" aria-describedby="birth_date-help"
                                                value="{{ old('birth_month', $trainee?->birth_month) }}" autocomplete="off">
                                         <span>月</span>
                                     </div>
                                     <div class="d-flex align-items-center gap-1">
                                         <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
-                                               id="birth_day" name="birth_day" inputmode="numeric" maxlength="2"
+                                               id="birth_day" name="birth_day" inputmode="numeric" maxlength="2" data-birthday-part="day"
                                                style="width: 4rem;" aria-label="誕生日の日" aria-describedby="birth_date-help"
                                                value="{{ old('birth_day', $trainee?->birth_day) }}" autocomplete="off">
                                         <span>日</span>
                                     </div>
+                                    {{-- 入力中の年齢（または入力中の案内）。JS が書き込む --}}
+                                    <span class="ms-2" data-birthday-display aria-live="polite"></span>
                                 </div>
                                 <x-form-error field="birth_date" block />
                                 <div id="birth_date-help" class="form-text">分かるところだけで構いません。年はおおよそでも大丈夫です。</div>
@@ -185,3 +191,6 @@
         </div>
     </form>
 </div>
+
+{{-- 誕生日の入力中の年齢表示（2026-10 追加）--}}
+@vite(['resources/js/trainee-birthday-input.js'])

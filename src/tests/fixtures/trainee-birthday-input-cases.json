@@ -38,6 +38,7 @@
     { "label": "5. 実在しない日付：うるう年でない年の2月29日", "ref": "2026-10-20", "year": "2021", "month": "2", "day": "29", "state": "invalid_date" },
     { "label": "5. 実在しない日付：32日", "ref": "2026-10-20", "year": "2020", "month": "3", "day": "32", "state": "invalid_date" },
     { "label": "5. 実在しない日付：0日", "ref": "2026-10-20", "year": "2020", "month": "3", "day": "0", "state": "invalid_date" },
+    { "label": "5. 実在しない日付：年が0の年月日（PHP の checkdate は年0を認めない）", "ref": "2026-10-20", "year": "0", "month": "3", "day": "1", "state": "invalid_date" },
 
     { "label": "6. 未来：年だけで来年", "ref": "2026-10-20", "year": "2027", "month": null, "day": null, "state": "future" },
     { "label": "6. 未来：年月で来月", "ref": "2026-10-20", "year": "2026", "month": "11", "day": null, "state": "future" },
