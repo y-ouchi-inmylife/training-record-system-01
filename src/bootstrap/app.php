@@ -68,5 +68,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ->appendOutputTo(storage_path('logs/cron-backup.log'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // 受付アンケート（S-1413）からの送信がセッション切れ（419。CSRF トークンの不一致）になったときだけ、
+        // お客様向けの文言の画面を出す（2026-10 追加。設計書 S-1413 備考「入力中にセッションが切れたとき」）。
+        // ほかの画面の 419 は今のまま（resources/views/errors/419.blade.php）。
+        // ここに来る例外は、Laravel が TokenMismatchException を 419 の HttpException に置き換えたあとのもの。
+        // 受付アンケートはログインしない画面のため、「再度ログインしてください」の文言では伝わらない。
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
+            if ($e->getStatusCode() === 419 && $request->is('client-portal/intake-survey/*')) {
+                return response()->view('client.intake-survey.session-expired', [], 419);
+            }
+
+            return null;
+        });
     })->create();
