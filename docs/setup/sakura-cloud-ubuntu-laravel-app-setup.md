@@ -786,6 +786,7 @@ cd /var/www/training-record-system-01
 git pull
 cd src
 composer install --no-dev --optimize-autoloader   # composer.lock が変わったとき
+sudo -u trs01 php artisan db:backup   # マイグレーションがあるとき
 sudo -u trs01 php artisan migrate --force
 sudo -u trs01 php artisan config:clear
 sudo -u trs01 php artisan view:clear
@@ -793,6 +794,8 @@ sudo -u trs01 php artisan route:clear
 sudo systemctl reload php8.4-fpm
 sudo -u trs01 php artisan queue:restart
 ```
+
+- **マイグレーションがあるときは、`migrate --force` の前に手動バックアップ（`db:backup`）を取る**（要件定義書 6-13-2 の手動バックアップ）。マイグレーションで既存のデータを移す（列を分ける・消す等）ことがあり、お客様のデータが本番に残っているため。戻すときは `sudo -u trs01 php artisan db:restore {filename}`（バッチ設計書 B-0302）。`db:backup` は `git pull` の前後どちらのコードにもあるため、`git pull` のあとに実行してよい
 
 - **`queue:restart` を最後に実行する**：キューのワーカー（第10段階）は、立ち上がったときのコードを読んだまま動き続ける。`queue:restart` は、ワーカーに「今のジョブを終えたら止まる」ように知らせ（キャッシュに印を置く）、supervisor が新しいコードで立ち上げ直す。キューを使っていない環境（`QUEUE_CONNECTION=sync`）でも、印を置くだけなので、実行して害はない。
 
