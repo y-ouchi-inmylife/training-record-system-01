@@ -254,4 +254,55 @@ class TraineeFormErrorRenderingTest extends TestCase
         $this->assertGreaterThan(mb_strpos($html, '<span>日</span>'), mb_strpos($html, 'data-birthday-display'));
         $this->assertStringContainsString('trainee-birthday-input', $html);
     }
+
+    // ---- 受付アンケートの案内を発行する（S-0308 だけ。2026-10 追加） ----
+
+    /** 「受付アンケートの案内を発行する」のチェックボックスの <input> を返す（なければ null） */
+    private function issueCheckbox(string $html): ?string
+    {
+        return preg_match('/<input class="form-check-input" type="checkbox" id="issue_intake_survey"[^>]*>/s', $html, $m) ? $m[0] : null;
+    }
+
+    public function test_登録で初めて開いたときは受付アンケートのチェックがオン(): void
+    {
+        $html = $this->renderForm([])->__toString();
+
+        $checkbox = $this->issueCheckbox($html);
+        $this->assertNotNull($checkbox);
+        $this->assertStringContainsString('name="issue_intake_survey" value="1"', $checkbox);
+        $this->assertMatchesRegularExpression('/\schecked>/', $checkbox);
+        $this->assertStringContainsString('受付アンケートの案内を発行する', $html);
+        $this->assertStringContainsString('お客様にお渡しする案内（QR コード・URL）を発行します。あとから会員詳細でも発行できます。', $html);
+    }
+
+    public function test_チェックを外して入力エラーで戻ったときは外した状態を保つ(): void
+    {
+        $this->app['request']->setLaravelSession($this->app['session.store']);
+        // チェックを外すと issue_intake_survey は送られない（old にもない）
+        session()->put('_old_input', ['name' => str_repeat('あ', 51)]);
+
+        $html = $this->renderForm(['name' => 'ERR_name'])->__toString();
+
+        $checkbox = $this->issueCheckbox($html);
+        $this->assertNotNull($checkbox);
+        $this->assertDoesNotMatchRegularExpression('/\schecked>/', $checkbox);
+    }
+
+    public function test_チェックしたまま入力エラーで戻ったときはオンのまま(): void
+    {
+        $this->app['request']->setLaravelSession($this->app['session.store']);
+        session()->put('_old_input', ['name' => str_repeat('あ', 51), 'issue_intake_survey' => '1']);
+
+        $html = $this->renderForm(['name' => 'ERR_name'])->__toString();
+
+        $this->assertMatchesRegularExpression('/\schecked>/', $this->issueCheckbox($html));
+    }
+
+    public function test_編集では受付アンケートのチェックを出さない(): void
+    {
+        $html = $this->renderForm([], isEdit: true)->__toString();
+
+        $this->assertNull($this->issueCheckbox($html));
+        $this->assertStringNotContainsString('受付アンケートの案内を発行する', $html);
+    }
 }

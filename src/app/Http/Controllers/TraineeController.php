@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Requests\TraineeRequest;
 use App\Models\Client;
 use App\Models\Trainee;
+use App\Services\TraineeIntakeSurveyTokenService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -31,17 +33,31 @@ class TraineeController extends Controller
     /**
      * トレーニー登録処理
      */
-    public function store(TraineeRequest $request, Client $client): RedirectResponse
+    public function store(TraineeRequest $request, Client $client, TraineeIntakeSurveyTokenService $intakeSurveyTokens): RedirectResponse
     {
         $validated = $request->validated();
         $validated['client_id'] = $client->id;
         $validated['updated_by'] = auth()->id();
 
-        Trainee::create($validated);
+        // 「受付アンケートの案内を発行する」（S-0308。2026-10 追加）。チェックを外すと送られないため、
+        // 送られたときだけ発行する。トレーニーの登録と同じトランザクションで発行し、どちらかが失敗したら
+        // 両方を取り消す。アクセスログは trainees.store の create_trainee の 1 件だけになる
+        // （ルート単位で記録するため。発行の操作種別は付かない）
+        $issueIntakeSurvey = $request->has('issue_intake_survey');
+
+        DB::transaction(function () use ($validated, $issueIntakeSurvey, $intakeSurveyTokens, $request) {
+            $trainee = Trainee::create($validated);
+            if ($issueIntakeSurvey) {
+                // 作ったばかりのトレーニーなので有効な案内はなく、必ず発行される
+                $intakeSurveyTokens->issue($trainee, $request->user());
+            }
+        });
 
         return redirect()
             ->route('clients.show', $client)
-            ->with('success', 'トレーニーを登録しました。');
+            ->with('success', $issueIntakeSurvey
+                ? 'トレーニーを登録し、受付アンケートの案内を発行しました。'
+                : 'トレーニーを登録しました。');
     }
 
     /**

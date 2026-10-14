@@ -187,6 +187,34 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- 行6: 受付アンケートの案内を発行する（2026-10 追加。要件定義書 6-16-1・6-16-8、設計書 S-0308）。
+                     登録（S-0308）のときだけ出し、編集（S-0310）では出さない（発行は S-0305／S-0309 のボタンで行う）。
+                     チェックを外すと送られないため、送られたときだけ発行する（パラメータ名 issue_intake_survey）。
+                     初期値はオン。チェックを外して入力エラーで戻ったときは外した状態を保つ
+                     （session()->hasOldInput() が真なら前の入力、偽〔初めて開いたとき〕ならオン）。
+                     左の空きはラベル列の幅（form-label-fixed）にそろえ、チェックの位置を入力欄の左端に合わせる。 --}}
+                @if($method === 'POST')
+                    @php
+                        $issueIntakeSurveyChecked = session()->hasOldInput() ? old('issue_intake_survey') !== null : true;
+                    @endphp
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <div class="row g-2">
+                                <div class="col-md-auto form-label-fixed d-none d-md-block"></div>
+                                <div class="col-12 col-md">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="issue_intake_survey"
+                                               name="issue_intake_survey" value="1" aria-describedby="issue_intake_survey-help"
+                                               {{ $issueIntakeSurveyChecked ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="issue_intake_survey">受付アンケートの案内を発行する</label>
+                                    </div>
+                                    <div id="issue_intake_survey-help" class="form-text">お客様にお渡しする案内（QR コード・URL）を発行します。あとから会員詳細でも発行できます。</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </form>
