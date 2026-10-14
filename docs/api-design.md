@@ -38,9 +38,11 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 
 ### 2-3. LogAccess（操作履歴の記録）
 
-クライアント・トレーニング記録の参照・登録・更新・削除が成功したとき、操作者・操作種別・操作対象・IPアドレス・ユーザーエージェントを、トレーナー操作履歴（access_logs）に記録する。記録される操作種別は、DB設計書の access_logs テーブル定義を参照。
+クライアント・トレーニング記録の参照・登録・更新・削除、トレーニー・計測値・契約・利用の登録・更新・削除、受付アンケート案内の発行・取消が成功したとき、操作者・操作種別・操作対象・IPアドレス・ユーザーエージェントを、トレーナー操作履歴（access_logs）に記録する。記録される操作種別は、DB設計書の access_logs テーブル定義を参照。
 
 なお、ログイン・ログアウトの記録は、このミドルウェアではなく、それぞれのエンドポイントの処理で行う。
+
+お客様（クライアント）の操作は記録しない（`access_logs.trainer_id` が NOT NULL で、アクセスログはトレーナーの操作の記録のため）。受付アンケートの回答（`POST /client-portal/intake-survey/{token}`）も記録せず、回答日時（`trainee_intake_survey_responses.answered_at`）が回答の記録を兼ねる（requirements.md 6-15-17 備考）。
 
 ---
 
@@ -76,6 +78,9 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 / S-0305 会員詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。**送信元は S-0305 または S-0309**（2026-09 追加、S-0305 のトレーニーカードからも登録可能）。リダイレクト先は hidden `return_to` で判別（詳細は下の「計測値エンドポイントの `return_to` 仕様」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 / S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。リダイレクト先は hidden `return_to` で判別（下の「受付アンケート案内エンドポイントの `return_to`」参照） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 / S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-intake-survey-tokens.destroy`。**2026-10 追加**）。リダイレクト先は発行と同じ | auth | 管理者、一般 |
+| トレーニー管理 | S-0311 受付アンケート案内画面 | GET | `/trainees/{trainee}/intake-survey-tokens/print` | 受付アンケート案内画面を表示する（ルート名 `trainee-intake-survey-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -155,6 +160,9 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント閲覧 | S-1407 クライアントパスワード再設定申し込み画面 | POST | `/client-portal/password-reset` | メールアドレスを受け取り、該当が「利用中」なら再設定リンクを送信する（該当しない場合も同じ画面・同じ文言を返す） | public | - |
 | クライアント閲覧 | S-1408 クライアントパスワード再設定画面 | GET | `/client-portal/password-reset/{token}` | パスワード再設定画面を表示する（トークン検証） | public | - |
 | クライアント閲覧 | S-1408 クライアントパスワード再設定画面 | POST | `/client-portal/password-reset/{token}` | 新しいパスワードを保存し、ログイン画面へ遷移する | public | - |
+| クライアント閲覧 | S-1414 受付アンケート回答完了画面 | GET | `/client-portal/intake-survey/thanks` | 受付アンケートの回答完了画面を表示する（トークンを持たない固定の画面。ルート名 `client-portal.intake-survey.thanks`。**2026-10 追加**） | public | - |
+| クライアント閲覧 | S-1413 受付アンケート回答画面 | GET | `/client-portal/intake-survey/{token}` | 受付アンケート回答画面を表示する（トークン検証。ルート名 `client-portal.intake-survey.show`。**2026-10 追加**） | public | - |
+| クライアント閲覧 | S-1413 受付アンケート回答画面 | POST | `/client-portal/intake-survey/{token}` | 受付アンケートの回答を保存し、トレーニーの空欄の項目に反映する（ルート名 `client-portal.intake-survey.store`。**2026-10 追加**） | public | - |
 | クライアント管理 | S-0305 クライアント詳細画面 | POST | `/clients/{client}/email-registration-tokens` | マイページ登録案内を発行する（未発行時の発行と再発行を同じエンドポイントで扱う。トークン自体は「メールアドレス登録用 URL」で、URL パスもそのまま） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/clients/search` | クライアントを検索する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/training-records/auto-create` | 音声記録の要約からトレーニング記録を作成する（**2026-10**：画面からは呼ばれなくなった。録音実行は `/api/audio-records/{id}/auto-create-training-record` を使う） | auth | 管理者、一般 |
@@ -186,6 +194,12 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 - **バリデーションエラー時**：Laravel の `back()` が送信元 URL に自動で戻すため、`return_to` はエラー時のリダイレクト先には影響しない（`return_to` は**成功時のリダイレクト先決定**のみに使う）。エラー画面での該当モーダル復元は hidden `_trainee_id` で行う（詳細は screen-design.md S-0309「計測値モーダルの共用（S-0305 との）」参照）
 - **今回のスコープでは `store` のみが S-0305 から呼ばれる**（S-0305 では計測値の登録のみ、編集・削除は S-0309 のみ）が、**`update` / `destroy` にも同じ `return_to` 仕組みを実装しておく**。将来 S-0305 から編集・削除もできるようにする可能性を残すため（今回のコード追加コストは各メソッドで if 分岐 1 段のみで小さい。3 メソッドで同じパターンにする方がコードの一貫性が保たれる）
 
+**受付アンケート案内エンドポイントの `return_to`**（**2026-10 追加**）：`POST /trainees/{trainee}/intake-survey-tokens`（発行）と `DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、計測値エンドポイントと同じく hidden `return_to`（`client` / `trainee` の 2 値、既定は `trainee`）で送信元を判別し、成功時のリダイレクト先を切り替える（要件定義書 6-16-8・6-16-9「操作した画面に戻る」）。
+
+- `return_to=client`：S-0305 会員詳細画面（`redirect()->route('clients.show', $trainee->client_id)`）に戻す
+- `return_to=trainee`（**既定**）：S-0309 トレーニー詳細画面の受付アンケートの欄（`redirect()->to(route('trainees.show', $trainee) . '#intake-survey')`）に戻す。受付アンケートの欄は画面の下のほうにあるため、状態が変わったことが目に入る位置に戻す
+- 値の扱い（上記以外・欠落時は既定にする、URL そのものは受け取らない）は計測値エンドポイントと同じ
+
 **契約・利用エンドポイントのリダイレクト先**：`client-contracts.*` / `client-usages.*` の 6 メソッドは、処理後（成功時）は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', …)`）に戻す。送信元は S-0305 だけのため、計測値エンドポイントのような `return_to` は持たない。認証・権限は計測値と同じ（`auth` ＋ `practitioners` ミドルウェア。一般トレーナーも削除まで可。管理者限定の操作はない）。バリデーションエラー時は `back()` で S-0305 に戻り、該当モーダルを開き直す（screen-design.md S-0305-M04 / M05 参照）。
 
 ---
@@ -212,6 +226,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 記号 | 意味 |
 |---|---|
 | ● | 必須 |
+| ▲ | 条件付き必須（条件は表の下か説明列に書く。**2026-10 追加**） |
 | 空欄 | 任意 |
 
 **バリデーションの補足**: 「リクエスト」表の「バリデーション」列は、Laravelのバリデーションルールを記載する。標準ルール以外のカスタムルールを以下に補足する。
@@ -1502,7 +1517,7 @@ POST /training-records に以下を追加する。
 
 ###### POST /client-portal/setup/{token}
 
-**概要**: 初回設定を保存する（パスワード＋基本情報＋**愛犬（トレーニー）の情報**）。
+**概要**: 初回設定を保存する（パスワード＋基本情報）。**愛犬（トレーニー）の情報は扱わない**（**2026-10 変更**。受付アンケート `POST /client-portal/intake-survey/{token}` で集める。requirements.md 6-15-5）。
 
 **リクエスト**:
 
@@ -1521,24 +1536,20 @@ POST /training-records に以下を追加する。
 | address2 | string | ● | required, string, max:50 | 市区町村 |
 | address3 | string | ● | required, string, max:100 | 町名・番地 |
 | address4 | string | | nullable, string, max:100 | 建物名・部屋番号 |
-| trainee_name | string | ● | required, string, max:50 | 愛犬の名前（トレーニー） |
-| trainee_breed | string | | nullable, string, max:100 | 愛犬の犬種 |
-| trainee_sex | string | | nullable, in:male,female,unknown | 愛犬の性別 |
-| trainee_birth_date | string | | nullable, date, before_or_equal:today | 愛犬の誕生日（未来日不可） |
-| trainee_note | string | | nullable, string | 愛犬の備考 |
 
 **処理**:
 - トークンの有効性を再チェック（無効ならエラー画面）
 - **初回設定を送信した時点で使用済み化する**（GET では使用済みにしない）
 - 以下を1つのトランザクションで実行する：
   - 対象クライアントの password・氏名・連絡先を更新する
-  - **愛犬（トレーニー）の情報を登録・更新する**：既存のトレーニーが 1 件以上あれば `id` 昇順の先頭（1 頭目）を更新、なければ新規作成する。**2 頭目以降のレコードには一切手を触れない**（削除も更新もしない）。詳細は requirements.md 6-15-5 / 6-16 参照
   - トークンを使用済み（is_used=true）にする
   - 対応するメールアドレス登録用トークン（`client_email_registration_tokens`）を使用済み（is_used=true）にする — **初回設定完了時に使い切り化**
   - 登録完了メール（`ClientSetupCompletedMail`）を登録アドレス宛に送信する（ログインURLの案内）。**送信はトークン使い切り化と同一トランザクション内で行い、送信失敗時は全ロールバックする**（ログイン用リンクは未使用のまま残るため、お客様は同じURLからやり直せる）
 - 対象クライアントで client guard にログインした状態を保つ
 
 **トレーニーの登録・更新に別エンドポイントを設けない理由**: 会員向けにトレーニーを扱うエンドポイントを新設すると、`trainees.*` の `practitioners` ミドルウェアで保護している運用と競合する（トレーナー限定の CRUD を会員側に開放しない方針。requirements.md 6-16 参照）。初回設定の POST 内で処理を完結させることで、既存のトレーナー向けルート・ミドルウェアには一切影響しない
+
+**2026-10 変更**：初回設定から愛犬の情報を外し、受付アンケート（`/client-portal/intake-survey/{token}`）に分離した（requirements.md 6-15-5 備考）。上の理由は経緯として残す。受付アンケートは、トレーナー向けの `trainees.*` を会員に開放するのではなく、**受付アンケート用 URL のトークンでだけ入れる専用のエンドポイント**として設けるため、「トレーナー限定の CRUD を会員側に開放しない」方針は変わらない（`trainees.*` と `practitioners` ミドルウェアには影響しない）
 
 **二重開封時の挙動**:
 - 複数の端末・タブでリンクを開いた場合、GET は使用済みにしないため両方でフォームを表示できる
@@ -1912,6 +1923,201 @@ POST /training-records に以下を追加する。
 
 ---
 
+
+##### S-1413 受付アンケート回答画面
+
+お客様がトレーナーから受け取った受付アンケート案内（受付アンケート用 URL）からアクセスする、認証不要の公開画面（**2026-10 追加**、requirements.md 6-15-17）。ログインはさせない（client guard に触らない）。マイページのアカウントを開設していなくても使える。
+
+**ルートの定義順**：`GET /client-portal/intake-survey/thanks`（S-1414）を `{token}` のルートより**先に**定義する（パスワード再設定の申し込みルートと同じ扱い。`thanks` がトークンとして解釈されないようにするため）。
+
+###### GET /client-portal/intake-survey/{token}
+
+**概要**: 受付アンケート用 URL のトークンを検証し、受付アンケート回答画面を表示する。
+
+**処理**:
+- トークン（`trainee_intake_survey_tokens.token`）を検索し、次の順に確かめる
+  1. 存在しない（取消済みを含む。取消は物理削除のため）→「使えない」
+  2. 回答済み（`answered_at` が入っている）→「回答済み」
+  3. 対象のトレーニーが存在しない → 「使えない」（通常は CASCADE でトークンも消えるため 1. に当たる）
+- 有効なら、トレーニーの名前（未登録なら NULL）を view に渡す。**会員の氏名・連絡先・住所は渡さない**（requirements.md 6-15-17）
+- 有効期限の確認はしない（受付アンケート用 URL は期限を持たない。architecture.md §3-1）
+- **開いただけでは使用済みにしない**（使用済みにするのは POST で回答を保存した時点）
+
+**レスポンス**:
+- 有効：view（回答フォーム。名前が登録済みなら名前を表示のみ、未登録なら入力欄）
+- 回答済み：受付アンケート用の使えない URL の画面に「このアンケートはすでにご回答いただいています。」
+- 使えない：同じ画面に「このアンケートはご利用いただけません。お手数ですがトレーナーにお問い合わせください。」
+- 使えない URL の画面は、既存の `client.setup.invalid-token` を使い回さず受付アンケート用に作る（screen-design.md S-1413「使えない URL の画面」）
+
+
+###### POST /client-portal/intake-survey/{token}
+
+**概要**: 受付アンケートの回答を保存し、トレーニーの空欄の項目に反映する。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| name | string | ▲ | トレーニーの名前が未登録なら required, string, max:50。登録済みなら受け取らない（送られても無視する） | 愛犬の名前 |
+| breed | string | | nullable, string, max:100 | 犬種 |
+| sex | string | | nullable, in:male,female | 性別（「不明」は置かない。requirements.md 6-15-17 備考） |
+| birth_year | string | | nullable（形式・範囲・組み合わせは下の注記のとおり 3 項目まとめて検証する） | 誕生日（年）。`type="text" inputmode="numeric"` の欄から送られる。今年から 30 年前まで |
+| birth_month | string | | nullable（同上） | 誕生日（月）。1〜12。入れる場合は年が必須 |
+| birth_day | string | | nullable（同上） | 誕生日（日）。入れる場合は年・月が必須 |
+| neuter_status | string | | nullable, in:neutered,not_neutered,dont_know | 去勢・避妊（している／していない／分からない） |
+| wish | string | | nullable, string, max:2000 | 自由記述「こうなったらいいな」 |
+| recent_events | string | | nullable, string, max:2000 | 自由記述「最近の様子」 |
+| ideal_days | string | | nullable, string, max:2000 | 自由記述「理想の毎日」 |
+| health_concerns | string | | nullable, string, max:2000 | 自由記述「体のこと」 |
+
+- 「必須」列の ▲ は条件付き必須（名前が未登録のトレーニーのときだけ必須）
+- 誕生日の 3 項目の検証（形式・範囲・組み合わせ・実在する日付・未来でない・30 年前まで）は、トレーナー側のトレーニー登録・更新と同じルール・同じ順で行う（下の 4-1-16 参照）。エラーは 1 つのキーにまとめて返す（キー名は実装で決める。screen-design.md §2-7 の但し書き）
+- 名前が必須かどうかは、**POST を処理する時点の**トレーニーの名前で判定する（画面を開いてから送信するまでの間に、トレーナーが名前を登録・削除した場合も、送信時点の状態に従う）
+
+**処理**:
+- 以下を 1 つのトランザクションで実行する（同時送信への対策。決定事項 19）
+  1. トークン行を**排他ロック**して取得する（`lockForUpdate`）。存在しなければ「使えない」画面
+  2. `answered_at` が空であることを確かめる。入っていれば「回答済み」画面（ロックを待っていた 2 回目の送信はここで止まる）
+  3. 対象のトレーニーが存在することを確かめる
+  4. 回答（`trainee_intake_survey_responses`）を 1 件保存する。`answered_at` は現在日時。名前が登録済みなら、回答時点のトレーニーの名前を記録する。**入力された値は答えたとおりに残す**（`neuter_status` の `dont_know` もそのまま）
+  5. トレーニー（`trainees`）の**空欄の項目だけ**に反映する（requirements.md 6-15-17「トレーニーへの反映」）
+     - `name` / `breed` / `sex` / `neuter_status`：トレーニーの値が NULL のときだけ反映。トレーナーが「不明」（`unknown`）を選んでいる場合は入力済みとみなし、反映しない
+     - 回答の `neuter_status = dont_know` は、トレーニーには `unknown` として反映する
+     - 誕生日：トレーニーの `birth_year`・`birth_month`・`birth_day` が**すべて NULL** のときだけ、回答の 3 項目をそのまま反映する
+     - 自由記述 4 欄は反映しない
+     - `trainees.updated_by` は**触らない**（お客様の操作のため。写真の登録・削除と同じ扱い）
+  6. トークンの `answered_at` に回答日時を記録する（使い切り）
+- **アクセスログには記録しない**（§2-3。回答日時が回答の記録を兼ねる）
+- メールは送らない
+
+**同時送信時の挙動**（初回設定の「二重開封時の挙動」にならう）:
+- 複数の端末・タブで同じ案内を開いた場合、GET は使用済みにしないため両方で回答画面を表示できる
+- 先に処理された POST が回答を保存し、トークンは回答済みになる
+- 後から処理された POST は、トークン行のロックが解けるのを待ったあと「回答済み」と判定され、「このアンケートはすでにご回答いただいています。」の画面を返す（回答は保存しない）
+
+**レスポンス**:
+- 成功：`redirect()->route('client-portal.intake-survey.thanks')`（PRG。再読み込みで二重送信にならないようにする）
+- 回答済み・使えない：GET と同じ使えない URL の画面
+- バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ（screen-design.md §2-7 の規約で返す）
+
+**備考**:
+- レート制限は付けない。トークンは `Str::random(32)` で推測が現実的でなく、既存のトークン付き URL（メールアドレス登録用 URL など）の公開ルートにもレート制限は付けていないため、同じ扱いにそろえる
+
+
+##### S-1414 受付アンケート回答完了画面
+
+###### GET /client-portal/intake-survey/thanks
+
+**概要**: 受付アンケートの回答を受け付けたことを伝える固定の画面を表示する（**2026-10 追加**）。
+
+**処理**:
+- トークンを受け取らず、DB も参照しない。愛犬の名前は出さない（requirements.md 6-15-17 備考。回答後に名前を取り出す手段を持たないため）
+- 直接開かれても同じ文面を返す（個人情報を含まないため）
+
+**レスポンス**:
+- view（回答完了画面）
+
+---
+
+#### 4-1-16. トレーニー管理
+
+トレーニー管理のエンドポイントのうち、受付アンケート（第1段階、**2026-10**）で変わるもの・新しく設けるものの詳細。その他のトレーニー・計測値のエンドポイントは「3. エンドポイント一覧」を参照。
+
+##### S-0308 トレーニー登録画面 / S-0310 トレーニー編集画面
+
+###### POST /clients/{client}/trainees（登録）・PUT /trainees/{trainee}（更新）
+
+**概要**: トレーニーを登録・更新する。**2026-10 変更**：名前を任意にし、誕生日を年・月・日の 3 項目に分け、去勢・避妊を加えた。登録では受付アンケート案内の発行を選べる。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| name | string | | nullable, string, max:50 | 名前（**2026-10 に必須を外した**） |
+| breed | string | | nullable, string, max:100 | 犬種 |
+| sex | string | | nullable, in:male,female,unknown | 性別 |
+| birth_year | string | | nullable（形式・範囲・組み合わせは下の注記のとおり 3 項目まとめて検証する） | 誕生日（年）。`type="text" inputmode="numeric"` の欄から送られる。今年から 30 年前まで |
+| birth_month | string | | nullable（同上） | 誕生日（月）。1〜12。入れる場合は年が必須 |
+| birth_day | string | | nullable（同上） | 誕生日（日）。入れる場合は年・月が必須 |
+| neuter_status | string | | nullable, in:neutered,not_neutered,unknown | 去勢・避妊（している／していない／不明） |
+| note | string | | nullable, string | 備考 |
+| issue_intake_survey | string | | nullable | **登録のときだけ**。「受付アンケートの案内を発行する」チェックボックス。チェックがオフのときはブラウザから送られないため、**送られたときだけ発行する**（画面の初期値はオン） |
+
+- 誕生日の 3 項目は、FormRequest の `after()` などで次の順に検証し、最初に当てはまった 1 つだけを、1 つにまとめたキーで返す（文言は screen-design.md S-0308「バリデーションチェック」）：数字であること → 月は 1〜12 → 月があるなら年がある → 日があるなら年・月がある → 3 つそろったら実在する日付 → 未来でない（年だけなら今年以前、年・月までなら今月以前、年・月・日なら今日以前）→ 年は今年から 30 年前まで
+- 同じルールを、入力中の年齢表示（JS）でも使う（requirements.md 6-16「年齢の表示規則」）
+
+**処理**（登録で `issue_intake_survey` が送られた場合）:
+- トレーニーの登録と、受付アンケート用 URL のトークンの作成を 1 つのトランザクションで行う（作り方は下の `POST /trainees/{trainee}/intake-survey-tokens` と同じ）
+- アクセスログは `create_trainee` の 1 件だけになる（ルート単位で記録するため。発行の操作種別は付かない）
+
+**レスポンス**:
+- 登録成功：`redirect('/clients/{client}')`（S-0305）。完了メッセージは、案内を発行した場合「トレーニーを登録し、受付アンケートの案内を発行しました。」、発行しない場合は従来どおり
+- 更新成功：従来どおり
+- バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ
+
+
+##### S-0305 会員詳細画面 / S-0309 トレーニー詳細画面
+
+###### POST /trainees/{trainee}/intake-survey-tokens
+
+**概要**: 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。requirements.md 6-16-8）。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| return_to | string | | — | 成功時の戻り先（`client` / `trainee`。既定は `trainee`。§3 の「受付アンケート案内エンドポイントの `return_to`」参照） |
+
+**処理**:
+- 以下を 1 つのトランザクションで実行する
+  - 対象トレーニーの行を**排他ロック**する（同じトレーニーへの同時の発行で、有効な案内が 2 つできないようにするため。MySQL では「`answered_at` が NULL の行は 1 つまで」という条件付きのユニーク制約を書けないので、アプリ側で守る。db-schema.md DS-1000）
+  - 状態が「未発行」であることを確かめる（回答がなく、`answered_at` が NULL のトークンもない）。当てはまらない場合は 409
+  - `Str::random(32)` でトークンを生成し、`trainee_intake_survey_tokens` に 1 件作成する（`created_by` は操作したトレーナー）。有効期限は持たない
+- **発行し直しはしない**（未回答のトークンがあれば発行できない。マイページ登録案内の発行と違い、既存のトークンを消して作り直す処理は持たない。requirements.md 6-16-8 備考）
+
+**レスポンス**:
+- 成功：`return_to` に従って S-0305 または S-0309 の `#intake-survey` へリダイレクト。フラッシュ `success` に「受付アンケートの案内を発行しました。」
+- 状態が「未発行」でない：409（UI 側でボタンを出し分けているため通常は到達しない）
+- S-0311 は自動で開かない（マイページ登録案内と同じ。requirements.md 6-16-1 備考）
+
+
+###### DELETE /trainees/{trainee}/intake-survey-tokens
+
+**概要**: 受付アンケート案内を取り消す（requirements.md 6-16-9）。対象トレーニーの未回答のトークンを物理削除する。
+
+**パス選定の理由**: 発行と同じリソース URL に対する DELETE とする（マイページ登録案内の `DELETE /clients/{client}/email-registration-tokens` と同じ考え方）。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| return_to | string | | — | 成功時の戻り先（発行と同じ） |
+
+**処理**:
+- 対象トレーニーの状態が「回答待ち」（回答がなく、`answered_at` が NULL のトークンがある）であることを確かめる。当てはまらない場合は 409
+- `answered_at` が NULL のトークンを物理削除する。**回答済みのトークンと回答には触らない**
+
+**レスポンス**:
+- 成功：`return_to` に従って S-0305 または S-0309 の `#intake-survey` へリダイレクト。フラッシュ `success` に「受付アンケートの案内を取り消しました。」
+- 状態が「回答待ち」でない：409
+- 押下時に確認モーダルを挟む（screen-design.md「受付アンケート案内の取消モーダル」）
+
+
+###### GET /trainees/{trainee}/intake-survey-tokens/print
+
+**概要**: 対象トレーニーの有効な受付アンケート用 URL を、QR コード・URL・手順を載せた案内として表示する（S-0311）。
+
+**処理**:
+- 対象トレーニーの `trainee_intake_survey_tokens` のうち `answered_at` が NULL のトークン 1 件を取得する（有効期限は見ない）
+- 有効なトークンがあれば、URL・QR コード用データ・愛犬の名前（未登録なら NULL）を view に渡す
+- **メール／LINE 送付用の案内文面もコントローラで組み立て、view に渡す**（マイページ登録案内と同じ。文面と決め事は screen-design.md S-0311「案内文面のコピー」）。事業者名（`config('app.client_portal_company')`）が未設定なら、事業者名の行は文面に含めない
+- **お客様の氏名は view に渡さない**（マイページ登録案内と同じ理由）
+
+**レスポンス**:
+- 有効なトークンあり：view（`layouts.print` を使う。S-0307 と同じ構え）
+- 有効なトークンなし（回答済み・取消済み・未発行のいずれでも）：同じ view で「有効な受付アンケート案内がありません。」を出す。QR・URL・コピー文面は出さない
+
+---
 
 ### 4-2. 内部API（routes/api.php）
 
