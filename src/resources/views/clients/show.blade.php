@@ -557,6 +557,31 @@
                                 </dl>
                                     </div>
                                 </div>
+                                {{-- 受付アンケートの行（2026-10 追加。要件定義書 6-16-8、設計書 S-0305 セクション3
+                                     「受付アンケート」）。ラベル（col-4）と値（col-8）の表には入れず、写真と右の列の
+                                     横並びの下に、カードの下端の全幅の 1 行で置く（上に薄い区切り線）。ラベル列は
+                                     写真の枠と並ぶため lg〜xl で狭く「受付アンケート」が折り返すこと、回答待ちでは
+                                     ボタンが並ぶことによる。状態はバッジにしない（「回答待ち」はお客様の対応を待つ
+                                     状態で、トレーナーが対応する状態ではないため）。
+                                     状態は Trainee::intake_survey_status（ClientController::show で
+                                     trainees.activeIntakeSurveyToken を先読み済み）。
+                                     「案内を表示」（S-0311）は段階3b で足す。 --}}
+                                <div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                                    <span>受付アンケート：{{ $trainee->intake_survey_status_label }}</span>
+                                    <div class="d-flex flex-wrap gap-2 ms-auto">
+                                        @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
+                                            <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
+                                                @csrf
+                                                <input type="hidden" name="return_to" value="client">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
+                                            </form>
+                                        @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
+                                                    data-intake-survey-trainee-id="{{ $trainee->id }}">案内を取消</button>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -667,6 +692,11 @@
             </div>
         </div>
     </div>
+    @endif
+
+    {{-- 受付アンケート案内取消確認モーダル（S-0305-M06。2026-10 追加）。トレーニーが何頭いても 1 つ --}}
+    @if($client->trainees->isNotEmpty())
+        @include('trainees._intake-survey-cancel-modal', ['returnTo' => 'client'])
     @endif
 
     {{-- マイページ登録案内取消確認モーダル（S-0305-M03）--}}

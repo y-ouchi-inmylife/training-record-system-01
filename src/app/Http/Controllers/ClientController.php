@@ -162,6 +162,8 @@ class ClientController extends Controller
         // trainees は id 昇順（Client::trainees() の既定）で並び、
         // 各 trainee の measurements を eager load することで、
         // トレーニーカードの「最終計測」表示で N+1 を起こさない。
+        // trainees.activeIntakeSurveyToken は受付アンケートの行の状態（Trainee::intake_survey_status）に使う。
+        // トレーニーが何頭いてもクエリは 1 本で済む（2026-10 追加）。
         // measurements は Trainee::measurements() で計測日時降順に並ぶため、
         // Trainee::latest_measurement アクセサが `first()` で最新 1 件を取り出せる
         // （設計書 S-0305 セクション3「最終計測」参照）。
@@ -172,7 +174,7 @@ class ClientController extends Controller
                 ->withCount('mediaRecords')
                 ->orderBy('training_date', 'desc')
                 ->orderBy('training_time', 'desc');
-        }, 'trainees.measurements', 'audioRecords' => function ($query) {
+        }, 'trainees.measurements', 'trainees.activeIntakeSurveyToken', 'audioRecords' => function ($query) {
             $query->select(['id', 'client_id']);
         }, 'contracts', 'usages']);
 

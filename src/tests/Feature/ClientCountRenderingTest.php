@@ -86,6 +86,8 @@ class ClientCountRenderingTest extends TestCase
             $table->boolean('is_used')->default(false);
             $table->timestamp('expires_at')->nullable();
         });
+        // 受付アンケート用 URL のトークン（トレーニーカードの受付アンケートの行の状態。2026-10 追加）
+        $this->createTraineeIntakeSurveyTokensTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;
@@ -679,5 +681,104 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertStringContainsString('<h6 class="mb-2"><a href="'.route('trainees.show', $id).'">ポチ</a></h6>', $html);
+    }
+
+    // ---- 受付アンケートの行（2026-10 追加。設計書 S-0305 セクション3「受付アンケート」） ----
+
+    private function intakeToken(int $traineeId, ?string $answeredAt = null, string $createdAt = '2026-10-15 09:00:00'): int
+    {
+        return DB::table('trainee_intake_survey_tokens')->insertGetId([
+            'token' => bin2hex(random_bytes(16)), 'trainee_id' => $traineeId,
+            'answered_at' => $answeredAt, 'created_at' => $createdAt, 'updated_at' => $createdAt,
+        ]);
+    }
+
+    public function test_受付アンケートが未発行なら未発行と案内を発行のボタンを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('受付アンケート：未発行', $html);
+        $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
+        $this->assertMatchesRegularExpression(
+            '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
+            .'<input type="hidden" name="return_to" value="client">\s*<button type="submit" class="btn btn-sm btn-outline-primary">案内を発行<\/button>/u',
+            $html
+        );
+        $this->assertStringNotContainsString('案内を取消', $html);
+        $this->assertStringNotContainsString('案内を表示', $html);
+    }
+
+    public function test_受付アンケートが回答待ちなら発行日と案内を取消のボタンを出し案内を表示は出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id, null, '2026-10-15 09:00:00');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('受付アンケート：回答待ち（2026/10/15 発行）', $html);
+        $this->assertMatchesRegularExpression(
+            '/<button type="button" class="btn btn-sm btn-outline-danger"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"\s*'
+            .'data-intake-survey-trainee-id="'.$id.'">案内を取消<\/button>/u',
+            $html
+        );
+        $this->assertStringNotContainsString('>案内を発行<', $html);
+        // 「案内を表示」（S-0311）は段階3b で足す
+        $this->assertStringNotContainsString('案内を表示', $html);
+    }
+
+    public function test_回答済みの案内しかなければ段階3では未発行として扱う(): void
+    {
+        // 回答（D-1100）は段階4で作るため、回答済みの判定はまだない。回答済みのトークンは有効な案内として数えない
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id, '2026-10-16 10:00:00');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('受付アンケート：未発行', $html);
+    }
+
+    public function test_取消モーダルはトレーニーが何頭いても1つで送信先のひな形と戻り先を持つ(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $a = $this->trainee($client, 'ポチ');
+        $b = $this->trainee($client, 'たま');
+        $this->intakeToken($a);
+        $this->intakeToken($b);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($html, 'id="intakeSurveyCancelModal"'));
+        $this->assertStringContainsString('受付アンケート案内の取消', $html);
+        $this->assertStringContainsString('発行済みの受付アンケート案内が使えなくなります。<br>', $html);
+        $this->assertMatchesRegularExpression('/id="intakeSurveyCancelForm">\s*<input type="hidden" name="_token"[^>]*>\s*<input type="hidden" name="_method" value="DELETE">\s*<input type="hidden" name="return_to" value="client">/u', $html);
+        // 送信先のひな形（トレーニーの id を JS で入れる）
+        $this->assertStringContainsString(json_encode(route('trainee-intake-survey-tokens.destroy', ['trainee' => '__ID__'])), $html);
+        $this->assertStringContainsString('data-intake-survey-trainee-id="'.$a.'"', $html);
+        $this->assertStringContainsString('data-intake-survey-trainee-id="'.$b.'"', $html);
+    }
+
+    public function test_受付アンケートの行は写真と右の列の横並びの下に置く(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 計測を追加のボタン（右の列の最後）より後、次のトレーニー・カードの下部より前
+        $posMeasure = strpos($html, '>計測を追加</button>');
+        $posRow = strpos($html, '<div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small">');
+        $this->assertNotFalse($posRow);
+        $this->assertGreaterThan($posMeasure, $posRow);
+        $this->assertLessThan(strpos($html, 'トレーニーを追加'), $posRow);
     }
 }
