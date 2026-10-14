@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- テスト全件を 1 つのプロセスで流すと、使うメモリが PHP の既定の上限（128M）に届くため
+             上限を上げる（2026-10。600 件を超えたあたりで 126MB に達した。テスト 1 件あたりの使う量は
+             ふつうで、件数が増えたことによる） -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
