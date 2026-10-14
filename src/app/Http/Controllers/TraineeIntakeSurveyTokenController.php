@@ -87,7 +87,7 @@ class TraineeIntakeSurveyTokenController extends Controller
         return view('trainees.intake-survey-token-print', [
             'trainee' => $trainee,
             'url' => $url,
-            'copyText' => $this->buildCopyText($trainee, $url),
+            'copyText' => $this->buildCopyText($url),
         ]);
     }
 
@@ -96,18 +96,18 @@ class TraineeIntakeSurveyTokenController extends Controller
      *
      * S-0307 の決め事にそろえる：件名を入れない・挨拶を入れない・QR コードに触れない・
      * 事業者名は最後の行で、config('app.client_portal_company') が未設定なら行ごと出さない。
-     * 名前が未登録なら 1 行目を変える（「愛犬の…愛犬のこと」と続かないように）。
+     * 愛犬の名前は使わない（名前の有無にかかわらず同じ文。2026-10 変更。トレーナーが電話などで聞いて入れた
+     * 名前が間違っていると、お客様に間違った名前を見せることになるため。当初は名前があれば
+     * 「モモちゃんのトレーニングの参考にするため、…」としていた）。
      *
      * 文面を直すときは、上の設計書と本メソッドを同時に更新すること。
      */
-    private function buildCopyText(Trainee $trainee, string $url): string
+    private function buildCopyText(string $url): string
     {
         $company = config('app.client_portal_company');
 
         $lines = [
-            $trainee->has_name
-                ? $trainee->client_call_name.'のトレーニングの参考にするため、受付アンケートへのご回答をお願いします。'
-                : 'トレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
+            'トレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
             '下のリンクから、愛犬のことと暮らしの様子をお聞かせください。',
             '',
             $url,

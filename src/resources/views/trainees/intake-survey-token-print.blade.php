@@ -7,7 +7,7 @@
      マイページ登録案内の印刷画面（S-0307、clients/email-registration-token-print.blade.php）と同じ作り：
      印刷専用レイアウト・ページ上部の操作エリア（「« 戻る」と「文面をコピー」。d-print-none で印刷時は
      出さない。S-0307 と S-0311 の 2 画面だけに認めた例外）・QR コード（qr-code.js）・文面のコピー
-     （copy-message.js）。S-0307 との違い：有効期限を載せない（代わりに「1回かぎり」の文）、愛犬の名前の行、
+     （copy-message.js）。S-0307 との違い：有効期限を載せない（代わりに「1回かぎり」の文）、「愛犬のことを教えてください」の行（名前は使わない）、
      手順の中身、戻り先は常に会員詳細。お客様の氏名は載せない（紛失時に氏名と URL が同時に漏れないため）。
      変数：$trainee、$url（有効な案内がなければ null）、$copyText（同） --}}
 <div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">
@@ -26,9 +26,11 @@
 @if($url)
     <h1 class="print-title">受付アンケートのご案内</h1>
 
-    {{-- 名前があれば「モモちゃんのことを…」、未登録なら「愛犬のことを…」（「ちゃん」を付けない。
-         会員側用の呼び名のアクセサ Trainee::client_call_name。§2-4 の例外） --}}
-    <p class="print-lead">{{ $trainee->client_call_name }}のことを教えてください</p>
+    {{-- 愛犬の名前は使わず、常に「愛犬のことを…」（2026-10 変更。トレーナーが電話などで聞いて入れた名前が
+         間違っていると、お客様に間違った名前を見せることになるため。当初は会員側用の呼び名
+         Trainee::client_call_name で「モモちゃんのことを…」〔未登録なら「愛犬のことを…」〕と出し分けていた。
+         設計書 S-0311・§2-4） --}}
+    <p class="print-lead">愛犬のことを教えてください</p>
 
     <div class="print-qr">
         <canvas data-qr-url="{{ $url }}" data-qr-size="240"

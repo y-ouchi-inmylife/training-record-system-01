@@ -94,7 +94,8 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         $this->assertSame('/client-portal/intake-survey/'.self::TOKEN, parse_url($url, PHP_URL_PATH));
         $this->assertStringContainsString('<h1 class="print-title">受付アンケートのご案内</h1>', $html);
-        $this->assertStringContainsString('<p class="print-lead">モモちゃんのことを教えてください</p>', $html);
+        // 愛犬の名前は使わない（2026-10 変更。設計書 S-0311）
+        $this->assertStringContainsString('<p class="print-lead">愛犬のことを教えてください</p>', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
         $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
         $this->assertStringContainsString('<p class="print-section-title">ご回答の手順</p>', $html);
@@ -114,7 +115,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertStringContainsString('qr-code', $html);
     }
 
-    public function test_文面_名前があり事業者名が設定されているとき(): void
+    public function test_文面_名前があっても名前を使わず事業者名が設定されているとき(): void
     {
         config(['app.client_portal_company' => 'テスト訓練所']);
         $this->issueToken();
@@ -122,7 +123,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $html = $this->printPage();
 
         $this->assertSame(implode("\n", [
-            'モモちゃんのトレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
+            'トレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
             '下のリンクから、愛犬のことと暮らしの様子をお聞かせください。',
             '',
             $this->surveyUrl(),
@@ -132,9 +133,10 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
             'テスト訓練所',
         ]), $this->copyText($html));
         $this->assertStringContainsString('<p class="print-company">テスト訓練所</p>', $html);
+        $this->assertStringNotContainsString('モモ', $this->copyText($html));
     }
 
-    public function test_名前が未登録なら愛犬と出し文面の1行目を変える(): void
+    public function test_名前が未登録でも名前があるときと同じ文(): void
     {
         config(['app.client_portal_company' => null]);
         $this->trainee->update(['name' => null]);
@@ -154,6 +156,13 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         ]), $this->copyText($html));
         // 事業者名が未設定なら、訓練所名の行も文面の最後の行も出さない
         $this->assertStringNotContainsString('<p class="print-company">', $html);
+    }
+
+    public function test_名前があってもページに愛犬の名前を出さない(): void
+    {
+        $this->issueToken();
+
+        $this->assertStringNotContainsString('モモ', $this->printPage());
     }
 
     public function test_お客様の氏名は出さない(): void

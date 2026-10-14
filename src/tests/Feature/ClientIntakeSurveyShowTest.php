@@ -96,14 +96,16 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->get($this->showPath())->assertOk()->assertSee('受付アンケート');
     }
 
-    public function test_名前が登録済みなら説明文に名前ちゃんを出し名前は表示だけ(): void
+    public function test_名前が登録済みでも説明文に名前を使わず名前は表示だけ(): void
     {
         $this->traineeWithToken('モモ');
 
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
         $this->assertStringContainsString('<h1 class="mb-2">受付アンケート</h1>', $html);
-        $this->assertStringContainsString('モモちゃんのことを教えてください。トレーニングの参考にさせていただきます。', $html);
+        // 説明文に愛犬の名前は使わない（2026-10 変更。設計書 S-1413）
+        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('モモちゃん', $html);
         $this->assertMatchesRegularExpression('/<div class="text-muted small">名前<\/div>\s*<div>モモ<\/div>/u', $html);
         $this->assertStringNotContainsString('name="name"', $html);
     }
