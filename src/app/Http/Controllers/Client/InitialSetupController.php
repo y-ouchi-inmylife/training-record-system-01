@@ -99,8 +99,11 @@ class InitialSetupController extends Controller
         // 一目で読み取れるようにするため）、`rtrim` してから明示的に '/' を付ける。
         $loginUrl = rtrim(url('/'), '/') . '/';
 
+        // どの処理で失敗したかをログで見分けるための印。メールの送信の直前に true にする。
+        $sendingMail = false;
+
         try {
-            DB::transaction(function () use ($validated, $tokenRecord, $loginUrl) {
+            DB::transaction(function () use ($validated, $tokenRecord, $loginUrl, &$sendingMail) {
                 // パスワード・氏名・連絡先を更新（email は S-1405 で登録済みのため触らない）
                 $tokenRecord->client->update([
                     'password' => $validated['password'],
@@ -153,18 +156,29 @@ class InitialSetupController extends Controller
                 // 登録完了メールを登録アドレス宛に送信する。失敗時は全ロールバックし、
                 // ログイン用リンクは未使用のまま残る（同じ URL からやり直せる）。
                 // Client::update() は email に触らないため、更新前後で $client->email は同値。
+                $sendingMail = true;
                 Mail::to($tokenRecord->client->email)
                     ->send(new ClientSetupCompletedMail($tokenRecord->client, $loginUrl));
             });
         } catch (\Throwable $e) {
-            // 全ロールバック済み。既存 5 通の Mailable 送信箇所はログを出していないが、
-            // 送信失敗がお客様側からは「初回設定が失敗しました」としか見えないため、
-            // 原因追跡のために [ClientSetupCompletedMail] のログを残す。メールアドレスは
-            // 個人情報のためログに残さず、client_id で追えるようにする。
-            Log::error('[ClientSetupCompletedMail] 初回設定完了メールの送信に失敗し、初回設定を全ロールバックしました: ' . $e->getMessage(), [
+            // 全ロールバック済み。お客様側からは「初回設定が失敗しました」としか見えないため、
+            // 原因追跡のためにログを残す。以前はどの失敗でも「メールの送信に失敗」と出して
+            // いたため、メールの送信で失敗したかどうかを分けて出す。
+            //
+            // 会員 ID・例外クラス名・コードだけを残し、例外のメッセージや例外そのものは残さない
+            // （会員削除の「最後の守り」〔requirements.md 6-3-5〕と同じ持ち方）。DB の例外の
+            // メッセージには SQL のバインド値（氏名・住所・電話番号・パスワードのハッシュ）が、
+            // メールの例外にはメールアドレスが含まれうるため。
+            $context = [
                 'client_id' => $tokenRecord->client_id,
-                'exception' => $e,
-            ]);
+                'exception' => get_class($e),
+                'code' => $e->getCode(),
+            ];
+            if ($sendingMail) {
+                Log::error('[ClientSetupCompletedMail] 初回設定完了メールの送信に失敗したため、初回設定の変更を取り消しました', $context);
+            } else {
+                Log::error('初回設定の処理に失敗したため、変更を取り消しました', $context);
+            }
 
             // 入力エラー以外の失敗はフォームの上に出す（設計書 §2-7 の規約。段階 4-2 で
             // キーを `setup` から専用の `form` に移した）。
