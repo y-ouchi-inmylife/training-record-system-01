@@ -182,53 +182,35 @@
         @endif
     </div>
 
-    {{-- 受付アンケートの欄（2026-10 追加。要件定義書 6-16-2・6-16-8〜6-16-10、設計書 S-0309
+    {{-- 受付アンケートの欄（2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
          「受付アンケートの欄」）。計測値のカードの下に置く（毎日使う計測値を上に残し、一度きりの
-         回答は下に置くため）。計測値のカードと同じ形（見出しの右にボタン）。
+         回答は下に置くため）。
+         - **状態（と、段階5以降は回答の内容）を見せるだけ**。発行・表示・取消のボタン、取消モーダル
+           （S-0305-M06）、欄の中の完了メッセージは置かない。受付アンケート案内の操作は会員詳細（S-0305）
+           だけで行う（案内を渡す相手は会員で、マイページ登録案内も会員詳細でしか操作しないため。
+           要件定義書 6-16-8 備考）。未発行・回答待ちのときは、会員詳細で操作できることを添える
+         - 経緯：2026-10 の段階3a では、この欄の見出しの右に「案内を発行」「案内を取消」を置き、
+           発行・取消のあとはこの欄（#intake-survey）に戻して完了メッセージを欄の中に出していた。
+           同じ 2026-10 に、操作を会員詳細に寄せたため外した
          - 状態は Trainee::intake_survey_status（TraineeController::show で activeIntakeSurveyToken を
            読み込み済み）。段階3では未発行・回答待ちの 2 つ（回答済みと回答の表示は段階4・5）
-         - S-0305 の「回答を見る」と、ここから発行・取消したあとの戻り先は #intake-survey。
-           scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
+         - id="intake-survey" と scroll-margin-top は残す（段階5で、会員詳細の「回答を見る」から飛ぶ先に
+           なるため）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
-           余白 16px を足した 72px（4.5rem）
-         - ここから発行・取消したときの完了メッセージは、画面の上端ではなく欄の中に出し、自動では
-           消さない（戻り先が画面の下のほうで、上端のメッセージは見えず、しかも 5 秒で消えるため）。
-           セッションのキーは TraineeIntakeSurveyTokenController::SESSION_KEY（intake_survey_success）
-         - 「案内を表示」（S-0311）は段階3b で足す --}}
+           余白 16px を足した 72px（4.5rem） --}}
     <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header">
             <h6 class="mb-0">受付アンケート</h6>
-            <div class="d-flex flex-wrap gap-2">
-                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                    <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
-                        @csrf
-                        <input type="hidden" name="return_to" value="trainee">
-                        <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
-                    </form>
-                @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
-                    <button type="button" class="btn btn-sm btn-outline-danger"
-                            data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
-                            data-intake-survey-trainee-id="{{ $trainee->id }}">案内を取消</button>
-                @endif
-            </div>
         </div>
         <div class="card-body">
-            @if(session(\App\Http\Controllers\TraineeIntakeSurveyTokenController::SESSION_KEY))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    {{ session(\App\Http\Controllers\TraineeIntakeSurveyTokenController::SESSION_KEY) }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="閉じる"></button>
-                </div>
-            @endif
             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                <p class="text-muted mb-0">受付アンケートの案内はまだ発行していません。</p>
+                <p class="text-muted mb-1">受付アンケートの案内はまだ発行していません。</p>
             @else
-                <p class="mb-0">{{ $trainee->intake_survey_status_label }}</p>
+                <p class="mb-1">{{ $trainee->intake_survey_status_label }}</p>
             @endif
+            <p class="small text-muted mb-0">案内の発行・取消は<a href="{{ route('clients.show', $trainee->client) }}">会員詳細</a>から行えます。</p>
         </div>
     </div>
-
-    {{-- 受付アンケート案内取消確認モーダル（S-0305-M06。S-0305 と共用）--}}
-    @include('trainees._intake-survey-cancel-modal', ['returnTo' => 'trainee'])
 
     {{-- 計測値の登録・編集モーダル（登録・編集で共用）。
          $returnTo は明示せず既定値 'trainee' を使う（S-0309 内で登録・編集した後は

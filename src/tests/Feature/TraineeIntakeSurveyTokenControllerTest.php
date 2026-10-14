@@ -15,8 +15,8 @@ use Tests\TestCase;
 /**
  * 受付アンケート案内の発行・取消（POST／DELETE /trainees/{trainee}/intake-survey-tokens。2026-10 追加）。
  *
- * - return_to=client は会員詳細（フラグメントなし）に戻り、完了メッセージは上端の success
- * - それ以外は S-0309 の #intake-survey に戻り、完了メッセージは欄の中に出す intake_survey_success
+ * - 発行・取消のあとは常に会員詳細に戻り、完了メッセージは上端の success（2026-10 変更。
+ *   段階3a では return_to で S-0309 の #intake-survey にも戻していたが、操作を会員詳細に寄せた）
  * - アクセスログに create_／delete_trainee_intake_survey_token（target_type='Trainee'）が残る
  *
  * ミドルウェア（auth・practitioners・LogAccess など）は外さず、実際の HTTP で確かめる。
@@ -68,13 +68,12 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
     // ---- 発行 ----
 
-    public function test_会員詳細から発行すると会員詳細に戻り上端のメッセージを出す(): void
+    public function test_発行すると会員詳細に戻り上端のメッセージを出す(): void
     {
-        $response = $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'client']);
+        $response = $this->post(route('trainee-intake-survey-tokens.store', $this->trainee));
 
         $response->assertRedirect(route('clients.show', 7));
         $response->assertSessionHas('success', '受付アンケートの案内を発行しました。');
-        $response->assertSessionMissing('intake_survey_success');
 
         $token = TraineeIntakeSurveyToken::query()->sole();
         $this->assertSame($this->trainee->id, (int) $token->trainee_id);
@@ -82,36 +81,26 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertNull($token->answered_at);
     }
 
-    public function test_トレーニー詳細から発行すると受付アンケートの欄に戻り欄の中のメッセージを出す(): void
+    public function test_return_toにtraineeを送っても会員詳細に戻る(): void
     {
         $response = $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'trainee']);
 
-        $response->assertRedirect(route('trainees.show', $this->trainee).'#intake-survey');
-        $response->assertSessionHas('intake_survey_success', '受付アンケートの案内を発行しました。');
-        $response->assertSessionMissing('success');
-    }
-
-    public function test_return_toがないか想定外の値ならトレーニー詳細に戻す(): void
-    {
-        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
-            ->assertRedirect(route('trainees.show', $this->trainee).'#intake-survey');
-
-        TraineeIntakeSurveyToken::query()->delete();
-        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'https://example.com/'])
-            ->assertRedirect(route('trainees.show', $this->trainee).'#intake-survey');
+        $response->assertRedirect(route('clients.show', 7));
+        $response->assertSessionHas('success', '受付アンケートの案内を発行しました。');
+        $response->assertSessionMissing('intake_survey_success');
     }
 
     public function test_有効な案内があれば409で作らない(): void
     {
         $this->insertToken();
 
-        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'client'])->assertStatus(409);
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertStatus(409);
         $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
     }
 
     public function test_発行はアクセスログにトレーニーへの操作として残る(): void
     {
-        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'client']);
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee));
 
         $log = $this->lastLog();
         $this->assertSame('create_trainee_intake_survey_token', $log->action);
@@ -127,7 +116,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $answered = $this->insertToken('2026-10-16 10:00:00');
         $active = $this->insertToken();
 
-        $response = $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee), ['return_to' => 'client']);
+        $response = $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee));
 
         $response->assertRedirect(route('clients.show', 7));
         $response->assertSessionHas('success', '受付アンケートの案内を取り消しました。');
@@ -135,28 +124,28 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertFalse(TraineeIntakeSurveyToken::query()->whereKey($active)->exists());
     }
 
-    public function test_トレーニー詳細から取り消すと受付アンケートの欄に戻る(): void
+    public function test_取消もreturn_toにtraineeを送っても会員詳細に戻る(): void
     {
         $this->insertToken();
 
         $response = $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee), ['return_to' => 'trainee']);
 
-        $response->assertRedirect(route('trainees.show', $this->trainee).'#intake-survey');
-        $response->assertSessionHas('intake_survey_success', '受付アンケートの案内を取り消しました。');
+        $response->assertRedirect(route('clients.show', 7));
+        $response->assertSessionHas('success', '受付アンケートの案内を取り消しました。');
     }
 
     public function test_有効な案内がなければ取消は409(): void
     {
         $this->insertToken('2026-10-16 10:00:00');
 
-        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee), ['return_to' => 'client'])->assertStatus(409);
+        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee))->assertStatus(409);
         $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
     }
 
     public function test_取消はアクセスログにトレーニーへの操作として残る(): void
     {
         $this->insertToken();
-        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee), ['return_to' => 'client']);
+        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee));
 
         $log = $this->lastLog();
         $this->assertSame('delete_trainee_intake_survey_token', $log->action);
@@ -171,7 +160,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
     {
         $this->actingAsRole('admin');
 
-        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'client'])
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
             ->assertRedirect(route('clients.show', 7));
     }
 

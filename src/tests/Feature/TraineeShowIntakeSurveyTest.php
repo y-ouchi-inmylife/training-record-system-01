@@ -14,8 +14,9 @@ use Tests\TestCase;
 /**
  * トレーニー詳細（S-0309）の受付アンケートの欄と、削除の確認の文言（2026-10 追加）。
  *
- * - 欄はカードに id="intake-survey" と scroll-margin-top を付け、未発行・回答待ちで中身とボタンを出し分ける
- * - S-0309 から発行・取消したときの完了メッセージは、欄の中に出し、自動では消さない
+ * - 欄はカードに id="intake-survey" と scroll-margin-top を付け、状態を見せるだけ（2026-10 変更：
+ *   発行・表示・取消のボタン・取消モーダル・欄の中の完了メッセージは置かない。操作は会員詳細だけ）
+ * - 未発行・回答待ちのときは「案内の発行・取消は会員詳細から行えます。」と会員詳細へのリンクを添える
  * - 削除の確認：未回答の案内があるときだけ、計測値の文の後ろに案内の文を足し、
  *   最後を「このトレーニーを削除しますか？」で締める（案内がないときは今までの文のまま）
  *
@@ -97,46 +98,53 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
         $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
-        $this->assertStringContainsString('<h6 class="mb-0">受付アンケート</h6>', $html);
+        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">受付アンケート<\/h6>\s*<\/div>/u', $html);
     }
 
-    public function test_未発行なら案内はまだ発行していませんと案内を発行のボタン(): void
+    /** 会員詳細で操作できることを添える文（「会員詳細」は S-0305 へのリンク） */
+    private function assertGuideToClientDetail(string $html): void
+    {
+        $url = preg_quote(route('clients.show', $this->trainee->client_id), '/');
+        $this->assertMatchesRegularExpression('/<p class="small text-muted mb-0">案内の発行・取消は<a href="'.$url.'">会員詳細<\/a>から行えます。<\/p>/u', $html);
+    }
+
+    /** 欄に操作のボタン・取消モーダル・欄の中の完了メッセージがないこと */
+    private function assertNoOperations(string $html): void
+    {
+        $this->assertStringNotContainsString('>案内を発行<', $html);
+        $this->assertStringNotContainsString('>案内を取消<', $html);
+        $this->assertStringNotContainsString('案内を表示', $html);
+        $this->assertStringNotContainsString('intakeSurveyCancelModal', $html);
+        $this->assertStringNotContainsString(route('trainee-intake-survey-tokens.store', $this->trainee), $html);
+    }
+
+    public function test_未発行なら案内はまだ発行していませんと会員詳細への案内でボタンは出さない(): void
     {
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
         $this->assertStringContainsString('受付アンケートの案内はまだ発行していません。', $html);
-        $url = preg_quote(route('trainee-intake-survey-tokens.store', $this->trainee), '/');
-        $this->assertMatchesRegularExpression('/<form method="POST" action="'.$url.'" class="d-inline m-0">\\s*<input type="hidden" name="_token"[^>]*>\\s*<input type="hidden" name="return_to" value="trainee">\\s*<button type="submit" class="btn btn-sm btn-outline-primary">案内を発行<\\/button>/u', $html);
-        $this->assertStringNotContainsString('>案内を取消<', $html);
+        $this->assertGuideToClientDetail($html);
+        $this->assertNoOperations($html);
     }
 
-    public function test_回答待ちなら発行日と案内を取消のボタンで案内を表示は出さない(): void
+    public function test_回答待ちなら発行日と会員詳細への案内でボタンも取消モーダルも出さない(): void
     {
         $this->issueToken();
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<p class="mb-0">回答待ち（2026/10/15 発行）</p>', $html);
-        $this->assertStringContainsString('data-intake-survey-trainee-id="'.$this->trainee->id.'">案内を取消</button>', $html);
-        $this->assertStringNotContainsString('>案内を発行<', $html);
-        $this->assertStringNotContainsString('案内を表示', $html);
-        // 取消モーダルは S-0309 から開くと S-0309 に戻る
-        $this->assertMatchesRegularExpression('/id="intakeSurveyCancelForm">\\s*<input type="hidden" name="_token"[^>]*>\\s*<input type="hidden" name="_method" value="DELETE">\\s*<input type="hidden" name="return_to" value="trainee">/u', $html);
+        $this->assertStringContainsString('<p class="mb-1">回答待ち（2026/10/15 発行）</p>', $html);
+        $this->assertGuideToClientDetail($html);
+        $this->assertNoOperations($html);
     }
 
-    public function test_発行のあとの完了メッセージは欄の中に出し自動では消さない(): void
+    public function test_欄の中に完了メッセージは出さない(): void
     {
+        // 段階3a で使っていたキーが残っていても、欄の中には出さない（操作を会員詳細に寄せたため）
         $html = $this->withSession(['intake_survey_success' => '受付アンケートの案内を発行しました。'])
             ->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $posCard = strpos($html, 'id="intake-survey"');
-        $posMessage = strpos($html, '受付アンケートの案内を発行しました。');
-        $this->assertNotFalse($posMessage);
-        $this->assertGreaterThan($posCard, $posMessage);
-        // 欄の中の完了メッセージは自動で消さない（上端のメッセージは data-auto-dismiss で 5 秒で消える）
-        $this->assertMatchesRegularExpression('/<div class="alert alert-success alert-dismissible fade show" role="alert">\\s*受付アンケートの案内を発行しました。/u', $html);
-        $this->assertSame(1, substr_count($html, '受付アンケートの案内を発行しました。'));
-        $this->assertDoesNotMatchRegularExpression('/data-auto-dismiss>\\s*受付アンケートの案内を発行しました。/u', $html);
+        $this->assertStringNotContainsString('受付アンケートの案内を発行しました。', $html);
     }
 
     // ---- 削除の確認の文言 ----

@@ -1,9 +1,8 @@
 {{-- 受付アンケート案内取消確認モーダル（S-0305-M06。2026-10 追加。要件定義書 6-16-9）。
-     S-0305 会員詳細のトレーニーカードと S-0309 トレーニー詳細の受付アンケートの欄で共用する。
+     S-0305 会員詳細のトレーニーカードだけで使う。取消のあとは会員詳細に戻る。
      見せ方はマイページ登録案内の取消（S-0305-M03）と同じ形。
-
-     変数：
-       - $returnTo : 'client'（S-0305 から）| 'trainee'（S-0309 から）。取消のあとの戻り先
+     経緯：段階3a では S-0309 トレーニー詳細の受付アンケートの欄でも共用し、戻り先を return_to
+     （client / trainee）で渡していた。2026-10 に操作を会員詳細に寄せたため、S-0309 では使わない
 
      開き方：「案内を取消」ボタンに data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
      と data-intake-survey-trainee-id="{トレーニーの id}" を付ける。トレーニーが何頭いてもモーダルは
@@ -30,7 +29,6 @@
                 <form method="POST" action="" class="d-inline m-0" id="intakeSurveyCancelForm">
                     @csrf
                     @method('DELETE')
-                    <input type="hidden" name="return_to" value="{{ $returnTo }}">
                     <button type="submit" class="btn btn-danger">取り消す</button>
                 </form>
             </div>

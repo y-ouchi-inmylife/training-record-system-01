@@ -572,7 +572,6 @@
                                         @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
                                             <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
                                                 @csrf
-                                                <input type="hidden" name="return_to" value="client">
                                                 <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
                                             </form>
                                         @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
@@ -696,7 +695,7 @@
 
     {{-- 受付アンケート案内取消確認モーダル（S-0305-M06。2026-10 追加）。トレーニーが何頭いても 1 つ --}}
     @if($client->trainees->isNotEmpty())
-        @include('trainees._intake-survey-cancel-modal', ['returnTo' => 'client'])
+        @include('trainees._intake-survey-cancel-modal')
     @endif
 
     {{-- マイページ登録案内取消確認モーダル（S-0305-M03）--}}

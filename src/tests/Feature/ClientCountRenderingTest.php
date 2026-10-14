@@ -705,7 +705,7 @@ class ClientCountRenderingTest extends TestCase
         $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
         $this->assertMatchesRegularExpression(
             '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
-            .'<input type="hidden" name="return_to" value="client">\s*<button type="submit" class="btn btn-sm btn-outline-primary">案内を発行<\/button>/u',
+            .'<button type="submit" class="btn btn-sm btn-outline-primary">案内を発行<\/button>/u',
             $html
         );
         $this->assertStringNotContainsString('案内を取消', $html);
@@ -745,7 +745,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('受付アンケート：未発行', $html);
     }
 
-    public function test_取消モーダルはトレーニーが何頭いても1つで送信先のひな形と戻り先を持つ(): void
+    public function test_取消モーダルはトレーニーが何頭いても1つで送信先のひな形を持つ(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -759,7 +759,8 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, substr_count($html, 'id="intakeSurveyCancelModal"'));
         $this->assertStringContainsString('受付アンケート案内の取消', $html);
         $this->assertStringContainsString('発行済みの受付アンケート案内が使えなくなります。<br>', $html);
-        $this->assertMatchesRegularExpression('/id="intakeSurveyCancelForm">\s*<input type="hidden" name="_token"[^>]*>\s*<input type="hidden" name="_method" value="DELETE">\s*<input type="hidden" name="return_to" value="client">/u', $html);
+        // 取消のあとは常に会員詳細に戻るため、戻り先（return_to）は送らない（2026-10 変更）
+        $this->assertMatchesRegularExpression('/id="intakeSurveyCancelForm">\s*<input type="hidden" name="_token"[^>]*>\s*<input type="hidden" name="_method" value="DELETE">\s*<button type="submit" class="btn btn-danger">取り消す<\/button>/u', $html);
         // 送信先のひな形（トレーニーの id を JS で入れる）
         $this->assertStringContainsString(json_encode(route('trainee-intake-survey-tokens.destroy', ['trainee' => '__ID__'])), $html);
         $this->assertStringContainsString('data-intake-survey-trainee-id="'.$a.'"', $html);
