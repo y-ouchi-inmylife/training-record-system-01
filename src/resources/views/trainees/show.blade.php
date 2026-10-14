@@ -45,7 +45,7 @@
             </div>
         </div>
 
-        {{-- 3段目: セパレータ下の属性。1 段目に犬種・性別・誕生日（・去勢・避妊）を md 以上で 4 列・
+        {{-- 3段目: セパレータ下の属性。1 段目に犬種・性別・誕生日・去勢・避妊を md 以上で 4 列・
              モバイルで 2 列（col-6 col-md-3）に並べ、2 段目に備考を全幅（col-12）で置く。
              基本情報カードは介さない（設計書 S-0309「設計方針」参照）。
              誕生日は要件定義書 6-16「年齢の表示規則」の形（「2020/03/15（6歳7ヶ月）」など）で、
@@ -62,6 +62,7 @@
             <x-detail-cell label="犬種" :value="$trainee->breed" cols="col-6 col-md-3" />
             <x-detail-cell label="性別" :value="$trainee->sex_label" cols="col-6 col-md-3" />
             <x-detail-cell label="誕生日" :value="$trainee->birthday_with_age_label" cols="col-6 col-md-3" />
+            <x-detail-cell label="去勢・避妊" :value="$trainee->neuter_status_label" cols="col-6 col-md-3" />
             <div class="col-12">
                 <div class="text-muted small mb-1">備考</div>
                 <div style="min-height: 1.5rem; white-space: pre-wrap;">{{ $trainee->note }}</div>

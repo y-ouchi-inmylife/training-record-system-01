@@ -526,6 +526,9 @@
                                          birthday_with_age_label アクセサ。未登録は空欄）。2026-10 変更：以前は
                                          birth_date と age アクセサで「Y/m/d（N歳）」に組み立てていた --}}
                                     <dd class="col-8 mb-1">{{ $trainee->birthday_with_age_label }}</dd>
+                                    {{-- 去勢・避妊（2026-10 追加）。誕生日の下・備考の上。未登録は空欄（§2-4） --}}
+                                    <dt class="col-4 fw-normal text-muted">去勢・避妊</dt>
+                                    <dd class="col-8 mb-1">{{ $trainee->neuter_status_label }}</dd>
                                     <dt class="col-4 fw-normal text-muted">備考</dt>
                                     <dd class="col-8 mb-1" style="white-space: pre-wrap;">{{ $trainee->note }}</dd>
                                     {{-- 最終計測（設計書 S-0305 セクション3「最終計測」参照）。

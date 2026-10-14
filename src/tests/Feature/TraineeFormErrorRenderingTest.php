@@ -34,6 +34,7 @@ class TraineeFormErrorRenderingTest extends TestCase
             $trainee->name = '';
             $trainee->breed = '';
             $trainee->sex = null;
+            $trainee->neuter_status = null;
             $trainee->birth_year = null;
             $trainee->birth_month = null;
             $trainee->birth_day = null;
@@ -96,6 +97,7 @@ class TraineeFormErrorRenderingTest extends TestCase
             'name' => 'ERR_name',
             'breed' => 'ERR_breed',
             'sex' => 'ERR_sex',
+            'neuter_status' => 'ERR_neuter_status',
             'birth_date' => 'ERR_birth_date',
             'note' => 'ERR_note',
         ];
@@ -192,5 +194,38 @@ class TraineeFormErrorRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/id="birth_year"[^>]*value="2020"/s', $html);
         $this->assertMatchesRegularExpression('/id="birth_month"[^>]*value="2"/s', $html);
         $this->assertMatchesRegularExpression('/id="birth_day"[^>]*value="30"/s', $html);
+    }
+
+    /**
+     * 去勢・避妊（2026-10 追加）：性別の右（col-md-4）のプルダウン。選択肢は空・している・していない・不明
+     */
+    public function test_去勢避妊は性別の右のプルダウンで選択肢は空している_していない_不明(): void
+    {
+        $html = $this->renderForm([])->__toString();
+
+        $this->assertMatchesRegularExpression('/<select class="form-select\s*"\s+id="neuter_status" name="neuter_status"/s', $html);
+        // 性別の欄より後、誕生日の欄より前（3 段目の右の枠）
+        $posNeuter = mb_strpos($html, 'id="neuter_status"');
+        $this->assertGreaterThan(mb_strpos($html, 'id="sex"'), $posNeuter);
+        $this->assertLessThan(mb_strpos($html, 'id="birth_year"'), $posNeuter);
+        $this->assertMatchesRegularExpression('/<div class="col-md-4">\s*<div class="row g-2 align-items-center">\s*<label for="neuter_status"/s', $html);
+
+        // 選択肢（空・している・していない・不明）
+        $this->assertMatchesRegularExpression(
+            '/id="neuter_status".*?<option value=""><\/option>\s*<option value="neutered"\s*>\s*している\s*<\/option>\s*<option value="not_neutered"\s*>\s*していない\s*<\/option>\s*<option value="unknown"\s*>\s*不明\s*<\/option>/s',
+            $html
+        );
+    }
+
+    /** 編集では登録済みの去勢・避妊が選ばれている */
+    public function test_編集では登録済みの去勢避妊が選ばれている(): void
+    {
+        $trainee = new Trainee;
+        $trainee->name = 'モモ';
+        $trainee->neuter_status = 'not_neutered';
+
+        $html = $this->renderForm([], isEdit: true, trainee: $trainee)->__toString();
+
+        $this->assertMatchesRegularExpression('/<option value="not_neutered" selected>/', $html);
     }
 }

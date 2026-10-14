@@ -39,6 +39,31 @@ class Trainee extends Model
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | 去勢・避妊（neuter_status）の定数と日本語ラベル（2026-10 追加。D-0700・5-21）
+    |--------------------------------------------------------------------------
+    | 性別と同じ作り。値・ラベルの単一情報源で、Blade からは neuterStatusLabels() を参照する。
+    | 受付アンケートの回答の「分からない」（dont_know）は、トレーニーには unknown として反映する
+    | （D-1100。回答の値は別のモデルで持つ）。
+    */
+
+    public const NEUTER_NEUTERED = 'neutered';
+    public const NEUTER_NOT_NEUTERED = 'not_neutered';
+    public const NEUTER_UNKNOWN = 'unknown';
+
+    /**
+     * 去勢・避妊のコード → 日本語ラベルのマッピング
+     */
+    public static function neuterStatusLabels(): array
+    {
+        return [
+            self::NEUTER_NEUTERED => 'している',
+            self::NEUTER_NOT_NEUTERED => 'していない',
+            self::NEUTER_UNKNOWN => '不明',
+        ];
+    }
+
     // 写真保存先の Filesystem ディスク名。
     // 既存メディアと同じ `media` ディスク（S3 互換）を共用し、キーの名前空間だけ
     // `trainees/` に分けて保存する（詳細は db-schema.md D-0700 注記「トレーニー写真の扱い」参照）。
@@ -57,6 +82,7 @@ class Trainee extends Model
         'birth_year',
         'birth_month',
         'birth_day',
+        'neuter_status',
         'note',
         'photo_path',
         'updated_by',
@@ -108,6 +134,14 @@ class Trainee extends Model
     public function getSexLabelAttribute(): ?string
     {
         return $this->sex ? (self::sexLabels()[$this->sex] ?? $this->sex) : null;
+    }
+
+    /**
+     * 去勢・避妊の日本語表示。未登録なら null
+     */
+    public function getNeuterStatusLabelAttribute(): ?string
+    {
+        return $this->neuter_status ? (self::neuterStatusLabels()[$this->neuter_status] ?? $this->neuter_status) : null;
     }
 
     /**

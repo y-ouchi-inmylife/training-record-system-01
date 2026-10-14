@@ -66,13 +66,15 @@
                     </div>
                 </div>
 
-                {{-- 行3: 犬種 + 性別 を 1 段に並べる。
-                     犬種は自由入力で幅を確保したいので col-md-5、性別は最も短いので col-md-3。
+                {{-- 行3: 犬種 + 性別 + 去勢・避妊 を 1 段に並べる。合計 12 で余白なく埋まる。
+                     犬種は自由入力で幅を確保したいので col-md-5、性別は最も短いので col-md-3、
+                     去勢・避妊は col-md-4（性別の右の空いた枠。screen-design.md S-0308）。
                      ラベルは各項目内で form-label-fixed の 140px 固定枠に右寄せされる（各項目の
                      まとまり幅が異なるため、項目のラベル位置が同じ縦線に揃うわけではない）。
                      経緯：以前は 3 項目目に誕生日（col-md-4、Y-m-d 相当）を置き、合計 12 で埋まって
                      いた。2026-10 に誕生日を年・月・日の 3 つの欄にしたため、収まらず独立した行に
-                     移した（screen-design.md S-0308）。空いた col-md-4 には去勢・避妊を置く予定。 --}}
+                     移した（screen-design.md S-0308）。空いた col-md-4 に去勢・避妊（2026-10 追加）を置いた。
+                     md の幅ではラベルが 140px 固定のため、性別・去勢・避妊の入力欄は狭くなる。 --}}
                 <div class="row g-3 mb-2">
                     <div class="col-md-5">
                         <div class="row g-2 align-items-center">
@@ -99,6 +101,23 @@
                                     @endforeach
                                 </select>
                                 <x-form-error field="sex" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="row g-2 align-items-center">
+                            <label for="neuter_status" class="col-md-auto col-form-label text-md-end form-label-fixed">去勢・避妊</label>
+                            <div class="col-12 col-md">
+                                <select class="form-select @error('neuter_status') is-invalid @enderror"
+                                        id="neuter_status" name="neuter_status" autocomplete="off">
+                                    <option value=""></option>
+                                    @foreach(\App\Models\Trainee::neuterStatusLabels() as $value => $label)
+                                        <option value="{{ $value }}" {{ old('neuter_status', $trainee?->neuter_status) === $value ? 'selected' : '' }}>
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <x-form-error field="neuter_status" />
                             </div>
                         </div>
                     </div>
