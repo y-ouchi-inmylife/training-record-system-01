@@ -94,6 +94,14 @@ erDiagram
         bigint client_id FK
     }
 
+    trainee_intake_survey_tokens {
+        bigint id PK
+        string token UK
+        timestamp answered_at
+        bigint trainee_id FK
+        bigint created_by FK
+    }
+
     training_records {
         bigint id PK
         bigint client_id FK
@@ -157,6 +165,8 @@ erDiagram
     trainers ||--o{ client_email_registration_tokens : "発行"
     clients ||--o{ client_email_change_tokens : "メールアドレス変更"
     clients ||--o{ client_password_reset_tokens : "パスワード再設定"
+    trainees ||--o{ trainee_intake_survey_tokens : "受付アンケート案内"
+    trainers ||--o{ trainee_intake_survey_tokens : "発行"
 
 
     trainees {
@@ -165,7 +175,10 @@ erDiagram
         string name
         string breed
         string sex
-        date birth_date
+        smallint birth_year
+        tinyint birth_month
+        tinyint birth_day
+        string neuter_status
     }
 
     trainee_measurements {
@@ -176,8 +189,17 @@ erDiagram
         decimal weight_kg
     }
 
+    trainee_intake_survey_responses {
+        bigint id PK
+        bigint trainee_id FK
+        bigint trainee_intake_survey_token_id FK
+        timestamp answered_at
+    }
+
     clients ||--o{ trainees : "トレーニングを受ける対象を持つ"
     trainees ||--o{ trainee_measurements : "計測される"
+    trainees ||--o{ trainee_intake_survey_responses : "受付アンケートに回答される"
+    trainee_intake_survey_tokens |o--o{ trainee_intake_survey_responses : "回答に使う（NULL はトークン削除済み）"
 
 
     client_contracts {
@@ -230,6 +252,14 @@ erDiagram
 
 なお CHECK 制約は Laravel の schema builder では表現できないため、マイグレーション内で
 `DB::statement` による生SQL（`ALTER TABLE ... ADD CONSTRAINT ... CHECK (...)`）で実装する。
+
+**例外：CHECK 制約で書けない値の制限**（2026-10 追加）：トレーニーの誕生日（D-0700 `trainees`・D-1100 `trainee_intake_survey_responses` の `birth_year` / `birth_month` / `birth_day`）の次の制限は、CHECK 制約では書けないため、**アプリ側の検証だけで担保する**（要件定義書 6-16「年齢の表示規則」の入力のルール）。
+
+- **実在する日付であること**（2月30日などは不可）：年・月・日の組み合わせで日付の計算が要るため
+- **未来でないこと**（年だけなら今年以前、年・月までなら今月以前、年・月・日なら今日以前）：今日の日付に依存するため（MySQL の CHECK 制約では `CURDATE()` 等の非決定的な関数を使えない）
+- **年は今年から30年前まで**：同じく今日の日付に依存するため
+
+月・日の範囲（1〜12、1〜31）と「月があるなら年がある」「日があるなら月がある」は、これまでどおり CHECK 制約で書く（D-0700・D-1100 の制約参照）。
 
 ---
 
@@ -553,15 +583,18 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
-| name | VARCHAR(50) | NO | — | 名前。犬の名前はひらがな・カタカナが多く、よみ（かな）は持たない |
+| name | VARCHAR(50) | YES | NULL | 名前。**任意**（2026-10 に NOT NULL から NULL 許容に変更。受付アンケート案内だけを先に発行する運用のため）。未登録のときの表示は要件定義書 6-16「名前が未登録のときの表示」（トレーナー側は「名前未登録」、会員側は「愛犬」）。受付アンケートの回答で、未登録のときだけ埋まる。犬の名前はひらがな・カタカナが多く、よみ（かな）は持たない |
 | breed | VARCHAR(100) | YES | NULL | 犬種。自由入力（「ミックス」等の表記に対応するためマスタは持たない） |
 | sex | VARCHAR(20) | YES | NULL | 性別。値は 5-20. 参照 |
-| birth_date | DATE | YES | NULL | 誕生日。保護犬等で正確な生年月日が不明な場合があるため NULL 許容（推定の場合は note に記載） |
+| birth_year | SMALLINT UNSIGNED | YES | NULL | 誕生日の年（2026-10 新設。旧 `birth_date` を年・月・日に分けた。下の注記参照）。誕生日は分かるところだけ入れる |
+| birth_month | TINYINT UNSIGNED | YES | NULL | 誕生日の月（1〜12）。入れる場合は `birth_year` が必須 |
+| birth_day | TINYINT UNSIGNED | YES | NULL | 誕生日の日（1〜31）。入れる場合は `birth_year`・`birth_month` が必須 |
+| neuter_status | VARCHAR(20) | YES | NULL | 去勢・避妊（2026-10 新設）。値は 5-21. 参照。NULL は未登録 |
 | note | TEXT | YES | NULL | 備考 |
 | photo_path | VARCHAR(500) | YES | NULL | トレーニーの写真のオブジェクトストレージ上の保存パス（キー）。写真未登録は NULL。**リサイズ済みの JPEG 1 枚のみ**（原寸・サムネイルは持たない）。詳細は下の注記「トレーニー写真の扱い」参照 |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
-| updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー）。**写真の登録・削除で会員が更新した場合は NULL のまま**（トレーナーによる更新の追跡カラムのため、会員操作では触らない。詳細は下の注記参照） |
+| updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー）。**写真の登録・削除で会員が更新した場合は NULL のまま**（トレーナーによる更新の追跡カラムのため、会員操作では触らない。詳細は下の注記参照）。**受付アンケートの回答をトレーニーに反映する場合も触らない**（2026-10 追加。お客様の操作でトレーナーの更新者が書き換わらないように。下の注記「受付アンケートの回答の反映」参照） |
 
 ##### インデックス
 
@@ -578,11 +611,20 @@ erDiagram
 | trainees_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時はトレーニーも削除。ただしアプリ側では**トレーニーが存在する会員の削除を拒否**する（既存のトレーニング記録と同じ二層構え。CASCADE は誤操作・整合性のための最終防壁） |
 | trainees_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
 | trainees_sex_check | CHECK | sex IN ('male', 'female', 'unknown') | — | 性別の値制限（5-20. 参照） |
+| trainees_birth_month_check | CHECK | birth_month IS NULL OR (birth_year IS NOT NULL AND birth_month BETWEEN 1 AND 12) | — | 誕生日の月の値制限（1〜12）。月があるなら年がある |
+| trainees_birth_day_check | CHECK | birth_day IS NULL OR (birth_month IS NOT NULL AND birth_day BETWEEN 1 AND 31) | — | 誕生日の日の値制限（1〜31）。日があるなら月がある（月があるなら年があるため、年もある） |
+| trainees_neuter_status_check | CHECK | neuter_status IN ('neutered', 'not_neutered', 'unknown') | — | 去勢・避妊の値制限（5-21. 参照） |
 
 ##### 注記
 
 - `display_order` は持たない。複数頭は稀であり、並び順は登録順（`id` 昇順）とする
 - 年齢カラムは持たない。`birth_date` から算出して表示する（`birth_date` が NULL のときは年齢表示なし）
+  - **2026-10 変更**：`birth_date` を `birth_year` / `birth_month` / `birth_day` に分けたため、年齢は**年・月・日のうち登録されている部分から算出して表示する**（年・月・日がそろっていれば満年齢と月数、年・月までならその月の1日生まれとみなす、年だけなら「約」を付ける。`birth_year` が NULL のときは誕生日・年齢とも表示なし）。算出の規則は要件定義書 6-16「年齢の表示規則」を正とし、年齢そのものは引き続き保存しない
+- **誕生日を年・月・日に分けた理由**（2026-10 変更）：誕生日が正確に分からなくても、生まれた年や月くらいは分かるお客様が多い。`DATE` 型のまま分からない部分を仮の値（1日など）で埋めると、仮の日付が表示や年齢の計算に出て誤った情報になるため、分からない部分を NULL のまま持てるよう3カラムに分けた（要件定義書 D-0700）。以前の `birth_date` の説明にあった「推定の場合は note に記載」は、年・月だけ・年だけを登録できるようになったため、分かっている深さまで登録する形に置き換わる（推定の根拠などは引き続き `note` に書ける）
+- **誕生日の値の制限**：月・日の範囲と「月があるなら年がある」「日があるなら月がある」は CHECK 制約で書く。「実在する日付」「未来でない」「今年から30年前まで」は CHECK 制約で書けないため、アプリ側の検証で担保する（§3-3 の例外）
+- **既存データの移行**（2026-10）：`name` の NULL 許容化、`birth_date` の3カラムへの分割、`neuter_status` の追加は、既存の `create_trainees_table` マイグレーションを書き換えず、**移行用のマイグレーションを新しく足して**行う。既存の `birth_date` の値は、年・月・日に分けて `birth_year` / `birth_month` / `birth_day` に移してから `birth_date` を削除する。`down()` では `birth_date` を作り直し、年・月・日がそろっている行の値を戻す（年・月だけ・年だけの行は `DATE` で表せないため NULL になる）
+  - **理由**：本番は 2026-10 時点で稼働中で、本番のデータに既存のトレーニーがあるかどうかを設計書の側からは確かめられない。追加のマイグレーションなら、本番にデータがあってもなくても安全に適用できる。2026-10 の契約・利用の変更（`client_usages` への `client_contract_id` の追加、`count` の削除）も、既存のマイグレーションを書き換えず追加のマイグレーションで行っている
+- **受付アンケートの回答の反映**（2026-10 追加、要件定義書 6-15-17 参照）：お客様が受付アンケート（D-1100）に回答すると、回答の保存と同じトランザクションで、本テーブルの**空欄の項目だけ**に回答の基本情報（`name` / `breed` / `sex` / `birth_year`・`birth_month`・`birth_day` / `neuter_status`）を反映する。反映の条件（`sex`・`neuter_status` が `unknown` なら入力済みとみなす、誕生日は年・月・日のすべてが NULL のときだけ反映する、回答の `dont_know` は `unknown` として反映する等）は要件定義書 6-15-17 を正とする。反映は**お客様の操作のため `updated_by` は触らない**（写真の登録・削除と同じ扱い）
 - 将来的にトレーニングの対象を犬以外（人間等）に広げる可能性を見据え、テーブル名・カラム名は犬に限定しない命名としている。ただし `breed` は犬固有の項目であり、対象を広げる際は使用しないカラムとして残すか別テーブルへの切り出しを検討する
 - `created_by` は持たない（`training_records` 等の既存テーブルと同様、`updated_by` のみ）
 - **トレーニー写真の扱い**（2026-09 追加、要件定義書 6-15-15 参照）：
@@ -721,6 +763,62 @@ erDiagram
 - 会員の残り回数がマイナスになる利用も登録できる（「契約なし」の利用は契約の残りに関係なく登録できる）
 - 会員削除時の扱いは D-0900 と同じ（CASCADE で一緒に削除し、アプリ側でも拒否しない）
 - `created_by` は持たない（既存テーブルと同様、`updated_by` のみ）
+
+
+---
+
+#### D-1100 trainee_intake_survey_responses（受付アンケート回答）
+
+##### カラム定義
+
+| カラム名 | 型 | NULL | デフォルト | 説明 |
+|---------|-----|------|----------|------|
+| id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
+| trainee_id | BIGINT UNSIGNED | NO | — | 回答の対象のトレーニーのID（外部キー） |
+| trainee_intake_survey_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った受付アンケート用 URL のトークン（DS-1000）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も回答は残すため NULL 許容（下の制約参照） |
+| answered_at | TIMESTAMP | NO | — | 回答日時。送信時に自動設定する。回答の記録を兼ねる（お客様の回答はアクセスログに記録しない。5-16. の注記参照） |
+| name | VARCHAR(50) | YES | NULL | 名前。トレーニーの名前が未登録のときだけ入力欄を出し、必須（アプリ側で検証）。登録済みのときは**回答時点のトレーニーの名前**を記録する。型は `trainees.name` と同じ |
+| breed | VARCHAR(100) | YES | NULL | 犬種。答えたとおりの内容。型は `trainees.breed` と同じ |
+| sex | VARCHAR(20) | YES | NULL | 性別。値は 5-20. のうち `male` / `female` だけ（回答には「不明」を置かない。要件定義書 6-15-17 備考） |
+| birth_year | SMALLINT UNSIGNED | YES | NULL | 誕生日の年。型・入力のルールは `trainees.birth_year` と同じ |
+| birth_month | TINYINT UNSIGNED | YES | NULL | 誕生日の月（1〜12）。入れる場合は `birth_year` が必須 |
+| birth_day | TINYINT UNSIGNED | YES | NULL | 誕生日の日（1〜31）。入れる場合は `birth_year`・`birth_month` が必須 |
+| neuter_status | VARCHAR(20) | YES | NULL | 去勢・避妊。値は 5-22. 参照（「分からない」を `dont_know` で持ち、トレーニーの「不明」〔`unknown`〕とは別の値にする） |
+| wish | TEXT | YES | NULL | 自由記述「こうなったらいいな」の回答（設問文は要件定義書 D-1100） |
+| recent_events | TEXT | YES | NULL | 自由記述「最近の様子」の回答 |
+| ideal_days | TEXT | YES | NULL | 自由記述「理想の毎日」の回答 |
+| health_concerns | TEXT | YES | NULL | 自由記述「体のこと」の回答 |
+| created_at | TIMESTAMP | YES | NULL | 作成日時 |
+| updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+
+##### インデックス
+
+| インデックス名 | カラム | 種類 | 目的 |
+|---------------|--------|------|------|
+| PRIMARY | id | PRIMARY KEY | 主キー |
+| trainee_intake_survey_responses_trainee_id_idx | trainee_id | INDEX | トレーニーによる検索・逆引き（トレーニーカード・トレーニー詳細での回答の有無・回答の表示）。**ユニーク制約は付けない**（1頭に複数件の回答を持てる） |
+| trainee_intake_survey_responses_token_id_idx | trainee_intake_survey_token_id | INDEX | トークンによる逆引き。名前は MySQL の識別子の長さの上限（64 文字）に収めるため `token_id` に縮めている（下の注記参照） |
+
+##### 制約
+
+| 制約名 | 種類 | 条件 | ON DELETE | 説明 |
+|--------|------|------|-----------|------|
+| trainee_intake_survey_responses_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時は回答も削除する（要件定義書 D-1100。削除確認で回答も一緒に削除される旨を提示する。要件定義書 6-16-4） |
+| trainee_intake_survey_responses_token_id_foreign | FOREIGN KEY | trainee_intake_survey_token_id → trainee_intake_survey_tokens(id) | SET NULL | トークンが削除されても回答は残す。回答済みのトークンは取消（物理削除）の対象にならないため、通常は起きない |
+| trainee_intake_survey_responses_sex_check | CHECK | sex IN ('male', 'female') | — | 性別の値制限（5-20. のうち `male` / `female` だけ） |
+| trainee_intake_survey_responses_birth_month_check | CHECK | birth_month IS NULL OR (birth_year IS NOT NULL AND birth_month BETWEEN 1 AND 12) | — | 誕生日の月の値制限。`trainees_birth_month_check` と同じ |
+| trainee_intake_survey_responses_birth_day_check | CHECK | birth_day IS NULL OR (birth_month IS NOT NULL AND birth_day BETWEEN 1 AND 31) | — | 誕生日の日の値制限。`trainees_birth_day_check` と同じ |
+| trainee_intake_survey_responses_neuter_status_check | CHECK | neuter_status IN ('neutered', 'not_neutered', 'dont_know') | — | 去勢・避妊の値制限（5-22. 参照） |
+
+##### 注記
+
+- **答えたとおりの内容を残す**：トレーニー（D-0700）には空欄の項目だけ反映する（D-0700 の注記「受付アンケートの回答の反映」）が、本テーブルには反映の有無にかかわらず回答の内容をそのまま保存する。トレーニーの現在の値と違うことがある。回答はトレーナー側では閲覧のみで、更新・削除の操作は持たない（要件定義書 6-16-10）
+- **1頭に複数件持てる**（ユニーク制約を付けない）。第1段階では1頭につき1件（回答済みのトレーニーには案内を発行できないため。DS-1000 の備考参照）。複数件ある場合は `answered_at` の新しい順に並べる。第2段階で、50問の診断の回答・採点結果・AI の下書きを本テーブルにひも付けて加える予定（要件定義書 D-1100）
+- **去勢・避妊の「分からない」をトレーニーの「不明」と別の値（`dont_know`）で持つ理由**：答えたとおりを残すため。トレーナーが確かめたうえで選ぶ「不明」（`unknown`）と、お客様が「分からない」と答えたことを区別できるようにする。トレーニーに反映するときに `unknown` に置き換える
+- **誕生日の値の制限**は D-0700 と同じ（CHECK 制約で書けない「実在する日付」「未来でない」「今年から30年前まで」はアプリ側の検証で担保する。§3-3 の例外）
+- **`created_by` / `updated_by` は持たない**：回答はお客様の操作で作られ、トレーナーが作成・更新することはないため（トレーナーのidを入れる場面がない）。誰の回答かは `trainee_id`（とトークン）で分かり、回答の記録は `answered_at` が兼ねる
+- **インデックス名・制約名の短縮**：`trainee_intake_survey_token_id` の外部キーとインデックスは、命名規則どおりの `trainee_intake_survey_responses_trainee_intake_survey_token_id_foreign`（70 文字）・`..._idx`（66 文字）が MySQL の識別子の上限（64 文字）を超えるため、`trainee_intake_survey_responses_token_id_foreign` / `trainee_intake_survey_responses_token_id_idx` に縮める（`login_attempts_trainer_idx`・`trainee_measurements_trainee_date_unique` と同じく、名前を縮める例は既存にもある）。マイグレーションでは名前を明示して作る
+- **回答の保存の流れ**（同時送信の防ぎ方を含む）は DS-1000 の備考参照
 
 
 ---
@@ -1048,6 +1146,59 @@ erDiagram
 
 ---
 
+#### DS-1000 trainee_intake_survey_tokens（受付アンケート用 URL のトークン）
+
+**概要**: トレーナーがトレーニーごとに発行する、受付アンケート案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに受付アンケートに回答し（回答は D-1100）、送信するとトークンは使用済みになる。
+
+**対応する要件**:
+- 受付アンケート案内の発行（6-16-8）
+- 受付アンケート案内の取消（6-16-9）
+- 受付アンケートの回答（6-15-17）
+
+##### カラム定義
+
+| カラム名 | 型 | NULL | デフォルト | 説明 |
+|---------|-----|------|----------|------|
+| id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
+| token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。カラム型 VARCHAR(64) は将来の長さ拡張に備えた余裕。重複不可。既存のトークン（DS-0600〜DS-0900）と同じく平文で持つ |
+| trainee_id | BIGINT UNSIGNED | NO | — | 受付アンケートの対象のトレーニーのID（外部キー）。発行時から特定のトレーニーに紐づく |
+| answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。回答の送信を受け付けた時点で設定する。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない） |
+| created_at | TIMESTAMP | YES | NULL | 発行日時（状態「回答待ち」に添える発行日に使う） |
+| updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+| created_by | BIGINT UNSIGNED | YES | NULL | トークンを発行したトレーナーのID（外部キー） |
+
+##### インデックス
+
+| インデックス名 | カラム | 種類 | 目的 |
+|---------------|--------|------|------|
+| PRIMARY | id | PRIMARY KEY | 主キー |
+| trainee_intake_survey_tokens_token_unique | token | UNIQUE | トークン文字列の重複を防ぐ。URLアクセス時の検索にも使用 |
+| trainee_intake_survey_tokens_trainee_id_idx | trainee_id | INDEX | トレーニーによる検索・逆引き（有効な案内の有無の判定） |
+| trainee_intake_survey_tokens_created_by_idx | created_by | INDEX | 発行者による検索・絞り込み |
+
+##### 制約
+
+| 制約名 | 種類 | 条件 | ON DELETE | 説明 |
+|--------|------|------|-----------|------|
+| trainee_intake_survey_tokens_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時はトークンも削除する（特定トレーニー専用のトークンのため。削除後にその URL を開くと「ご利用いただけません」の画面になる。要件定義書 6-15-17） |
+| trainee_intake_survey_tokens_created_by_foreign | FOREIGN KEY | created_by → trainers(id) | SET NULL | 発行者トレーナー削除時は NULL にする |
+
+**備考**:
+- **有効期限（`expires_at`）は持たない**（要件定義書 6-15-17 備考）。受付アンケートの URL は回答を受け付けるだけで、画面に個人情報を出さず、送信すれば使い切りになるため、マイページ登録案内（DS-0700）の URL と危険の大きさが違う。放置された案内はトレーナーが取り消す。したがって `architecture.md` §3-1 の有効期限の設定値も持たない
+- **`is_used` は持たない**：使用済みかどうかは `answered_at` の有無で判定する（使用済みになった日時を状態の表示にも使うため、真偽値と日時を二重に持たない）
+- **`token` 以外の一意制約は付けない**。**同じトレーニーに有効な（`answered_at` が NULL の）案内は1つまで**という制約は、MySQL では条件付きのユニーク制約（部分インデックス）を書けないため、アプリ側で担保する：発行時に、トランザクション内で**対象のトレーニーの行を排他ロック**（`SELECT ... FOR UPDATE`）してから、有効な案内も回答（D-1100）もないことを確かめて発行する（同じトレーニーへの同時の発行で、有効な案内が2つできないようにするため。回答済みのトレーニーには発行できない〔第1段階〕）
+- **取消はトークン行の物理削除**（要件定義書 6-16-9）。対象は `answered_at` が NULL の行だけ。取消すると状態は「未発行」に戻る
+- **回答済みのトークン行は削除せず残す**：回答済みの URL を開いたときに「すでにご回答いただいています」の画面を出すため（存在しない URL の「ご利用いただけません」と区別する）。トレーニーの状態の判定は「回答（D-1100）あり → 有効な案内（本テーブルで `answered_at` が NULL の行）あり → 未発行」の順に行う
+- **同時送信の防ぎ方**（要件定義書 6-15-17 動作）：同じ案内から同時に2回送信された場合に回答が2件保存されないよう、回答の送信は次の順で1つのトランザクションの中で行う
+  1. トークンの行を**排他ロック**する（`SELECT ... FOR UPDATE`。後から来た送信は、先の送信のトランザクションが終わるまで待つ）
+  2. `answered_at` が NULL であることを確かめる（NULL でなければ、回答を保存せず「すでに回答済み」の画面を返す）
+  3. 回答（D-1100）を保存する
+  4. トレーニー（D-0700）の空欄の項目に回答を反映する（D-0700 の注記「受付アンケートの回答の反映」）
+  5. トークンの `answered_at` に回答日時を記録する（D-1100 の `answered_at` と同じ値）
+- お客様の回答はアクセスログ（DS-0500）に記録しない（5-16. の注記参照）。発行・取消はトレーナーの操作として記録する（`create_trainee_intake_survey_token` / `delete_trainee_intake_survey_token`）
+
+---
+
 
 ## 5. ENUMおよび定数
 
@@ -1098,6 +1249,8 @@ erDiagram
 | create_trainee_measurement | トレーニー計測値登録 |
 | edit_trainee_measurement | トレーニー計測値編集 |
 | delete_trainee_measurement | トレーニー計測値削除 |
+| create_trainee_intake_survey_token | 受付アンケート案内の発行 |
+| delete_trainee_intake_survey_token | 受付アンケート案内の取消 |
 | create_client_contract | 契約登録 |
 | edit_client_contract | 契約編集 |
 | delete_client_contract | 契約削除 |
@@ -1106,6 +1259,10 @@ erDiagram
 | delete_client_usage | 利用削除 |
 
 `target_type` には短縮クラス名を格納する（例：会員は `'Client'`、トレーニング記録は `'TrainingRecord'`、トレーニーは `'Trainee'`、計測値は `'TraineeMeasurement'`）。トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため、参照の操作種別（`view_trainee`）は持たない（トレーニーの参照は `view_client` に含める。計測値も同様）。契約は `'ClientContract'`、利用は `'ClientUsage'` を格納する。契約・利用も会員詳細（S-0305）の中だけで表示するため、参照の操作種別は持たない（参照は `view_client` に含める）。
+
+- **`view_trainee` を持たない注記の前提について**（2026-10 追記）：上の「トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため」は、トレーニーを会員詳細の中だけで扱っていた段階①の前提で書いたもの。その後、トレーニー詳細は独立した画面（S-0309、`trainees.show`）になったが、トレーニー詳細の参照は記録していない（`view_trainee` は持たない）点は変わっていない。2026-10 に受付アンケートの回答（D-1100。愛犬の健康状態などを含む）を S-0309 で表示するようになったが、本書では参照の操作種別を追加していない（追加するかは未決定）
+- **受付アンケート案内**（2026-10 追加）：`create_trainee_intake_survey_token`（発行）・`delete_trainee_intake_survey_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（トークンの行は取消で物理削除されるため、トークンではなくトレーニーを対象として記録する）。トレーニー登録（S-0308）で「受付アンケートの案内を発行する」をオンにして同時に発行した場合は、ルート単位で記録するため `create_trainee` の1件だけが記録される
+- **お客様の受付アンケートの回答は記録しない**：アクセスログはトレーナーの操作の記録で、`access_logs.trainer_id` が NOT NULL のため（お客様の操作を入れる先がない）。回答の記録は D-1100 の `answered_at` が兼ねる
 
 ### 5-17. メディア種別
 
@@ -1144,6 +1301,28 @@ D-0700 `trainees.sex` の値。犬以外への対象拡張時にも共通で使�
 | unknown | 不明。保護犬等で性別が不明な場合、または未確認の場合 |
 
 > **表示の文言の変更（2026-10）**：お客様（ドッグトレーナー）の要望により、画面に出す性別の文言を「オス／メス」から「男の子／女の子」に変更した。DB に保存する値（`male` / `female` / `unknown`）は変えておらず、Blade からは `Trainee::sexLabels()` の 1 か所で対応表を参照する。
+
+D-1100 `trainee_intake_survey_responses.sex`（受付アンケートの回答）は、このうち `male` / `female` だけを使う（回答には「不明」を置かない。要件定義書 6-15-17 備考）。
+
+### 5-21. 去勢・避妊
+
+D-0700 `trainees.neuter_status` の値（2026-10 追加）。値の持ち方は 5-20. 性別にそろえる（英語の値を保存し、日本語表示は画面設計書に委ねる）。
+
+| 値 | 説明 |
+|----|------|
+| neutered | している |
+| not_neutered | していない |
+| unknown | 不明。受付アンケートの回答の反映では、NULL（未登録）と違い入力済みとみなす（要件定義書 6-15-17） |
+
+### 5-22. 受付アンケートの去勢・避妊
+
+D-1100 `trainee_intake_survey_responses.neuter_status` の値（2026-10 追加）。お客様が**答えたとおり**を残すため、「分からない」を 5-21. の「不明」（`unknown`）とは別の値で持つ。
+
+| 値 | 説明 |
+|----|------|
+| neutered | している |
+| not_neutered | していない |
+| dont_know | 分からない。トレーニーに反映するときは 5-21. の `unknown`（不明）に置き換える |
 
 
 ---
@@ -1193,6 +1372,8 @@ D-0700 `trainees.sex` の値。犬以外への対象拡張時にも共通で使�
 | 17 | trainee_measurements | trainees, trainers |
 | 18 | client_contracts | clients, trainers |
 | 19 | client_usages | clients, client_contracts, trainers |
+| 20 | trainee_intake_survey_tokens | trainees, trainers |
+| 21 | trainee_intake_survey_responses | trainees, trainee_intake_survey_tokens |
 
 ---
 
