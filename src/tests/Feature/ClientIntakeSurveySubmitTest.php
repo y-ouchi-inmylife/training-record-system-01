@@ -397,6 +397,62 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->submit($data)->assertRedirect(route('client-portal.intake-survey.thanks'));
     }
 
+    public function test_自由記述はCRLFの改行をLFに直してから数えるのでちょうど2000字なら受け付ける(): void
+    {
+        // ブラウザの maxlength は改行を 1 文字と数えるが、送信では CRLF（2 文字）になる。
+        // LF に直すと 2,000 字（改行 9 個を含む）、CRLF のままなら 2,009 字の文章
+        $this->traineeWithToken();
+        $text = implode("\r\n", array_fill(0, 10, str_repeat('あ', 199))).'あ';
+        $this->assertSame(2009, mb_strlen($text));
+        $this->assertSame(2000, mb_strlen(str_replace("\r\n", "\n", $text)));
+
+        $this->submit(['wish' => $text])->assertRedirect(route('client-portal.intake-survey.thanks'));
+
+        $saved = TraineeIntakeSurveyResponse::query()->sole()->wish;
+        $this->assertSame(2000, mb_strlen($saved));
+        $this->assertStringNotContainsString("\r", $saved);
+    }
+
+    public function test_自由記述はLFに直しても2001字ならエラー(): void
+    {
+        $this->traineeWithToken();
+        $text = implode("\r\n", array_fill(0, 10, str_repeat('あ', 199))).'ああ';
+
+        $this->submit(['wish' => $text])
+            ->assertSessionHasErrors(['wish' => 'こうなったらいいなは2000文字以内で入力してください。']);
+        $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
+    }
+
+    public function test_自由記述の改行は4欄ともLFにそろえて保存しCRを残さない(): void
+    {
+        $this->traineeWithToken();
+
+        $this->submit([
+            'wish' => "1行目\r\n2行目",
+            'recent_events' => "CRだけ\r改行",
+            'ideal_days' => "混在\r\nCRLF\rCR\nLF",
+            'health_concerns' => "LFだけ\n改行",
+        ])->assertRedirect(route('client-portal.intake-survey.thanks'));
+
+        $saved = TraineeIntakeSurveyResponse::query()->sole();
+        $this->assertSame("1行目\n2行目", $saved->wish);
+        $this->assertSame("CRだけ\n改行", $saved->recent_events);
+        $this->assertSame("混在\nCRLF\nCR\nLF", $saved->ideal_days);
+        $this->assertSame("LFだけ\n改行", $saved->health_concerns);
+    }
+
+    public function test_改行を直しても誕生日の全角の数字の受け付けは変わらない(): void
+    {
+        $this->traineeWithToken();
+
+        $this->submit(['birth_year' => '２０２２', 'birth_month' => '３', 'wish' => "a\r\nb"])
+            ->assertRedirect(route('client-portal.intake-survey.thanks'));
+
+        $saved = TraineeIntakeSurveyResponse::query()->sole();
+        $this->assertSame([2022, 3], [$saved->birth_year, $saved->birth_month]);
+        $this->assertSame("a\nb", $saved->wish);
+    }
+
     public function test_項目名は設問の短い呼び名と食い違わない(): void
     {
         foreach (TraineeIntakeSurveyResponse::questions() as $column => $question) {

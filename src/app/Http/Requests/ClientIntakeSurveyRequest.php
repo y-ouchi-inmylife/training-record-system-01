@@ -20,11 +20,14 @@ use Illuminate\Foundation\Http\FormRequest;
  *   ロックの前に読んだもので、コントローラでロックしたあとにもう一度確かめる
  * - 性別は男の子・女の子だけ（「不明」は置かない）、去勢・避妊は「分からない」を dont_know で受ける
  * - 誕生日はトレーナー側（TraineeRequest）と同じ判定（trait NormalizesTraineeBirthday）
+ * - 自由記述 4 欄は、検証の前に改行を LF にそろえる（下の prepareForValidation() 参照）
  * - 項目名と文言は lang/ja/validation.php（自由記述は設問の短い呼び名。screen-design.md S-1413）
  */
 class ClientIntakeSurveyRequest extends FormRequest
 {
-    use NormalizesTraineeBirthday;
+    use NormalizesTraineeBirthday {
+        prepareForValidation as normalizeTraineeBirthday;
+    }
 
     public function authorize(): bool
     {
@@ -49,6 +52,30 @@ class ClientIntakeSurveyRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * 検証の前に値を直す。
+     *
+     * - 誕生日の 3 つの欄：trait NormalizesTraineeBirthday の処理（全角の数字を半角に、など）
+     * - 自由記述 4 欄：改行を LF にそろえる（CRLF → LF、残った CR → LF。2026-10 追加）。
+     *   ブラウザは textarea の maxlength で改行を 1 文字と数えるが、送信では改行が CRLF（2 文字）になるため、
+     *   そのままだと、改行を含めて 2,000 字近く書いたとき、ブラウザでは入力できたのにサーバーの
+     *   「2000文字以内」でエラーになることがある。保存される文章も LF になる（表示は white-space: pre-wrap
+     *   なので見え方は変わらない）
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeTraineeBirthday();
+
+        $normalized = [];
+        foreach (array_keys(TraineeIntakeSurveyResponse::questions()) as $column) {
+            $value = $this->input($column);
+            if (is_string($value)) {
+                $normalized[$column] = str_replace(["\r\n", "\r"], "\n", $value);
+            }
+        }
+        $this->merge($normalized);
     }
 
     /**
