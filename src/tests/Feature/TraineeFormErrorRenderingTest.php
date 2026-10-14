@@ -27,15 +27,16 @@ class TraineeFormErrorRenderingTest extends TestCase
         return $c;
     }
 
-    private function renderForm(array $errors, bool $isEdit = false): TestView
+    private function renderForm(array $errors, bool $isEdit = false, ?Trainee $trainee = null): TestView
     {
-        $trainee = null;
-        if ($isEdit) {
+        if ($isEdit && $trainee === null) {
             $trainee = new Trainee();
             $trainee->name = '';
             $trainee->breed = '';
             $trainee->sex = null;
-            $trainee->birth_date = null;
+            $trainee->birth_year = null;
+            $trainee->birth_month = null;
+            $trainee->birth_day = null;
             $trainee->note = '';
         }
 
@@ -113,5 +114,83 @@ class TraineeFormErrorRenderingTest extends TestCase
         // 代表的な欄に is-invalid が付く
         $view->assertSee('name="name"', false);
         $view->assertSee('is-invalid', false);
+    }
+
+    /**
+     * 誕生日（2026-10 変更）：年・月・日の 3 つの欄。type="text" inputmode="numeric"、年は 4 桁・
+     * 月と日は 2 桁まで。flatpickr（.datepicker）は使わない。説明文を .form-text で出す。
+     */
+    public function test_誕生日は年月日の3つの数字欄でflatpickrを使わない(): void
+    {
+        $html = $this->renderForm([])->__toString();
+
+        foreach (['birth_year' => 4, 'birth_month' => 2, 'birth_day' => 2] as $field => $max) {
+            $this->assertMatchesRegularExpression(
+                '/<input type="text"[^>]*id="'.$field.'" name="'.$field.'" inputmode="numeric" maxlength="'.$max.'"/s',
+                $html,
+                $field.' の欄'
+            );
+        }
+        $this->assertStringNotContainsString('name="birth_date"', $html);
+        $this->assertStringNotContainsString('datepicker', $html);
+        $this->assertStringContainsString('分かるところだけで構いません。年はおおよそでも大丈夫です。', $html);
+
+        // 単位の「年」「月」「日」が欄の右に出る（欄 → 単位の順）
+        $this->assertGreaterThan(mb_strpos($html, 'id="birth_year"'), mb_strpos($html, '<span>年</span>'));
+        $this->assertGreaterThan(mb_strpos($html, 'id="birth_month"'), mb_strpos($html, '<span>月</span>'));
+        $this->assertGreaterThan(mb_strpos($html, 'id="birth_day"'), mb_strpos($html, '<span>日</span>'));
+    }
+
+    /**
+     * 誕生日のエラーは 3 つの欄のまとまりの下に 1 つだけ出し、3 つの欄すべてを赤枠にする
+     *（§2-7 の但し書き）。
+     */
+    public function test_誕生日のエラーはまとまりの下に1つだけ出て3つの欄が赤枠になる(): void
+    {
+        $html = $this->renderForm(['birth_date' => '誕生日の日付を確認してください。'])->__toString();
+
+        $this->assertSame(1, substr_count($html, '誕生日の日付を確認してください。'));
+        foreach (['birth_year', 'birth_month', 'birth_day'] as $field) {
+            $this->assertMatchesRegularExpression(
+                '/<input type="text" class="form-control\s+is-invalid\s*"\s+id="'.$field.'"/s',
+                $html,
+                $field.' の欄が赤枠'
+            );
+        }
+        // まとまりの下（3 つ目の欄より後、説明文より前）に block で出る
+        $posError = mb_strpos($html, '誕生日の日付を確認してください。');
+        $this->assertGreaterThan(mb_strpos($html, 'id="birth_day"'), $posError);
+        $this->assertLessThan(mb_strpos($html, '分かるところだけで構いません。'), $posError);
+        $this->assertStringContainsString('invalid-feedback d-block', $html);
+    }
+
+    /** 編集（S-0310）では、登録済みの値が 3 つの欄に入る（年だけ・年月だけでも） */
+    public function test_編集では登録済みの誕生日が3つの欄に入る(): void
+    {
+        $trainee = new Trainee();
+        $trainee->name = 'モモ';
+        $trainee->birth_year = 2020;
+        $trainee->birth_month = 3;
+        $trainee->birth_day = null;
+
+        $html = $this->renderForm([], isEdit: true, trainee: $trainee)->__toString();
+
+        $this->assertMatchesRegularExpression('/id="birth_year"[^>]*value="2020"/s', $html);
+        $this->assertMatchesRegularExpression('/id="birth_month"[^>]*value="3"/s', $html);
+        $this->assertMatchesRegularExpression('/id="birth_day"[^>]*value=""/s', $html);
+    }
+
+    /** エラーで戻ったときは、入力した値（old）が 3 つの欄に残る */
+    public function test_エラーで戻ったときは入力した誕生日が残る(): void
+    {
+        // old() はリクエストに結び付いたセッションの _old_input を読む
+        $this->app['request']->setLaravelSession($this->app['session.store']);
+        session()->put('_old_input', ['birth_year' => '2020', 'birth_month' => '2', 'birth_day' => '30']);
+
+        $html = $this->renderForm(['birth_date' => '誕生日の日付を確認してください。'])->__toString();
+
+        $this->assertMatchesRegularExpression('/id="birth_year"[^>]*value="2020"/s', $html);
+        $this->assertMatchesRegularExpression('/id="birth_month"[^>]*value="2"/s', $html);
+        $this->assertMatchesRegularExpression('/id="birth_day"[^>]*value="30"/s', $html);
     }
 }

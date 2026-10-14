@@ -1,0 +1,30 @@
+{
+  "description": "トレーニーの年齢の表示規則（要件定義書 6-16）の固定データ。PHP（tests/Unit/Support/TraineeAgeTest.php）と JS（段階2b）の両方のテストで同じものを使う。ref は基準日（Y-m-d）。year・month・day は誕生日（分からない部分は null）。age は年齢の表示、birthday は誕生日の部分だけの表示、birthday_with_age は誕生日と年齢を並べた表示（未登録は null）",
+  "cases": [
+    { "label": "要件の例：年・月・日", "ref": "2026-10-20", "year": 2020, "month": 3, "day": 15, "age": "6歳7ヶ月", "birthday": "2020/03/15", "birthday_with_age": "2020/03/15（6歳7ヶ月）" },
+    { "label": "要件の例：年・月（1日生まれとみなす）", "ref": "2026-10-20", "year": 2020, "month": 3, "day": null, "age": "6歳7ヶ月", "birthday": "2020年3月生まれ", "birthday_with_age": "2020年3月生まれ（6歳7ヶ月）" },
+    { "label": "要件の例：年のみ", "ref": "2026-10-20", "year": 2020, "month": null, "day": null, "age": "約6歳", "birthday": "2020年生まれ", "birthday_with_age": "2020年生まれ（約6歳）" },
+    { "label": "要件の例：未登録", "ref": "2026-10-20", "year": null, "month": null, "day": null, "age": null, "birthday": null, "birthday_with_age": null },
+
+    { "label": "1歳未満（年・月・日）：10ヶ月", "ref": "2026-10-20", "year": 2025, "month": 12, "day": 20, "age": "10ヶ月", "birthday": "2025/12/20", "birthday_with_age": "2025/12/20（10ヶ月）" },
+    { "label": "1歳未満（年・月）：10ヶ月", "ref": "2026-10-20", "year": 2025, "month": 12, "day": null, "age": "10ヶ月", "birthday": "2025年12月生まれ", "birthday_with_age": "2025年12月生まれ（10ヶ月）" },
+    { "label": "1歳未満（年・月）：今月生まれは1ヶ月未満", "ref": "2026-10-20", "year": 2026, "month": 10, "day": null, "age": "1ヶ月未満", "birthday": "2026年10月生まれ", "birthday_with_age": "2026年10月生まれ（1ヶ月未満）" },
+    { "label": "1歳未満（年・月・日）：今月生まれは1ヶ月未満", "ref": "2026-10-20", "year": 2026, "month": 10, "day": 5, "age": "1ヶ月未満", "birthday": "2026/10/05", "birthday_with_age": "2026/10/05（1ヶ月未満）" },
+    { "label": "1歳未満（年のみ）：今年生まれは1歳未満", "ref": "2026-10-20", "year": 2026, "month": null, "day": null, "age": "1歳未満", "birthday": "2026年生まれ", "birthday_with_age": "2026年生まれ（1歳未満）" },
+
+    { "label": "誕生日の前日：満年齢はまだ上がらない", "ref": "2026-10-20", "year": 2020, "month": 10, "day": 21, "age": "5歳11ヶ月", "birthday": "2020/10/21", "birthday_with_age": "2020/10/21（5歳11ヶ月）" },
+    { "label": "誕生日の当日：満年齢が上がる", "ref": "2026-10-20", "year": 2020, "month": 10, "day": 20, "age": "6歳0ヶ月", "birthday": "2020/10/20", "birthday_with_age": "2020/10/20（6歳0ヶ月）" },
+
+    { "label": "月末：1月31日生まれ、うるう年でない年の2月27日はまだ1ヶ月未満", "ref": "2026-02-27", "year": 2026, "month": 1, "day": 31, "age": "1ヶ月未満", "birthday": "2026/01/31", "birthday_with_age": "2026/01/31（1ヶ月未満）" },
+    { "label": "月末：1月31日生まれ、うるう年でない年の2月28日（末日）に1ヶ月", "ref": "2026-02-28", "year": 2026, "month": 1, "day": 31, "age": "1ヶ月", "birthday": "2026/01/31", "birthday_with_age": "2026/01/31（1ヶ月）" },
+    { "label": "月末：1月31日生まれ、うるう年の2月28日はまだ1ヶ月未満", "ref": "2024-02-28", "year": 2024, "month": 1, "day": 31, "age": "1ヶ月未満", "birthday": "2024/01/31", "birthday_with_age": "2024/01/31（1ヶ月未満）" },
+    { "label": "月末：1月31日生まれ、うるう年の2月29日（末日）に1ヶ月", "ref": "2024-02-29", "year": 2024, "month": 1, "day": 31, "age": "1ヶ月", "birthday": "2024/01/31", "birthday_with_age": "2024/01/31（1ヶ月）" },
+    { "label": "月末：1月31日生まれ、3月30日はまだ1ヶ月（3月には31日がある）", "ref": "2026-03-30", "year": 2026, "month": 1, "day": 31, "age": "1ヶ月", "birthday": "2026/01/31", "birthday_with_age": "2026/01/31（1ヶ月）" },
+    { "label": "月末：2月29日生まれ、うるう年でない年の2月27日はまだ11ヶ月", "ref": "2025-02-27", "year": 2024, "month": 2, "day": 29, "age": "11ヶ月", "birthday": "2024/02/29", "birthday_with_age": "2024/02/29（11ヶ月）" },
+    { "label": "月末：2月29日生まれ、うるう年でない年の2月28日（末日）に1歳", "ref": "2025-02-28", "year": 2024, "month": 2, "day": 29, "age": "1歳0ヶ月", "birthday": "2024/02/29", "birthday_with_age": "2024/02/29（1歳0ヶ月）" },
+    { "label": "月末：2月29日生まれ、うるう年でない年の3月1日も1歳（3月29日までは0ヶ月）", "ref": "2025-03-01", "year": 2024, "month": 2, "day": 29, "age": "1歳0ヶ月", "birthday": "2024/02/29", "birthday_with_age": "2024/02/29（1歳0ヶ月）" },
+
+    { "label": "年・月のみで、基準日の月が生まれ月と同じ（1日生まれとみなすので満年齢が上がっている）", "ref": "2026-10-01", "year": 2020, "month": 10, "day": null, "age": "6歳0ヶ月", "birthday": "2020年10月生まれ", "birthday_with_age": "2020年10月生まれ（6歳0ヶ月）" },
+    { "label": "年・月のみで、基準日が生まれ月の前月の末日（満年齢はまだ上がらない）", "ref": "2026-09-30", "year": 2020, "month": 10, "day": null, "age": "5歳11ヶ月", "birthday": "2020年10月生まれ", "birthday_with_age": "2020年10月生まれ（5歳11ヶ月）" }
+  ]
+}

@@ -66,11 +66,13 @@
                     </div>
                 </div>
 
-                {{-- 行3: 犬種 + 性別 + 誕生日 を 1 段に並べる。合計 12 で余白なく埋まる。
-                     犬種は自由入力で幅を確保したいので col-md-5、性別は最も短いので col-md-3、
-                     誕生日は Y-m-d 相当で col-md-4。ラベルは各項目内で form-label-fixed の
-                     140px 固定枠に右寄せされる（各項目のまとまり幅が異なるため、
-                     3 項目のラベル位置が同じ縦線に揃うわけではない）。 --}}
+                {{-- 行3: 犬種 + 性別 を 1 段に並べる。
+                     犬種は自由入力で幅を確保したいので col-md-5、性別は最も短いので col-md-3。
+                     ラベルは各項目内で form-label-fixed の 140px 固定枠に右寄せされる（各項目の
+                     まとまり幅が異なるため、項目のラベル位置が同じ縦線に揃うわけではない）。
+                     経緯：以前は 3 項目目に誕生日（col-md-4、Y-m-d 相当）を置き、合計 12 で埋まって
+                     いた。2026-10 に誕生日を年・月・日の 3 つの欄にしたため、収まらず独立した行に
+                     移した（screen-design.md S-0308）。空いた col-md-4 には去勢・避妊を置く予定。 --}}
                 <div class="row g-3 mb-2">
                     <div class="col-md-5">
                         <div class="row g-2 align-items-center">
@@ -100,25 +102,52 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="row g-2 align-items-center">
-                            <label for="birth_date" class="col-md-auto col-form-label text-md-end form-label-fixed">誕生日</label>
+                </div>
+
+                {{-- 行4: 誕生日（独立した全幅の行。2026-10 変更）。年・月・日の 3 つの欄で、分かるところだけ
+                     入れる（要件定義書 6-16「年齢の表示規則」の「入力のルール」）。
+                     - 欄は type="text" inputmode="numeric"（スマホで数字のキーボードを出す。type="number" は
+                       ホイールで値が変わる・「e」が入るなどのため使わない）。年は 4 桁、月・日は 2 桁まで
+                     - エラーは 3 つの欄のまとまりの下に 1 つだけ（キー birth_date。§2-7 の但し書き）。
+                       エラーがあるときは 3 つの欄すべてを赤枠にする。欄の兄弟の位置ではないので block を付ける
+                     - flatpickr（.datepicker）は使わない（以前は 1 つの日付の欄で使っていた）
+                     - 入力中の年齢表示は段階2b で、単位の右に足す --}}
+                <div class="row g-3 mb-2">
+                    <div class="col-12">
+                        <div class="row g-2 align-items-start">
+                            <label for="birth_year" id="birth_date-label" class="col-md-auto col-form-label text-md-end form-label-fixed">誕生日</label>
                             <div class="col-12 col-md">
-                                {{-- Flatpickr（.datepicker）は altInput を使っていないため、
-                                     オリジナルの input がそのまま残る → is-invalid の兄弟セレクタで
-                                     invalid-feedback が自動表示されるため block は付けない（3-1 と同じ）。 --}}
-                                <input type="text" class="form-control datepicker @error('birth_date') is-invalid @enderror"
-                                       id="birth_date" name="birth_date"
-                                       value="{{ old('birth_date', $trainee?->birth_date?->format('Y-m-d')) }}"
-                                       placeholder="例: 2020-05-01" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
-                                       autocomplete="off">
-                                <x-form-error field="birth_date" />
+                                <div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-labelledby="birth_date-label">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
+                                               id="birth_year" name="birth_year" inputmode="numeric" maxlength="4"
+                                               style="width: 5.5rem;" aria-label="誕生日の年" aria-describedby="birth_date-help"
+                                               value="{{ old('birth_year', $trainee?->birth_year) }}" autocomplete="off">
+                                        <span>年</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
+                                               id="birth_month" name="birth_month" inputmode="numeric" maxlength="2"
+                                               style="width: 4rem;" aria-label="誕生日の月" aria-describedby="birth_date-help"
+                                               value="{{ old('birth_month', $trainee?->birth_month) }}" autocomplete="off">
+                                        <span>月</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
+                                               id="birth_day" name="birth_day" inputmode="numeric" maxlength="2"
+                                               style="width: 4rem;" aria-label="誕生日の日" aria-describedby="birth_date-help"
+                                               value="{{ old('birth_day', $trainee?->birth_day) }}" autocomplete="off">
+                                        <span>日</span>
+                                    </div>
+                                </div>
+                                <x-form-error field="birth_date" block />
+                                <div id="birth_date-help" class="form-text">分かるところだけで構いません。年はおおよそでも大丈夫です。</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- 行4: 備考 --}}
+                {{-- 行5: 備考 --}}
                 <div class="row g-3">
                     <div class="col-12">
                         <div class="row g-2 align-items-start">

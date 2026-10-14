@@ -99,7 +99,10 @@ class ClientInitialSetupStoreTest extends TestCase
             $table->string('name', 50)->nullable();
             $table->string('breed', 100)->nullable();
             $table->string('sex', 20)->nullable();
-            $table->date('birth_date')->nullable();
+            // 誕生日は年・月・日の 3 列（D-0700。2026-10 に birth_date から分けた）
+            $table->unsignedSmallInteger('birth_year')->nullable();
+            $table->unsignedTinyInteger('birth_month')->nullable();
+            $table->unsignedTinyInteger('birth_day')->nullable();
             $table->text('note')->nullable();
             $table->string('photo_path', 500)->nullable();
             $table->timestamps();
@@ -186,7 +189,9 @@ class ClientInitialSetupStoreTest extends TestCase
             'name' => 'モモ',
             'breed' => 'トイ・プードル',
             'sex' => 'female',
-            'birth_date' => '2022-03-15',
+            'birth_year' => 2022,
+            'birth_month' => 3,
+            'birth_day' => 15,
             'note' => 'トレーナーのメモ',
             'photo_path' => null,
             'created_at' => '2026-10-01 10:00:00',
@@ -216,7 +221,9 @@ class ClientInitialSetupStoreTest extends TestCase
             'name' => 'モモ',
             'breed' => null,
             'sex' => null,
-            'birth_date' => null,
+            'birth_year' => null,
+            'birth_month' => null,
+            'birth_day' => null,
             'note' => null,
             'photo_path' => null,
             'created_at' => '2026-10-01 10:00:00',

@@ -284,6 +284,18 @@ return [
         'count' => [
             'below_assigned' => '回数は割り当て済みの利用の件数（:assigned件）以上で入力してください。',
         ],
+        // トレーニーの誕生日（年・月・日の 3 つの欄。S-0308／S-0310。2026-10 追加）。
+        // TraineeRequest の withValidator（after）で上から順に判定し、最初の 1 つだけを
+        // キー birth_date に載せる（screen-design.md §2-8「誕生日（年・月・日の 3 つの欄）の文言」）。
+        'birth_date' => [
+            'numeric' => '誕生日は数字で入力してください。',
+            'month_range' => '誕生日の月は1〜12で入力してください。',
+            'month_without_year' => '誕生日の月を入れる場合は、年も入力してください。',
+            'day_without_year_month' => '誕生日の日を入れる場合は、年と月も入力してください。',
+            'invalid_date' => '誕生日の日付を確認してください。',
+            'future' => '誕生日が未来になっています。',
+            'year_range' => '誕生日の年を確認してください。',
+        ],
     ],
 
     /*

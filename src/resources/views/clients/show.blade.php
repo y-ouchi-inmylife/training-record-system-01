@@ -522,11 +522,10 @@
                                     <dt class="col-4 fw-normal text-muted">性別</dt>
                                     <dd class="col-8 mb-1">{{ $trainee->sex_label }}</dd>
                                     <dt class="col-4 fw-normal text-muted">誕生日</dt>
-                                    <dd class="col-8 mb-1">
-                                        @if($trainee->birth_date)
-                                            {{ $trainee->birth_date->format('Y/m/d') }}（{{ $trainee->age }}歳）
-                                        @endif
-                                    </dd>
+                                    {{-- 誕生日と年齢（要件定義書 6-16「年齢の表示規則」。組み立ては Trainee の
+                                         birthday_with_age_label アクセサ。未登録は空欄）。2026-10 変更：以前は
+                                         birth_date と age アクセサで「Y/m/d（N歳）」に組み立てていた --}}
+                                    <dd class="col-8 mb-1">{{ $trainee->birthday_with_age_label }}</dd>
                                     <dt class="col-4 fw-normal text-muted">備考</dt>
                                     <dd class="col-8 mb-1" style="white-space: pre-wrap;">{{ $trainee->note }}</dd>
                                     {{-- 最終計測（設計書 S-0305 セクション3「最終計測」参照）。

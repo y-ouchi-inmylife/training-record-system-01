@@ -43,7 +43,9 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
         $trainee->name = 'ポチ';
         $trainee->breed = null;
         $trainee->sex = null;
-        $trainee->birth_date = null;
+        $trainee->birth_year = null;
+        $trainee->birth_month = null;
+        $trainee->birth_day = null;
         $trainee->note = null;
         $trainee->exists = true;
         $trainee->setRelation('client', $client);

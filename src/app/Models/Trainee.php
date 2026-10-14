@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TraineeAge;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
@@ -53,7 +54,9 @@ class Trainee extends Model
         'name',
         'breed',
         'sex',
-        'birth_date',
+        'birth_year',
+        'birth_month',
+        'birth_day',
         'note',
         'photo_path',
         'updated_by',
@@ -62,7 +65,11 @@ class Trainee extends Model
     protected function casts(): array
     {
         return [
-            'birth_date' => 'date',
+            // 誕生日は年・月・日を別々に持つ（D-0700。2026-10 に birth_date から分けた）。
+            // 分かるところだけ入るため、それぞれ NULL がありうる
+            'birth_year' => 'integer',
+            'birth_month' => 'integer',
+            'birth_day' => 'integer',
         ];
     }
 
@@ -104,12 +111,31 @@ class Trainee extends Model
     }
 
     /**
-     * 誕生日から算出した年齢（年単位・切り捨て）。
-     * 誕生日が未登録なら null を返す。
+     * 誕生日の部分だけの表示（「2020/03/15」「2020年3月生まれ」「2020年生まれ」）。未登録なら null。
+     *
+     * 規則は要件定義書 6-16「年齢の表示規則」。組み立ては App\Support\TraineeAge に集約する。
      */
-    public function getAgeAttribute(): ?int
+    public function getBirthdayLabelAttribute(): ?string
     {
-        return $this->birth_date?->age;
+        return TraineeAge::birthdayLabel($this->birth_year, $this->birth_month, $this->birth_day);
+    }
+
+    /**
+     * 誕生日と年齢を並べた表示（「2020/03/15（6歳7ヶ月）」「2020年3月生まれ（6歳7ヶ月）」
+     * 「2020年生まれ（約6歳）」）。未登録なら null。会員詳細（S-0305）のトレーニーカードと
+     * トレーニー詳細（S-0309）で使う。基準日は表示するその日（アプリのタイムゾーンでの今日）。
+     *
+     * 2026-10 変更：以前は `age` アクセサ（birth_date から年単位・切り捨て）で年齢だけを返し、
+     * Blade で「Y/m/d（N歳）」に組み立てていた。誕生日を年・月・日に分けたため置き換えた。
+     */
+    public function getBirthdayWithAgeLabelAttribute(): ?string
+    {
+        $today = today();
+
+        return TraineeAge::birthdayWithAgeLabel(
+            $this->birth_year, $this->birth_month, $this->birth_day,
+            $today->year, $today->month, $today->day,
+        );
     }
 
     /**
