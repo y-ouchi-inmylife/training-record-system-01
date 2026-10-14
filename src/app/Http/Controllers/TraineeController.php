@@ -69,8 +69,9 @@ class TraineeController extends Controller
      */
     public function show(Trainee $trainee): View
     {
-        // activeIntakeSurveyToken は受付アンケートの欄の状態と、削除確認の文言に使う（2026-10 追加）
-        $trainee->load(['client', 'measurements', 'activeIntakeSurveyToken']);
+        // latestIntakeSurveyResponse と activeIntakeSurveyToken は受付アンケートの欄の状態と、
+        // 削除確認の文言に使う（2026-10 追加）
+        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken']);
 
         // 削除確認ダイアログに件数を含めるため、コントローラで数えて渡す。
         $measurementCount = $trainee->measurements->count();
@@ -89,16 +90,24 @@ class TraineeController extends Controller
         // 同じシングルクォート形式で埋め込む。**文言にシングルクォート・改行を
         // 含めないこと**（含めると onsubmit 内の JS 文字列リテラルが壊れる）。
         //
-        // 受付アンケート（2026-10 追加。要件定義書 6-16-4、設計書 S-0309「削除」）：未回答の案内が
-        // あるときは、計測値の文の後ろに「発行済みの受付アンケート案内も使えなくなります。」を足し、
-        // 最後を「このトレーニーを削除しますか？」で締める。文と文は区切りなしで続ける
-        // （confirm() では改行が使えないため）。案内がないときは、これまでの文のまま
-        // （0 件のときの出し方を含めて変えない）。段階4で、回答があるときの文を同じ形で足す。
+        // 受付アンケート（2026-10 追加。要件定義書 6-16-4、設計書 S-0309「削除」）：計測値の文の後ろに、
+        // 回答があれば「受付アンケートの回答も一緒に削除されます。」、未回答の案内があれば
+        // 「発行済みの受付アンケート案内も使えなくなります。」をこの順で足し、最後を
+        // 「このトレーニーを削除しますか？」で締める。文と文は区切りなしで続ける
+        // （confirm() では改行が使えないため）。どちらもないときは、これまでの文のまま
+        // （0 件のときの出し方を含めて変えない）。
         $measurementSentence = $measurementCount > 0
             ? "このトレーニーには {$measurementCount} 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。"
             : '';
+        $intakeSurveySentence = '';
+        if ($trainee->latestIntakeSurveyResponse !== null) {
+            $intakeSurveySentence .= '受付アンケートの回答も一緒に削除されます。';
+        }
         if ($trainee->activeIntakeSurveyToken !== null) {
-            $deleteConfirmMessage = $measurementSentence.'発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？';
+            $intakeSurveySentence .= '発行済みの受付アンケート案内も使えなくなります。';
+        }
+        if ($intakeSurveySentence !== '') {
+            $deleteConfirmMessage = $measurementSentence.$intakeSurveySentence.'このトレーニーを削除しますか？';
         } else {
             $deleteConfirmMessage = $measurementCount > 0
                 ? $measurementSentence.'削除しますか？'

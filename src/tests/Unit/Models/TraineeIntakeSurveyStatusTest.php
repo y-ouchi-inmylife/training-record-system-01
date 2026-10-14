@@ -3,6 +3,7 @@
 namespace Tests\Unit\Models;
 
 use App\Models\Trainee;
+use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\TraineeIntakeSurveyToken;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -10,8 +11,8 @@ use Tests\TestCase;
 /**
  * トレーニーの受付アンケートの状態（要件定義書 6-16-8。2026-10 追加）。
  *
- * 段階3では「有効な案内あり → 回答待ち、なし → 未発行」の 2 つ（回答済みは段階4で足す）。
- * 状態は activeIntakeSurveyToken（eager load したもの）から決まる。
+ * 判定の順は「回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行」。
+ * 状態は latestIntakeSurveyResponse・activeIntakeSurveyToken（eager load したもの）から決まる。
  */
 class TraineeIntakeSurveyStatusTest extends TestCase
 {
@@ -19,6 +20,7 @@ class TraineeIntakeSurveyStatusTest extends TestCase
     {
         $trainee = new Trainee;
         $trainee->setRelation('activeIntakeSurveyToken', null);
+        $trainee->setRelation('latestIntakeSurveyResponse', null);
 
         $this->assertSame(Trainee::INTAKE_NOT_ISSUED, $trainee->intake_survey_status);
         $this->assertSame('未発行', $trainee->intake_survey_status_label);
@@ -31,9 +33,38 @@ class TraineeIntakeSurveyStatusTest extends TestCase
 
         $trainee = new Trainee;
         $trainee->setRelation('activeIntakeSurveyToken', $token);
+        $trainee->setRelation('latestIntakeSurveyResponse', null);
 
         $this->assertSame(Trainee::INTAKE_AWAITING, $trainee->intake_survey_status);
         $this->assertSame('回答待ち（2026/10/15 発行）', $trainee->intake_survey_status_label);
+    }
+
+    public function test_回答があれば回答済みで回答日を添える(): void
+    {
+        $response = new TraineeIntakeSurveyResponse;
+        $response->answered_at = Carbon::parse('2026-10-16 14:32:00');
+
+        $trainee = new Trainee;
+        $trainee->setRelation('activeIntakeSurveyToken', null);
+        $trainee->setRelation('latestIntakeSurveyResponse', $response);
+
+        $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
+        $this->assertSame('回答済み（2026/10/16）', $trainee->intake_survey_status_label);
+    }
+
+    public function test_回答と有効な案内の両方があれば回答済みを先に判定する(): void
+    {
+        $token = new TraineeIntakeSurveyToken;
+        $token->created_at = Carbon::parse('2026-10-15 09:30:00');
+        $response = new TraineeIntakeSurveyResponse;
+        $response->answered_at = Carbon::parse('2026-10-16 14:32:00');
+
+        $trainee = new Trainee;
+        $trainee->setRelation('activeIntakeSurveyToken', $token);
+        $trainee->setRelation('latestIntakeSurveyResponse', $response);
+
+        $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
+        $this->assertSame('回答済み（2026/10/16）', $trainee->intake_survey_status_label);
     }
 
     public function test_状態の定数(): void

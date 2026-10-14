@@ -185,17 +185,17 @@
     {{-- 受付アンケートの欄（2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
          「受付アンケートの欄」）。計測値のカードの下に置く（毎日使う計測値を上に残し、一度きりの
          回答は下に置くため）。
-         - **状態（と、段階5以降は回答の内容）を見せるだけ**。発行・表示・取消のボタン、取消モーダル
+         - **状態（と、回答済みなら回答の内容）を見せるだけ**。発行・表示・取消のボタン、取消モーダル
            （S-0305-M06）、欄の中の完了メッセージは置かない。受付アンケート案内の操作は会員詳細（S-0305）
            だけで行う（案内を渡す相手は会員で、マイページ登録案内も会員詳細でしか操作しないため。
            要件定義書 6-16-8 備考）。未発行・回答待ちのときは、会員詳細で操作できることを添える
          - 経緯：2026-10 の段階3a では、この欄の見出しの右に「案内を発行」「案内を取消」を置き、
            発行・取消のあとはこの欄（#intake-survey）に戻して完了メッセージを欄の中に出していた。
            同じ 2026-10 に、操作を会員詳細に寄せたため外した
-         - 状態は Trainee::intake_survey_status（TraineeController::show で activeIntakeSurveyToken を
-           読み込み済み）。段階3では未発行・回答待ちの 2 つ（回答済みと回答の表示は段階4・5）
-         - id="intake-survey" と scroll-margin-top は残す（段階5で、会員詳細の「回答を見る」から飛ぶ先に
-           なるため）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
+         - 状態は Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
+           activeIntakeSurveyToken を読み込み済み）。回答済みのときは回答日時（Y/m/d H:i）を出し、
+           会員詳細で操作できる旨は出さない（回答済みでは発行・取消ができないため）
+         - id="intake-survey" と scroll-margin-top は、会員詳細の「回答を見る」から飛ぶ先にするため。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
            余白 16px を足した 72px（4.5rem） --}}
     <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
@@ -203,12 +203,16 @@
             <h6 class="mb-0">受付アンケート</h6>
         </div>
         <div class="card-body">
-            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                <p class="text-muted mb-1">受付アンケートの案内はまだ発行していません。</p>
+            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+                <p class="mb-0">回答済み（{{ $trainee->latestIntakeSurveyResponse->answered_at->format('Y/m/d H:i') }}）</p>
             @else
-                <p class="mb-1">{{ $trainee->intake_survey_status_label }}</p>
+                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
+                    <p class="text-muted mb-1">受付アンケートの案内はまだ発行していません。</p>
+                @else
+                    <p class="mb-1">{{ $trainee->intake_survey_status_label }}</p>
+                @endif
+                <p class="small text-muted mb-0">案内の発行・取消は<a href="{{ route('clients.show', $trainee->client) }}">会員詳細</a>から行えます。</p>
             @endif
-            <p class="small text-muted mb-0">案内の発行・取消は<a href="{{ route('clients.show', $trainee->client) }}">会員詳細</a>から行えます。</p>
         </div>
     </div>
 

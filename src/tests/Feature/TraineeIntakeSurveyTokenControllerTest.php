@@ -40,6 +40,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineeIntakeSurveyTokensTable();
+        $this->createTraineeIntakeSurveyResponsesTable();
 
         $this->trainee = Trainee::query()->create(['client_id' => 7, 'name' => 'モモ']);
         $this->actingAsRole('staff');
@@ -96,6 +97,18 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertStatus(409);
         $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
+    }
+
+    public function test_回答済みなら409で作らない(): void
+    {
+        $tokenId = $this->insertToken('2026-10-16 10:00:00');
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $this->trainee->id, 'trainee_intake_survey_token_id' => $tokenId,
+            'answered_at' => '2026-10-16 10:00:00', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertStatus(409);
+        $this->assertSame([$tokenId], TraineeIntakeSurveyToken::query()->pluck('id')->all());
     }
 
     public function test_発行はアクセスログにトレーニーへの操作として残る(): void

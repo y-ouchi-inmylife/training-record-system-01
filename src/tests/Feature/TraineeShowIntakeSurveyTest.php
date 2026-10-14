@@ -17,8 +17,9 @@ use Tests\TestCase;
  * - 欄はカードに id="intake-survey" と scroll-margin-top を付け、状態を見せるだけ（2026-10 変更：
  *   発行・表示・取消のボタン・取消モーダル・欄の中の完了メッセージは置かない。操作は会員詳細だけ）
  * - 未発行・回答待ちのときは「案内の発行・取消は会員詳細から行えます。」と会員詳細へのリンクを添える
- * - 削除の確認：未回答の案内があるときだけ、計測値の文の後ろに案内の文を足し、
- *   最後を「このトレーニーを削除しますか？」で締める（案内がないときは今までの文のまま）
+ *   （回答済みのときは添えず、回答日時を出す）
+ * - 削除の確認：計測値の文の後ろに、回答があれば回答の文、未回答の案内があれば案内の文をこの順で足し、
+ *   最後を「このトレーニーを削除しますか？」で締める（どちらもないときは今までの文のまま）
  *
  * ミドルウェアは外さず、実際の HTTP で確かめる。
  */
@@ -58,6 +59,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
             $table->timestamps();
         });
         $this->createTraineeIntakeSurveyTokensTable();
+        $this->createTraineeIntakeSurveyResponsesTable();
 
         $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
         $admin->id = 100;
@@ -73,6 +75,14 @@ class TraineeShowIntakeSurveyTest extends TestCase
         DB::table('trainee_intake_survey_tokens')->insert([
             'token' => bin2hex(random_bytes(16)), 'trainee_id' => $this->trainee->id,
             'answered_at' => $answeredAt, 'created_at' => '2026-10-15 09:00:00', 'updated_at' => '2026-10-15 09:00:00',
+        ]);
+    }
+
+    private function addResponse(string $answeredAt = '2026-10-16 14:32:00'): void
+    {
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $this->trainee->id, 'answered_at' => $answeredAt,
+            'created_at' => $answeredAt, 'updated_at' => $answeredAt,
         ]);
     }
 
@@ -138,6 +148,19 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertNoOperations($html);
     }
 
+    public function test_回答済みなら回答日時を出し会員詳細への案内は出さない(): void
+    {
+        $this->issueToken('2026-10-16 14:32:00');
+        $this->addResponse();
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertStringContainsString('回答済み（2026/10/16 14:32）', $html);
+        $this->assertStringNotContainsString('案内の発行・取消は', $html);
+        $this->assertStringNotContainsString('受付アンケートの案内はまだ発行していません。', $html);
+        $this->assertNoOperations($html);
+    }
+
     public function test_欄の中に完了メッセージは出さない(): void
     {
         // 段階3a で使っていたキーが残っていても、欄の中には出さない（操作を会員詳細に寄せたため）
@@ -187,5 +210,34 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
         $this->assertSame('このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_回答あり計測値なし(): void
+    {
+        $this->issueToken('2026-10-16 14:32:00');
+        $this->addResponse();
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('受付アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_回答あり計測値あり(): void
+    {
+        $this->issueToken('2026-10-16 14:32:00');
+        $this->addResponse();
+        $this->addMeasurements(2);
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_回答と未回答の案内の両方があれば回答の文から足す(): void
+    {
+        // 第1段階では起きない組み合わせ（回答済みには発行しない）だが、文の順を確かめる
+        $this->addResponse();
+        $this->issueToken();
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('受付アンケートの回答も一緒に削除されます。発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 }

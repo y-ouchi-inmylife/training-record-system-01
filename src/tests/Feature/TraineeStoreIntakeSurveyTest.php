@@ -49,6 +49,7 @@ class TraineeStoreIntakeSurveyTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineeIntakeSurveyTokensTable();
+        $this->createTraineeIntakeSurveyResponsesTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;

@@ -88,6 +88,7 @@ class ClientCountRenderingTest extends TestCase
         });
         // 受付アンケート用 URL のトークン（トレーニーカードの受付アンケートの行の状態。2026-10 追加）
         $this->createTraineeIntakeSurveyTokensTable();
+        $this->createTraineeIntakeSurveyResponsesTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;
@@ -736,9 +737,36 @@ class ClientCountRenderingTest extends TestCase
         );
     }
 
-    public function test_回答済みの案内しかなければ段階3では未発行として扱う(): void
+    private function intakeResponse(int $traineeId, ?int $tokenId, string $answeredAt = '2026-10-16 14:32:00'): void
     {
-        // 回答（D-1100）は段階4で作るため、回答済みの判定はまだない。回答済みのトークンは有効な案内として数えない
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $traineeId, 'trainee_intake_survey_token_id' => $tokenId,
+            'answered_at' => $answeredAt, 'created_at' => $answeredAt, 'updated_at' => $answeredAt,
+        ]);
+    }
+
+    public function test_受付アンケートが回答済みなら回答日と回答を見るのリンクを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $tokenId = $this->intakeToken($id, '2026-10-16 14:32:00');
+        $this->intakeResponse($id, $tokenId);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('受付アンケート：回答済み（2026/10/16）', $html);
+        // 「回答を見る」は S-0309 の受付アンケートの欄へ（同じタブ）
+        $url = preg_quote(route('trainees.show', $id).'#intake-survey', '/');
+        $this->assertMatchesRegularExpression('/<a href="'.$url.'"\s*class="btn btn-sm btn-outline-primary">回答を見る<\/a>/u', $html);
+        $this->assertStringNotContainsString('>案内を発行<', $html);
+        $this->assertStringNotContainsString('>案内を取消<', $html);
+        $this->assertStringNotContainsString('案内を表示', $html);
+    }
+
+    public function test_回答のない回答済みの案内しかなければ未発行として扱う(): void
+    {
+        // 回答済みのトークンは有効な案内として数えない（回答済みかどうかは回答〔D-1100〕で決める）
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $id = $this->trainee($client, 'ポチ');
@@ -747,6 +775,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertStringContainsString('受付アンケート：未発行', $html);
+        $this->assertStringNotContainsString('回答を見る', $html);
     }
 
     public function test_取消モーダルはトレーニーが何頭いても1つで送信先のひな形を持つ(): void
