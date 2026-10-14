@@ -188,7 +188,10 @@ class ClientIntakeSurveyShowTest extends TestCase
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
         $this->assertStringContainsString('<div class="c-login c-login--wide">', $html);
-        $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-2">愛犬のこと</h2>', $html);
+        // 小見出し「愛犬のこと」は置かない（2026-10 変更。説明文と重なるため）。カードは名前の欄から始まる
+        $this->assertStringNotContainsString('>愛犬のこと<', $html);
+        $this->assertSame(1, substr_count($html, '<h2 '));
+        $this->assertMatchesRegularExpression('/novalidate>\s*<input type="hidden" name="_token"[^>]*>\s*<div class="mb-3">\s*<label for="name"/u', $html);
         $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-2">暮らしの様子</h2>', $html);
         $this->assertStringContainsString('どれも任意です。思いつくことを自由にお書きください。', $html);
         // 区切り線は 1 本だけ（去勢・避妊のまとまりの下）
