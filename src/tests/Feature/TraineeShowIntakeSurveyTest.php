@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Trainee;
+use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -78,12 +79,22 @@ class TraineeShowIntakeSurveyTest extends TestCase
         ]);
     }
 
-    private function addResponse(string $answeredAt = '2026-10-16 14:32:00'): void
+    private function addResponse(string $answeredAt = '2026-10-16 14:32:00', array $attributes = []): void
     {
-        DB::table('trainee_intake_survey_responses')->insert([
+        DB::table('trainee_intake_survey_responses')->insert(array_merge([
             'trainee_id' => $this->trainee->id, 'answered_at' => $answeredAt,
             'created_at' => $answeredAt, 'updated_at' => $answeredAt,
-        ]);
+        ], $attributes));
+    }
+
+    /** 回答した基本情報の表の 1 行（ラベルと値） */
+    private function assertBasicRow(string $html, string $label, string $value, bool $unanswered = false): void
+    {
+        $class = $unanswered ? 'col-8 col-md-10 mb-1 text-muted' : 'col-8 col-md-10 mb-1';
+        $this->assertMatchesRegularExpression(
+            '/<dt class="col-4 col-md-2 fw-normal text-muted">'.preg_quote($label, '/').'<\/dt>\s*<dd class="'.$class.'">'.preg_quote($value, '/').'<\/dd>/u',
+            $html
+        );
     }
 
     private function addMeasurements(int $count): void
@@ -239,5 +250,109 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
         $this->assertSame('受付アンケートの回答も一緒に削除されます。発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    // ---- 回答の内容（2026-10 追加。設計書 S-0309「受付アンケートの欄」） ----
+
+    public function test_回答の内容を答えたとおりに出す(): void
+    {
+        // トレーニーの現在の値（犬種なし）と違う、答えたとおりの内容を出す
+        $this->addResponse('2026-10-16 14:32:00', [
+            'name' => 'モモ', 'breed' => 'トイプードル', 'sex' => 'female',
+            'birth_year' => 2022, 'birth_month' => 3, 'neuter_status' => 'dont_know',
+            'wish' => '留守番中に鳴き続けてしまうのを直したい',
+        ]);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<p class="mb-3">回答済み（2026/10/16 14:32）</p>', $html);
+        $this->assertBasicRow($html, '名前', 'モモ');
+        $this->assertBasicRow($html, '犬種', 'トイプードル');
+        $this->assertBasicRow($html, '性別', '女の子');
+        // 誕生日は日付の部分だけ（年齢を付けない）
+        $this->assertBasicRow($html, '誕生日', '2022年3月生まれ');
+        $this->assertStringNotContainsString('2022年3月生まれ（', $html);
+        // 「分からない」はトレーニーの「不明」に置き換えない
+        $this->assertBasicRow($html, '去勢・避妊', '分からない');
+    }
+
+    public function test_答えなかった基本情報は未回答と出す(): void
+    {
+        $this->addResponse('2026-10-16 14:32:00', ['name' => 'モモ']);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertBasicRow($html, '名前', 'モモ');
+        foreach (['犬種', '性別', '誕生日', '去勢・避妊'] as $label) {
+            $this->assertBasicRow($html, $label, '（未回答）', true);
+        }
+    }
+
+    public function test_誕生日の日付の部分は年月日なら日付の形(): void
+    {
+        $this->addResponse('2026-10-16 14:32:00', ['birth_year' => 2020, 'birth_month' => 3, 'birth_day' => 15]);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertBasicRow($html, '誕生日', '2020/03/15');
+    }
+
+    public function test_自由記述は設問文と回答の対で改行を保持し答えなかった設問は未回答(): void
+    {
+        $this->addResponse('2026-10-16 14:32:00', [
+            'wish' => "留守番中に鳴き続けてしまう\nのを直したい",
+            'ideal_days' => 'ドッグランで遊びたい',
+        ]);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $questions = TraineeIntakeSurveyResponse::questions();
+        $q = fn (string $column) => preg_quote($questions[$column]['question'], '/');
+        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('wish').'<\/dt>\s*<dd class="mb-3" style="white-space: pre-wrap;">留守番中に鳴き続けてしまう\nのを直したい<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('recent_events').'<\/dt>\s*<dd class="mb-3 text-muted">（未回答）<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('ideal_days').'<\/dt>\s*<dd class="mb-3" style="white-space: pre-wrap;">ドッグランで遊びたい<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('health_concerns').'<\/dt>\s*<dd class="mb-0 text-muted">（未回答）<\/dd>/u', $html);
+        // 例文は回答の表示には出さない
+        $this->assertStringNotContainsString($questions['wish']['examples'][0], $html);
+    }
+
+    public function test_回答の内容は受付アンケートの欄の中に出し編集や削除の操作は置かない(): void
+    {
+        $this->addResponse('2026-10-16 14:32:00', ['breed' => 'トイプードル']);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $card = substr($html, strpos($html, 'id="intake-survey"'));
+        // 欄のすぐ後ろは計測値のモーダル（このモーダルには計測値の操作のボタンがあるため、そこで切る）
+        $end = strpos($card, 'id="measurementModal-');
+        $this->assertNotFalse($end);
+        $card = substr($card, 0, $end);
+        $this->assertStringContainsString('data-intake-survey-basics', $card);
+        $this->assertStringContainsString('data-intake-survey-answers', $card);
+        $this->assertStringNotContainsString('<button', $card);
+        $this->assertStringNotContainsString('<form', $card);
+    }
+
+    public function test_回答がなければ回答の内容は出さない(): void
+    {
+        $this->issueToken();
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('data-intake-survey-basics', $html);
+        $this->assertStringNotContainsString('data-intake-survey-answers', $html);
+        $this->assertStringNotContainsString('（未回答）', $html);
+    }
+
+    public function test_回答が複数件あれば最新の1件を出す(): void
+    {
+        $this->addResponse('2026-10-16 14:32:00', ['breed' => '古い回答']);
+        $this->addResponse('2026-10-18 09:05:00', ['breed' => '新しい回答']);
+
+        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+
+        $this->assertStringContainsString('回答済み（2026/10/18 09:05）', $html);
+        $this->assertBasicRow($html, '犬種', '新しい回答');
+        $this->assertStringNotContainsString('古い回答', $html);
     }
 }

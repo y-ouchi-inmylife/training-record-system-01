@@ -193,8 +193,17 @@
            発行・取消のあとはこの欄（#intake-survey）に戻して完了メッセージを欄の中に出していた。
            同じ 2026-10 に、操作を会員詳細に寄せたため外した
          - 状態は Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
-           activeIntakeSurveyToken を読み込み済み）。回答済みのときは回答日時（Y/m/d H:i）を出し、
+           activeIntakeSurveyToken を読み込み済み）。回答済みのときは回答日時（Y/m/d H:i）と回答の内容を出し、
            会員詳細で操作できる旨は出さない（回答済みでは発行・取消ができないため）
+         - 回答の内容（要件定義書 6-16-10、設計書 S-0309「受付アンケートの欄」）：上部の属性（トレーニーの現在の値）とは
+           別のこの欄に、**答えたとおり**に出す（反映されなかった項目も含め、現在の値と違うことがある）。
+           基本情報 5 項目はラベルと値の小さな表（会員詳細のトレーニーカードと同じ dl.row）、誕生日は日付の部分だけ
+           （年齢は付けない）、去勢・避妊の「分からない」はそのまま。自由記述 4 欄は設問文
+           （TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で、改行を保持する。
+           答えなかった項目は「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。
+           編集・削除の操作は置かない（閲覧のみ）
+         - 回答が複数件あるときに新しい順に並べるのは第 2 段階（第 1 段階では 1 件）。今は最新の 1 件
+           （latestIntakeSurveyResponse）だけを出す
          - id="intake-survey" と scroll-margin-top は、会員詳細の「回答を見る」から飛ぶ先にするため。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
            余白 16px を足した 72px（4.5rem） --}}
@@ -204,7 +213,37 @@
         </div>
         <div class="card-body">
             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
-                <p class="mb-0">回答済み（{{ $trainee->latestIntakeSurveyResponse->answered_at->format('Y/m/d H:i') }}）</p>
+                @php
+                    $intakeResponse = $trainee->latestIntakeSurveyResponse;
+                    $intakeBasics = [
+                        '名前' => $intakeResponse->name,
+                        '犬種' => $intakeResponse->breed,
+                        '性別' => $intakeResponse->sex_label,
+                        '誕生日' => $intakeResponse->birthday_label,
+                        '去勢・避妊' => $intakeResponse->neuter_status_label,
+                    ];
+                @endphp
+                <p class="mb-3">回答済み（{{ $intakeResponse->answered_at->format('Y/m/d H:i') }}）</p>
+                <dl class="row mb-3" data-intake-survey-basics>
+                    @foreach($intakeBasics as $label => $value)
+                        <dt class="col-4 col-md-2 fw-normal text-muted">{{ $label }}</dt>
+                        @if(blank($value))
+                            <dd class="col-8 col-md-10 mb-1 text-muted">（未回答）</dd>
+                        @else
+                            <dd class="col-8 col-md-10 mb-1">{{ $value }}</dd>
+                        @endif
+                    @endforeach
+                </dl>
+                <dl class="mb-0" data-intake-survey-answers>
+                    @foreach(\App\Models\TraineeIntakeSurveyResponse::questions() as $column => $question)
+                        <dt class="fw-normal text-muted">{{ $question['question'] }}</dt>
+                        @if(blank($intakeResponse->{$column}))
+                            <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted">（未回答）</dd>
+                        @else
+                            <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }}" style="white-space: pre-wrap;">{{ $intakeResponse->{$column} }}</dd>
+                        @endif
+                    @endforeach
+                </dl>
             @else
                 @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
                     <p class="text-muted mb-1">受付アンケートの案内はまだ発行していません。</p>
