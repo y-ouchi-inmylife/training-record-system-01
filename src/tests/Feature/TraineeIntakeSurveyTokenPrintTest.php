@@ -204,6 +204,28 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertSame(0, AccessLog::query()->count());
     }
 
+    public function test_見出しの上に受付アンケートの緑の帯を出しアイコンは読み上げない(): void
+    {
+        $this->issueToken();
+
+        $html = $this->printPage();
+
+        // 帯（2026-10 追加）：文字は「受付アンケート」、色は緑（print-band--intake）、アイコンは aria-hidden
+        $this->assertMatchesRegularExpression('/<div class="print-band print-band--intake">\s*<p class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケート<\/p>\s*<\/div>/u', $html);
+        // 操作エリアの下、見出しの上
+        $this->assertMatchesRegularExpression('/print-actions.*<div class="print-band print-band--intake">.*<h1 class="print-title">受付アンケートのご案内<\/h1>/su', $html);
+        // マイページ登録の帯は出さない
+        $this->assertStringNotContainsString('print-band--mypage', $html);
+    }
+
+    public function test_有効な案内がないときも受付アンケートの帯を出す(): void
+    {
+        $html = $this->printPage();
+
+        $this->assertStringContainsString('<div class="print-band print-band--intake">', $html);
+        $this->assertStringContainsString('<h1 class="print-title">有効な受付アンケート案内がありません。</h1>', $html);
+    }
+
     public function test_システム管理者は403(): void
     {
         $this->actingAsRole('system_admin');

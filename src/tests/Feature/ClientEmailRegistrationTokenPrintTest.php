@@ -178,6 +178,28 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringContainsString('発行済みのマイページ登録案内がありません', $this->printPage());
     }
 
+    public function test_見出しの上にマイページ登録の青の帯を出しアイコンは読み上げない(): void
+    {
+        $this->issueToken();
+
+        $html = $this->printPage();
+
+        // 帯（2026-10 追加）：文字は「マイページ登録」、色は青（print-band--mypage）、アイコンは aria-hidden
+        $this->assertMatchesRegularExpression('/<div class="print-band print-band--mypage">\s*<p class="print-band-label"><i class="bi bi-person-circle" aria-hidden="true"><\/i>マイページ登録<\/p>\s*<\/div>/u', $html);
+        // 操作エリアの下、見出しの上
+        $this->assertMatchesRegularExpression('/print-actions.*<div class="print-band print-band--mypage">.*<h1 class="print-title">マイページ登録のご案内<\/h1>/su', $html);
+        // 受付アンケートの帯は出さない
+        $this->assertStringNotContainsString('print-band--intake', $html);
+    }
+
+    public function test_有効な案内がないときもマイページ登録の帯を出す(): void
+    {
+        $html = $this->printPage();
+
+        $this->assertStringContainsString('<div class="print-band print-band--mypage">', $html);
+        $this->assertStringContainsString('<h1 class="print-title">発行済みのマイページ登録案内がありません</h1>', $html);
+    }
+
     public function test_システム管理者は403(): void
     {
         $this->actingAsRole('system_admin');

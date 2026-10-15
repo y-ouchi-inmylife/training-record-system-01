@@ -57,3 +57,46 @@ h2 {
 .alert.fade {
     transition: opacity 1s linear;
 }
+
+// 案内を見分ける帯（S-0307 マイページ登録案内・S-0311 受付アンケート案内。2026-10 追加）。
+// 部品は resources/views/components/print-band.blade.php。設計書 screen-design.md S-0307 備考「案内を見分ける帯」。
+// - 色は Bootstrap の primary（#0d6efd）・success（#198754）より 1 段濃い $blue-600・$green-600。
+//   白の文字とのコントラスト比は 6.4:1 以上（primary・success は 4.5:1 ちょうど前後で余裕がないため）
+// - 印刷で「背景のグラフィック」を出さない設定でも帯の色が出るよう、帯の色は背景ではなく太い枠線（border-top）で塗り、
+//   その上に文字を重ねる（枠線は背景の設定にかかわらず印刷される）。白黒の印刷では帯が灰色になり、白の文字で読める。
+//   print-color-adjust: exact で、色を変えずに印刷させる。画面と印刷で見た目は同じ（@media print で切り替えない）
+$print-band-height: 2.5rem;
+
+.print-band {
+    position: relative;
+    border-top: $print-band-height solid var(--print-band-color);
+    margin: 0 0 1.25rem;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.print-band--mypage {
+    --print-band-color: #{$blue-600};
+}
+
+.print-band--intake {
+    --print-band-color: #{$green-600};
+}
+
+// 枠線（帯の色）の上に重ねる文字とアイコン。見出し（.print-title 1.5rem）より小さい太字
+.print-band-label {
+    position: absolute;
+    top: -$print-band-height;
+    left: 0;
+    right: 0;
+    height: $print-band-height;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+}

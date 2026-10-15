@@ -29,6 +29,10 @@
     @endif
 </div>
 
+{{-- 案内を見分ける帯（2026-10 追加。受付アンケート案内〔S-0311〕と取り違えないため）。
+     有効な URL がないときも出す（どちらの案内の画面かが分かるように） --}}
+<x-print-band label="マイページ登録" variant="mypage" icon="person-circle" />
+
 @if($url)
     {{-- 有効な URL あり ---}}
     <h1 class="print-title">マイページ登録のご案内</h1>
