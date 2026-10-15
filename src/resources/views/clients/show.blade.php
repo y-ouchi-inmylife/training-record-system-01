@@ -285,8 +285,10 @@
                             </form>
                         @endif
                         @if($showPrint)
+                            {{-- 表示はオプションの操作なので白抜き（発行すると案内が別タブで開くので、あとで見直すときだけ使う。
+                                 2026-10 変更。設計書 4-4・S-0305「ボタンの色」） --}}
                             <a href="{{ route('client-email-registration-tokens.print', $client) }}"
-                               class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示</a>
+                               class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示</a>
                         @endif
                         @if($showCancel)
                             <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
@@ -406,7 +408,7 @@
                          狭い幅ではボタンと重ならないよう、card-header の flex-wrap で折り返す。 --}}
                     <h6 class="mb-0">ご利用回数@if(! is_null($ticket['remaining']))<span class="ms-2"><x-remaining-count :value="$ticket['remaining']" class="fs-5" /></span>@endif</h6>
                     <div class="d-flex gap-2">
-                        {{-- 青いボタンはこの画面ではすべて塗り（btn-primary。2026-10 変更。設計書 S-0305「ボタンの色」） --}}
+                        {{-- 必ず使う操作なので塗り（btn-primary。2026-10 変更。設計書 S-0305「ボタンの色」） --}}
                         <button type="button" class="btn btn-sm btn-primary"
                                 onclick="window.contractModal.openForCreate()">契約を追加</button>
                         <button type="button" class="btn btn-sm btn-primary"
@@ -570,7 +572,7 @@
                                                 </form>
                                             @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
                                                 <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示</a>
+                                                   class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示</a>
                                                 <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                                         data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
                                                         data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>

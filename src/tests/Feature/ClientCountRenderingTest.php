@@ -778,7 +778,7 @@ class ClientCountRenderingTest extends TestCase
         // 「受付アンケートの案内を表示」は S-0311 を別タブで開き、「取消」の左に置く（2026-10、段階3b）
         $printUrl = preg_quote(route('trainee-intake-survey-tokens.print', $id), '/');
         $this->assertMatchesRegularExpression(
-            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
+            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
             $html
         );
     }
@@ -970,7 +970,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringContainsString('role="group" aria-label="マイページ登録の案内"', $buttons);
         $printUrl = preg_quote(route('client-email-registration-tokens.print', $client), '/');
-        $this->assertMatchesRegularExpression('/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $buttons);
+        $this->assertMatchesRegularExpression('/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $buttons);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#tokenCancellationModal">\s*取消\s*<\/button>/u', $buttons);
         // 古い文字のボタンは出さない
         $this->assertSame(0, preg_match('/>\s*登録案内を(発行|表示|取消)\s*</u', $buttons));
@@ -1105,7 +1105,7 @@ class ClientCountRenderingTest extends TestCase
         return substr($html, 0, $end);
     }
 
-    public function test_青いボタンはすべて塗りにし白抜きの青を残さない(): void
+    public function test_表示のボタンが出ないときは白抜きの青を残さず発行やほかの青いボタンは塗り(): void
     {
         $this->fakeMediaDisk();
         $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
@@ -1130,7 +1130,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('class="btn btn-outline-secondary">&laquo; 会員一覧に戻る</a>', $body);
     }
 
-    public function test_表示のボタンも塗りにし取消とマイページ登録を削除は赤の白抜きのまま(): void
+    public function test_表示のボタンは青の白抜きにし取消とマイページ登録を削除は赤の白抜きのまま(): void
     {
         $this->fakeMediaDisk();
         // 受付アンケートは回答待ち、マイページは登録待ち（期限内）
@@ -1140,9 +1140,11 @@ class ClientCountRenderingTest extends TestCase
 
         $body = $this->bodyBeforeModals($this->get(route('clients.show', $waiting))->assertOk()->getContent());
 
-        $this->assertStringNotContainsString('btn-outline-primary', $body);
-        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>/u', $body);
-        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $body);
+        // 白抜きの青は［…の案内を表示］の 2 つだけ（オプションの操作。2026-10 変更）
+        $this->assertSame(2, substr_count($body, 'btn-outline-primary'));
+        $this->assertStringNotContainsString('btn-primary text-nowrap" target="_blank"', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>/u', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $body);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"/u', $body);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#tokenCancellationModal"/u', $body);
 
