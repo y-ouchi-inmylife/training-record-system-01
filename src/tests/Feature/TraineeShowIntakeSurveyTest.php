@@ -283,6 +283,64 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertSame('受付アンケートの回答も一緒に削除されます。発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
+    // ---- 削除の確認：性格診断（2026-10 追加。要件定義書 6-16-4） ----
+
+    private function addPersonalityResult(): void
+    {
+        DB::table('trainee_personality_diagnosis_results')->insert([
+            'trainee_id' => $this->trainee->id, 'answered_at' => '2026-10-16 15:00:00', 'question_version' => 'v1',
+            'answers' => '{}', 'score_people' => 0, 'score_dogs' => 0, 'score_possessiveness' => 0, 'score_separation' => 0,
+            'score_fear' => 0, 'score_trainability' => 0, 'score_excitability' => 0, 'personality_type' => 'calm',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    private function issuePersonalityToken(): void
+    {
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => bin2hex(random_bytes(16)), 'trainee_id' => $this->trainee->id, 'answered_at' => null,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    public function test_削除の確認_受付アンケートの回答と性格診断の結果の両方があればつないで出す(): void
+    {
+        $this->issueToken('2026-10-16 14:32:00');
+        $this->addResponse();
+        $this->addPersonalityResult();
+        $this->addMeasurements(2);
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_性格診断の結果だけ(): void
+    {
+        $this->addPersonalityResult();
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_性格診断の未回答の案内だけ(): void
+    {
+        $this->issuePersonalityToken();
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('発行済みの性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_すべてあれば消えるものから使えなくなる案内の順(): void
+    {
+        $this->addResponse();
+        $this->issueToken();
+        $this->addPersonalityResult();
+        $this->issuePersonalityToken();
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('受付アンケートの回答と性格診断の結果も一緒に削除されます。発行済みの受付アンケート案内と性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
     // ---- 回答の内容（2026-10 追加。設計書 S-0309「受付アンケートの欄」） ----
 
     public function test_回答済みでも基本情報の回答は欄に出さない(): void

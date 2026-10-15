@@ -58,8 +58,9 @@ class TraineeController extends Controller
     {
         // latestIntakeSurveyResponse と activeIntakeSurveyToken は受付アンケートの欄の状態と、
         // 削除確認の文言に使う（2026-10 追加）。personalityDiagnosisResults は性格診断の欄の結果の一覧
-        // （新しい順。2026-10 追加。何件あってもクエリは 1 本）
-        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults']);
+        // （新しい順。2026-10 追加。何件あってもクエリは 1 本）。personalityDiagnosisResults と activePersonalityDiagnosisToken は
+        // 削除確認の文言にも使う（2026-10 追加）
+        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults', 'activePersonalityDiagnosisToken']);
 
         // 削除確認ダイアログに件数を含めるため、コントローラで数えて渡す。
         $measurementCount = $trainee->measurements->count();
@@ -78,21 +79,29 @@ class TraineeController extends Controller
         // 同じシングルクォート形式で埋め込む。**文言にシングルクォート・改行を
         // 含めないこと**（含めると onsubmit 内の JS 文字列リテラルが壊れる）。
         //
-        // 受付アンケート（2026-10 追加。要件定義書 6-16-4、設計書 S-0309「削除」）：計測値の文の後ろに、
-        // 回答があれば「受付アンケートの回答も一緒に削除されます。」、未回答の案内があれば
-        // 「発行済みの受付アンケート案内も使えなくなります。」をこの順で足し、最後を
-        // 「このトレーニーを削除しますか？」で締める。文と文は区切りなしで続ける
-        // （confirm() では改行が使えないため）。どちらもないときは、これまでの文のまま
-        // （0 件のときの出し方を含めて変えない）。
+        // 受付アンケート・性格診断（2026-10 追加。要件定義書 6-16-4、設計書 S-0309「削除」）：計測値の文の後ろに、
+        // 消えるもの（受付アンケートの回答・性格診断の結果のうち、あるものだけを「と」でつなぎ「〜も一緒に削除されます。」）、
+        // 使えなくなる未回答の案内（受付アンケート案内・性格診断の案内のうち、あるものだけを「と」でつなぎ
+        // 「発行済みの〜も使えなくなります。」）をこの順で足し、最後を「このトレーニーを削除しますか？」で締める。
+        // 文と文は区切りなしで続ける（confirm() では改行が使えないため）。どれもないときは、これまでの文のまま
+        // （0 件のときの出し方を含めて変えない）。2026-10 変更：性格診断の結果・案内を足した
         $measurementSentence = $measurementCount > 0
             ? "このトレーニーには {$measurementCount} 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。"
             : '';
+        $deleted = array_keys(array_filter([
+            '受付アンケートの回答' => $trainee->latestIntakeSurveyResponse !== null,
+            '性格診断の結果' => $trainee->personalityDiagnosisResults->isNotEmpty(),
+        ]));
+        $invalidated = array_keys(array_filter([
+            '受付アンケート案内' => $trainee->activeIntakeSurveyToken !== null,
+            '性格診断の案内' => $trainee->activePersonalityDiagnosisToken !== null,
+        ]));
         $intakeSurveySentence = '';
-        if ($trainee->latestIntakeSurveyResponse !== null) {
-            $intakeSurveySentence .= '受付アンケートの回答も一緒に削除されます。';
+        if ($deleted !== []) {
+            $intakeSurveySentence .= implode('と', $deleted).'も一緒に削除されます。';
         }
-        if ($trainee->activeIntakeSurveyToken !== null) {
-            $intakeSurveySentence .= '発行済みの受付アンケート案内も使えなくなります。';
+        if ($invalidated !== []) {
+            $intakeSurveySentence .= '発行済みの'.implode('と', $invalidated).'も使えなくなります。';
         }
         if ($intakeSurveySentence !== '') {
             $deleteConfirmMessage = $measurementSentence.$intakeSurveySentence.'このトレーニーを削除しますか？';
