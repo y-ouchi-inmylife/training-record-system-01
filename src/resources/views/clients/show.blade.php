@@ -150,11 +150,11 @@
               - メールアドレスなし              → 「マイページ登録の案内を発行」（新規発行）
               - メールアドレス登録待ち（期限内）→ 「マイページ登録の案内を表示」＋「取消」
               - メールアドレス登録待ち（期限切れ）→ 「マイページ登録の案内を発行」（期限切れは未発行と同じ扱い。取消は出さない）
-              - 初回設定待ち（期限内・期限切れ）→ 「登録を削除」
+              - 初回設定待ち（期限内・期限切れ）→ 「マイページ登録を削除」（1 段目の上部ボタン列）
                 （行き止まりを作らないために出す。お客様が間違ったメールアドレスを
                  登録した場合、削除して「メールアドレスなし」に戻せば発行し直せる。
                  期限切れの方がむしろ削除したい場面が多い）
-              - 利用中                          → 「登録を削除」
+              - 利用中                          → 「マイページ登録を削除」（1 段目の上部ボタン列）
              状態判定は段階 4-2 で Client モデルに実装した仕組みを使う。
              これらは 3 段目のメールアドレス列の状態バッジ隣で描画する
              （下の 3 段目参照）。上部 1 段目にはクライアント自体の操作だけを置く。 --}}
@@ -166,7 +166,7 @@
             $showPrint = $status === \App\Models\Client::STATUS_AWAITING_EMAIL && !$expired;
             // 取消は「表示」と同じ条件（登録待ち・期限内）
             $showCancel = $showPrint;
-            // 登録を削除（旧「メールアドレスを削除」）：初回設定待ち（期限内・期限切れの両方）と利用中で出す。
+            // マイページ登録を削除：初回設定待ち（期限内・期限切れの両方）と利用中で出す。
             // 判定は「clients.email が非 NULL」で足りる（この 2 状態で真、他の状態で偽）。
             // サーバー側 API（DELETE /clients/{client}/email）も同じ条件でガードする。
             $showDeleteEmail = in_array($status, [
@@ -174,10 +174,24 @@
                 \App\Models\Client::STATUS_IN_USE,
             ], true);
         @endphp
-        {{-- 1段目: 上部の操作ボタン列（右寄せ）。クライアント自体の操作だけ。
-             メールアドレス関連は 3 段目のバッジ隣に置く（設計書 S-0305「操作ボタンの配置」）。 --}}
-        <div class="d-flex justify-content-end gap-2 mb-2">
+        {{-- 1段目: 上部の操作ボタン列（右寄せ）。会員自体と会員のアカウントの操作。
+             並びは「会員一覧に戻る → マイページ登録を削除 → 編集 → 削除」。マイページ登録の案内の操作（発行・表示・取消）は
+             3 段目のバッジ隣に置く（設計書 S-0305「操作ボタンの配置」）。
+             「マイページ登録を削除」（2026-10 変更。旧「登録を削除」を 3 段目から移した）：案内の発行・取消とは違い、会員の
+             アカウントに対する操作なので、会員の編集・削除と同じこの並びに置く。会員の「削除」（塗りの赤 btn-danger）と
+             区別するため、名前に「マイページ登録」を入れ、枠だけの赤（btn-outline-danger）にする。大きさはこの並びの
+             ほかのボタンに合わせて既定（btn-sm を付けない）。出す条件は今までどおり $showDeleteEmail（初回設定待ち・利用中）。
+             ボタンが 4 つになっても狭い幅ではみ出さないよう、flex-wrap で折り返す（右寄せのまま） --}}
+        <div class="d-flex flex-wrap justify-content-end gap-2 mb-2">
             <a href="{{ route('clients.index') }}" class="btn btn-outline-secondary">&laquo; 会員一覧に戻る</a>
+            @if($showDeleteEmail)
+                {{-- モーダルのタイトル・本文・完了メッセージは変えていない（役割が違うため揃えない —
+                     詳細は設計書 S-0305「ボタンとモーダル・完了メッセージで語彙が違う理由」） --}}
+                <button type="button" class="btn btn-outline-danger text-nowrap"
+                        data-bs-toggle="modal" data-bs-target="#emailDeletionModal">
+                    マイページ登録を削除
+                </button>
+            @endif
             <a href="{{ route('clients.edit', $client) }}" class="btn btn-primary">編集</a>
             @if(auth()->user()->isAdmin())
                 <form method="POST" action="{{ route('clients.destroy', $client) }}" class="d-inline"
@@ -257,7 +271,7 @@
                          ボタンの文字だけで分かるようにし、受付アンケートの案内のボタンと見分けるため。取消は隣の
                          「マイページ登録の案内を表示」と確認〔M03〕の文言で対象が分かる）。読み上げで何の取消かが
                          伝わるよう、案内のボタンが出るときはラッパーを role="group" にして
-                         「マイページ登録の案内」の名前を付ける（「登録を削除」だけの状態では付けない） --}}
+                         「マイページ登録の案内」の名前を付ける（案内のボタンが出ない状態〔初回設定待ち・利用中〕では付けない） --}}
                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"
                          @if($showIssue || $showPrint || $showCancel) role="group" aria-label="マイページ登録の案内" @endif>
                         @if($showIssue)
@@ -276,16 +290,6 @@
                             <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                     data-bs-toggle="modal" data-bs-target="#tokenCancellationModal">
                                 取消
-                            </button>
-                        @endif
-                        @if($showDeleteEmail)
-                            {{-- ボタン名は「登録を削除」（旧「メールアドレスを削除」）。
-                                 理由は screen-design.md S-0305「操作ボタンの配置」参照。
-                                 モーダルのタイトル・本文・完了メッセージは変えていない（役割が
-                                 違うため揃えない — 詳細は同設計書参照）。 --}}
-                            <button type="button" class="btn btn-sm btn-outline-danger"
-                                    data-bs-toggle="modal" data-bs-target="#emailDeletionModal">
-                                登録を削除
                             </button>
                         @endif
                     </div>

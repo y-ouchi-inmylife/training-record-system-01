@@ -993,17 +993,75 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(0, preg_match('/>\s*取消\s*</u', $buttons));
     }
 
-    public function test_利用中なら登録を削除だけを出しまとまりの名前は付けない(): void
+    /** 1 段目の上部ボタン列（右寄せ）の HTML */
+    private function topButtons(string $html): string
+    {
+        // 次の 2 段目（氏名の行）の手前まで
+        $start = strpos($html, '<div class="d-flex flex-wrap justify-content-end gap-2 mb-2">');
+        $this->assertNotFalse($start);
+        $end = strpos($html, '<div class="d-flex align-items-center gap-2 flex-wrap mb-2">', $start);
+        $this->assertNotFalse($end);
+
+        return substr($html, $start, $end - $start);
+    }
+
+    public function test_利用中なら上部の並びにマイページ登録を削除を出しメールアドレスの欄には出さない(): void
     {
         $this->fakeMediaDisk();
+        // 管理者（会員の「削除」も出る）で並びを確かめる
+        $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
+        $admin->id = 100;
+        $admin->exists = true;
+        $this->actingAs($admin, 'web');
         $client = $this->makeClient('0001', '山田');
         $client->forceFill(['email' => 'yamada@example.com', 'password' => 'hashed'])->save();
 
-        $buttons = $this->emailButtons($this->get(route('clients.show', $client))->assertOk()->getContent());
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $top = $this->topButtons($html);
 
-        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger"\s*data-bs-toggle="modal" data-bs-target="#emailDeletionModal">\s*登録を削除\s*<\/button>/u', $buttons);
+        // 並びは「会員一覧に戻る → マイページ登録を削除 → 編集 → 削除」（2026-10 変更）
+        $this->assertMatchesRegularExpression(
+            '/会員一覧に戻る<\/a>\s*<button type="button" class="btn btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#emailDeletionModal">\s*マイページ登録を削除\s*<\/button>\s*'
+            .'<a href="[^"]+" class="btn btn-primary">編集<\/a>.*?<button type="submit" class="btn btn-danger">削除<\/button>/su',
+            $top
+        );
+        // メールアドレス（マイページ）の欄には削除のボタンを出さない。案内のまとまりの名前も付けない
+        $buttons = $this->emailButtons($html);
+        $this->assertStringNotContainsString('削除', $buttons);
+        $this->assertStringNotContainsString('<button', $buttons);
         $this->assertStringNotContainsString('role="group"', $buttons);
-        $this->assertStringNotContainsString('マイページ登録の案内', $buttons);
+        // 「登録を削除」だけの古い名前のボタンはどこにもない
+        $this->assertSame(0, preg_match('/>\s*登録を削除\s*</u', $html));
+        // 確認のモーダル（M02）の文言は今までどおり
+        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="emailDeletionModalLabel">\s*メールアドレスの削除\s*<\/h5>/u', $html);
+        $this->assertStringContainsString('登録されたメールアドレスが削除され、マイページを使えなくなります。<br>', $html);
+    }
+
+    public function test_初回設定待ちでも上部の並びにマイページ登録を削除を出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $client->forceFill(['email' => 'yamada@example.com'])->save();
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('マイページ登録を削除', $this->topButtons($html));
+        $this->assertStringNotContainsString('削除', $this->emailButtons($html));
+    }
+
+    public function test_未登録と登録待ちでは上部にマイページ登録を削除を出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $none = $this->makeClient('0001', '山田');
+        $awaiting = $this->makeClient('0002', '佐藤');
+        $this->emailRegToken($awaiting, now()->addDays(2)->format('Y-m-d H:i:s'));
+
+        foreach ([$none, $awaiting] as $client) {
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+            $this->assertStringNotContainsString('マイページ登録を削除', $html);
+            $this->assertStringContainsString('role="group" aria-label="マイページ登録の案内"', $this->emailButtons($html));
+        }
     }
 
     public function test_上部のメールアドレスのラベルはメールアドレス_マイページ(): void
