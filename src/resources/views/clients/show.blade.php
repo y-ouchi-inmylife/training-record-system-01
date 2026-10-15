@@ -511,9 +511,51 @@
                                         </div>
                                     </a>
                                     <div class="flex-grow-1" style="min-width: 0;">
-                                {{-- 名前のリンク。名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
+                                {{-- 名前の行。右端に受付アンケートのまとまり（「受付アンケート」の文字とボタン）を右寄せで置く
+                                     （2026-10 変更。要件定義書 6-16-8、設計書 S-0305 セクション3「受付アンケート」）。
+                                     - 名前とまとまりは縦の中央でそろえる（align-items-center）。幅が足りないとき（スマホの幅、
+                                       名前が長いとき、回答待ちでボタンが 2 つのとき）は、flex-wrap でまとまりごと名前の下の行に
+                                       折り返し、ms-auto で右寄せのままにする。名前は text-break で長くてもはみ出さない
+                                     - ラベル（col-4）と値（col-8）の表には入れない：ラベル列は写真の枠と並ぶため lg〜xl で狭く
+                                       「受付アンケート」が折り返し、回答待ちではボタンが並ぶため。名前の行の右の空いたところに
+                                       置けば、カードの下に行を足さずに済む（経緯：当初はカードの下端に区切り線つきの全幅の行で
+                                       置いていた）
+                                     - 左の文字は「受付アンケート」だけ：状態はボタンで分かるため、状態の文字・発行日・回答日時は
+                                       出さない。状態はバッジにしない（「回答待ち」はお客様の対応を待つ状態で、トレーナーが対応する
+                                       状態ではないため）
+                                     - 状態は Trainee::intake_survey_status（ClientController::show で
+                                       trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）
+                                     - 「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
+                                       「登録案内を表示」と同じ）。「回答を見る」は S-0309 の暮らしの様子の欄（#intake-survey）へ移る
+                                     - 読み上げでどのトレーニーの操作かが分かるよう、まとまりを role="group" にして
+                                       「{表示名}の受付アンケート」の名前を付ける（ボタンの文字は変えない）。読み上げの順は
+                                       名前 → 受付アンケートのまとまり → 属性 → 計測を追加
+                                     名前のリンク：名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
-                                <h6 class="mb-2"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                    <h6 class="mb-0 text-break"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
+                                    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto small"
+                                         role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
+                                        <span>受付アンケート</span>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
+                                                <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
+                                                </form>
+                                            @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
+                                                <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
+                                                   class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示</a>
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
+                                                        data-intake-survey-trainee-id="{{ $trainee->id }}">案内を取消</button>
+                                            @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+                                                <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
+                                                   class="btn btn-sm btn-outline-primary">回答を見る</a>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。備考は改行を保持（S-0309 と同じ）。
                                      x-detail-cell は使わない（3 列グリッド前提のコンポーネントで
@@ -555,42 +597,6 @@
                                                 onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()">計測を追加</button>
                                     </dd>
                                 </dl>
-                                    </div>
-                                </div>
-                                {{-- 受付アンケートの行（2026-10 追加。要件定義書 6-16-8、設計書 S-0305 セクション3
-                                     「受付アンケート」）。ラベル（col-4）と値（col-8）の表には入れず、写真と右の列の
-                                     横並びの下に、カードの下端の全幅の 1 行で置く（上に薄い区切り線）。ラベル列は
-                                     写真の枠と並ぶため lg〜xl で狭く「受付アンケート」が折り返すこと、回答待ちでは
-                                     ボタンが並ぶことによる。状態はバッジにしない（「回答待ち」はお客様の対応を待つ
-                                     状態で、トレーナーが対応する状態ではないため）。
-                                     状態は Trainee::intake_survey_status（ClientController::show で
-                                     trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）。
-                                     「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
-                                     「登録案内を表示」と同じ）。「回答を見る」は S-0309 の受付アンケートの欄
-                                     （#intake-survey）へ移る（同じタブ）。
-                                     左は「受付アンケート」の文字だけ（2026-10 変更）：状態はボタンで分かるため、状態の文字・
-                                     発行日・回答日時は出さない（行を短くし、トレーニーの情報の邪魔をしないため。日付は S-0309 で
-                                     確かめる）。読み上げでどのトレーニーの操作かが分かるよう、行を role="group" にして
-                                     「{表示名}の受付アンケート」の名前を付ける（ボタンの文字は変えない） --}}
-                                <div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small"
-                                     role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
-                                    <span>受付アンケート</span>
-                                    <div class="d-flex flex-wrap gap-2 ms-auto">
-                                        @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                                            <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
-                                            </form>
-                                        @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
-                                            <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
-                                               class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示</a>
-                                            <button type="button" class="btn btn-sm btn-outline-danger"
-                                                    data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
-                                                    data-intake-survey-trainee-id="{{ $trainee->id }}">案内を取消</button>
-                                        @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
-                                            <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
-                                               class="btn btn-sm btn-outline-primary">回答を見る</a>
-                                        @endif
                                     </div>
                                 </div>
                             </div>

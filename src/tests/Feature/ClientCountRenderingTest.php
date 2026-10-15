@@ -571,7 +571,7 @@ class ClientCountRenderingTest extends TestCase
             $url = preg_quote(route('trainees.show', $id), '/');
             $this->assertMatchesRegularExpression(
                 '/<div class="d-flex align-items-start gap-3">\s*<a href="'.$url.'" class="flex-shrink-0 text-decoration-none"[^>]*>.*?<\/a>\s*'
-                .'<div class="flex-grow-1" style="min-width: 0;">\s*<h6 class="mb-2"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
+                .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
                 $html,
                 $name
             );
@@ -594,13 +594,13 @@ class ClientCountRenderingTest extends TestCase
         $pattern = '/<div class="d-flex align-items-start gap-3">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'" class="flex-shrink-0 text-decoration-none"\s*>.*?<\/a>\s*'
             .'<div class="flex-grow-1" style="min-width: 0;">\s*'
-            .'<h6 class="mb-2"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
+            .'<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
         $this->assertMatchesRegularExpression($pattern, $html);
 
         // 写真がないまとまりも、左に「写真なし」の枠のリンク、右に名前・項目の列（位置がそろう）
         $this->assertMatchesRegularExpression(
             '/<div class="d-flex align-items-start gap-3">\s*<a href="[^"]+" class="flex-shrink-0 text-decoration-none"\s*aria-label="たまの写真なし。トレーニー詳細へ"\s*>.*?写真なし<\/span>\s*<\/div>\s*<\/a>\s*'
-            .'<div class="flex-grow-1" style="min-width: 0;">\s*<h6 class="mb-2"><a href="[^"]+">たま<\/a><\/h6>/su',
+            .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="[^"]+">たま<\/a><\/h6>/su',
             $html
         );
 
@@ -667,7 +667,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $url = preg_quote(route('trainees.show', $id), '/');
-        $this->assertMatchesRegularExpression('/<h6 class="mb-2"><a href="'.$url.'" class="text-muted">名前未登録<\/a><\/h6>/u', $html);
+        $this->assertMatchesRegularExpression('/<h6 class="mb-0 text-break"><a href="'.$url.'" class="text-muted">名前未登録<\/a><\/h6>/u', $html);
         $this->assertStringContainsString('aria-label="名前未登録の写真なし。トレーニー詳細へ"', $html);
         // リンクの文字が空にならない
         $this->assertDoesNotMatchRegularExpression('/<a href="'.$url.'"[^>]*><\/a>/u', $html);
@@ -681,7 +681,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<h6 class="mb-2"><a href="'.route('trainees.show', $id).'">ポチ</a></h6>', $html);
+        $this->assertStringContainsString('<h6 class="mb-0 text-break"><a href="'.route('trainees.show', $id).'">ポチ</a></h6>', $html);
     }
 
     // ---- 受付アンケートの行（2026-10 追加。設計書 S-0305 セクション3「受付アンケート」） ----
@@ -695,13 +695,19 @@ class ClientCountRenderingTest extends TestCase
     }
 
     /**
-     * 受付アンケートの行（トレーニーカードの下端の 1 行）を取り出し、左が「受付アンケート」の文字だけで、
+     * 受付アンケートのまとまり（名前の行の右）を取り出し、左が「受付アンケート」の文字だけで、
      * 状態の文字・発行日・回答日時が出ていないことを確かめる（2026-10 変更。状態はボタンで分かる）。
-     * 行には、読み上げ用に「{表示名}の受付アンケート」の名前を付ける
+     * まとまりは名前の見出しと同じ行の要素（名前の行の囲み）の中に置き、読み上げ用に
+     * 「{表示名}の受付アンケート」の名前を付ける
      */
     private function assertIntakeRowHasNoStatusText(string $html, array $dates = [], string $name = 'ポチ'): void
     {
-        $this->assertSame(1, preg_match('/<div class="border-top mt-2 pt-2 d-flex[^"]*"\s*role="group" aria-label="'.preg_quote($name, '/').'の受付アンケート">(.*?)<\/div>\s*<\/div>/su', $html, $m));
+        $this->assertSame(1, preg_match(
+            '/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break">.*?<\/h6>\s*'
+            .'<div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto small"\s*role="group" aria-label="'.preg_quote($name, '/').'の受付アンケート">(.*?)<\/div>\s*<\/div>\s*<\/div>/su',
+            $html,
+            $m
+        ));
         $row = $m[1];
         $this->assertMatchesRegularExpression('/^\s*<span>受付アンケート<\/span>/u', $row);
         foreach (array_merge(['：', '未発行', '回答待ち', '回答済み', '発行）'], $dates) as $text) {
@@ -827,7 +833,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('data-intake-survey-trainee-id="'.$b.'"', $html);
     }
 
-    public function test_受付アンケートの行は写真と右の列の横並びの下に置く(): void
+    public function test_受付アンケートは名前の行の右に置き下の行はなくした(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -835,11 +841,14 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 計測を追加のボタン（右の列の最後）より後、次のトレーニー・カードの下部より前
-        $posMeasure = strpos($html, '>計測を追加</button>');
-        $posRow = strpos($html, '<div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small"');
-        $this->assertNotFalse($posRow);
-        $this->assertGreaterThan($posMeasure, $posRow);
-        $this->assertLessThan(strpos($html, 'トレーニーを追加'), $posRow);
+        // 名前の見出しのすぐ後ろ（同じ行の要素の中）で、属性の表（犬種など）より前
+        $posName = strpos($html, '>ポチ</a></h6>');
+        $posGroup = strpos($html, 'aria-label="ポチの受付アンケート"');
+        $this->assertNotFalse($posGroup);
+        $this->assertGreaterThan($posName, $posGroup);
+        $this->assertLessThan(strpos($html, '<dl class="row mb-0 small">'), $posGroup);
+        // 区切り線つきの下の行はない
+        $this->assertStringNotContainsString('border-top mt-2 pt-2', $html);
+        $this->assertSame(1, substr_count($html, '<span>受付アンケート</span>'));
     }
 }
