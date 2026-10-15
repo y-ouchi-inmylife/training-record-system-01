@@ -240,6 +240,47 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('聡明・スマート優等生タイプ', $card);
     }
 
+    /** 回の中のレーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
+    private function radarData(string $resultHtml): array
+    {
+        $this->assertSame(1, preg_match('/<canvas role="img" aria-label="レーダーチャート（点数は隣の表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $resultHtml, $m));
+
+        return json_decode(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    public function test_開いた回にレーダーチャートのcanvasがあり表と同じ値を渡す(): void
+    {
+        $old = $this->addResult('past-2', '2026-07-02 10:00:00');
+        $new = $this->addResult('past-1', '2026-10-15 09:00:00');
+        $categories = array_keys(PersonalityDiagnosisQuestions::categories());
+        $display = fn (string $name) => array_map(fn ($c) => $this->fixtureCase($name)['expected']['display'][$c], $categories);
+
+        $html = $this->page();
+
+        // 今回と前回（表と同じ表示の値。小数第 1 位）
+        $this->assertSame([
+            'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
+            'current' => $display('past-1'),
+            'previous' => $display('past-2'),
+        ], $this->radarData($this->resultBody($html, $new)));
+        // いちばん古い回は前回なし
+        $this->assertSame([
+            'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
+            'current' => $display('past-2'),
+            'previous' => null,
+        ], $this->radarData($this->resultBody($html, $old)));
+        // グラフの JS を読み込む
+        $this->assertStringContainsString('personality-radar', $html);
+    }
+
+    public function test_結果がなければレーダーチャートのJSを読み込まない(): void
+    {
+        $html = $this->page();
+
+        $this->assertStringNotContainsString('data-personality-radar', $html);
+        $this->assertStringNotContainsString('personality-radar', $html);
+    }
+
     public function test_会員詳細の性格診断のリンクの飛び先とこの欄のidが一致する(): void
     {
         // 会員詳細（S-0305）のテンプレートの「性格診断」のリンクの飛び先（描いたときの href は ClientCountRenderingTest で確かめている）

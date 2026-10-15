@@ -266,6 +266,12 @@
                         $previousDisplay = $previous?->displayScores();
                         $questions = \App\Support\PersonalityDiagnosisQuestions::questionsFor($result->question_version);
                         $collapseId = 'personality-diagnosis-result-'.$result->id;
+                        // レーダーチャートに渡す値：表と同じ表示の値（小数第 1 位）。前回がない回は null
+                        $radarData = [
+                            'labels' => array_values($pdCategories),
+                            'current' => array_values($display),
+                            'previous' => $previousDisplay === null ? null : array_values($previousDisplay),
+                        ];
                     @endphp
                     <div class="list-group-item">
                         <button type="button" class="btn btn-link text-start text-decoration-none p-0 w-100 d-flex flex-wrap gap-2 align-items-center"
@@ -276,6 +282,12 @@
                         </button>
                         <div class="collapse{{ $loop->first ? ' show' : '' }} mt-3" id="{{ $collapseId }}" data-personality-diagnosis-result>
                             <div class="row g-3">
+                                {{-- レーダーチャート（この回と前回を重ねる。personality-radar.js）。グラフは見た目のためのもので、
+                                     同じ数字を隣の点数の表に出すので、読み上げは role="img" と短い説明だけ。スマホの幅では表と縦に積む --}}
+                                <div class="col-md-6">
+                                    <canvas role="img" aria-label="レーダーチャート（点数は隣の表のとおり）"
+                                            data-personality-radar="{{ json_encode($radarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
+                                </div>
                                 <div class="col-md-6">
                                     <table class="table table-sm mb-0">
                                         <thead>
@@ -329,6 +341,11 @@
          S-0309 に戻る。ID を一意化した辞書形式の経緯は設計書 S-0309「計測値モーダル」参照。 --}}
     @include('trainees._measurement-modal', ['trainee' => $trainee])
 </div>
+
+{{-- 性格診断のレーダーチャート用スクリプト（結果があるときだけ読み込む。2026-10 追加） --}}
+@if($trainee->personalityDiagnosisResults->isNotEmpty())
+    @vite('resources/js/personality-radar.js')
+@endif
 
 {{-- 体重推移グラフ用スクリプト（Chart.js を npm でビルドに含める。会員側 S-1402 と同じ
      条件付きの書き方。計測値が 0 件なら canvas を出さないため、スクリプトも読ませない）。 --}}
