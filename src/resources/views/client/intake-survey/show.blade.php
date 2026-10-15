@@ -114,7 +114,7 @@
                         <span class="ms-2" data-birthday-display aria-live="polite"></span>
                     </div>
                     <x-form-error field="birth_date" block />
-                    <div id="birth_date-help" class="form-text">分かるところだけで構いません。年はおおよそでも大丈夫です。</div>
+                    <div id="birth_date-help" class="form-text">年だけ、または年と月だけでも入力できます。</div>
                 </div>
 
                 {{-- 去勢・避妊が愛犬の基本情報の最後。下に区切り線を引く（「暮らしの様子」との境目） --}}

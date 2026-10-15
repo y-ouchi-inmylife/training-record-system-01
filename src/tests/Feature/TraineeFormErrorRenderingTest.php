@@ -135,7 +135,7 @@ class TraineeFormErrorRenderingTest extends TestCase
         }
         $this->assertStringNotContainsString('name="birth_date"', $html);
         $this->assertStringNotContainsString('datepicker', $html);
-        $this->assertStringContainsString('分かるところだけで構いません。年はおおよそでも大丈夫です。', $html);
+        $this->assertStringContainsString('年だけ、または年と月だけでも入力できます。', $html);
 
         // 単位の「年」「月」「日」が欄の右に出る（欄 → 単位の順）
         $this->assertGreaterThan(mb_strpos($html, 'id="birth_year"'), mb_strpos($html, '<span>年</span>'));
@@ -162,7 +162,7 @@ class TraineeFormErrorRenderingTest extends TestCase
         // まとまりの下（3 つ目の欄より後、説明文より前）に block で出る
         $posError = mb_strpos($html, '誕生日の日付を確認してください。');
         $this->assertGreaterThan(mb_strpos($html, 'id="birth_day"'), $posError);
-        $this->assertLessThan(mb_strpos($html, '分かるところだけで構いません。'), $posError);
+        $this->assertLessThan(mb_strpos($html, '年だけ、または年と月だけでも入力できます。'), $posError);
         $this->assertStringContainsString('invalid-feedback d-block', $html);
     }
 
@@ -180,6 +180,23 @@ class TraineeFormErrorRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/id="birth_year"[^>]*value="2020"/s', $html);
         $this->assertMatchesRegularExpression('/id="birth_month"[^>]*value="3"/s', $html);
         $this->assertMatchesRegularExpression('/id="birth_day"[^>]*value=""/s', $html);
+    }
+
+    /**
+     * 誕生日の説明文（2026-10 変更）：年だけ・年月だけでも入力できることが分かる文。登録・編集の両方で出す
+     * （受付アンケートの回答画面 S-1413 も同じ文。ClientIntakeSurveyShowTest で確かめる）
+     */
+    public function test_誕生日の説明文は登録と編集の両方で新しい文(): void
+    {
+        $trainee = new Trainee();
+        $trainee->name = 'モモ';
+
+        foreach ([$this->renderForm([]), $this->renderForm([], isEdit: true, trainee: $trainee)] as $view) {
+            $html = $view->__toString();
+
+            $this->assertStringContainsString('<div id="birth_date-help" class="form-text">年だけ、または年と月だけでも入力できます。</div>', $html);
+            $this->assertStringNotContainsString('分かるところだけで構いません', $html);
+        }
     }
 
     /** エラーで戻ったときは、入力した値（old）が 3 つの欄に残る */

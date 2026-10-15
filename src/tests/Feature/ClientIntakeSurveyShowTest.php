@@ -269,7 +269,8 @@ class ClientIntakeSurveyShowTest extends TestCase
             $this->assertMatchesRegularExpression('/id="birth_'.$part.'" name="birth_'.$part.'" inputmode="numeric" maxlength="'.$max.'" data-birthday-part="'.$part.'"/u', $html);
         }
         $this->assertStringContainsString('<span class="ms-2" data-birthday-display aria-live="polite"></span>', $html);
-        $this->assertStringContainsString('<div id="birth_date-help" class="form-text">分かるところだけで構いません。年はおおよそでも大丈夫です。</div>', $html);
+        $this->assertStringContainsString('<div id="birth_date-help" class="form-text">年だけ、または年と月だけでも入力できます。</div>', $html);
+        $this->assertStringNotContainsString('分かるところだけで構いません', $html);
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*trainee-birthday-input[^"]*\.js"/u', $html);
     }
 
