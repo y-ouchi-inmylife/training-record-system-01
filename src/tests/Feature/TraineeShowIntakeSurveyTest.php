@@ -15,8 +15,8 @@ use Tests\TestCase;
 /**
  * トレーニー詳細（S-0309）の暮らしの様子の欄（受付アンケートの回答）と、削除の確認の文言（2026-10 追加）。
  *
- * - 欄は回答があるときだけ出し、見出しは「暮らしの様子」。状態の文字・日付は出さない（2026-10 変更。
- *   案内の状態は会員詳細のボタンで分かるため）。未発行・回答待ちのときは欄を出さない
+ * - 欄の見出しは「暮らしの様子」。状態の文字・日付は出さない（2026-10 変更。案内の状態は会員詳細のボタンで
+ *   分かるため）。未発行・回答待ちのときは、本文に「（未回答）」とだけ出す
  * - 欄はカードに id="intake-survey" と scroll-margin-top を付ける（会員詳細の「回答を見る」の飛び先）
  * - 発行・表示・取消のボタン・取消モーダル・欄の中の完了メッセージは置かない（操作は会員詳細だけ）
  * - 削除の確認：計測値の文の後ろに、回答があれば回答の文、未回答の案内があれば案内の文をこの順で足し、
@@ -139,13 +139,23 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString(route('trainee-intake-survey-tokens.store', $this->trainee), $html);
     }
 
-    /** 欄そのものが出ていないこと（見出し・状態の文字・会員詳細への案内も出ない） */
-    private function assertNoIntakeSurveyCard(string $html): void
+    /**
+     * 回答がないときの欄：見出し「暮らしの様子」と、本文に「（未回答）」の 1 行だけ（2026-10 変更）。
+     * 設問文・「●」・状態の文字・発行日・会員詳細への案内は出さない。id と scroll-margin-top は回答済みと同じ
+     */
+    private function assertUnansweredCard(string $html): void
     {
-        $this->assertStringNotContainsString('id="intake-survey"', $html);
-        $this->assertStringNotContainsString('暮らしの様子', $html);
-        // 「受付アンケート」は削除の確認の文（「発行済みの受付アンケート案内も…」）には出るため、見出しの形で確かめる
-        $this->assertStringNotContainsString('>受付アンケート<', $html);
+        $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
+        $card = $this->intakeCard($html);
+        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">暮らしの様子<\/h6>\s*<\/div>\s*<div class="card-body">\s*<p class="mb-0 text-muted">（未回答）<\/p>\s*<\/div>/u', $card);
+        $this->assertSame(1, substr_count($card, '（未回答）'));
+        $this->assertStringNotContainsString('data-intake-survey-answers', $card);
+        $this->assertStringNotContainsString('●', $card);
+        foreach (TraineeIntakeSurveyResponse::questions() as $question) {
+            $this->assertStringNotContainsString($question['question'], $card);
+        }
+        // 「受付アンケート」は削除の確認の文（「発行済みの受付アンケート案内も…」）には出るため、欄の中で確かめる
+        $this->assertStringNotContainsString('受付アンケート', $card);
         $this->assertStringNotContainsString('未発行', $html);
         $this->assertStringNotContainsString('受付アンケートの案内はまだ発行していません。', $html);
         $this->assertStringNotContainsString('回答待ち', $html);
@@ -153,21 +163,21 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString('会員詳細から行えます', $html);
     }
 
-    public function test_未発行なら欄を出さない(): void
+    public function test_未発行なら見出しと未回答だけを出す(): void
     {
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertNoIntakeSurveyCard($html);
+        $this->assertUnansweredCard($html);
         $this->assertNoOperations($html);
     }
 
-    public function test_回答待ちなら欄を出さない(): void
+    public function test_回答待ちなら見出しと未回答だけを出す(): void
     {
         $this->issueToken();
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertNoIntakeSurveyCard($html);
+        $this->assertUnansweredCard($html);
         $this->assertNoOperations($html);
     }
 
@@ -337,7 +347,8 @@ class TraineeShowIntakeSurveyTest extends TestCase
 
         $this->assertStringNotContainsString('data-intake-survey-basics', $html);
         $this->assertStringNotContainsString('data-intake-survey-answers', $html);
-        $this->assertStringNotContainsString('（未回答）', $html);
+        // 「（未回答）」は欄の本文の 1 行だけ
+        $this->assertSame(1, substr_count($html, '（未回答）'));
     }
 
     public function test_回答が複数件あれば最新の1件を出す(): void

@@ -185,9 +185,11 @@
     {{-- 暮らしの様子の欄（受付アンケートの回答。2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
          「暮らしの様子の欄」）。計測値のカードの下に置く（毎日使う計測値を上に残し、一度きりの回答は下に置くため）。
          - 欄は回答の中身（自由記述）を読むためのもの。案内の状態は会員詳細のボタンで分かるため、ここでは状態・日付を
-           出さず、回答がないとき（未発行・回答待ち）は欄を出さない（2026-10 変更。当初は見出し「受付アンケート」の
-           欄で、状態の文字・発行日・回答日時と「案内の発行・取消は会員詳細から行えます。」を出していた）。
-           見出しは回答画面（S-1413）の小見出しと同じ「暮らしの様子」
+           出さず、回答がないとき（未発行・回答待ち）は本文に「（未回答）」とだけ出す（設問文は出さない。見た目は
+           回答済みの空欄の「（未回答）」と同じ text-muted）。2026-10 変更：当初は見出し「受付アンケート」の欄で、
+           状態の文字・発行日・回答日時と「案内の発行・取消は会員詳細から行えます。」を出していた。
+           見出しは回答画面（S-1413）の小見出しと同じ「暮らしの様子」で、回答の有無で変えない
+         - 回答がないときも、欄の id と scroll-margin-top は回答済みのときと同じに付ける（欄の作りを 1 つにそろえる）
          - 発行・表示・取消のボタン、取消モーダル（S-0305-M06）は置かない。受付アンケート案内の操作は会員詳細
            （S-0305）だけで行う（要件定義書 6-16-8 備考）
          - 回答があるかは Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
@@ -204,15 +206,15 @@
            id は変えない）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
            余白 16px を足した 72px（4.5rem） --}}
-    @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
-        @php
-            $intakeResponse = $trainee->latestIntakeSurveyResponse;
-        @endphp
-        <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
-            <div class="card-header">
-                <h6 class="mb-0">暮らしの様子</h6>
-            </div>
-            <div class="card-body">
+    <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
+        <div class="card-header">
+            <h6 class="mb-0">暮らしの様子</h6>
+        </div>
+        <div class="card-body">
+            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+                @php
+                    $intakeResponse = $trainee->latestIntakeSurveyResponse;
+                @endphp
                 <dl class="mb-0" data-intake-survey-answers>
                     @foreach(\App\Models\TraineeIntakeSurveyResponse::questions() as $column => $question)
                         <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
@@ -223,9 +225,11 @@
                         @endif
                     @endforeach
                 </dl>
-            </div>
+            @else
+                <p class="mb-0 text-muted">（未回答）</p>
+            @endif
         </div>
-    @endif
+    </div>
 
     {{-- 計測値の登録・編集モーダル（登録・編集で共用）。
          $returnTo は明示せず既定値 'trainee' を使う（S-0309 内で登録・編集した後は
