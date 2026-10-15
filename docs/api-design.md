@@ -2046,17 +2046,15 @@ POST /training-records に以下を追加する。
 | birth_day | string | | nullable（同上） | 誕生日（日）。入れる場合は年・月が必須 |
 | neuter_status | string | | nullable, in:neutered,not_neutered,unknown | 去勢・避妊（している／していない／不明） |
 | note | string | | nullable, string | 備考 |
-| issue_intake_survey | string | | nullable | **登録のときだけ**。「受付アンケートの案内を発行する」チェックボックス。チェックがオフのときはブラウザから送られないため、**送られたときだけ発行する**（画面の初期値はオン） |
 
 - 誕生日の 3 項目は、FormRequest の `after()` などで次の順に検証し、最初に当てはまった 1 つだけを、1 つにまとめたキーで返す（文言は screen-design.md S-0308「バリデーションチェック」）：数字であること → 月は 1〜12 → 月があるなら年がある → 日があるなら年・月がある → 3 つそろったら実在する日付 → 未来でない（年だけなら今年以前、年・月までなら今月以前、年・月・日なら今日以前）→ 年は今年から 30 年前まで
 - 同じルールを、入力中の年齢表示（JS）でも使う（requirements.md 6-16「年齢の表示規則」）
 
-**処理**（登録で `issue_intake_survey` が送られた場合）:
-- トレーニーの登録と、受付アンケート用 URL のトークンの作成を 1 つのトランザクションで行う（作り方は下の `POST /trainees/{trainee}/intake-survey-tokens` と同じ）
-- アクセスログは `create_trainee` の 1 件だけになる（ルート単位で記録するため。発行の操作種別は付かない）
+**処理**:
+- 登録では受付アンケート案内を発行しない（**2026-10 変更**。案内の発行は S-0305 の［案内を発行］〔`POST /trainees/{trainee}/intake-survey-tokens`〕だけで行う。requirements.md 6-16-1）。ほかのパラメータ（以前の `issue_intake_survey` など）が送られてきても使わない
 
 **レスポンス**:
-- 登録成功：`redirect('/clients/{client}')`（S-0305）。完了メッセージは、案内を発行した場合「トレーニーを登録し、受付アンケートの案内を発行しました。」、発行しない場合は従来どおり
+- 登録成功：`redirect('/clients/{client}')`（S-0305）。完了メッセージは「トレーニーを登録しました。」
 - 更新成功：従来どおり
 - バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ
 
