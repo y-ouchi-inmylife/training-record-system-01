@@ -62,20 +62,19 @@ class TraineeIntakeSurveyResponseTest extends TestCase
         foreach ($questions as $column => $question) {
             $this->assertContains($column, (new TraineeIntakeSurveyResponse)->getFillable());
             $this->assertNotSame('', $question['question']);
-            $this->assertCount(2, $question['examples']);
+            // 例文は持たない（2026-10 変更。回答を例文に誘導しないため）
+            $this->assertSame(['label', 'question'], array_keys($question));
         }
     }
 
-    public function test_設問文と例文は要件定義書のとおり(): void
+    public function test_設問文は要件定義書のとおり(): void
     {
-        $wish = TraineeIntakeSurveyResponse::questions()['wish'];
+        $questions = TraineeIntakeSurveyResponse::questions();
 
-        $this->assertSame('日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？', $wish['question']);
-        $this->assertSame('インターホンが鳴るたびに激しく吠えるのを、もう少し落ち着かせたい', $wish['examples'][0]);
-        $this->assertSame(
-            '健康診断で『左後ろ足のパテラ（膝蓋骨脱臼）がグレード2』と言われているので、足腰に負担をかけたくない',
-            TraineeIntakeSurveyResponse::questions()['health_concerns']['examples'][1]
-        );
+        $this->assertSame('日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？', $questions['wish']['question']);
+        $this->assertSame('最近の様子で、ふと気になったことや、印象に残っている出来事があれば教えてください。', $questions['recent_events']['question']);
+        $this->assertSame('これから一緒に、どんな楽しいことをしたいですか？『理想の毎日』を聞かせてください。', $questions['ideal_days']['question']);
+        $this->assertSame('体のことで気になることや、お医者様から言われていることがあれば教えてください。', $questions['health_concerns']['question']);
     }
 
     public function test_トレーニーとトークンへのひも付け(): void

@@ -133,24 +133,26 @@
                     <x-form-error field="neuter_status" block />
                 </div>
 
-                <h2 class="fs-6 fw-bold mb-2">暮らしの様子</h2>
-                <p class="mb-3">どれも任意です。思いつくことを自由にお書きください。</p>
+                {{-- 小見出し「暮らしの様子」の同じ行の後ろに、控えめなカッコ書き（太字にしない・少し小さく・色を落とす。
+                     fw-normal small text-muted）。カッコ書きは見出しの一部として読まれる。2026-10 変更：当初は小見出しの
+                     下に「どれも任意です。思いつくことを自由にお書きください。」の 1 行を置いていた（入力欄に必須の「*」が
+                     ないので、任意であることは伝わる。設計書 S-1413） --}}
+                <h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことを自由にお書きください。）</span></h2>
 
-                {{-- 自由記述 4 欄。設問文（ラベル）と例文（.form-text）は TraineeIntakeSurveyResponse::questions()
-                     の 1 か所から（S-0309 の回答の表示と共用）。rows="4" で、縦方向にだけ広げられる
-                     （textarea の resize: vertical は Bootstrap の既定〔_reboot.scss〕） --}}
+                {{-- 自由記述 4 欄。設問文（ラベル）は TraineeIntakeSurveyResponse::questions() の 1 か所から
+                     （S-0309 の回答の表示と共用）。rows="4" で、縦方向にだけ広げられる
+                     （textarea の resize: vertical は Bootstrap の既定〔_reboot.scss〕）。
+                     - 設問の先頭の「●」は見た目の印。aria-hidden="true" の要素にして読み上げでは読まない
+                       （ラベルの読み上げは設問文だけになる）。ラベルを d-flex にし、設問文を別の要素にして、
+                       折り返したときに 2 行目が「●」の右から始まるようにする（ぶら下げ）。2026-10 追加
+                     - 例文は出さない（2026-10 変更。お客様の回答を例文に誘導してしまうおそれがあるため。当初は
+                       入力欄の下に例文 2 つを .form-text で出していた） --}}
                 @foreach($questions as $column => $question)
                     <div class="mb-3">
-                        <label for="{{ $column }}" class="form-label">{{ $question['question'] }}</label>
+                        <label for="{{ $column }}" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></label>
                         <textarea class="form-control @error($column) is-invalid @enderror"
-                                  id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="2000"
-                                  aria-describedby="{{ $column }}-examples">{{ old($column) }}</textarea>
+                                  id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="2000">{{ old($column) }}</textarea>
                         <x-form-error :field="$column" />
-                        <div id="{{ $column }}-examples" class="form-text">
-                            @foreach($question['examples'] as $example)
-                                <div>例：「{{ $example }}」</div>
-                            @endforeach
-                        </div>
                     </div>
                 @endforeach
 

@@ -192,8 +192,9 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringNotContainsString('>愛犬のこと<', $html);
         $this->assertSame(1, substr_count($html, '<h2 '));
         $this->assertMatchesRegularExpression('/novalidate>\s*<input type="hidden" name="_token"[^>]*>\s*<div class="mb-3">\s*<label for="name"/u', $html);
-        $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-2">暮らしの様子</h2>', $html);
-        $this->assertStringContainsString('どれも任意です。思いつくことを自由にお書きください。', $html);
+        // 「暮らしの様子」の同じ行の後ろに控えめなカッコ書き。「どれも任意です。…」の 1 行はなくした（2026-10 変更）
+        $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことを自由にお書きください。）</span></h2>', $html);
+        $this->assertStringNotContainsString('どれも任意です', $html);
         // 区切り線は 1 本だけ（去勢・避妊のまとまりの下）
         $this->assertSame(1, substr_count($html, 'border-bottom'));
         $this->assertLessThan(strpos($html, '暮らしの様子'), strpos($html, 'border-bottom'));
@@ -274,7 +275,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*trainee-birthday-input[^"]*\.js"/u', $html);
     }
 
-    public function test_自由記述は設問文をラベルに例文を下に出す(): void
+    public function test_自由記述は設問文の先頭に読み上げない印を付け例文は出さない(): void
     {
         $this->traineeWithToken('モモ');
 
@@ -282,13 +283,15 @@ class ClientIntakeSurveyShowTest extends TestCase
 
         $positions = [];
         foreach (TraineeIntakeSurveyResponse::questions() as $column => $question) {
-            $this->assertStringContainsString('<label for="'.$column.'" class="form-label">'.$question['question'].'</label>', $html);
+            // 設問の先頭に「●」。aria-hidden で読み上げでは読まず、設問文は別の要素（折り返しは「●」の右から）
+            $this->assertStringContainsString('<label for="'.$column.'" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>'.$question['question'].'</span></label>', $html);
             $this->assertMatchesRegularExpression('/<textarea class="form-control\s*"\s+id="'.$column.'" name="'.$column.'" rows="4" maxlength="2000"/u', $html);
-            foreach ($question['examples'] as $example) {
-                $this->assertStringContainsString('<div>例：「'.e($example).'」</div>', $html);
-            }
             $positions[] = strpos($html, 'id="'.$column.'"');
         }
+        // 例文は出さない（2026-10 変更。回答を例文に誘導しないため）
+        $this->assertStringNotContainsString('例：', $html);
+        $this->assertStringNotContainsString('-examples', $html);
+        $this->assertSame(4, substr_count($html, '<span class="me-1" aria-hidden="true">●</span>'));
         // こうなったらいいな → 最近の様子 → 理想の毎日 → 体のこと の順
         $sorted = $positions;
         sort($sorted);

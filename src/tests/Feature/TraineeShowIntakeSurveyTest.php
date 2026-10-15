@@ -321,8 +321,9 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('recent_events').'<\/dt>\s*<dd class="mb-3 text-muted">（未回答）<\/dd>/u', $html);
         $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('ideal_days').'<\/dt>\s*<dd class="mb-3" style="white-space: pre-wrap;">ドッグランで遊びたい<\/dd>/u', $html);
         $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('health_concerns').'<\/dt>\s*<dd class="mb-0 text-muted">（未回答）<\/dd>/u', $html);
-        // 例文は回答の表示には出さない
-        $this->assertStringNotContainsString($questions['wish']['examples'][0], $html);
+        // 回答の表示は設問文と回答の対だけ（「●」も例文も出さない）
+        $this->assertStringNotContainsString('例：', $html);
+        $this->assertStringNotContainsString('●', $html);
     }
 
     public function test_回答の内容は受付アンケートの欄の中に出し編集や削除の操作は置かない(): void
