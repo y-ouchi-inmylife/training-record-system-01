@@ -87,14 +87,19 @@ class TraineeShowIntakeSurveyTest extends TestCase
         ], $attributes));
     }
 
-    /** 回答した基本情報の表の 1 行（ラベルと値） */
-    private function assertBasicRow(string $html, string $label, string $value, bool $unanswered = false): void
+    /**
+     * 受付アンケートの欄（カード）の HTML だけを取り出す。画面上部のトレーニーの情報（名前・犬種など）と
+     * 見分けるため、確かめる範囲を欄の中に絞る。欄のすぐ後ろは計測値のモーダル
+     */
+    private function intakeCard(string $html): string
     {
-        $class = $unanswered ? 'col-8 col-md-10 mb-1 text-muted' : 'col-8 col-md-10 mb-1';
-        $this->assertMatchesRegularExpression(
-            '/<dt class="col-4 col-md-2 fw-normal text-muted">'.preg_quote($label, '/').'<\/dt>\s*<dd class="'.$class.'">'.preg_quote($value, '/').'<\/dd>/u',
-            $html
-        );
+        $start = strpos($html, 'id="intake-survey"');
+        $this->assertNotFalse($start);
+        $card = substr($html, $start);
+        $end = strpos($card, 'id="measurementModal-');
+        $this->assertNotFalse($end);
+
+        return substr($card, 0, $end);
     }
 
     private function addMeasurements(int $count): void
@@ -254,9 +259,10 @@ class TraineeShowIntakeSurveyTest extends TestCase
 
     // ---- 回答の内容（2026-10 追加。設計書 S-0309「受付アンケートの欄」） ----
 
-    public function test_回答の内容を答えたとおりに出す(): void
+    public function test_回答済みでも基本情報の回答は欄に出さない(): void
     {
-        // トレーニーの現在の値（犬種なし）と違う、答えたとおりの内容を出す
+        // 基本情報の回答はトレーニーの基本情報に反映済みで、画面上部と重なるため出さない（2026-10 変更）
+        $this->trainee->update(['breed' => '柴']);
         $this->addResponse('2026-10-16 14:32:00', [
             'name' => 'モモ', 'breed' => 'トイプードル', 'sex' => 'female',
             'birth_year' => 2022, 'birth_month' => 3, 'neuter_status' => 'unknown',
@@ -264,46 +270,20 @@ class TraineeShowIntakeSurveyTest extends TestCase
         ]);
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+        $card = $this->intakeCard($html);
 
-        $this->assertStringContainsString('<p class="mb-3">回答済み（2026/10/16 14:32）</p>', $html);
-        $this->assertBasicRow($html, '名前', 'モモ');
-        $this->assertBasicRow($html, '犬種', 'トイプードル');
-        $this->assertBasicRow($html, '性別', '女の子');
-        // 誕生日は日付の部分だけ（年齢を付けない）
-        $this->assertBasicRow($html, '誕生日', '2022年3月生まれ');
-        $this->assertStringNotContainsString('2022年3月生まれ（', $html);
-        // 去勢・避妊の「不明」はそのまま（2026-10 変更。当初は「分からない」〔dont_know〕を出していた）
-        $this->assertBasicRow($html, '去勢・避妊', '不明');
-    }
-
-    public function test_性別の不明も出せる(): void
-    {
-        $this->addResponse('2026-10-16 14:32:00', ['name' => 'モモ', 'sex' => 'unknown']);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertBasicRow($html, '性別', '不明');
-    }
-
-    public function test_答えなかった基本情報は未回答と出す(): void
-    {
-        $this->addResponse('2026-10-16 14:32:00', ['name' => 'モモ']);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertBasicRow($html, '名前', 'モモ');
-        foreach (['犬種', '性別', '誕生日', '去勢・避妊'] as $label) {
-            $this->assertBasicRow($html, $label, '（未回答）', true);
+        $this->assertStringContainsString('<p class="mb-3">回答済み（2026/10/16 14:32）</p>', $card);
+        foreach (['名前', '犬種', '性別', '誕生日', '去勢・避妊'] as $label) {
+            $this->assertStringNotContainsString('>'.$label.'<', $card, $label);
         }
-    }
-
-    public function test_誕生日の日付の部分は年月日なら日付の形(): void
-    {
-        $this->addResponse('2026-10-16 14:32:00', ['birth_year' => 2020, 'birth_month' => 3, 'birth_day' => 15]);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertBasicRow($html, '誕生日', '2020/03/15');
+        $this->assertStringNotContainsString('トイプードル', $card);
+        $this->assertStringNotContainsString('女の子', $card);
+        $this->assertStringNotContainsString('2022年3月生まれ', $card);
+        $this->assertStringNotContainsString('data-intake-survey-basics', $card);
+        // 画面上部のトレーニーの情報は今までどおり出る（欄の外）
+        $this->assertStringContainsString('柴', substr($html, 0, strpos($html, 'id="intake-survey"')));
+        // 「回答済み」の行のすぐ下が自由記述（余白は「回答済み」の行の mb-3）
+        $this->assertMatchesRegularExpression('/<p class="mb-3">回答済み（2026\/10\/16 14:32）<\/p>\s*<dl class="mb-0" data-intake-survey-answers>/u', $card);
     }
 
     public function test_自由記述は設問文と回答の対で改行を保持し答えなかった設問は未回答(): void
@@ -331,13 +311,8 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addResponse('2026-10-16 14:32:00', ['breed' => 'トイプードル']);
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+        $card = $this->intakeCard($html);
 
-        $card = substr($html, strpos($html, 'id="intake-survey"'));
-        // 欄のすぐ後ろは計測値のモーダル（このモーダルには計測値の操作のボタンがあるため、そこで切る）
-        $end = strpos($card, 'id="measurementModal-');
-        $this->assertNotFalse($end);
-        $card = substr($card, 0, $end);
-        $this->assertStringContainsString('data-intake-survey-basics', $card);
         $this->assertStringContainsString('data-intake-survey-answers', $card);
         $this->assertStringNotContainsString('<button', $card);
         $this->assertStringNotContainsString('<form', $card);
@@ -356,13 +331,13 @@ class TraineeShowIntakeSurveyTest extends TestCase
 
     public function test_回答が複数件あれば最新の1件を出す(): void
     {
-        $this->addResponse('2026-10-16 14:32:00', ['breed' => '古い回答']);
-        $this->addResponse('2026-10-18 09:05:00', ['breed' => '新しい回答']);
+        $this->addResponse('2026-10-16 14:32:00', ['wish' => '古い回答']);
+        $this->addResponse('2026-10-18 09:05:00', ['wish' => '新しい回答']);
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
         $this->assertStringContainsString('回答済み（2026/10/18 09:05）', $html);
-        $this->assertBasicRow($html, '犬種', '新しい回答');
+        $this->assertStringContainsString('>新しい回答</dd>', $html);
         $this->assertStringNotContainsString('古い回答', $html);
     }
 }

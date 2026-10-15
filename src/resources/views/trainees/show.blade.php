@@ -195,15 +195,13 @@
          - 状態は Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
            activeIntakeSurveyToken を読み込み済み）。回答済みのときは回答日時（Y/m/d H:i）と回答の内容を出し、
            会員詳細で操作できる旨は出さない（回答済みでは発行・取消ができないため）
-         - 回答の内容（要件定義書 6-16-10、設計書 S-0309「受付アンケートの欄」）：上部の属性（トレーニーの現在の値）とは
-           別のこの欄に、**答えたとおり**に出す（反映されなかった空・未選択の項目や、回答のあとにトレーナーが直した
-           項目は、現在の値と違うことがある）。
-           基本情報 5 項目はラベルと値の小さな表（会員詳細のトレーニーカードと同じ dl.row）、誕生日は日付の部分だけ
-           （年齢は付けない）、性別・去勢・避妊はトレーニーと同じ対応表（「不明」もそのまま。2026-10 変更：当初は
-           去勢・避妊に「分からない」があった）。自由記述 4 欄は設問文
-           （TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で、改行を保持する。
-           答えなかった項目は「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。
+         - 回答の内容（要件定義書 6-16-10、設計書 S-0309「受付アンケートの欄」）：自由記述 4 欄を、設問文
+           （TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で出し、改行を保持する。
+           答えなかった設問は「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。
            編集・削除の操作は置かない（閲覧のみ）
+         - 回答した基本情報（名前・犬種・性別・誕生日・去勢・避妊）は出さない（2026-10 変更）：基本情報の回答は
+           トレーニーの基本情報に反映済みで、画面上部と重なるため。回答そのものは trainee_intake_survey_responses に
+           残っている
          - 回答が複数件あるときに新しい順に並べるのは第 2 段階（第 1 段階では 1 件）。今は最新の 1 件
            （latestIntakeSurveyResponse）だけを出す
          - id="intake-survey" と scroll-margin-top は、会員詳細の「回答を見る」から飛ぶ先にするため。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
@@ -217,25 +215,8 @@
             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
                 @php
                     $intakeResponse = $trainee->latestIntakeSurveyResponse;
-                    $intakeBasics = [
-                        '名前' => $intakeResponse->name,
-                        '犬種' => $intakeResponse->breed,
-                        '性別' => $intakeResponse->sex_label,
-                        '誕生日' => $intakeResponse->birthday_label,
-                        '去勢・避妊' => $intakeResponse->neuter_status_label,
-                    ];
                 @endphp
                 <p class="mb-3">回答済み（{{ $intakeResponse->answered_at->format('Y/m/d H:i') }}）</p>
-                <dl class="row mb-3" data-intake-survey-basics>
-                    @foreach($intakeBasics as $label => $value)
-                        <dt class="col-4 col-md-2 fw-normal text-muted">{{ $label }}</dt>
-                        @if(blank($value))
-                            <dd class="col-8 col-md-10 mb-1 text-muted">（未回答）</dd>
-                        @else
-                            <dd class="col-8 col-md-10 mb-1">{{ $value }}</dd>
-                        @endif
-                    @endforeach
-                </dl>
                 <dl class="mb-0" data-intake-survey-answers>
                     @foreach(\App\Models\TraineeIntakeSurveyResponse::questions() as $column => $question)
                         <dt class="fw-normal text-muted">{{ $question['question'] }}</dt>
