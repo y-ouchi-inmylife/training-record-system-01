@@ -12,7 +12,7 @@ use Tests\TestCase;
  * 2026-10 追加：会員側 S-1402 の写真枠は、スマホで幅いっぱいに広げるため
  * `.c-trainee-photo-col` / `.c-trainee-photo-frame` を付けるようにした
  * （SCSS のメディアクエリで切り替え）。トレーナー側 S-0309 の写真枠
- * （app.scss の .trainee-show-photo。2026-10 変更で sm 以上 280px 四方・スマホ 180px 四方）には、
+ * （app.scss の .trainee-show-photo。2026-10 変更で sm 以上 224px 四方・スマホ 180px 四方）には、
  * 同クラスが付かないことを確かめる。
  *
  * クラスが付いてしまうと `client.scss` 側のメディアクエリに引っかかって
@@ -96,12 +96,12 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<div class="trainee-show-photo d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<img src="https:\/\/example.com\/photo.jpg"/u', $html);
     }
 
-    public function test_写真の枠の大きさはsm以上280pxでスマホは180px(): void
+    public function test_写真の枠の大きさはsm以上224pxでスマホは180px(): void
     {
         $scss = file_get_contents(resource_path('sass/app.scss'));
 
         $this->assertMatchesRegularExpression(
-            '/\.trainee-show-photo \{\s*width: 180px;\s*height: 180px;\s*@include media-breakpoint-up\(sm\) \{\s*width: 280px;\s*height: 280px;\s*\}\s*\}/u',
+            '/\.trainee-show-photo \{\s*width: 180px;\s*height: 180px;\s*@include media-breakpoint-up\(sm\) \{\s*width: 224px;\s*height: 224px;\s*\}\s*\}/u',
             $scss
         );
     }

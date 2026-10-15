@@ -123,19 +123,19 @@ class TraineeShowPhotoMeasurementsLayoutTest extends TestCase
 
         $this->assertStringContainsString('<div class="col-12 col-xl-8">', $layout);
         $this->assertMatchesRegularExpression('/<div class="col-12 col-xl-4">\s*<div class="card h-100">/u', $layout);
-        // 計測値が 0 件のときのグラフの案内も、グラフと同じ高さ（280px）
-        $this->assertMatchesRegularExpression('/style="height: 280px;">\s*まだ計測値がありません。/u', $layout);
+        // 計測値が 0 件のときのグラフの案内も、グラフと同じ高さ（224px）
+        $this->assertMatchesRegularExpression('/style="height: 224px;">\s*まだ計測値がありません。/u', $layout);
         $this->assertStringNotContainsString('data-trainee-measurements-scroll', $layout);
         $this->assertMatchesRegularExpression('/<div class="card-body">\s*<p class="text-muted mb-0">計測値は登録されていません<\/p>\s*<\/div>/u', $layout);
         $this->assertStringContainsString('計測値（0件）', $layout);
     }
 
-    public function test_グラフの枠の高さは280px(): void
+    public function test_グラフの枠の高さは224px(): void
     {
         $layout = $this->layout($this->renderWithChart());
 
         // 2026-10 変更：当初は会員側と同じ 180px
-        $this->assertMatchesRegularExpression('/<div style="position: relative; height: 280px;" data-trainee-weight-chart>\s*<canvas data-measurement-chart=/u', $layout);
+        $this->assertMatchesRegularExpression('/<div style="position: relative; height: 224px;" data-trainee-weight-chart>\s*<canvas data-measurement-chart=/u', $layout);
         $this->assertStringNotContainsString('height: 180px', $layout);
     }
 

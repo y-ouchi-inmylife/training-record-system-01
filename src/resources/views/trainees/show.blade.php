@@ -79,7 +79,7 @@
                 <div class="card-body">
                     <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
                         {{-- 左：トレーニー写真（縦横比を保つ）。大きさは app.scss の .trainee-show-photo（2026-10 変更：
-                             sm 以上はグラフと同じ 280px 四方、写真の下にグラフを置くスマホの幅〔sm 未満〕は今までどおり 180px 四方。
+                             sm 以上はグラフと同じ 224px 四方、写真の下にグラフを置くスマホの幅〔sm 未満〕は今までどおり 180px 四方。
                              当初はどの幅でも 180px 四方のインライン style。会員側〔client.scss〕とは共有しない）。
                              トレーナー側は登録・変更・削除の操作を置かない（要件定義書
                              6-15-15 は会員の機能）。クリックしても何も起きない静的な枠にする。 --}}
@@ -106,9 +106,9 @@
                             @if(empty($weightChart['datasets']))
                                 {{-- 計測値 0 件（会員側と同じ扱い）。空のグラフを描くと意味のない
                                      目盛りが出て不具合に見えるため、canvas を出さず案内文を表示する。
-                                     高さは通常のグラフ（280px）と揃える。 --}}
+                                     高さは通常のグラフ（224px）と揃える。 --}}
                                 <div class="d-flex align-items-center justify-content-center text-muted"
-                                     style="height: 280px;">
+                                     style="height: 224px;">
                                     まだ計測値がありません。
                                 </div>
                             @else
@@ -116,9 +116,9 @@
                                      線の色：--c-brand-bright は client.scss にしか定義がなく、
                                      トレーナー側は measurement-chart.js のフォールバック #2A4A94
                                      （$brand-bright と同色）が使われる。 --}}
-                                {{-- グラフの高さは 280px（2026-10 変更：当初は会員側と同じ 180px。左のカードを高くして、
-                                     横に並べた計測値のカードで計測値が 5〜6 件見えるようにするため。Chart.js の設定は変えない） --}}
-                                <div style="position: relative; height: 280px;" data-trainee-weight-chart>
+                                {{-- グラフの高さは 224px（2026-10 変更：当初は会員側と同じ 180px。いったん 280px にしたが大きすぎたため 224px。左のカードを高くして、
+                                     横に並べた計測値のカードで計測値が 4 件ほど見えるようにするため。Chart.js の設定は変えない） --}}
+                                <div style="position: relative; height: 224px;" data-trainee-weight-chart>
                                     <canvas data-measurement-chart="{{ json_encode([
                                         'datasets' => $weightChart['datasets'],
                                     ], JSON_UNESCAPED_UNICODE) }}"></canvas>
