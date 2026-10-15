@@ -514,6 +514,19 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
+    public function test_トレーニーの欄に備考の行はなく去勢避妊の次が最終計測(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // ラベルの並び（2026-10 変更：トレーニーの備考をなくした）
+        preg_match_all('/<dt class="col-4 fw-normal text-muted">([^<]+)<\/dt>/u', $html, $m);
+        $this->assertSame(['犬種', '性別', '誕生日', '去勢・避妊', '最終計測'], array_slice($m[1], 0, 5));
+        $this->assertNotContains('備考', $m[1]);
+    }
+
     public function test_写真があるトレーニーにはトレーニー詳細へのリンクの中に写真が出る(): void
     {
         $this->fakeMediaDisk();

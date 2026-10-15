@@ -12,7 +12,7 @@ use Tests\TestCase;
 /**
  * トレーニー詳細（S-0309）の属性の並びと表示（2026-10 変更）。
  *
- * - 1 段目に犬種・性別・誕生日・去勢・避妊の 4 つ（col-6 col-md-3）、2 段目に備考を全幅（col-12）
+ * - 犬種・性別・誕生日・去勢・避妊の 4 つを 1 段（col-6 col-md-3）。備考は 2026-10 になくした（2 段目はない）
  * - 誕生日は要件定義書 6-16「年齢の表示規則」の形（Trainee::birthday_with_age_label）
  * - 去勢・避妊は Trainee::neuter_status_label。未登録は空欄（§2-4）
  */
@@ -60,7 +60,7 @@ class TraineeShowAttributesRenderingTest extends TestCase
         ])->__toString();
     }
 
-    public function test_1段目に犬種性別誕生日去勢避妊_2段目に備考を全幅で並べる(): void
+    public function test_犬種性別誕生日去勢避妊を1段で並べ備考はない(): void
     {
         Carbon::setTestNow('2026-10-20 10:00:00');
 
@@ -72,7 +72,6 @@ class TraineeShowAttributesRenderingTest extends TestCase
         $trainee->birth_month = 3;
         $trainee->birth_day = null;
         $trainee->neuter_status = 'neutered';
-        $trainee->note = '保護犬';
 
         $html = $this->renderTraineeShow($trainee);
 
@@ -90,9 +89,13 @@ class TraineeShowAttributesRenderingTest extends TestCase
         sort($sorted);
         $this->assertSame($sorted, $positions, '犬種・性別・誕生日・去勢・避妊の順');
 
-        // 備考は 2 段目の全幅（col-12）で、4 つの属性の後
-        $this->assertMatchesRegularExpression('/<div class="col-12">\s*<div class="text-muted small mb-1">備考<\/div>/u', $html);
-        $this->assertGreaterThan(end($positions), mb_strpos($html, '<div class="text-muted small mb-1">備考</div>'));
+        // 備考の行はない（2026-10 になくした。4 つの属性のあとに 2 段目の全幅のマスを置かない）
+        $this->assertStringNotContainsString('<div class="text-muted small mb-1">備考</div>', $html);
+        $this->assertMatchesRegularExpression(
+            '/去勢・避妊<\/div>\s*<div style="min-height: 1.5rem;">\s*している\s*<\/div>\s*<\/div>\s*<\/div>/u',
+            $html,
+            '去勢・避妊のマスで属性の行が閉じる'
+        );
 
         // 値
         $this->assertStringContainsString('2022年3月生まれ（4歳7ヶ月）', $html);

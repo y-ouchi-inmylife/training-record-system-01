@@ -38,7 +38,6 @@ class TraineeFormErrorRenderingTest extends TestCase
             $trainee->birth_year = null;
             $trainee->birth_month = null;
             $trainee->birth_day = null;
-            $trainee->note = '';
         }
 
         return $this->withViewErrors($errors)->blade(
@@ -90,6 +89,20 @@ class TraineeFormErrorRenderingTest extends TestCase
         $view->assertDontSee('メス');
     }
 
+    /** 備考の入力欄はない（2026-10 変更：トレーニーの備考をなくした。登録・編集の両方） */
+    public function test_登録と編集の画面に備考の入力欄がない(): void
+    {
+        foreach ([false, true] as $isEdit) {
+            $html = $this->renderForm([], isEdit: $isEdit)->__toString();
+
+            $this->assertStringNotContainsString('name="note"', $html);
+            $this->assertStringNotContainsString('<textarea', $html);
+            $this->assertStringNotContainsString('>備考</label>', $html);
+            // 誕生日の行が最後の行（下の余白なし）
+            $this->assertStringContainsString('<div id="birth_date-help" class="form-text">', $html);
+        }
+    }
+
     /** 全項目にエラーが入っているとき：上部に 1 文の案内と各欄のエラーが出る */
     public function test_全項目にエラーが入ったとき上部に1文の案内と各欄のエラーが出る(): void
     {
@@ -99,7 +112,6 @@ class TraineeFormErrorRenderingTest extends TestCase
             'sex' => 'ERR_sex',
             'neuter_status' => 'ERR_neuter_status',
             'birth_date' => 'ERR_birth_date',
-            'note' => 'ERR_note',
         ];
         $view = $this->renderForm($errors, isEdit: true);
 

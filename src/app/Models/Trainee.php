@@ -96,7 +96,6 @@ class Trainee extends Model
         'birth_month',
         'birth_day',
         'neuter_status',
-        'note',
         'photo_path',
         'updated_by',
     ];

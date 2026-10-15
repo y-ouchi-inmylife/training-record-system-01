@@ -43,7 +43,8 @@ class TraineeRequest extends FormRequest
             'birth_day' => 'nullable',
             // 去勢・避妊（2026-10 追加。値は Trainee::neuterStatusLabels() のキー。D-0700・5-21）
             'neuter_status' => 'nullable|in:neutered,not_neutered,unknown',
-            'note' => 'nullable|string',
+            // 備考（note）は 2026-10 になくした（要件定義書 D-0700）。古い画面から送られてきても、
+            // ルールにないので validated() に含まれず、保存されない
         ];
     }
 
@@ -59,7 +60,6 @@ class TraineeRequest extends FormRequest
             'breed' => '犬種',
             'sex' => '性別',
             'neuter_status' => '去勢・避妊',
-            'note' => '備考',
         ];
     }
 }

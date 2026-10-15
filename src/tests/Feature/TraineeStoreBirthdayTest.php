@@ -62,6 +62,23 @@ class TraineeStoreBirthdayTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_備考の値を送っても登録でも更新でも保存されない(): void
+    {
+        // 2026-10 変更：トレーニーの備考をなくした。古い画面から note が送られてきても、TraineeRequest の
+        // ルールにないので validated() に含まれず、保存されない（列はまだあるので、空のままであること）
+        $this->post(route('trainees.store', $this->client), ['name' => 'モモ', 'note' => '古い画面からの備考'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('clients.show', $this->client));
+        $trainee = Trainee::query()->sole();
+        $this->assertNull(DB::table('trainees')->where('id', $trainee->id)->value('note'));
+
+        $this->put(route('trainees.update', $trainee), ['name' => 'モモ', 'note' => '古い画面からの備考'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('trainees.show', $trainee));
+        $this->assertNull(DB::table('trainees')->where('id', $trainee->id)->value('note'));
+        $this->assertSame('モモ', DB::table('trainees')->where('id', $trainee->id)->value('name'));
+    }
+
     public function test_全角の数字と前後の空白は半角の整数として保存される(): void
     {
         $response = $this->post(route('trainees.store', $this->client), [

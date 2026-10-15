@@ -273,11 +273,15 @@ class ClientIntakeSurveySubmitTest extends TestCase
 
     public function test_自由記述は反映しない(): void
     {
-        $trainee = $this->traineeWithToken(['note' => '保護犬']);
+        $trainee = $this->traineeWithToken();
 
         $this->submit(['wish' => 'こうなったらいい', 'health_concerns' => 'パテラ']);
 
-        $this->assertSame('保護犬', $trainee->fresh()->note);
+        // 自由記述はトレーニーのどの列にも入らない（2026-10 変更：以前は備考〔note〕が変わらないことで確かめていた。
+        // トレーニーの備考はなくした）
+        $row = json_encode(DB::table('trainees')->where('id', $trainee->id)->first(), JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString('こうなったらいい', $row);
+        $this->assertStringNotContainsString('パテラ', $row);
     }
 
     public function test_最終更新者は変えない(): void

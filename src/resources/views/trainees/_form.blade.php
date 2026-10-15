@@ -125,7 +125,7 @@
                     </div>
                 </div>
 
-                {{-- 行4: 誕生日（独立した全幅の行。2026-10 変更）。年・月・日の 3 つの欄で、分かるところだけ
+                {{-- 行4: 誕生日（独立した全幅の行。2026-10 変更。最後の行なので下の余白〔mb-2〕は付けない。2026-10 にトレーニーの備考〔行5〕をなくした）。年・月・日の 3 つの欄で、分かるところだけ
                      入れる（要件定義書 6-16「年齢の表示規則」の「入力のルール」）。
                      - 欄は type="text" inputmode="numeric"（スマホで数字のキーボードを出す。type="number" は
                        ホイールで値が変わる・「e」が入るなどのため使わない）。年は 4 桁、月・日は 2 桁まで
@@ -137,7 +137,7 @@
                        年齢は本文と同じ色、入力中の案内は控えめな色（text-muted。JS で付け外し）で、
                        送信時のエラー（下の赤字・赤枠）とは別に出す
                      - 全角の数字は、欄から離れたとき（blur）に半角に書き換える（送信時も半角に直して受け付ける） --}}
-                <div class="row g-3 mb-2">
+                <div class="row g-3">
                     <div class="col-12">
                         <div class="row g-2 align-items-start">
                             <label for="birth_year" id="birth_date-label" class="col-md-auto col-form-label text-md-end form-label-fixed">誕生日</label>
@@ -169,20 +169,6 @@
                                 </div>
                                 <x-form-error field="birth_date" block />
                                 <div id="birth_date-help" class="form-text">※ 年だけ、または年と月だけでも入力できます。</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- 行5: 備考 --}}
-                <div class="row g-3">
-                    <div class="col-12">
-                        <div class="row g-2 align-items-start">
-                            <label for="note" class="col-md-auto col-form-label text-md-end form-label-fixed">備考</label>
-                            <div class="col-12 col-md">
-                                <textarea class="form-control @error('note') is-invalid @enderror"
-                                          id="note" name="note" rows="3">{{ old('note', $trainee?->note) }}</textarea>
-                                <x-form-error field="note" />
                             </div>
                         </div>
                     </div>

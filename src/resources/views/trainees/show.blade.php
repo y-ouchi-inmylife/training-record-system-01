@@ -6,8 +6,7 @@
 <div class="container">
     {{-- ヘッダーサマリー — 会員詳細（S-0305）と同じ 3 段構成に揃える
          （1 段目: 操作ボタン列（右寄せ）／ 2 段目: 名前 + 会員リンク + 内部ID ／
-          3 段目: セパレータ下に犬種・性別・誕生日を x-detail-cell で並べ、
-                備考は 2 段目に全幅で置く）。詳細は設計書 S-0309 参照。 --}}
+          3 段目: セパレータ下に犬種・性別・誕生日・去勢・避妊を x-detail-cell で並べる）。詳細は設計書 S-0309 参照。 --}}
     <div class="mb-4">
         {{-- 1段目: 操作ボタン列（右寄せ）。従前の「« 会員詳細へ戻る」は廃止し、
              戻り導線は 2 段目の会員名リンクに一本化した（設計書 S-0309「設計方針」参照）。 --}}
@@ -46,17 +45,14 @@
             </div>
         </div>
 
-        {{-- 3段目: セパレータ下の属性。1 段目に犬種・性別・誕生日・去勢・避妊を md 以上で 4 列・
-             モバイルで 2 列（col-6 col-md-3）に並べ、2 段目に備考を全幅（col-12）で置く。
+        {{-- 3段目: セパレータ下の属性。犬種・性別・誕生日・去勢・避妊を md 以上で 4 列・
+             モバイルで 2 列（col-6 col-md-3）の 1 段で並べる。
              基本情報カードは介さない（設計書 S-0309「設計方針」参照）。
              誕生日は要件定義書 6-16「年齢の表示規則」の形（「2020/03/15（6歳7ヶ月）」など）で、
              組み立ては Trainee の birthday_with_age_label アクセサ。誕生日が未登録なら空欄（§2-4）。
-             経緯：2026-09 は犬種・性別・誕生日・備考の 4 列 1 段で、誕生日は「Y/m/d（N歳）」
-             （age アクセサで年単位・切り捨て）だった。2026-10 に去勢・避妊を加えるため、備考を
-             2 段目の全幅に移し（設計書に「備考を全幅に戻す判断もあり得る」と残していた案）、
-             誕生日を年・月・日に分けて表示規則を置き換えた。
-             備考は改行保持（white-space: pre-wrap）が必要なため x-detail-cell を使わず
-             自前で書く。x-detail-cell の cols 既定値（col-6 col-md-4）は会員詳細
+             2026-10 変更：トレーニーの備考（2 段目の全幅）をなくした（受付アンケートの「暮らしの様子」で、
+             飼い主さんの言葉で様子を残せるようになったため。要件定義書 D-0700）。
+             x-detail-cell の cols 既定値（col-6 col-md-4）は会員詳細
              （S-0305 の連絡先セクション）向けの現状値。呼び出し側で col-6 col-md-3 を渡し、
              会員詳細への影響を出さないようにする。 --}}
         <div class="row g-3 mt-2 pt-2 border-top">
@@ -64,10 +60,6 @@
             <x-detail-cell label="性別" :value="$trainee->sex_label" cols="col-6 col-md-3" />
             <x-detail-cell label="誕生日" :value="$trainee->birthday_with_age_label" cols="col-6 col-md-3" />
             <x-detail-cell label="去勢・避妊" :value="$trainee->neuter_status_label" cols="col-6 col-md-3" />
-            <div class="col-12">
-                <div class="text-muted small mb-1">備考</div>
-                <div style="min-height: 1.5rem; white-space: pre-wrap;">{{ $trainee->note }}</div>
-            </div>
         </div>
     </div>
 
