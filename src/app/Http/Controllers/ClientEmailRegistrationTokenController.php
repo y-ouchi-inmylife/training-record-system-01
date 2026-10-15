@@ -198,7 +198,7 @@ class ClientEmailRegistrationTokenController extends Controller
             '【ご登録の手順】',
             '1. 上の URL を開きます',
             '2. 開いたページでメールアドレスを入力します',
-            '3. 届いたメールのリンクを開いて、パスワードを設定します',
+            '3. 届いたメールのリンクを開いて、パスワードとご住所・お電話番号などを設定します',
             '',
             '【有効期限】',
             $expiryLine,

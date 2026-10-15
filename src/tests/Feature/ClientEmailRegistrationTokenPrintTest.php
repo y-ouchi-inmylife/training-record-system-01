@@ -97,7 +97,12 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
         $this->assertStringContainsString('<li>上の QR コードを読み取ります</li>', $html);
         $this->assertStringContainsString('<li>開いたページでメールアドレスを入力します</li>', $html);
-        $this->assertStringContainsString('<li>届いたメールのリンクを開いて、パスワードを設定します</li>', $html);
+        $this->assertStringContainsString('<li>届いたメールのリンクを開いて、パスワードとご住所・お電話番号などを設定します</li>', $html);
+        // 説明文は受付アンケートの案内（S-0311）と同じ文（2026-10 変更）。前の文言は出さない
+        $this->assertStringContainsString('上の QR コードを読み取るか、下の URL をブラウザに入力してください。', $html);
+        $this->assertStringNotContainsString('マイページへのご登録は、', $html);
+        $this->assertStringNotContainsString('<li>届いたメールのリンクを開いて、パスワードを設定します</li>', $html);
+        $this->assertStringNotContainsString('3. 届いたメールのリンクを開いて、パスワードを設定します', $this->copyText($html));
         $this->assertStringContainsString('<p class="print-expiry-date">2026年10月17日まで</p>', $html);
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>', $html);
         // 操作エリアは印刷では出さない
@@ -125,7 +130,7 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
             '【ご登録の手順】',
             '1. 上の URL を開きます',
             '2. 開いたページでメールアドレスを入力します',
-            '3. 届いたメールのリンクを開いて、パスワードを設定します',
+            '3. 届いたメールのリンクを開いて、パスワードとご住所・お電話番号などを設定します',
             '',
             '【有効期限】',
             '2026年10月17日まで',
