@@ -73,9 +73,33 @@ return Application::configure(basePath: dirname(__DIR__))
         // ほかの画面の 419 は今のまま（resources/views/errors/419.blade.php）。
         // ここに来る例外は、Laravel が TokenMismatchException を 419 の HttpException に置き換えたあとのもの。
         // 受付アンケートはログインしない画面のため、「再度ログインしてください」の文言では伝わらない。
+        //
+        // 性格診断（S-1415）からの送信がセッション切れ（419）になったときは、送られてきた回答を入れたまま回答の画面を
+        // 出し直す（2026-10 追加。設計書 S-1415 備考「時間切れ（419）のとき」・api-design.md）。50 問あり、一から入れ直すのは
+        // お客様の負担が大きいため、受付アンケート（専用の画面を出し、一から入れ直す）とは扱いを変えている。
+        // - ステータスは 200。出し直した画面には今のセッションの CSRF トークンが入るので、そのまま送り直せる
+        // - 戻すのは正しい値（Q01〜Q50 の 0〜4・na）だけ。ほかの値・設問にないキーは捨てる（保存はしない）
+        // - 案内が使えなくなっていたら（取消・回答済み）、その画面を出す（PersonalityDiagnosisController::showForm が確かめる）
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, \Illuminate\Http\Request $request) {
-            if ($e->getStatusCode() === 419 && $request->is('client-portal/intake-survey/*')) {
+            if ($e->getStatusCode() !== 419) {
+                return null;
+            }
+            if ($request->is('client-portal/intake-survey/*')) {
                 return response()->view('client.intake-survey.session-expired', [], 419);
+            }
+            if ($request->isMethod('POST') && $request->is('client-portal/personality-diagnosis/*')) {
+                $token = (string) $request->route('token');
+                $choices = array_map('strval', array_keys(\App\Support\PersonalityDiagnosisQuestions::choices()));
+                $sent = $request->input('answers');
+                $restored = [];
+                foreach (array_keys(\App\Support\PersonalityDiagnosisQuestions::questions()) as $id) {
+                    $value = is_array($sent) ? ($sent[$id] ?? null) : null;
+                    if (is_scalar($value) && in_array((string) $value, $choices, true)) {
+                        $restored[$id] = (string) $value;
+                    }
+                }
+
+                return response(\App\Http\Controllers\Client\PersonalityDiagnosisController::showForm($token, $restored, true), 200);
             }
 
             return null;
