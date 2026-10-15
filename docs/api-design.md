@@ -78,7 +78,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。送信元は S-0309 だけ（**2026-10 変更**）。成功後は S-0309 に戻す（下の「計測値エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
-| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。成功後は S-0311 を同じタブで開く（有効な案内がすでにあれば発行せずにその案内を開く。**2026-10 変更**。下の「受付アンケート案内エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。成功後は S-0311 にリダイレクトする（会員詳細のフォームは別タブで送る。有効な案内がすでにあれば発行せずにその案内を開く。**2026-10 変更**。下の「受付アンケート案内エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-intake-survey-tokens.destroy`。**2026-10 追加**）。リダイレクト先は発行と同じ | auth | 管理者、一般 |
 | トレーニー管理 | S-0311 受付アンケート案内画面 | GET | `/trainees/{trainee}/intake-survey-tokens/print` | 受付アンケート案内画面を表示する（ルート名 `trainee-intake-survey-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
@@ -186,7 +186,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 
 **計測値エンドポイントのリダイレクト先**（**2026-10 変更**）：`POST /trainees/{trainee}/measurements` / `PUT /trainee-measurements/{measurement}` / `DELETE /trainee-measurements/{measurement}` の 3 メソッドは、成功後は**常に S-0309 トレーニー詳細画面**（`redirect()->route('trainees.show', $trainee)`）に戻す。計測値の登録・編集・削除はトレーニー詳細（S-0309）の計測値の欄だけで行うため（requirements.md 6-16-5）、送信元を判別する `return_to` は持たない（送られても使わない）。バリデーションエラー時は Laravel の `back()` で S-0309 に戻り、hidden `_trainee_id` で計測値モーダルを開き直す（screen-design.md S-0309「計測値モーダル」参照）。
 
-**受付アンケート案内エンドポイントのリダイレクト先**（**2026-10 変更**）：`DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、成功後は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', $trainee->client_id)`）に戻し、完了メッセージはフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/intake-survey-tokens`（発行）は、成功後は S-0311 受付アンケート案内画面を同じタブで開き、完了メッセージは出さない（下の発行のエンドポイント参照）。受付アンケート案内の発行・表示・取消を会員詳細だけで行う形にしたため（requirements.md 6-16-8 備考「操作を会員詳細に寄せた理由」）、`return_to` は持たない（送られても使わない）。
+**受付アンケート案内エンドポイントのリダイレクト先**（**2026-10 変更**）：`DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、成功後は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', $trainee->client_id)`）に戻し、完了メッセージはフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/intake-survey-tokens`（発行）は、成功後は S-0311 受付アンケート案内画面にリダイレクトし（会員詳細のフォームは別タブで送るので、案内は別タブで開く）、完了メッセージは出さない（下の発行のエンドポイント参照）。受付アンケート案内の発行・表示・取消を会員詳細だけで行う形にしたため（requirements.md 6-16-8 備考「操作を会員詳細に寄せた理由」）、`return_to` は持たない（送られても使わない）。
 
 **経緯：当初の `return_to`**（**2026-10 追加**。同じ 2026-10 に、操作を会員詳細に寄せたため廃止。経緯として残す）：当初は発行・取消を S-0305 と S-0309 の両方から行えるようにし、当時の計測値エンドポイントと同じく hidden `return_to`（`client` / `trainee` の 2 値、既定は `trainee`）で送信元を判別し、成功時のリダイレクト先を切り替えていた（当時の要件定義書 6-16-8・6-16-9「操作した画面に戻る」）。S-0309 に戻るときの完了メッセージは、受付アンケートの欄の中に出すための別のキー（`intake_survey_success`）で渡していた。
 
@@ -422,9 +422,9 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 - **この時点で決まる `expires_at` が初回設定完了までの全体の期限**となる。以降、対応する `client_login_link_tokens`（ログイン用リンク）を作成する際は、この `expires_at` をそのまま引き継ぐ
 
 **レスポンス**:
-- 成功（新規発行・期限切れからの発行し直しとも）：`redirect()->route('client-email-registration-tokens.print', $client)` — **発行のあとは同じタブで S-0307 印刷ページを開く**（**2026-10 変更**）。完了メッセージ（フラッシュ `success`）は載せない（S-0307 は印刷用の画面のため出さず、S-0307 の［« 戻る］で会員詳細に戻ったときにも出さない。S-0307 が開くこと自体が、発行できたことの知らせになる）
+- 成功（新規発行・期限切れからの発行し直しとも）：`redirect()->route('client-email-registration-tokens.print', $client)` — **発行のあとは S-0307 印刷ページを開く**（**2026-10 変更**。会員詳細のフォームに `target="_blank"` を付けて別タブで送るので、案内は別タブで開く）。完了メッセージ（フラッシュ `success`）は載せない（S-0307 は印刷用の画面のため出さず、元のタブの会員詳細を開き直したときにも出さない。S-0307 が開くこと自体が、発行できたことの知らせになる）
 - 有効な URL がすでにある（二重送信・ほかのタブで発行済みなど）：新しく発行せず、同じく `redirect()->route('client-email-registration-tokens.print', $client)`（今ある有効な案内の S-0307 を開く。お客様に渡すものは同じため）
-- 発行のあとに案内の画面を開く理由・同じタブにする理由は requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」
+- 発行のあとに案内の画面を別タブで開く理由と、元のタブの会員詳細を開き直す仕組みは requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」
 
 **備考**:
 - 発行された URL の受け渡し方法は、**紙の案内シート（S-0307 印刷ページ）**を推奨する。QR コード・URL 文字列・有効期限・手順は印刷ページで確認する
@@ -2066,7 +2066,7 @@ POST /training-records に以下を追加する。
 - **発行し直しはしない**（未回答のトークンがあれば発行できない。マイページ登録案内の発行と違い、既存のトークンを消して作り直す処理は持たない。requirements.md 6-16-8 備考）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainee-intake-survey-tokens.print', $trainee)` — **発行のあとは同じタブで S-0311 を開く**（**2026-10 変更**。理由は requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」）。完了メッセージ（フラッシュ `success`）は載せない（マイページ登録案内の発行と同じ）
+- 成功：`redirect()->route('trainee-intake-survey-tokens.print', $trainee)` — **発行のあとは S-0311 を開く**（**2026-10 変更**。会員詳細のフォームは別タブで送るので、案内は別タブで開く。理由は requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」）。完了メッセージ（フラッシュ `success`）は載せない（マイページ登録案内の発行と同じ）
 - 有効な案内がすでにある（状態が「回答待ち」。二重送信・ほかのタブで発行済みなど）：新しく発行せず、同じく `redirect()->route('trainee-intake-survey-tokens.print', $trainee)`（今ある有効な案内の S-0311 を開く）
 - 回答済み：409（今までどおり。UI 側でボタンを出し分けているため通常は到達しない）
 
