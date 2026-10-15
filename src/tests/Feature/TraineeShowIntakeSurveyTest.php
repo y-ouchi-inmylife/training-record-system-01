@@ -132,7 +132,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
     /** 欄（と画面全体）に操作のボタン・取消モーダルがないこと */
     private function assertNoOperations(string $html): void
     {
-        $this->assertStringNotContainsString('>案内を発行<', $html);
+        $this->assertStringNotContainsString('>受付アンケートの案内を発行<', $html);
         $this->assertStringNotContainsString('>案内を取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
         $this->assertStringNotContainsString('intakeSurveyCancelModal', $html);

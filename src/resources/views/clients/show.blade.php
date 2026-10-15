@@ -521,17 +521,21 @@
                                        「受付アンケート」が折り返し、回答待ちではボタンが並ぶため。名前の行の右の空いたところに
                                        置けば、カードの下に行を足さずに済む（経緯：当初はカードの下端に区切り線つきの全幅の行で
                                        置いていた）
-                                     - 左の文字は「受付アンケート」だけ：状態はボタンで分かるため、状態の文字・発行日・回答日時は
+                                     - まとまりはボタンだけ（左に「受付アンケート」の文字は置かない。2026-10 変更）：発行と表示のボタンを
+                                       「受付アンケートの案内を…」として、何の案内かをボタンの文字だけで分かるようにした（マイページ
+                                       登録案内のボタンと見分けるため）。状態はボタンで分かるため、状態の文字・発行日・回答日時も
                                        出さない。状態はバッジにしない（「回答待ち」はお客様の対応を待つ状態で、トレーナーが対応する
                                        状態ではないため）
                                      - 状態は Trainee::intake_survey_status（ClientController::show で
                                        trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）
-                                     - 「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
-                                       「登録案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。まとまりの中で
-                                       対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は付けない）
+                                     - 「受付アンケートの案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
+                                       「登録案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。隣の「受付アンケートの
+                                       案内を表示」で対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は
+                                       付けない）
+                                     - ボタンの文字は text-nowrap で途中で折り返さない（幅が足りないときは、ボタンごと次の行に移る）
                                      - 読み上げでどのトレーニーの操作かが分かるよう、まとまりを role="group" にして
                                        「{表示名}の受付アンケート」の名前を付ける（ボタンの文字は変えない）。読み上げの順は
-                                       名前 → 受付アンケートのまとまり → 属性 → 計測を追加
+                                       名前 → 受付アンケートのまとまり → 属性
                                      名前のリンク：名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
@@ -539,17 +543,16 @@
                                     @if($trainee->intake_survey_status !== \App\Models\Trainee::INTAKE_ANSWERED)
                                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto small"
                                          role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
-                                        <span>受付アンケート</span>
-                                        <div class="d-flex flex-wrap gap-2">
+                                        <div class="d-flex flex-wrap justify-content-end gap-2">
                                             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
                                                 <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-outline-primary">案内を発行</button>
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を発行</button>
                                                 </form>
                                             @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
                                                 <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示</a>
-                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                   class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示</a>
+                                                <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                                         data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
                                                         data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>
                                             @endif

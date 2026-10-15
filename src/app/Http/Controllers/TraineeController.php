@@ -38,7 +38,7 @@ class TraineeController extends Controller
         $validated['updated_by'] = auth()->id();
 
         // 受付アンケート案内はここでは発行しない（2026-10 変更。要件定義書 6-16-1）。案内の発行は会員詳細
-        // （S-0305）の［案内を発行］だけで行う。以前の「受付アンケートの案内を発行する」のチェックの値
+        // （S-0305）の［受付アンケートの案内を発行］だけで行う。以前の「受付アンケートの案内を発行する」のチェックの値
         // （issue_intake_survey）が送られてきても、validated() に含まれないため使われない
         Trainee::create($validated);
 

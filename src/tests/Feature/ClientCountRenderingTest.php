@@ -715,8 +715,8 @@ class ClientCountRenderingTest extends TestCase
     }
 
     /**
-     * 受付アンケートのまとまり（名前の行の右）を取り出し、左が「受付アンケート」の文字だけで、
-     * 状態の文字・発行日・回答日時が出ていないことを確かめる（2026-10 変更。状態はボタンで分かる）。
+     * 受付アンケートのまとまり（名前の行の右）を取り出し、中身がボタンだけで（左に「受付アンケート」の
+     * ラベルの文字を置かない）、状態の文字・発行日・回答日時が出ていないことを確かめる（2026-10 変更）。
      * まとまりは名前の見出しと同じ行の要素（名前の行の囲み）の中に置き、読み上げ用に
      * 「{表示名}の受付アンケート」の名前を付ける
      */
@@ -729,13 +729,16 @@ class ClientCountRenderingTest extends TestCase
             $m
         ));
         $row = $m[1];
-        $this->assertMatchesRegularExpression('/^\s*<span>受付アンケート<\/span>/u', $row);
+        // ボタンの並びから始まり、ラベルの <span> はない（ボタンの文字の中の「受付アンケート」は除いて確かめる）
+        $this->assertMatchesRegularExpression('/^\s*<div class="d-flex flex-wrap justify-content-end gap-2">/u', $row);
+        $this->assertStringNotContainsString('<span>', $row);
+        $this->assertSame(0, preg_match('/>\s*受付アンケート\s*</u', $row));
         foreach (array_merge(['：', '未発行', '回答待ち', '回答済み', '発行）'], $dates) as $text) {
             $this->assertStringNotContainsString($text, $row, $text);
         }
     }
 
-    public function test_受付アンケートが未発行なら案内を発行のボタンだけを出し状態の文字は出さない(): void
+    public function test_受付アンケートが未発行なら受付アンケートの案内を発行のボタンだけを出し状態の文字は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -747,14 +750,14 @@ class ClientCountRenderingTest extends TestCase
         $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
         $this->assertMatchesRegularExpression(
             '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
-            .'<button type="submit" class="btn btn-sm btn-outline-primary">案内を発行<\/button>/u',
+            .'<button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を発行<\/button>/u',
             $html
         );
         $this->assertStringNotContainsString('>取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
     }
 
-    public function test_受付アンケートが回答待ちなら案内を表示と取消のボタンを出し発行日は出さない(): void
+    public function test_受付アンケートが回答待ちなら受付アンケートの案内を表示と取消のボタンを出し発行日は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -765,17 +768,17 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertIntakeRowHasNoStatusText($html, ['2026/10/15']);
         $this->assertMatchesRegularExpression(
-            '/<button type="button" class="btn btn-sm btn-outline-danger"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"\s*'
+            '/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"\s*'
             .'data-intake-survey-trainee-id="'.$id.'">取消<\/button>/u',
             $html
         );
         // 取消のボタンの文字は「取消」だけ（2026-10 変更）。「案内を取消」のボタンは出さない
         $this->assertStringNotContainsString('>案内を取消<', $html);
-        $this->assertStringNotContainsString('>案内を発行<', $html);
-        // 「案内を表示」は S-0311 を別タブで開き、「取消」の左に置く（2026-10、段階3b）
+        $this->assertStringNotContainsString('>受付アンケートの案内を発行<', $html);
+        // 「受付アンケートの案内を表示」は S-0311 を別タブで開き、「取消」の左に置く（2026-10、段階3b）
         $printUrl = preg_quote(route('trainee-intake-survey-tokens.print', $id), '/');
         $this->assertMatchesRegularExpression(
-            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger"/u',
+            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
             $html
         );
     }
@@ -810,7 +813,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('aria-label="ポチの受付アンケート"', $html);
         $this->assertStringNotContainsString('<span>受付アンケート</span>', $html);
         $this->assertStringNotContainsString('回答を見る', $html);
-        $this->assertStringNotContainsString('>案内を発行<', $html);
+        $this->assertStringNotContainsString('>受付アンケートの案内を発行<', $html);
         $this->assertStringNotContainsString('>取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
         // 名前の行は名前だけ
@@ -849,7 +852,7 @@ class ClientCountRenderingTest extends TestCase
         // 名前の行のまとまりとボタンは今までどおり
         $this->assertStringContainsString('aria-label="ポチの受付アンケート"', $html);
         $this->assertStringContainsString('aria-label="たまの受付アンケート"', $html);
-        $this->assertSame(1, substr_count($html, '>案内を発行</button>'));
+        $this->assertSame(1, substr_count($html, '>受付アンケートの案内を発行</button>'));
         $this->assertSame(1, substr_count($html, '>取消</button>'));
         $this->assertStringContainsString(route('trainee-intake-survey-tokens.store', $notIssued), $html);
     }
@@ -865,7 +868,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertIntakeRowHasNoStatusText($html);
-        $this->assertStringContainsString('>案内を発行<', $html);
+        $this->assertStringContainsString('>受付アンケートの案内を発行<', $html);
         $this->assertStringNotContainsString('暮らしの様子', $html);
     }
 
@@ -918,6 +921,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertLessThan(strpos($html, '<dl class="row mb-0 small">'), $posGroup);
         // 区切り線つきの下の行はない
         $this->assertStringNotContainsString('border-top mt-2 pt-2', $html);
-        $this->assertSame(1, substr_count($html, '<span>受付アンケート</span>'));
+        // まとまりに「受付アンケート」のラベルの文字は置かない（2026-10 変更）
+        $this->assertStringNotContainsString('<span>受付アンケート</span>', $html);
     }
 }
