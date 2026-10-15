@@ -147,9 +147,9 @@
     <div class="mb-4">
         {{-- 状態別ボタンの表示条件（設計書 S-0305「操作ボタンの配置」）。
              基本 1 つだけだが、「メールアドレス登録待ち（期限内）」だけ「表示」＋「取消」の 2 つが並ぶ：
-              - メールアドレスなし              → 「登録案内を発行」（新規発行）
-              - メールアドレス登録待ち（期限内）→ 「登録案内を表示」＋「登録案内を取消」
-              - メールアドレス登録待ち（期限切れ）→ 「登録案内を発行」（期限切れは未発行と同じ扱い。取消は出さない）
+              - メールアドレスなし              → 「マイページ登録の案内を発行」（新規発行）
+              - メールアドレス登録待ち（期限内）→ 「マイページ登録の案内を表示」＋「取消」
+              - メールアドレス登録待ち（期限切れ）→ 「マイページ登録の案内を発行」（期限切れは未発行と同じ扱い。取消は出さない）
               - 初回設定待ち（期限内・期限切れ）→ 「登録を削除」
                 （行き止まりを作らないために出す。お客様が間違ったメールアドレスを
                  登録した場合、削除して「メールアドレスなし」に戻せば発行し直せる。
@@ -248,25 +248,32 @@
                     @endif
                     <span class="badge {{ $badge['class'] }}">{{ $badge['label'] }}</span>
                     {{-- 状態別ボタン群のラッパー。ms-auto で右端に寄せる。
-                         ラッパー内は gap-2 のみ・flex-nowrap（デフォルト）で、
-                         2 つ並ぶとき（登録待ち期限内）は隣り合ったまま右端に寄る --}}
-                    <div class="d-flex align-items-center gap-2 ms-auto">
+                         2 つ並ぶとき（登録待ち期限内）は隣り合ったまま右端に寄る。幅が足りないときは、
+                         ボタンごと折り返して右端に寄せたままにする（flex-wrap・justify-content-end。
+                         ボタンの中の文字は text-nowrap で折り返さない。2026-10 変更）。
+                         ボタン名は「マイページ登録の案内を発行／表示」と「取消」（2026-10 変更。何の案内かを
+                         ボタンの文字だけで分かるようにし、受付アンケートの案内のボタンと見分けるため。取消は隣の
+                         「マイページ登録の案内を表示」と確認〔M03〕の文言で対象が分かる）。読み上げで何の取消かが
+                         伝わるよう、案内のボタンが出るときはラッパーを role="group" にして
+                         「マイページ登録の案内」の名前を付ける（「登録を削除」だけの状態では付けない） --}}
+                    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"
+                         @if($showIssue || $showPrint || $showCancel) role="group" aria-label="マイページ登録の案内" @endif>
                         @if($showIssue)
                             {{-- 押下でその場で発行し、詳細画面へ戻る（モーダルは開かない） --}}
                             <form method="POST" action="{{ route('client-email-registration-tokens.store', $client) }}"
                                   class="d-inline m-0">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-primary">登録案内を発行</button>
+                                <button type="submit" class="btn btn-sm btn-primary text-nowrap">マイページ登録の案内を発行</button>
                             </form>
                         @endif
                         @if($showPrint)
                             <a href="{{ route('client-email-registration-tokens.print', $client) }}"
-                               class="btn btn-sm btn-primary" target="_blank" rel="noopener">登録案内を表示</a>
+                               class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示</a>
                         @endif
                         @if($showCancel)
-                            <button type="button" class="btn btn-sm btn-outline-danger"
+                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                     data-bs-toggle="modal" data-bs-target="#tokenCancellationModal">
-                                登録案内を取消
+                                取消
                             </button>
                         @endif
                         @if($showDeleteEmail)
@@ -529,7 +536,7 @@
                                      - 状態は Trainee::intake_survey_status（ClientController::show で
                                        trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）
                                      - 「受付アンケートの案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
-                                       「登録案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。隣の「受付アンケートの
+                                       「マイページ登録の案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。隣の「受付アンケートの
                                        案内を表示」で対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は
                                        付けない）
                                      - ボタンの文字は text-nowrap で途中で折り返さない（幅が足りないときは、ボタンごと次の行に移る）

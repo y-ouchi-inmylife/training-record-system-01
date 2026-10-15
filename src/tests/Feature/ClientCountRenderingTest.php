@@ -924,4 +924,85 @@ class ClientCountRenderingTest extends TestCase
         // まとまりに「受付アンケート」のラベルの文字は置かない（2026-10 変更）
         $this->assertStringNotContainsString('<span>受付アンケート</span>', $html);
     }
+
+    // ---- マイページ登録案内のボタン（3 段目のメールアドレス列。2026-10 変更） ----
+
+    /**
+     * 3 段目のメールアドレス列の状態別ボタンのラッパー（バッジの右）を取り出す。
+     * 受付アンケートの「取消」と取り違えないよう、ラッパーの中だけで確かめる
+     */
+    private function emailButtons(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"[^>]*>(.*?)<\/div>\s*<\/div>\s*<\/div>/su', $html, $m));
+
+        return $m[0];
+    }
+
+    private function emailRegToken(Client $client, string $expiresAt): void
+    {
+        DB::table('client_email_registration_tokens')->insert([
+            'client_id' => $client->id, 'is_used' => false, 'expires_at' => $expiresAt,
+        ]);
+    }
+
+    public function test_未登録ならマイページ登録の案内を発行のボタンを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+
+        $buttons = $this->emailButtons($this->get(route('clients.show', $client))->assertOk()->getContent());
+
+        $this->assertStringContainsString('role="group" aria-label="マイページ登録の案内"', $buttons);
+        $this->assertStringContainsString('<button type="submit" class="btn btn-sm btn-primary text-nowrap">マイページ登録の案内を発行</button>', $buttons);
+        $this->assertSame(0, preg_match('/>\s*登録案内を(発行|表示|取消)\s*</u', $buttons));
+        $this->assertStringNotContainsString('マイページ登録の案内を表示', $buttons);
+        $this->assertSame(0, preg_match('/>\s*取消\s*</u', $buttons));
+    }
+
+    public function test_登録待ちならマイページ登録の案内を表示と取消のボタンを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->emailRegToken($client, now()->addDays(2)->format('Y-m-d H:i:s'));
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $buttons = $this->emailButtons($html);
+
+        $this->assertStringContainsString('role="group" aria-label="マイページ登録の案内"', $buttons);
+        $printUrl = preg_quote(route('client-email-registration-tokens.print', $client), '/');
+        $this->assertMatchesRegularExpression('/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $buttons);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#tokenCancellationModal">\s*取消\s*<\/button>/u', $buttons);
+        // 古い文字のボタンは出さない
+        $this->assertSame(0, preg_match('/>\s*登録案内を(発行|表示|取消)\s*</u', $buttons));
+        $this->assertStringNotContainsString('マイページ登録の案内を発行', $buttons);
+        // 取消の確認（M03）の文言は今までどおり
+        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="tokenCancellationModalLabel">\s*マイページ登録案内の取消\s*<\/h5>/u', $html);
+        $this->assertStringContainsString('発行済みのマイページ登録案内が使えなくなります。<br>', $html);
+        $this->assertStringContainsString('すでにお渡しした案内からは登録できなくなります。', $html);
+    }
+
+    public function test_登録待ちで期限切れならマイページ登録の案内を発行のボタンを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->emailRegToken($client, now()->subDay()->format('Y-m-d H:i:s'));
+
+        $buttons = $this->emailButtons($this->get(route('clients.show', $client))->assertOk()->getContent());
+
+        $this->assertStringContainsString('>マイページ登録の案内を発行</button>', $buttons);
+        $this->assertSame(0, preg_match('/>\s*取消\s*</u', $buttons));
+    }
+
+    public function test_利用中なら登録を削除だけを出しまとまりの名前は付けない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $client->forceFill(['email' => 'yamada@example.com', 'password' => 'hashed'])->save();
+
+        $buttons = $this->emailButtons($this->get(route('clients.show', $client))->assertOk()->getContent());
+
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger"\s*data-bs-toggle="modal" data-bs-target="#emailDeletionModal">\s*登録を削除\s*<\/button>/u', $buttons);
+        $this->assertStringNotContainsString('role="group"', $buttons);
+        $this->assertStringNotContainsString('マイページ登録の案内', $buttons);
+    }
 }
