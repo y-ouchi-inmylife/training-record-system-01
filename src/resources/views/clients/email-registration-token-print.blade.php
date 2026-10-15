@@ -11,7 +11,9 @@
      操作エリアに含める要素だけを例外として認めている（設計書 S-0307
      備考「操作エリアのまとめ方」参照）。
      文面をコピーは有効な URL があるときだけ出すため `@if($url)` の内側に置く。
-     戻るリンクは URL の有無を問わず常に出す（条件分岐で出し分けない — 設計書参照）。 --}}
+     戻るリンクは URL の有無を問わず常に出す（条件分岐で出し分けない — 設計書参照）。
+     戻るは会員詳細へのリンクにする（history.back() にしない。発行のあと同じタブでこの画面を開いたとき、
+     発行の前の古い会員詳細に戻ることがあるため。2026-10）。 --}}
 <div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">
     <a href="{{ route('clients.show', $client) }}" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>
     @if($url)

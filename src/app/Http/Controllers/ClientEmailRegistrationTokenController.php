@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
  * メールアドレス登録用 URL の発行コントローラ（トレーナー側の操作）
  *
  * S-0305 クライアント詳細画面から「マイページ登録の案内を発行」を
- * 実行したときの受け口。未発行時の発行と再発行を同じエンドポイントで扱う。
+ * 実行したときの受け口。未発行時の発行と期限切れからの発行し直しを同じエンドポイントで扱う。
  * 発行するトークン自体（`client_email_registration_tokens.token` に基づく URL）
  * は設計書上「メールアドレス登録用 URL」と呼び、この呼称は内部の識別として維持する。
  *
@@ -29,33 +29,42 @@ class ClientEmailRegistrationTokenController extends Controller
     /**
      * メールアドレス登録用 URL の発行処理
      *
-     * 発行後はクライアント詳細画面（S-0305）にリダイレクトし、完了メッセージを
-     * 表示する。案内シート（S-0307）を開くのはトレーナー側の判断とし、詳細画面
-     * の「マイページ登録の案内を表示」ボタン（別タブで開く）から任意のタイミングで開く。
+     * 発行のあとは、同じタブで案内シート（S-0307）にリダイレクトする（2026-10 変更）。
+     * 発行のあとの次の作業は案内を見せる・印刷する・文面をコピーすることなので、
+     * 「マイページ登録の案内を表示」を押し直す手間をなくす。完了メッセージは載せない
+     * （S-0307 は印刷用の画面のため。S-0307 が開くこと自体が発行できたことの知らせになる）。
+     * S-0307 の「« 戻る」は会員詳細へのリンクなので、戻ると会員詳細が新しい状態で開く。
      *
-     * 過去の遷移案の経緯（requirements.md 6-3-6 の備考も参照）：
-     * - 案 A：同タブで印刷ページへ遷移 → 印刷ページから戻ったときに詳細画面が
-     *   キャッシュで発行前の状態のまま表示される問題があり不採用
-     * - 案 B：詳細画面へ戻しつつ `window.open` で別タブを開く → ブラウザの
-     *   ポップアップブロックで実用にならず不採用
-     * - 現行：詳細画面に戻して完了メッセージだけを表示し、案内シートは
-     *   ボタン押下で明示的に開く（当初案に戻した）
+     * 有効な（未使用で期限内の）トークンがすでにあるとき（二重送信・ほかのタブで発行済みなど）は、
+     * 新しく発行せず、今ある案内の S-0307 を開く（お客様に渡すものは同じため）。
+     * 期限切れの未使用トークンしかないときは、それを消して作り直す（期限切れからの発行し直し）。
+     *
+     * 2 回の送信がほぼ同時に届いても有効な案内を作り直さないよう、トランザクションの中で
+     * 会員の行をロックしてから確かめる（受付アンケート案内の発行と同じ作り）。
+     *
+     * 設計書: requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」
      */
     public function store(Client $client): RedirectResponse
     {
-        // 既存の未使用トークンがあれば再発行扱い
-        $wasReissued = $client->emailRegistrationTokens()
-            ->where('is_used', false)
-            ->exists();
-
         DB::transaction(function () use ($client) {
-            // 対象クライアントの未使用メールアドレス登録用トークンを物理削除
+            Client::query()->whereKey($client->id)->lockForUpdate()->first();
+
+            // 有効な案内がすでにあれば、何も作らず・消さずにその案内を開く
+            $hasActive = $client->emailRegistrationTokens()
+                ->where('is_used', false)
+                ->where('expires_at', '>', now())
+                ->exists();
+            if ($hasActive) {
+                return;
+            }
+
+            // 対象クライアントの未使用メールアドレス登録用トークン（期限切れ）を物理削除
             $client->emailRegistrationTokens()
                 ->where('is_used', false)
                 ->delete();
 
             // 対象クライアントの未使用ログイン用リンクも物理削除
-            // 再発行時に送信済みログイン用リンクも無効化するため
+            // 発行し直したときに送信済みログイン用リンクも無効化するため
             $client->loginLinkTokens()
                 ->where('is_used', false)
                 ->delete();
@@ -72,13 +81,7 @@ class ClientEmailRegistrationTokenController extends Controller
             ]);
         });
 
-        $message = $wasReissued
-            ? 'マイページ登録案内を発行し直しました。'
-            : 'マイページ登録案内を発行しました。';
-
-        return redirect()
-            ->route('clients.show', $client)
-            ->with('success', $message);
+        return redirect()->route('client-email-registration-tokens.print', $client);
     }
 
     /**
