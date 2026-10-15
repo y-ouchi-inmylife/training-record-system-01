@@ -30,12 +30,6 @@
             max-width: 780px;
             margin: 0 auto;
         }
-        .print-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin: 0 0 1.5rem;
-        }
         .print-qr {
             display: flex;
             justify-content: center;

@@ -91,7 +91,8 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
 
         $html = $this->printPage();
 
-        $this->assertStringContainsString('<h1 class="print-title">マイページ登録のご案内</h1>', $html);
+        // 見出しは帯（2026-10 変更）。帯のすぐ後ろに QR コード
+        $this->assertMatchesRegularExpression('/>マイページ登録のご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
         $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
         $this->assertStringContainsString('<li>上の QR コードを読み取ります</li>', $html);
@@ -159,7 +160,8 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
     {
         $html = $this->printPage();
 
-        $this->assertStringContainsString('<h1 class="print-title">発行済みのマイページ登録案内がありません</h1>', $html);
+        // 「ない」ことは本文の 1 行目（太字）で伝える。見出しは帯だけ（2026-10 変更）
+        $this->assertStringContainsString('<strong>発行済みのマイページ登録案内がありません</strong>', $html);
         $this->assertStringContainsString('会員詳細画面から発行してください。', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('<div class="print-url">', $html);
@@ -178,26 +180,30 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringContainsString('発行済みのマイページ登録案内がありません', $this->printPage());
     }
 
-    public function test_見出しの上にマイページ登録の青の帯を出しアイコンは読み上げない(): void
+    public function test_マイページ登録のご案内の青の帯を見出しにしアイコンは読み上げない(): void
     {
         $this->issueToken();
 
         $html = $this->printPage();
 
-        // 帯（2026-10 追加）：文字は「マイページ登録」、色は青（print-band--mypage）、アイコンは aria-hidden
-        $this->assertMatchesRegularExpression('/<div class="print-band print-band--mypage">\s*<p class="print-band-label"><i class="bi bi-person-circle" aria-hidden="true"><\/i>マイページ登録<\/p>\s*<\/div>/u', $html);
-        // 操作エリアの下、見出しの上
-        $this->assertMatchesRegularExpression('/print-actions.*<div class="print-band print-band--mypage">.*<h1 class="print-title">マイページ登録のご案内<\/h1>/su', $html);
+        // 帯＝見出し（h1。2026-10 変更）：文字は「マイページ登録のご案内」、色は青（print-band--mypage）、アイコンは aria-hidden
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--mypage"><span class="print-band-label"><i class="bi bi-person-circle" aria-hidden="true"><\/i>マイページ登録のご案内<\/span><\/h1>/u', $html);
+        // 操作エリアの下
+        $this->assertMatchesRegularExpression('/print-actions.*<h1 class="print-band print-band--mypage">/su', $html);
+        // 見出しは帯の 1 つだけ。「マイページ登録のご案内」は <title> を除くと帯の 1 か所だけ
+        $this->assertSame(1, substr_count($html, '<h1'));
+        $this->assertSame(1, substr_count(preg_replace('/<title>.*?<\/title>/su', '', $html), 'マイページ登録のご案内'));
+        $this->assertStringNotContainsString('print-title', $html);
         // 受付アンケートの帯は出さない
         $this->assertStringNotContainsString('print-band--intake', $html);
     }
 
-    public function test_有効な案内がないときもマイページ登録の帯を出す(): void
+    public function test_有効な案内がないときもマイページ登録の帯を見出しにする(): void
     {
         $html = $this->printPage();
 
-        $this->assertStringContainsString('<div class="print-band print-band--mypage">', $html);
-        $this->assertStringContainsString('<h1 class="print-title">発行済みのマイページ登録案内がありません</h1>', $html);
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--mypage"><span class="print-band-label"><i class="bi bi-person-circle" aria-hidden="true"><\/i>マイページ登録のご案内<\/span><\/h1>/u', $html);
+        $this->assertSame(1, substr_count($html, '<h1'));
     }
 
     public function test_システム管理者は403(): void

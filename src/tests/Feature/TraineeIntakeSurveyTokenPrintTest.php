@@ -93,9 +93,8 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $html = $this->printPage();
 
         $this->assertSame('/client-portal/intake-survey/'.self::TOKEN, parse_url($url, PHP_URL_PATH));
-        $this->assertStringContainsString('<h1 class="print-title">受付アンケートのご案内</h1>', $html);
-        // 見出しのすぐ下に QR コード。「愛犬のことを教えてください」の行は置かない（2026-10 変更。設計書 S-0311）
-        $this->assertMatchesRegularExpression('/<h1 class="print-title">受付アンケートのご案内<\/h1>\s*<div class="print-qr">/u', $html);
+        // 見出し（帯）のすぐ下に QR コード。「愛犬のことを教えてください」の行は置かない（2026-10 変更。設計書 S-0311）
+        $this->assertMatchesRegularExpression('/>受付アンケートのご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
         $this->assertStringNotContainsString('愛犬のことを教えてください', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
         $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
@@ -181,7 +180,8 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
     {
         $html = $this->printPage();
 
-        $this->assertStringContainsString('<h1 class="print-title">有効な受付アンケート案内がありません。</h1>', $html);
+        // 「ない」ことは本文（太字）で伝える。見出しは帯だけ（2026-10 変更）
+        $this->assertStringContainsString('<strong>有効な受付アンケート案内がありません。</strong>', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('<div class="print-url">', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
@@ -204,26 +204,30 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertSame(0, AccessLog::query()->count());
     }
 
-    public function test_見出しの上に受付アンケートの緑の帯を出しアイコンは読み上げない(): void
+    public function test_受付アンケートのご案内の緑の帯を見出しにしアイコンは読み上げない(): void
     {
         $this->issueToken();
 
         $html = $this->printPage();
 
-        // 帯（2026-10 追加）：文字は「受付アンケート」、色は緑（print-band--intake）、アイコンは aria-hidden
-        $this->assertMatchesRegularExpression('/<div class="print-band print-band--intake">\s*<p class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケート<\/p>\s*<\/div>/u', $html);
-        // 操作エリアの下、見出しの上
-        $this->assertMatchesRegularExpression('/print-actions.*<div class="print-band print-band--intake">.*<h1 class="print-title">受付アンケートのご案内<\/h1>/su', $html);
+        // 帯＝見出し（h1。2026-10 変更）：文字は「受付アンケートのご案内」、色は緑（print-band--intake）、アイコンは aria-hidden
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケートのご案内<\/span><\/h1>/u', $html);
+        // 操作エリアの下
+        $this->assertMatchesRegularExpression('/print-actions.*<h1 class="print-band print-band--intake">/su', $html);
+        // 見出しは帯の 1 つだけ。「受付アンケートのご案内」は <title> を除くと帯の 1 か所だけ
+        $this->assertSame(1, substr_count($html, '<h1'));
+        $this->assertSame(1, substr_count(preg_replace('/<title>.*?<\/title>/su', '', $html), '受付アンケートのご案内'));
+        $this->assertStringNotContainsString('print-title', $html);
         // マイページ登録の帯は出さない
         $this->assertStringNotContainsString('print-band--mypage', $html);
     }
 
-    public function test_有効な案内がないときも受付アンケートの帯を出す(): void
+    public function test_有効な案内がないときも受付アンケートの帯を見出しにする(): void
     {
         $html = $this->printPage();
 
-        $this->assertStringContainsString('<div class="print-band print-band--intake">', $html);
-        $this->assertStringContainsString('<h1 class="print-title">有効な受付アンケート案内がありません。</h1>', $html);
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケートのご案内<\/span><\/h1>/u', $html);
+        $this->assertSame(1, substr_count($html, '<h1'));
     }
 
     public function test_システム管理者は403(): void
