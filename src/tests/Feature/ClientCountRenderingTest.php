@@ -581,7 +581,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertLessThan(strpos($html, '>たま</a>'), strpos($html, '>写真なし</span>'));
     }
 
-    public function test_写真は名前と項目の左にあり計測を追加は写真の有無にかかわらず同じ並べ方(): void
+    public function test_写真は名前と項目の左にあり写真の有無にかかわらず同じ並べ方(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -604,12 +604,32 @@ class ClientCountRenderingTest extends TestCase
             $html
         );
 
-        // 「計測を追加」ボタンは写真の有無にかかわらず同じ並べ方（写真を置く前と同じクラス）
-        $ddPattern = '/<dd class="col-8 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2">/u';
-        $this->assertSame(2, preg_match_all($ddPattern, $html));
-        $this->assertSame(2, substr_count($html, '<button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0"'));
+        // 最終計測の行は写真の有無にかかわらず同じ並べ方（ほかの属性と同じ dd）
+        $this->assertSame(2, preg_match_all('/<dt class="col-4 fw-normal text-muted">最終計測<\/dt>\s*<dd class="col-8 mb-0"><\/dd>/u', $html));
         // 項目の dl は写真の有無で変わらない（flex-grow-1 などを持たない）
         $this->assertSame(2, substr_count($html, '<dl class="row mb-0 small">'));
+    }
+
+    public function test_トレーニーの欄に計測を追加のボタンと計測値のモーダルを出さない(): void
+    {
+        // 計測値の登録はトレーニー詳細（S-0309）の計測値の欄から行う（2026-10 変更）
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        // このテストの表には体重の列がないため、最終計測の値を確かめるときだけ足す
+        Schema::table('trainee_measurements', fn (Blueprint $table) => $table->decimal('weight_kg', 5, 2)->nullable());
+        DB::table('trainee_measurements')->insert([
+            'trainee_id' => $id, 'measured_date' => '2026-10-13', 'measured_time' => '08:00:00', 'weight_kg' => 3.2,
+        ]);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('計測を追加', $html);
+        $this->assertStringNotContainsString('measurementModal', $html);
+        $this->assertStringNotContainsString('name="return_to"', $html);
+        $this->assertStringNotContainsString(route('trainee-measurements.store', $id), $html);
+        // 最終計測の値は今までどおり（ほかの属性と同じ dd の中に値だけ）
+        $this->assertMatchesRegularExpression('/<dt class="col-4 fw-normal text-muted">最終計測<\/dt>\s*<dd class="col-8 mb-0">2026\/10\/13（3\.20kg）<\/dd>/u', $html);
     }
 
     public function test_pc幅では左のトレーニング記録カードを右の列の高さに合わせる(): void
@@ -795,9 +815,9 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('案内を表示', $html);
         // 名前の行は名前だけ
         $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="[^"]+">ポチ<\/a><\/h6>\s*<\/div>/u', $html);
-        // 「暮らしの様子」のリンクは、最終計測（と計測を追加）の後ろ、属性の並びのすぐ後ろ。S-0309 の #intake-survey へ
+        // 「暮らしの様子」のリンクは、最終計測の後ろ、属性の並びのすぐ後ろ。S-0309 の #intake-survey へ
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
-        $this->assertGreaterThan(strpos($html, '>計測を追加</button>'), strpos($html, '>暮らしの様子</a>'));
+        $this->assertGreaterThan(strpos($html, '>最終計測</dt>'), strpos($html, '>暮らしの様子</a>'));
         // 回答日時は出さない
         $this->assertStringNotContainsString('2026/10/16', $html);
     }

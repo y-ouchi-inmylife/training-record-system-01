@@ -366,11 +366,11 @@
         </div>
 
         {{-- 右カラム: トレーニー一覧（設計書 S-0305 セクション3）。
-             1 トレーニー = 1 カード。**カード全体クリックは廃止し、名前だけをリンク**にする
-             （2026-09 変更。カード内に「計測を追加」ボタンを置くにあたり、913c31e で発生した
-             stretched-link とボタンの共存問題を根本的に回避するため。設計書 S-0305
-             セクション3 設計方針「『計測を追加』ボタンをカード内に置く／カード全体クリックを
-             廃止」参照）。編集は名前リンクで S-0309 へ遷移してから「編集」ボタンで行う。
+             1 トレーニー = 1 カード。**カード全体クリックはせず、名前（と写真の枠）だけをリンク**にする
+             （2026-09 変更。カード内にボタン〔受付アンケートの操作など〕を置くと、913c31e で発生した
+             stretched-link とボタンの共存問題が起きるため。設計書 S-0305 セクション3 設計方針
+             「カード全体はクリック領域にしない」参照）。編集・計測値の登録は、名前リンクで S-0309 へ
+             遷移してから行う（2026-10 変更：会員詳細の「計測を追加」をなくした）。
              未登録項目は値を空欄にし行ごと消さない（§2-4 参照）。 --}}
         {{-- 右カラム: トレーニー一覧。col-lg-5（2026-09 変更で 4→5 に広げた。詳細は
              screen-design.md S-0305 設計方針「2カラム本体の幅を 8:4 から 7:5 に」参照）。 --}}
@@ -480,16 +480,15 @@
                                  「クリック可能」を伝える（Bootstrap の <a> 既定の下線を維持する
                                  ため text-decoration-none は付けない）。 --}}
                             <div class="list-group-item">
-                                {{-- 左：写真（あるときだけ）、右：名前・項目・「計測を追加」ボタン の横並び
+                                {{-- 左：写真の枠、右：名前・項目 の横並び
                                      （設計書 S-0305 セクション3「写真」）。align-items-start で写真の上端を
                                      名前の行の上端にそろえる。右の列は flex-grow-1 で残りの幅いっぱいに広げ、
-                                     min-width: 0 で長い値でも横にはみ出さない。右の列の中身は写真を置く前と同じ作りで、
-                                     「計測を追加」ボタンは写真の有無にかかわらず右の列の右端にそろう。 --}}
+                                     min-width: 0 で長い値でも横にはみ出さない。右の列の中身は写真の有無にかかわらず同じ作り。 --}}
                                 <div class="d-flex align-items-start gap-3">
                                     {{-- トレーニーの写真（左、96px 四方。上端は名前の行の上端にそろう）。
                                          写真がないときも同じ枠を出し、中に「写真なし」を出す（トレーニー詳細 S-0309 の
                                          写真なしの表示と同じ文言・text-muted・0.875rem）。枠は写真の有無で共通にし、
-                                         中身だけを切り替える。これで写真の有無にかかわらず名前・項目・「計測を追加」の位置がそろう。
+                                         中身だけを切り替える。これで写真の有無にかかわらず名前・項目の位置がそろう。
                                          押すとトレーニー詳細（S-0309）を開く（写真の有無にかかわらず。名前のリンクと同じ行き先）。
                                          写真がないときは img の代替テキストがないため、リンクに読み上げ用の名前を付ける。
                                          URL はトレーニー詳細と同じ Trainee::photo_url（media ディスクの署名付き一時 URL を
@@ -581,29 +580,16 @@
                                          最新 1 件は Trainee::latest_measurement アクセサ経由で取り出し、
                                          「Y/m/d（N.NNkg）」で表示。0 件は空欄（§2-4 参照）。
                                          N+1 回避のため ClientController::show で trainees.measurements を eager load 済み。 --}}
+                                    {{-- 計測値の登録のボタンは置かない（2026-10 変更。計測値の登録はトレーニー詳細 S-0309 の
+                                         計測値の欄から行い、会員詳細のトレーニーの欄はトレーニーの情報を見る場所にするため）。
+                                         値だけをほかの属性と同じ dd で出す（行の高さもほかの属性とそろう） --}}
                                     <dt class="col-4 fw-normal text-muted">最終計測</dt>
-                                    {{-- 値と「計測を追加」ボタンを横並びで表示（設計書 S-0305
-                                         セクション3「『計測を追加』ボタンの位置を最終計測の値の横に」参照）。
-                                         当初はカード下部の独立した行に置いていたが、位置が中途半端で
-                                         カードが縦に間延びしたため値の右横に移動した。flex-wrap を明示：
-                                         狭いときはボタンが下に折り返す（今回は折り返しを防ぐ工夫は入れない）。
-                                         値が空欄（計測値 0 件）でもボタンは表示する
-                                         （まだ計測がないトレーニーにこそ追加したいため）。 --}}
-                                    <dd class="col-8 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                                        <span>
-                                            @if($trainee->latest_measurement)
-                                                {{ $trainee->latest_measurement->measured_date->format('Y/m/d') }}（{{ number_format((float) $trainee->latest_measurement->weight_kg, 2) }}kg）
-                                            @endif
-                                        </span>
-                                        <button type="button" class="btn btn-sm btn-outline-primary flex-shrink-0"
-                                                onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()">計測を追加</button>
-                                    </dd>
+                                    <dd class="col-8 mb-0">@if($trainee->latest_measurement){{ $trainee->latest_measurement->measured_date->format('Y/m/d') }}（{{ number_format((float) $trainee->latest_measurement->weight_kg, 2) }}kg）@endif</dd>
                                 </dl>
                                 {{-- 暮らしの様子（受付アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。
                                      属性の並び（dl.row）の最後、最終計測の下に、文字のリンク（ボタンではない）で置く。dl の行には入れず、
                                      dl のすぐ後ろに置く（値の列がない 1 項目のため。dl.row のラベル列〔col-4〕と同じく左端から始まるので、
-                                     左の位置は属性の見出しにそろう）。「計測を追加」は今までどおり最終計測の値の右に置き、このリンクとは
-                                     別の行なので重ならない。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
+                                     左の位置は属性の見出しにそろう）。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
                                      読み上げでどのトレーニーのものかが分かるよう、aria-label を「{表示名}の暮らしの様子」にする
                                      （見える文字「暮らしの様子」を含む） --}}
                                 @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
@@ -632,19 +618,6 @@
                     <a href="{{ route('trainees.create', $client) }}" class="btn btn-sm btn-outline-primary">トレーニーを追加</a>
                 </div>
             </div>
-
-            {{-- 計測値モーダル（トレーニーごとに 1 個、カードの外側に配置）。
-                 カード内の「計測を追加」ボタンから開く。トレーナー側の .card は
-                 hover 時の transform 変化を持たないため子要素として置いても機能は
-                 するが、Bootstrap のモーダルは position: fixed のオーバーレイで
-                 「表示上のカードの一部」ではないため、DOM ツリーでも兄弟として
-                 分離しておく（役割の分離）。設計書 S-0309「計測値モーダルの共用
-                 （S-0305 との）」参照。$returnTo='client' で成功時に S-0305 に戻す。 --}}
-            @if($client->trainees->count() > 0)
-                @foreach($client->trainees as $trainee)
-                    @include('trainees._measurement-modal', ['trainee' => $trainee, 'returnTo' => 'client'])
-                @endforeach
-            @endif
 
             {{-- 契約・利用の登録・編集モーダル（S-0305-M04 / M05）。回数カードのボタン・見出し・マスから開く。
                  $openModal はエラーで戻ったときに開き直すモーダルの種別（ClientController::show 参照）。 --}}

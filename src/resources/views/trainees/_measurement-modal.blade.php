@@ -1,4 +1,5 @@
-{{-- 計測値の登録・編集モーダル（登録と編集で共用、S-0305 / S-0309 の両方で使う汎用部品）。
+{{-- 計測値の登録・編集モーダル（登録と編集で共用。トレーニー詳細 S-0309 だけで使う。2026-10 変更：当初は会員詳細
+     S-0305 のトレーニーカードの「計測を追加」からも使っていた）。
      登録・編集で 1 つのモーダルを使い、JavaScript でフォームの `action` /
      `_method` / 各入力値を差し替える。
 
@@ -8,27 +9,21 @@
        //   新規登録: onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()"
        //   編集   : onclick="window.measurementModals[{{ $trainee->id }}].openForEdit(this.dataset)"
 
-     利用方法（S-0305 = 会員詳細、複数トレーニーが並ぶ画面）:
-       for-each の中で
-         include('trainees._measurement-modal', ['trainee' => $trainee, 'returnTo' => 'client'])
-       を呼ぶ形。実装例は resources/views/clients/show.blade.php を参照
-
      期待する変数:
        - $trainee  : App\Models\Trainee 親トレーニー（store URL 生成・ID の一意化に使う）
-       - $returnTo : string ('trainee' | 'client')
-                     成功時のリダイレクト先を判別する hidden。既定は 'trainee'（S-0309 との後方互換）。
-                     S-0305 では 'client' を渡して会員詳細に戻す。詳細は
-                     api-design.md 「計測値エンドポイントの `return_to` 仕様」参照。
 
-     ## 複数トレーニーに対応する ID の一意化（2026-09 変更、設計書 S-0305 セクション3 参照）
+     成功後は常にトレーニー詳細（S-0309）に戻る（api-design.md「計測値エンドポイントのリダイレクト先」）。
+     2026-10 変更：当初は hidden return_to（'client' / 'trainee'）で送信元を判別し、会員詳細から登録したときは
+     会員詳細に戻していた。
+
+     ## 複数トレーニーに対応する ID の一意化（2026-09 変更。S-0309 だけで使う今もこの形のまま。設計書 S-0309「計測値モーダル」）
 
      以前は固定 ID（`measurementModal` / `measurementForm` / `measured_date` など）を
      使っていたが、S-0305 は 1 会員に複数トレーニーが並ぶため重複違反になる。
      モーダル・フォーム・入力欄のすべての ID に `-{{ $trainee->id }}` を付けて
      トレーニーごとに一意化する。あわせて `window.measurementModal` の単一
      オブジェクトを `window.measurementModals[traineeId]` の辞書に変更した。
-     S-0309 も同じ形（辞書経由）に揃える（詳細は screen-design.md S-0309
-     「計測値モーダルの共用（S-0305 との）」参照）。
+     S-0309 も同じ形（辞書経由）に揃えた（詳細は screen-design.md S-0309「計測値モーダル」参照）。
 
      ## 新規登録時の初期日時（変更なし、設計書 S-0309「新規登録時の初期値」参照）
 
@@ -47,9 +42,6 @@
 --}}
 
 @php
-    // returnTo の既定値。S-0309 側は引数なしで include するため、ここでフォールバックを設定する。
-    $returnTo = $returnTo ?? 'trainee';
-
     // 計測値フォームに関するエラーがあるかを Blade 側で判定してから JS に渡す。
     // トレーニー本体のエラー（トレーニー編集フォームで発生）とは区別する。
     $measurementFieldNames = ['measured_date', 'measured_time', 'weight_kg'];
@@ -80,10 +72,6 @@
                      だけを開き直す。TraineeMeasurementRequest は _trainee_id をルールに
                      持たないため validated() に混入しない。 --}}
                 <input type="hidden" name="_trainee_id" value="{{ $trainee->id }}">
-                {{-- 成功時のリダイレクト先を送信元から示す（api-design.md「計測値エンドポイントの
-                     `return_to` 仕様」参照）。値は 'client' / 'trainee' のみ。URL は渡さない
-                     （open redirect の回避）。 --}}
-                <input type="hidden" name="return_to" value="{{ $returnTo }}">
 
                 <div class="modal-header">
                     <h5 class="modal-title" id="measurementModalLabel-{{ $trainee->id }}">計測値の登録</h5>
