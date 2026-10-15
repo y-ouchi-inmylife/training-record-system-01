@@ -61,6 +61,9 @@ class TraineeShowIntakeSurveyTest extends TestCase
         });
         $this->createTraineeIntakeSurveyTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
+        // 性格診断の欄（2026-10 追加）
+        $this->createTraineePersonalityDiagnosisTokensTable();
+        $this->createTraineePersonalityDiagnosisResultsTable();
 
         $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
         $admin->id = 100;
@@ -96,7 +99,8 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $start = strpos($html, 'id="intake-survey"');
         $this->assertNotFalse($start);
         $card = substr($html, $start);
-        $end = strpos($card, 'id="measurementModal-');
+        // 暮らしの様子の欄の次は性格診断の欄（2026-10 追加）。その手前まで
+        $end = strpos($card, 'id="personality-diagnosis"');
         $this->assertNotFalse($end);
 
         return substr($card, 0, $end);
@@ -347,8 +351,8 @@ class TraineeShowIntakeSurveyTest extends TestCase
 
         $this->assertStringNotContainsString('data-intake-survey-basics', $html);
         $this->assertStringNotContainsString('data-intake-survey-answers', $html);
-        // 「（未回答）」は欄の本文の 1 行だけ
-        $this->assertSame(1, substr_count($html, '（未回答）'));
+        // 暮らしの様子の欄の「（未回答）」は本文の 1 行だけ（性格診断の欄にも「（未回答）」があるので、欄の中で数える）
+        $this->assertSame(1, substr_count($this->intakeCard($html), '（未回答）'));
     }
 
     public function test_回答が複数件あれば最新の1件を出す(): void

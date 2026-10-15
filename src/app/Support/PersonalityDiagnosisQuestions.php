@@ -103,6 +103,21 @@ class PersonalityDiagnosisQuestions
     }
 
     /**
+     * 設問の版ごとの 50 問（ID → カテゴリの値・設問の文）。定義のない版なら null（2026-10 追加）。
+     * 結果（D-1200）を表示するときは、結果の question_version に合った設問の文で出す（S-0309）。
+     * 今の版は v1 だけ。設問の文を直して版を上げるときは、前の版の設問もここで返せるように残すこと
+     *
+     * @return array<string, array{category: string, text: string}>|null
+     */
+    public static function questionsFor(string $version): ?array
+    {
+        return match ($version) {
+            self::VERSION => self::questions(),
+            default => null,
+        };
+    }
+
+    /**
      * カテゴリごとの設問の ID（カテゴリの値 → ID の一覧）。並びは categories() と同じ
      *
      * @return array<string, list<string>>

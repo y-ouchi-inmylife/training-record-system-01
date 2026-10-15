@@ -57,8 +57,9 @@ class TraineeController extends Controller
     public function show(Trainee $trainee): View
     {
         // latestIntakeSurveyResponse と activeIntakeSurveyToken は受付アンケートの欄の状態と、
-        // 削除確認の文言に使う（2026-10 追加）
-        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken']);
+        // 削除確認の文言に使う（2026-10 追加）。personalityDiagnosisResults は性格診断の欄の結果の一覧
+        // （新しい順。2026-10 追加。何件あってもクエリは 1 本）
+        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults']);
 
         // 削除確認ダイアログに件数を含めるため、コントローラで数えて渡す。
         $measurementCount = $trainee->measurements->count();

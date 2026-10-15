@@ -47,6 +47,10 @@ class TraineeShowAttributesRenderingTest extends TestCase
             $trainee->setRelation('activeIntakeSurveyToken', null);
             $trainee->setRelation('latestIntakeSurveyResponse', null);
         }
+        // 性格診断の欄の結果（2026-10 追加）。呼び出し側が渡さなければ結果なし
+        if (! $trainee->relationLoaded('personalityDiagnosisResults')) {
+            $trainee->setRelation('personalityDiagnosisResults', new EloquentCollection([]));
+        }
 
         return $this->withViewErrors([])->view('trainees.show', [
             'trainee' => $trainee,

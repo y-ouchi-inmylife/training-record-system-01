@@ -53,6 +53,8 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
         // 受付アンケートの欄の状態（2026-10 追加）。この表示では未発行
         $trainee->setRelation('activeIntakeSurveyToken', null);
         $trainee->setRelation('latestIntakeSurveyResponse', null);
+        // 性格診断の欄の結果（2026-10 追加）。結果なし
+        $trainee->setRelation('personalityDiagnosisResults', new EloquentCollection([]));
 
         // $errors（ViewErrorBag）はビュー内の partial（_measurement-modal.blade.php）で
         // 参照されるため、withViewErrors([]) で空のバッグを bind してから描画する。

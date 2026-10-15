@@ -231,6 +231,100 @@
         </div>
     </div>
 
+    {{-- 性格診断の欄（2026-10 追加。要件定義書 6-16-2・6-16-13、設計書 S-0309「性格診断の欄」）。暮らしの様子の欄の下に置き、いつも出す。
+         - 結果（D-1200）を新しい順（Trainee::personalityDiagnosisResults()。TraineeController::show で読み込み済み）に並べる。
+           結果がないときは本文に「（未回答）」とだけ出す（暮らしの様子と同じ見た目）
+         - 各回の見出しの行（回答日 Y/m/d とタイプ）を押すと開閉する（Bootstrap の collapse。aria-expanded・aria-controls）。
+           いちばん新しい回は最初から開いておき、ほかは閉じておく。複数の回を同時に開いてよい
+         - 開いた回の中身：7 カテゴリの点数の表（この回と前回。前回はその回の 1 つ後ろ〔古い方〕の結果。いちばん古い回は
+           「前回」の列を出さない）と、50 問の回答（折りたたみ。最初は閉じる）
+         - 点数は表示の値（小数第 1 位）。保存の値（小数第 2 位）から四捨五入する（TraineePersonalityDiagnosisResult::displayScores()）
+         - 50 問の回答は、結果の設問の版に合った設問の文で出す（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は
+           設問の ID を出す）。答えの表示は選択肢の表示の文（「2：時々ある」「未経験」など）
+         - 操作（発行・表示・取消）は置かない（会員詳細 S-0305 だけで行う）
+         - id="personality-diagnosis" と scroll-margin-top は、会員詳細の「性格診断」のリンクの飛び先にするため（暮らしの様子と同じ値） --}}
+    @php
+        $pdResults = $trainee->personalityDiagnosisResults;
+        $pdCategories = \App\Support\PersonalityDiagnosisQuestions::categories();
+        $pdIdsByCategory = \App\Support\PersonalityDiagnosisQuestions::questionIdsByCategory();
+        $pdChoices = \App\Support\PersonalityDiagnosisQuestions::choices();
+    @endphp
+    <div class="card mb-3" id="personality-diagnosis" style="scroll-margin-top: 4.5rem;">
+        <div class="card-header">
+            <h6 class="mb-0">性格診断</h6>
+        </div>
+        @if($pdResults->isEmpty())
+            <div class="card-body">
+                <p class="mb-0 text-muted">（未回答）</p>
+            </div>
+        @else
+            <div class="list-group list-group-flush" data-personality-diagnosis-results>
+                @foreach($pdResults as $result)
+                    @php
+                        $previous = $pdResults->get($loop->index + 1);
+                        $display = $result->displayScores();
+                        $previousDisplay = $previous?->displayScores();
+                        $questions = \App\Support\PersonalityDiagnosisQuestions::questionsFor($result->question_version);
+                        $collapseId = 'personality-diagnosis-result-'.$result->id;
+                    @endphp
+                    <div class="list-group-item">
+                        <button type="button" class="btn btn-link text-start text-decoration-none p-0 w-100 d-flex flex-wrap gap-2 align-items-center"
+                                data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}"
+                                aria-expanded="{{ $loop->first ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}">
+                            <span>{{ $result->answered_at->format('Y/m/d') }}</span>
+                            <span class="fw-bold">{{ $result->personality_type_label }}</span>
+                        </button>
+                        <div class="collapse{{ $loop->first ? ' show' : '' }} mt-3" id="{{ $collapseId }}" data-personality-diagnosis-result>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <table class="table table-sm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col" class="fw-normal text-muted">カテゴリ</th>
+                                                <th scope="col" class="fw-normal text-muted text-end">今回</th>
+                                                @if($previous)
+                                                    <th scope="col" class="fw-normal text-muted text-end">前回</th>
+                                                @endif
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($pdCategories as $category => $categoryLabel)
+                                                <tr>
+                                                    <th scope="row" class="fw-normal">{{ $categoryLabel }}</th>
+                                                    <td class="text-end">{{ $display[$category] }}</td>
+                                                    @if($previous)
+                                                        <td class="text-end text-muted">{{ $previousDisplay[$category] }}</td>
+                                                    @endif
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {{-- 50 問の回答（折りたたみ。最初は閉じる） --}}
+                            <button type="button" class="btn btn-link btn-sm p-0 mt-3"
+                                    data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}-answers"
+                                    aria-expanded="false" aria-controls="{{ $collapseId }}-answers">50問の回答</button>
+                            <div class="collapse mt-2" id="{{ $collapseId }}-answers" data-personality-diagnosis-answers>
+                                @foreach($pdIdsByCategory as $category => $ids)
+                                    <p class="fw-bold small mb-1 @if(! $loop->first) mt-3 @endif">{{ $pdCategories[$category] }}</p>
+                                    <dl class="row small mb-0">
+                                        @foreach($ids as $id)
+                                            @php($value = $result->answers[$id] ?? null)
+                                            <dt class="col-sm-8 fw-normal">{{ $questions[$id]['text'] ?? $id }}</dt>
+                                            <dd class="col-sm-4 mb-1">{{ $value === null ? '' : ($pdChoices[(string) $value] ?? $value) }}</dd>
+                                        @endforeach
+                                    </dl>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
     {{-- 計測値の登録・編集モーダル（登録・編集で共用。この画面だけで使う）。登録・編集・削除の後は
          S-0309 に戻る。ID を一意化した辞書形式の経緯は設計書 S-0309「計測値モーダル」参照。 --}}
     @include('trainees._measurement-modal', ['trainee' => $trainee])
