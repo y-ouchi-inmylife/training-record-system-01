@@ -98,11 +98,16 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $start = strpos($html, 'id="intake-survey"');
         $this->assertNotFalse($start);
         $card = substr($html, $start);
-        // 暮らしの様子の欄の次は性格診断の欄（2026-10 追加）。その手前まで
-        $end = strpos($card, 'id="personality-diagnosis"');
-        $this->assertNotFalse($end);
+        // 暮らしの様子の欄はいちばん下の欄（2026-10 変更：性格診断の欄を上に移した）。次に来るのはモーダル
+        // （性格診断の削除確認・50 問の回答、計測値）なので、その手前まで
+        $ends = array_filter([
+            strpos($card, 'data-personality-diagnosis-delete'),
+            strpos($card, 'data-personality-diagnosis-answers'),
+            strpos($card, 'id="measurementModal-'),
+        ]);
+        $this->assertNotEmpty($ends);
 
-        return substr($card, 0, $end);
+        return substr($card, 0, min($ends));
     }
 
     private function addMeasurements(int $count): void
