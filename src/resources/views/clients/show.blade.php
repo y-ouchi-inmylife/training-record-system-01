@@ -622,25 +622,41 @@
                                      - 状態は Trainee::activePersonalityDiagnosisToken（ClientController::show で先読み済み）
                                      - ［案内を発行］は受付アンケート・マイページ登録と同じく、別タブで案内の画面（S-0312）を開き、元のタブは
                                        戻ってきたときに開き直す（target="_blank"・data-issue-in-new-tab。issue-in-new-tab.js）
-                                     - ［取消］は確認（S-0305-M07。trainees/_personality-diagnosis-cancel-modal.blade.php）を開く --}}
-                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">
-                                    <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis"
-                                       aria-label="{{ $trainee->display_name }}の性格診断">性格診断</a>
-                                    <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"
-                                         role="group" aria-label="{{ $trainee->display_name }}の性格診断">
-                                        @if($trainee->activePersonalityDiagnosisToken === null)
-                                            <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0"
-                                                  target="_blank" rel="noopener" data-issue-in-new-tab>
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行</button>
-                                            </form>
+                                     - ［取消］は確認（S-0305-M07。trainees/_personality-diagnosis-cancel-modal.blade.php）を開く
+                                     - 最新の診断の日付（2026-10 追加）：リンクとボタンの間に、最新の結果の回答日（Y/m/d）を出す。
+                                       結果がないときは「診断なし」（text-muted）。回答待ちの案内があっても、出すのは結果の日付。
+                                       最新は Trainee::latestPersonalityDiagnosisResult（ClientController::show で先読み済み。
+                                       トレーニー詳細のグラフの「今回」と同じ回）
+                                     - 日付を上の属性の値の列と左をそろえるため、行は属性の並び（dl.row）と同じ row・col-4／col-8 で組む。
+                                       ラベルの列にリンク、値の列の左に日付、値の列の右にボタンのまとまり。幅が足りないときに折り返すのは
+                                       値の列の中のボタンのまとまりだけで、日付はリンクと同じ行に残る --}}
+                                <div class="row small mt-1 align-items-center" data-personality-diagnosis-row>
+                                    <div class="col-4">
+                                        <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis"
+                                           aria-label="{{ $trainee->display_name }}の性格診断">性格診断</a>
+                                    </div>
+                                    <div class="col-8 d-flex flex-wrap align-items-center gap-2">
+                                        @if($trainee->latestPersonalityDiagnosisResult)
+                                            <span data-personality-diagnosis-latest>{{ $trainee->latestPersonalityDiagnosisResult->answered_at->format('Y/m/d') }}</span>
                                         @else
-                                            <a href="{{ route('trainee-personality-diagnosis-tokens.print', $trainee) }}"
-                                               class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">案内を表示</a>
-                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
-                                                    data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"
-                                                    data-personality-diagnosis-trainee-id="{{ $trainee->id }}">取消</button>
+                                            <span class="text-muted" data-personality-diagnosis-latest>診断なし</span>
                                         @endif
+                                        <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"
+                                             role="group" aria-label="{{ $trainee->display_name }}の性格診断">
+                                            @if($trainee->activePersonalityDiagnosisToken === null)
+                                                <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0"
+                                                      target="_blank" rel="noopener" data-issue-in-new-tab>
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行</button>
+                                                </form>
+                                            @else
+                                                <a href="{{ route('trainee-personality-diagnosis-tokens.print', $trainee) }}"
+                                                   class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">案内を表示</a>
+                                                <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
+                                                        data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"
+                                                        data-personality-diagnosis-trainee-id="{{ $trainee->id }}">取消</button>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                                 {{-- 暮らしの様子（受付アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。

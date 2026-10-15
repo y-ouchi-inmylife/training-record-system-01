@@ -91,6 +91,8 @@ class ClientCountRenderingTest extends TestCase
         $this->createTraineeIntakeSurveyResponsesTable();
         // 性格診断の案内（2026-10 追加）。会員詳細の「性格診断」の行のボタンに使う
         $this->createTraineePersonalityDiagnosisTokensTable();
+        // 性格診断の結果（性格診断の行の最新の診断の日付。2026-10 追加）
+        $this->createTraineePersonalityDiagnosisResultsTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;
@@ -811,8 +813,8 @@ class ClientCountRenderingTest extends TestCase
     {
         $url = preg_quote(route('trainees.show', $traineeId).'#intake-survey', '/');
 
-        // 性格診断の行（外側の div とボタンのまとまりの div）のすぐ後ろ（2026-10 変更：当初は属性の並び〔dl〕のすぐ後ろ）
-        return '/role="group" aria-label="'.preg_quote($name, '/').'の性格診断">.*?<\/div>\s*<\/div>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
+        // 性格診断の行（ボタンのまとまり・値の列・行の div）のすぐ後ろ（2026-10 変更：当初は属性の並び〔dl〕のすぐ後ろ）
+        return '/role="group" aria-label="'.preg_quote($name, '/').'の性格診断">.*?<\/div>\s*<\/div>\s*<\/div>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
     }
 
     public function test_受付アンケートが回答済みなら名前の行のまとまりを出さず性格診断の行の下に暮らしの様子のリンクを出す(): void
@@ -1270,7 +1272,7 @@ class ClientCountRenderingTest extends TestCase
         // 性格診断の行。トレーニー詳細の欄の順にそろえた）
         // 回答済みのトレーニー：属性の並び（dl）のすぐ後ろに性格診断の行、その後ろに暮らしの様子のリンク
         $this->assertMatchesRegularExpression(
-            '/<\/dl>\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">\s*'
+            '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $answered), '/').'#personality-diagnosis"\s*aria-label="ポチの性格診断">性格診断<\/a>/u',
             $html
         );
@@ -1278,14 +1280,14 @@ class ClientCountRenderingTest extends TestCase
         // 名前未登録・結果も案内もない（受付アンケートも未回答の）トレーニーにも、属性の並びのすぐ後ろに出る
         // （読み上げは「名前未登録の性格診断」）。暮らしの様子のリンクは出ず、性格診断の行で欄が終わる
         $this->assertMatchesRegularExpression(
-            '/<\/dl>\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">\s*'
+            '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis"\s*aria-label="名前未登録の性格診断">性格診断<\/a>/u',
             $html
         );
         $afterNotIssued = substr($html, strpos($html, 'aria-label="名前未登録の性格診断">性格診断</a>'));
         $this->assertStringNotContainsString('暮らしの様子</a>', $afterNotIssued);
         $this->assertMatchesRegularExpression(
-            '/role="group" aria-label="名前未登録の性格診断">.*?<\/form>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/us',
+            '/role="group" aria-label="名前未登録の性格診断">.*?<\/form>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/us',
             $afterNotIssued,
             '性格診断の行のあと、トレーニーの欄が閉じる'
         );
@@ -1382,6 +1384,136 @@ class ClientCountRenderingTest extends TestCase
             DB::enableQueryLog();
             $this->get(route('clients.show', $client))->assertOk();
             $queries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'trainee_personality_diagnosis_tokens'));
+            DB::disableQueryLog();
+
+            return $queries->count();
+        };
+
+        $this->assertSame(1, $count($one));
+        $this->assertSame(1, $count($three));
+    }
+
+    // ---- 性格診断の行の最新の診断の日付（2026-10 追加。設計書 S-0305「性格診断の行」の「最新の診断の日付」） ----
+
+    private function personalityResult(int $traineeId, string $answeredAt): void
+    {
+        $row = [
+            'trainee_id' => $traineeId, 'trainee_personality_diagnosis_token_id' => null, 'answered_at' => $answeredAt,
+            'question_version' => 'v1', 'answers' => json_encode(['Q01' => 0]), 'personality_type' => 'calm',
+            'created_at' => now(), 'updated_at' => now(),
+        ];
+        foreach (['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'] as $category) {
+            $row['score_'.$category] = '0.00';
+        }
+        DB::table('trainee_personality_diagnosis_results')->insert($row);
+    }
+
+    /** トレーニー 1 頭分の「性格診断」の行（行の始まりから、ボタンのまとまりの手前まで）の HTML */
+    private function personalityLatest(string $html, int $traineeId): string
+    {
+        $link = route('trainees.show', $traineeId).'#personality-diagnosis';
+        $start = strpos($html, '<a href="'.$link.'"');
+        $this->assertNotFalse($start);
+        $end = strpos($html, 'role="group"', $start);
+
+        return substr($html, $start, $end - $start);
+    }
+
+    public function test_性格診断の結果があれば行に最新の回答日を出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->personalityResult($id, '2026-06-01 09:00:00');
+        $this->personalityResult($id, '2026-10-15 10:30:00');
+        $this->personalityResult($id, '2026-03-10 11:00:00');
+
+        $row = $this->personalityLatest($this->get(route('clients.show', $client))->assertOk()->getContent(), $id);
+
+        // いちばん新しい回答日だけを出す（トレーニー詳細のグラフの「今回」と同じ回）。時刻は出さない
+        $this->assertMatchesRegularExpression('/<span data-personality-diagnosis-latest>2026\/10\/15<\/span>/u', $row);
+        $this->assertStringNotContainsString('2026/06/01', $row);
+        $this->assertStringNotContainsString('2026/03/10', $row);
+        $this->assertStringNotContainsString('診断なし', $row);
+    }
+
+    public function test_性格診断の結果がなければ診断なしを控えめな色で出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+
+        $row = $this->personalityLatest($this->get(route('clients.show', $client))->assertOk()->getContent(), $id);
+
+        $this->assertMatchesRegularExpression('/<span class="text-muted" data-personality-diagnosis-latest>診断なし<\/span>/u', $row);
+    }
+
+    public function test_回答待ちの案内があっても出すのは結果の日付(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        // 結果あり＋回答待ち：結果の日付（案内の発行日は出さない）
+        $withResult = $this->trainee($client, 'ポチ');
+        $this->personalityResult($withResult, '2026-06-01 09:00:00');
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => bin2hex(random_bytes(16)), 'trainee_id' => $withResult, 'answered_at' => null,
+            'created_at' => '2026-10-20 09:00:00', 'updated_at' => '2026-10-20 09:00:00',
+        ]);
+        // 結果なし＋回答待ち：診断なし
+        $noResult = $this->trainee($client, 'たま');
+        $this->personalityToken($noResult);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $row = $this->personalityLatest($html, $withResult);
+        $this->assertStringContainsString('<span data-personality-diagnosis-latest>2026/06/01</span>', $row);
+        $this->assertStringNotContainsString('2026/10/20', $html);
+        $this->assertStringContainsString('<span class="text-muted" data-personality-diagnosis-latest>診断なし</span>', $this->personalityLatest($html, $noResult));
+        // どちらも回答待ちのボタン
+        $this->assertSame(2, substr_count($html, '>案内を表示</a>'));
+    }
+
+    public function test_日付は属性の値の列にそろえリンクと同じ行に置く(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->personalityResult($id, '2026-10-15 10:30:00');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 属性の並び（dl.row の dt col-4・dd col-8）と同じ row・col-4／col-8。ラベルの列にリンク、値の列の左に日付、
+        // 値の列の右にボタンのまとまり（折り返すのは値の列の中のボタンのまとまりだけ）
+        $this->assertMatchesRegularExpression('/<dl class="row mb-0 small">[\s\S]*?<dt class="col-4 fw-normal text-muted">/u', $html);
+        $this->assertMatchesRegularExpression(
+            '/<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*'
+            .'<div class="col-4">\s*<a href="'.preg_quote(route('trainees.show', $id), '/').'#personality-diagnosis"\s*aria-label="ポチの性格診断">性格診断<\/a>\s*<\/div>\s*'
+            .'<div class="col-8 d-flex flex-wrap align-items-center gap-2">\s*'
+            .'<span data-personality-diagnosis-latest>2026\/10\/15<\/span>\s*'
+            .'<div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"\s*role="group" aria-label="ポチの性格診断">/u',
+            $html
+        );
+        // 日付には読み上げ用の特別な指定を付けない（普通の文字として読まれる）
+        $this->assertDoesNotMatchRegularExpression('/data-personality-diagnosis-latest[^>]*aria-/u', $html);
+    }
+
+    public function test_性格診断の結果の読み込みはトレーニーの数で増えない(): void
+    {
+        $this->fakeMediaDisk();
+        $one = $this->makeClient('0001', '山田');
+        $this->personalityResult($this->trainee($one, 'ポチ'), '2026-10-15 10:30:00');
+        $three = $this->makeClient('0002', '佐藤');
+        foreach (['ハル', 'ナツ', 'アキ'] as $name) {
+            $id = $this->trainee($three, $name);
+            $this->personalityResult($id, '2026-06-01 09:00:00');
+            $this->personalityResult($id, '2026-10-15 10:30:00');
+        }
+
+        $count = function (Client $client): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->get(route('clients.show', $client))->assertOk();
+            $queries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'trainee_personality_diagnosis_results'));
             DB::disableQueryLog();
 
             return $queries->count();
