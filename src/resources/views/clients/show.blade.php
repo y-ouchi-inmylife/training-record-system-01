@@ -275,9 +275,11 @@
                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"
                          @if($showIssue || $showPrint || $showCancel) role="group" aria-label="マイページ登録の案内" @endif>
                         @if($showIssue)
-                            {{-- 押下でその場で発行し、詳細画面へ戻る（モーダルは開かない） --}}
+                            {{-- 押下でその場で発行し、別タブで案内の画面（S-0307）を開く（モーダルは開かない。2026-10 変更）。
+                                 target="_blank" でクリックそのものから新しいタブに送るので、ポップアップブロックにかからない。
+                                 元のタブは data-issue-in-new-tab（issue-in-new-tab.js）で、戻ってきたときに開き直す --}}
                             <form method="POST" action="{{ route('client-email-registration-tokens.store', $client) }}"
-                                  class="d-inline m-0">
+                                  class="d-inline m-0" target="_blank" rel="noopener" data-issue-in-new-tab>
                                 @csrf
                                 <button type="submit" class="btn btn-sm btn-primary text-nowrap">マイページ登録の案内を発行</button>
                             </form>
@@ -559,7 +561,10 @@
                                          role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                                                <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
+                                                {{-- マイページ登録の案内を発行と同じく、別タブで案内の画面（S-0311）を開き、
+                                                     元のタブは戻ってきたときに開き直す（2026-10 変更） --}}
+                                                <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0"
+                                                      target="_blank" rel="noopener" data-issue-in-new-tab>
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行</button>
                                                 </form>
@@ -756,3 +761,8 @@
 
 </div>
 @endsection
+
+@push('scripts')
+    {{-- 案内の発行のフォーム（data-issue-in-new-tab）を送ったあと、元のタブを開き直す（2026-10 追加） --}}
+    @vite(['resources/js/issue-in-new-tab.js'])
+@endpush

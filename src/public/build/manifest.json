@@ -42,6 +42,12 @@
     "src": "resources/js/form-errors.js",
     "isEntry": true
   },
+  "resources/js/issue-in-new-tab.js": {
+    "file": "assets/issue-in-new-tab-D5jEW6Bo.js",
+    "name": "issue-in-new-tab",
+    "src": "resources/js/issue-in-new-tab.js",
+    "isEntry": true
+  },
   "resources/js/measurement-chart.js": {
     "file": "assets/measurement-chart-D8e4ygbS.js",
     "name": "measurement-chart",

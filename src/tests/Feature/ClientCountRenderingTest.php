@@ -749,7 +749,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertIntakeRowHasNoStatusText($html);
         $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
         $this->assertMatchesRegularExpression(
-            '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
+            '/<form method="POST" action="'.$url.'" class="d-inline m-0"\s*target="_blank" rel="noopener" data-issue-in-new-tab>\s*<input type="hidden" name="_token"[^>]*>\s*'
             .'<button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行<\/button>/u',
             $html
         );
@@ -1153,5 +1153,60 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringNotContainsString('btn-outline-primary', $body);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#emailDeletionModal">\s*マイページ登録を削除/u', $body);
+    }
+
+    // ---- 案内の発行は別タブで送る（2026-10 変更） ----
+
+    /** data-issue-in-new-tab を付けたフォームの開始タグ */
+    private function issueInNewTabForms(string $html): array
+    {
+        preg_match_all('/<form\b[^>]*\bdata-issue-in-new-tab\b[^>]*>/u', $html, $m);
+
+        return $m[0];
+    }
+
+    public function test_二つの発行のフォームだけを別タブで送り目印を付ける(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $notIssued = $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $forms = $this->issueInNewTabForms($html);
+
+        $this->assertCount(2, $forms);
+        $actions = [
+            route('client-email-registration-tokens.store', $client),
+            route('trainee-intake-survey-tokens.store', $notIssued),
+        ];
+        foreach ($actions as $i => $action) {
+            $this->assertStringContainsString('action="'.$action.'"', $forms[$i]);
+            $this->assertStringContainsString('target="_blank"', $forms[$i]);
+            $this->assertStringContainsString('rel="noopener"', $forms[$i]);
+        }
+        // target="_blank" のフォームはこの 2 つだけ
+        $this->assertSame(2, preg_match_all('/<form\b[^>]*target="_blank"/u', $html));
+        $this->assertStringContainsString('issue-in-new-tab', $html);
+    }
+
+    public function test_取消や削除のフォームは別タブにせず目印も付けない(): void
+    {
+        $this->fakeMediaDisk();
+        $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
+        $admin->id = 100;
+        $admin->exists = true;
+        $this->actingAs($admin, 'web');
+        // マイページは登録待ち（期限内）、受付アンケートは回答待ち：発行のフォームは出ない
+        $client = $this->makeClient('0001', '山田');
+        $this->emailRegToken($client, now()->addDays(2)->format('Y-m-d H:i:s'));
+        $this->intakeToken($this->trainee($client, 'ポチ'), null, '2026-10-15 09:00:00');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame([], $this->issueInNewTabForms($html));
+        $this->assertSame(0, preg_match_all('/<form\b[^>]*target="_blank"/u', $html));
+        // 取消（M03・M06）・会員の削除のフォームはある
+        $this->assertStringContainsString('action="'.route('client-email-registration-tokens.destroy', $client).'" class="d-inline m-0">', $html);
+        $this->assertStringContainsString('action="'.route('clients.destroy', $client).'"', $html);
     }
 }
