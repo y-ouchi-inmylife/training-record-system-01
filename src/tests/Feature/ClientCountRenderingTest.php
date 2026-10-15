@@ -1005,4 +1005,16 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('role="group"', $buttons);
         $this->assertStringNotContainsString('マイページ登録の案内', $buttons);
     }
+
+    public function test_上部のメールアドレスのラベルはメールアドレス_マイページ(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 初回日・主担当と並ぶ 3 段目の列（2026-10 変更）
+        $this->assertMatchesRegularExpression('/<div class="text-muted small">主担当<\/div>.*?<div class="text-muted small">メールアドレス（マイページ）<\/div>/su', $html);
+        $this->assertStringNotContainsString('<div class="text-muted small">メールアドレス</div>', $html);
+    }
 }
