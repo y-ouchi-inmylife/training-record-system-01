@@ -193,7 +193,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertSame(1, substr_count($html, '<h2 '));
         $this->assertMatchesRegularExpression('/novalidate>\s*<input type="hidden" name="_token"[^>]*>\s*<div class="mb-3">\s*<label for="name"/u', $html);
         // 「暮らしの様子」の同じ行の後ろに控えめなカッコ書き。「どれも任意です。…」の 1 行はなくした（2026-10 変更）
-        $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことを自由にお書きください。）</span></h2>', $html);
+        $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>', $html);
         $this->assertStringNotContainsString('どれも任意です', $html);
         // 区切り線は 1 本だけ（去勢・避妊のまとまりの下）
         $this->assertSame(1, substr_count($html, 'border-bottom'));

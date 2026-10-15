@@ -137,7 +137,7 @@
                      fw-normal small text-muted）。カッコ書きは見出しの一部として読まれる。2026-10 変更：当初は小見出しの
                      下に「どれも任意です。思いつくことを自由にお書きください。」の 1 行を置いていた（入力欄に必須の「*」が
                      ないので、任意であることは伝わる。設計書 S-1413） --}}
-                <h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことを自由にお書きください。）</span></h2>
+                <h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>
 
                 {{-- 自由記述 4 欄。設問文（ラベル）は TraineeIntakeSurveyResponse::questions() の 1 か所から
                      （S-0309 の回答の表示と共用）。rows="4" で、縦方向にだけ広げられる
