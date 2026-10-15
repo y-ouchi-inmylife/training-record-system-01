@@ -232,7 +232,8 @@
     </div>
 
     {{-- 性格診断の欄（2026-10 追加。要件定義書 6-16-2・6-16-13、設計書 S-0309「性格診断の欄」）。暮らしの様子の欄の下に置き、いつも出す。
-         - 上にレーダーチャートを 1 つ（今回・前回・初回を重ねる。personality-radar.js）、下にすべての回の結果の表を 1 つ出す
+         - レーダーチャートを 1 つ（今回・前回・初回を重ねる。personality-radar.js）と、すべての回の結果の表を 1 つ出す。
+           xl 以上はグラフが左・表が右、それより狭いときはグラフが上・表が下（2026-10 変更）
            （2026-10 変更：当初は回ごとに見出しの行・レーダーチャート・点数の表を並べ、開閉していた。回数が増えても欄が長くならない
            ように作り直した）。結果がないときは本文に「（未回答）」とだけ出す（グラフも表も出さない）
          - 結果は Trainee::personalityDiagnosisResults()（新しい順。TraineeController::show で読み込み済み）。表は古い順（上が初回）
@@ -270,57 +271,72 @@
             @if($pdResults->isEmpty())
                 <p class="mb-0 text-muted">（未回答）</p>
             @else
-                {{-- レーダーチャート（1 つ。今回・前回・初回を重ねる）。グラフは見た目のためのもので、同じ数字を下の表に出すので、
-                     読み上げは role="img" と短い説明だけ --}}
-                <div class="mx-auto" style="max-width: 420px;">
-                    <canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は下の表のとおり）"
-                            data-personality-radar="{{ json_encode($pdRadarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
-                </div>
-                {{-- 凡例（2026-10 変更：Chart.js の凡例はグラフの枠〔最大 420px〕の中に描かれて 2 行に折り返すため、グラフの下に
-                     欄の幅いっぱいを使う HTML の凡例にした）。項目と線の見本は personality-radar.js が、グラフと同じ値（SERIES_STYLES）から作る。
-                     パソコンの幅では 1 行、スマホの幅では収まらなければ折り返す --}}
-                <ul class="list-unstyled d-flex flex-wrap justify-content-center column-gap-3 row-gap-1 small mt-2 mb-3"
-                    data-personality-radar-legend="personality-diagnosis-radar"></ul>
+                {{-- グラフと表の並び（2026-10 変更）：xl（1200px）以上はグラフを左・表を右に横に並べる（グラフの左右の余白をなくすため）。
+                     それより狭いときはグラフが上・表が下（表は 11 列あり、狭い幅で横に並べると窮屈になるため）。
+                     align-items-start：回答の回数が多いと表のほうが縦に長くなるので、上にそろえる --}}
+                <div class="row gy-3 align-items-start" data-personality-diagnosis-layout>
+                    <div class="col-12 col-xl-4">
+                        {{-- レーダーチャート（1 つ。今回・前回・初回を重ねる）。グラフは見た目のためのもので、同じ数字を下の表に出すので、
+                             読み上げは role="img" と短い説明だけ。最大 420px（横に並べたときも左の列に収まる） --}}
+                        <div class="mx-auto" style="max-width: 420px;">
+                            <canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は下の表のとおり）"
+                                    data-personality-radar="{{ json_encode($pdRadarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
+                        </div>
+                        {{-- 凡例（2026-10 変更：Chart.js の凡例はグラフの枠〔最大 420px〕の中に描かれて 2 行に折り返すため、グラフの下に
+                             HTML の凡例にした）。項目と線の見本は personality-radar.js が、グラフと同じ値（SERIES_STYLES）から作る。
+                             並べ方だけ画面の幅で切り替える（クラスだけ。JS では切り替えない）：グラフが上・表が下のときは 1 行
+                             （スマホの幅では収まらなければ折り返す）、xl 以上で横に並べたときは左の列が狭いので縦に 3 行（flex-xl-column）。
+                             外の d-flex justify-content-center で、縦 3 行のときも凡例のかたまりをグラフの下の中央に置き、項目は左にそろえる --}}
+                        <div class="d-flex justify-content-center mt-2">
+                            <ul class="list-unstyled d-flex flex-wrap flex-xl-column align-items-xl-start justify-content-center column-gap-3 row-gap-1 small mb-0"
+                                data-personality-radar-legend="personality-diagnosis-radar"></ul>
+                        </div>
+                    </div>
 
-                {{-- 結果の表（古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
-                     横に流す枠の外に出てページの幅を広げないよう、枠を位置の基準にする --}}
-                <div class="table-responsive position-relative">
-                    <table class="table table-sm align-middle mb-0" data-personality-diagnosis-results>
-                        <thead>
-                            <tr>
-                                <th scope="col" class="fw-normal text-muted text-nowrap">回答日</th>
-                                <th scope="col" class="fw-normal text-muted text-nowrap">タイプ</th>
-                                @foreach($pdCategories as $categoryLabel)
-                                    <th scope="col" class="fw-normal text-muted text-end text-nowrap">{{ $categoryLabel }}</th>
-                                @endforeach
-                                <th scope="col"><span class="visually-hidden">操作</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($pdResults->reverse() as $result)
-                                @php($display = $result->displayScores())
-                                <tr>
-                                    <th scope="row" class="fw-normal text-nowrap">{{ $result->answered_at->format('Y/m/d') }}</th>
-                                    <td class="text-nowrap">{{ $result->personality_type_label }}</td>
-                                    @foreach(array_keys($pdCategories) as $category)
-                                        <td class="text-end">{{ $display[$category] }}</td>
+                    <div class="col-12 col-xl-8">
+                        {{-- 結果の表（古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
+                             横に流す枠の外に出てページの幅を広げないよう、枠を位置の基準にする。
+                             タイプは折り返してよい（横に並べたときに表を収めるため。min-width で 1 文字ずつの折り返しは防ぐ）。
+                             回答日・点数・ボタンは折り返さない。それでも収まらなければ枠の中で横にスクロールする --}}
+                        <div class="table-responsive position-relative">
+                            <table class="table table-sm align-middle mb-0" data-personality-diagnosis-results>
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="fw-normal text-muted text-nowrap">回答日</th>
+                                        <th scope="col" class="fw-normal text-muted text-nowrap">タイプ</th>
+                                        @foreach($pdCategories as $categoryLabel)
+                                            <th scope="col" class="fw-normal text-muted text-end text-nowrap">{{ $categoryLabel }}</th>
+                                        @endforeach
+                                        <th scope="col"><span class="visually-hidden">操作</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($pdResults->reverse() as $result)
+                                        @php($display = $result->displayScores())
+                                        <tr>
+                                            <th scope="row" class="fw-normal text-nowrap">{{ $result->answered_at->format('Y/m/d') }}</th>
+                                            <td style="min-width: 8em;">{{ $result->personality_type_label }}</td>
+                                            @foreach(array_keys($pdCategories) as $category)
+                                                <td class="text-end text-nowrap">{{ $display[$category] }}</td>
+                                            @endforeach
+                                            <td class="text-end text-nowrap">
+                                                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                        data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-{{ $result->id }}"
+                                                        aria-label="{{ $result->answered_at->format('Y/m/d') }}の50問の回答">50問の回答</button>
+                                                {{-- 結果の削除（管理者だけ。2026-10 追加。要件定義書 6-16-14）。一覧の行の中の削除なので白抜き（4-4）。
+                                                     確認は S-0309-M01（1 行ごとのモーダル） --}}
+                                                @if(auth()->user()->isAdmin())
+                                                    <button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"
+                                                            data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-{{ $result->id }}"
+                                                            aria-label="{{ $result->answered_at->format('Y/m/d') }}の性格診断の結果を削除">削除</button>
+                                                @endif
+                                            </td>
+                                        </tr>
                                     @endforeach
-                                    <td class="text-end text-nowrap">
-                                        <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
-                                                data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-{{ $result->id }}"
-                                                aria-label="{{ $result->answered_at->format('Y/m/d') }}の50問の回答">50問の回答</button>
-                                        {{-- 結果の削除（管理者だけ。2026-10 追加。要件定義書 6-16-14）。一覧の行の中の削除なので白抜き（4-4）。
-                                             確認は S-0309-M01（1 行ごとのモーダル） --}}
-                                        @if(auth()->user()->isAdmin())
-                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"
-                                                    data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-{{ $result->id }}"
-                                                    aria-label="{{ $result->answered_at->format('Y/m/d') }}の性格診断の結果を削除">削除</button>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             @endif
         </div>

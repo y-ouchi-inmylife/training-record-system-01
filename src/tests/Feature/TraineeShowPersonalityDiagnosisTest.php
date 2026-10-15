@@ -122,7 +122,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     /** 結果の表の行（回答日 → [タイプ, 7 カテゴリの値…]）。表の上から順 */
     private function tableRows(string $html): array
     {
-        preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>\s*<td class="text-nowrap">([^<]+)<\/td>((?:\s*<td class="text-end">[0-9.]+<\/td>){7})/u', $html, $m, PREG_SET_ORDER);
+        preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>\s*<td style="min-width: 8em;">([^<]+)<\/td>((?:\s*<td class="text-end text-nowrap">[0-9.]+<\/td>){7})/u', $html, $m, PREG_SET_ORDER);
 
         $rows = [];
         foreach ($m as $row) {
@@ -346,9 +346,11 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
             $card = $this->card($this->page());
 
-            // 凡例を入れる枠（中身は JS がグラフと同じ値から作る）。グラフの枠の外（下）に、欄の幅いっぱいで置く
+            // 凡例を入れる枠（中身は JS がグラフと同じ値から作る）。グラフの枠の外（下）に置く。
+            // 並べ方はクラスだけで切り替える：ふだんは 1 行（折り返しあり）、xl 以上で横に並べたときは縦に 3 行（flex-xl-column）
             $this->assertMatchesRegularExpression(
-                '/<\/canvas>\s*<\/div>\s*<ul class="list-unstyled d-flex flex-wrap justify-content-center column-gap-3 row-gap-1 small mt-2 mb-3"\s*'
+                '/<\/canvas>\s*<\/div>\s*<div class="d-flex justify-content-center mt-2">\s*'
+                .'<ul class="list-unstyled d-flex flex-wrap flex-xl-column align-items-xl-start justify-content-center column-gap-3 row-gap-1 small mb-0"\s*'
                 .'data-personality-radar-legend="personality-diagnosis-radar"><\/ul>/u',
                 $card,
                 ($count + 1).' 件'
@@ -361,6 +363,54 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     public function test_結果がなければ凡例の枠も出さない(): void
     {
         $this->assertStringNotContainsString('data-personality-radar-legend', $this->page());
+    }
+
+    // ---- グラフと表の並び（xl 以上は横に並べる。2026-10 変更） ----
+
+    public function test_グラフと表はxl以上で横に並べそれより狭いときは縦に積む枠に入れる(): void
+    {
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $card = $this->card($this->page());
+
+        // 1 行（row。上にそろえる）の中に、グラフの列（xl で 4/12）と表の列（xl で 8/12）。xl 未満はどちらも col-12（縦に積む）
+        $this->assertSame(1, substr_count($card, 'data-personality-diagnosis-layout'));
+        $this->assertMatchesRegularExpression(
+            '/<div class="row gy-3 align-items-start" data-personality-diagnosis-layout>\s*'
+            .'(?:\{\{--.*?--\}\}\s*)?<div class="col-12 col-xl-4">\s*.*?<canvas id="personality-diagnosis-radar"/us',
+            $card
+        );
+        $graphCol = strpos($card, '<div class="col-12 col-xl-4">');
+        $tableCol = strpos($card, '<div class="col-12 col-xl-8">');
+        $this->assertNotFalse($tableCol);
+        // グラフ（と凡例）が左の列、表が右の列
+        $this->assertTrue($graphCol < strpos($card, '<canvas') && strpos($card, 'data-personality-radar-legend') < $tableCol);
+        $this->assertGreaterThan($tableCol, strpos($card, '<div class="table-responsive position-relative">'));
+        // グラフは最大 420px の枠のまま
+        $this->assertStringContainsString('<div class="mx-auto" style="max-width: 420px;">', $card);
+    }
+
+    public function test_表はタイプだけ折り返してよくほかは折り返さない(): void
+    {
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $card = $this->card($this->page());
+
+        $this->assertSame(1, substr_count($card, '<td style="min-width: 8em;">'));
+        $this->assertSame(1, substr_count($card, '<th scope="row" class="fw-normal text-nowrap">'));
+        // 点数 7 つ＋ボタンの列
+        $this->assertSame(8, substr_count($card, '<td class="text-end text-nowrap">'));
+        // ボタンの列も折り返さない（［50問の回答］と［削除］を横に並べたまま）
+        $this->assertMatchesRegularExpression('/<td class="text-end text-nowrap">\s*<button type="button" class="btn btn-sm btn-outline-primary text-nowrap"/u', $card);
+    }
+
+    public function test_結果がなければ並びの枠も出さない(): void
+    {
+        $card = $this->card($this->page());
+
+        $this->assertStringNotContainsString('data-personality-diagnosis-layout', $card);
+        $this->assertStringNotContainsString('col-xl-', $card);
+        $this->assertMatchesRegularExpression('/<div class="card-body">\s*<p class="mb-0 text-muted">（未回答）<\/p>\s*<\/div>/u', $card);
     }
 
     public function test_会員詳細の性格診断のリンクの飛び先とこの欄のidが一致する(): void
