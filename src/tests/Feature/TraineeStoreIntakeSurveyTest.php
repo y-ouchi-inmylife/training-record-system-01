@@ -13,10 +13,11 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニー登録（S-0308）の「受付アンケートの案内を発行する」（2026-10 追加。要件定義書 6-16-1）。
+ * トレーニー登録（S-0308）では受付アンケート案内を発行しない（2026-10 変更。要件定義書 6-16-1）。
  *
- * - チェックが送られたときだけ、トレーニーの登録と同じトランザクションで案内を発行する
- * - 完了メッセージは発行したかどうかで変え、会員詳細に戻る（上端のメッセージ）
+ * - 案内の発行は会員詳細（S-0305）の［案内を発行］だけで行う。以前の「受付アンケートの案内を発行する」の
+ *   チェックの値（issue_intake_survey）が送られてきても発行しない
+ * - 登録後は会員詳細に戻り、完了メッセージは「トレーニーを登録しました。」
  * - アクセスログは create_trainee の 1 件だけ
  *
  * ミドルウェアは外さず、実際の HTTP で確かめる。
@@ -59,24 +60,7 @@ class TraineeStoreIntakeSurveyTest extends TestCase
         $this->client = Client::query()->create(['internal_id' => '0001', 'last_name' => '山田']);
     }
 
-    public function test_チェックありで登録すると案内も発行する(): void
-    {
-        $response = $this->post(route('trainees.store', $this->client), ['name' => null, 'issue_intake_survey' => '1']);
-
-        $response->assertRedirect(route('clients.show', $this->client));
-        $response->assertSessionHas('success', 'トレーニーを登録し、受付アンケートの案内を発行しました。');
-
-        $trainee = Trainee::query()->sole();
-        $token = TraineeIntakeSurveyToken::query()->sole();
-        $this->assertSame($trainee->id, (int) $token->trainee_id);
-        $this->assertSame(200, (int) $token->created_by);
-        $this->assertNull($token->answered_at);
-
-        // アクセスログは create_trainee の 1 件だけ
-        $this->assertSame(['create_trainee'], AccessLog::query()->pluck('action')->all());
-    }
-
-    public function test_チェックなしで登録すると案内は発行しない(): void
+    public function test_登録しても案内は発行しない(): void
     {
         $response = $this->post(route('trainees.store', $this->client), ['name' => 'モモ']);
 
@@ -84,9 +68,22 @@ class TraineeStoreIntakeSurveyTest extends TestCase
         $response->assertSessionHas('success', 'トレーニーを登録しました。');
         $this->assertSame(1, Trainee::query()->count());
         $this->assertSame(0, TraineeIntakeSurveyToken::query()->count());
+        $this->assertSame(['create_trainee'], AccessLog::query()->pluck('action')->all());
     }
 
-    public function test_入力エラーなら登録も発行もしない(): void
+    public function test_以前のチェックの値を送っても案内は発行しない(): void
+    {
+        // 古い画面（チェックボックスがあったころ）から送られてきた場合も、値は使わない
+        $response = $this->post(route('trainees.store', $this->client), ['name' => null, 'issue_intake_survey' => '1']);
+
+        $response->assertRedirect(route('clients.show', $this->client));
+        $response->assertSessionHas('success', 'トレーニーを登録しました。');
+        $this->assertSame(1, Trainee::query()->count());
+        $this->assertSame(0, TraineeIntakeSurveyToken::query()->count());
+        $this->assertSame(['create_trainee'], AccessLog::query()->pluck('action')->all());
+    }
+
+    public function test_入力エラーなら登録しない(): void
     {
         $response = $this->post(route('trainees.store', $this->client), ['name' => str_repeat('あ', 51), 'issue_intake_survey' => '1']);
 
