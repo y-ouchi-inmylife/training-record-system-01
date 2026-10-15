@@ -276,12 +276,15 @@ Route::domain(config('subdomain.client_host'))->group(function () {
     Route::post('client-portal/intake-survey/{token}', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'store'])
         ->name('client-portal.intake-survey.store');
 
-    // 性格診断（S-1415 回答画面、公開URL、認証不要。2026-10 追加）。
-    // 仮の受け口（段階2）：性格診断の案内（S-0312）の QR コード・URL に要るため、GET のルートだけを先に定義する。
-    // 今はどのトークンでも「ご利用いただけません」の画面を返す。送信（POST）と回答完了（thanks。{token} より先に
-    // 定義すること）は段階3で足す
+    // 性格診断（S-1415 回答画面・S-1416 回答完了画面、公開URL、認証不要。2026-10 追加）。受付アンケートと同じ形。
+    // 回答完了画面 client-portal/personality-diagnosis/thanks は、`thanks` が {token} として解釈されないよう、
+    // {token} のルートより**先に**定義すること（api-design.md 4-1-15）
+    Route::get('client-portal/personality-diagnosis/thanks', [\App\Http\Controllers\Client\PersonalityDiagnosisController::class, 'thanks'])
+        ->name('client-portal.personality-diagnosis.thanks');
     Route::get('client-portal/personality-diagnosis/{token}', [\App\Http\Controllers\Client\PersonalityDiagnosisController::class, 'show'])
         ->name('client-portal.personality-diagnosis.show');
+    Route::post('client-portal/personality-diagnosis/{token}', [\App\Http\Controllers\Client\PersonalityDiagnosisController::class, 'store'])
+        ->name('client-portal.personality-diagnosis.store');
 
     // メールアドレス確認リンク（S-1406 派生、公開URL、認証不要）。段階 4-3。
     // ログイン状態を問わず、切替 → ログアウト → ログイン画面へ遷移する。

@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 /**
  * 性格診断の案内の発行・取消・表示（POST／DELETE /trainees/{trainee}/personality-diagnosis-tokens、
- * GET …/print〔S-0312〕。2026-10 追加。性格診断 段階2）と、お客様の URL の仮の受け口（S-1415）。
+ * GET …/print〔S-0312〕。2026-10 追加。性格診断 段階2）と、案内の URL で開くお客様の回答の画面（S-1415）。
  *
  * - 受付アンケート案内と同じ作り。違いは、前の結果（回答済みの案内）があっても発行できること
  * - 発行のあとは S-0312 を開き、完了メッセージは載せない。取消のあとは会員詳細に戻り、上端の success
@@ -297,9 +297,9 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertSame(0, AccessLog::query()->count());
     }
 
-    // ---- お客様の URL の仮の受け口（S-1415。段階3で回答の画面に差し替える） ----
+    // ---- お客様の URL（S-1415。段階2 では仮の受け口だった。段階3 で回答の画面にした） ----
 
-    public function test_お客様の性格診断のURLを開くと仮の使えない画面が出る(): void
+    public function test_S0312のURLを開くとお客様の回答の画面が出る(): void
     {
         $this->insertToken(null, 'personality-diagnosis-token-000001');
         auth('web')->logout();
@@ -307,7 +307,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $html = $this->get(route('client-portal.personality-diagnosis.show', ['token' => 'personality-diagnosis-token-000001']))
             ->assertOk()->getContent();
 
-        $this->assertStringContainsString('<h1 class="mb-4">性格診断</h1>', $html);
-        $this->assertStringContainsString('この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。', $html);
+        $this->assertStringContainsString('<h1 class="mb-2">性格診断</h1>', $html);
+        $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
     }
 }

@@ -1106,6 +1106,66 @@ input[type="tel"] {
     }
 }
 
+// 性格診断の選択肢（S-1415。2026-10 追加。設計書 S-1415「選択肢の部品」）
+// - 本物のラジオボタン（Bootstrap の .btn-check で見た目だけ隠す。キーボードの矢印キー・読み上げは今までどおり）と、
+//   それに対応する <label> をボタンのような枠にする。ラベル全体が押せる範囲
+// - 大きさ：1 つの選択肢の高さは 48px 以上（会員側の押せる範囲の基準 44px より少し大きく。50 問を続けて押すため）
+// - 並び：スマホの幅は 2 列 × 3 段（0・1／2・3／4・未経験）、md 以上は 6 列 × 1 段。文字は枠の中で折り返す
+// - 選んだもの：ブランドの色で塗り、文字を白に。色だけに頼らないよう、枠を太く（2px）し、先頭に「✓」の印を付ける
+// - フォーカス：キーボードで動かしたとき、枠の外に二重の輪（.c-choice・入力欄と同じ値）
+// - ボタンの色の決まり（4-4）の対象外（操作ではなく選択の入力欄のため）
+// Blade：<div class="c-scale-choice"> の中に <input type="radio" class="btn-check"> と <label class="c-scale-choice-label"> を並べる
+.c-scale-choice {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+
+    @include media-breakpoint-up(md) {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
+
+.c-scale-choice-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3rem;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid rgba($ink, 0.35);
+    border-radius: $border-radius;
+    background-color: $mat;
+    color: $ink;
+    text-align: center;
+    line-height: 1.3;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+        border-color: $brand-bright;
+    }
+}
+
+.btn-check:checked + .c-scale-choice-label {
+    border: 2px solid $ink;
+    background-color: $brand-bright;
+    color: $mat;
+    font-weight: 700;
+
+    &::before {
+        content: "✓";
+        margin-right: 0.25rem;
+    }
+}
+
+.btn-check:focus-visible + .c-scale-choice-label {
+    box-shadow: 0 0 0 3px $mat, 0 0 0 5px $ink;
+}
+
+// 答えていない問：枠を赤に（文言は問の下の invalid-feedback）
+.c-scale-choice.is-invalid .c-scale-choice-label {
+    border-color: $madder;
+}
+
 // 登録情報設定画面（S-1406）用の幅広コンテナ。
 // 認証後レイアウト（layouts.client）で使うため .c-login のシェル
 // （padding-top など pre-auth 用の余白）は継承しない。3 フォーム
