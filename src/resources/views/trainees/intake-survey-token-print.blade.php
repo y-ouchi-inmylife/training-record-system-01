@@ -11,7 +11,9 @@
      手順の中身、戻り先は常に会員詳細。お客様の氏名は載せない（紛失時に氏名と URL が同時に漏れないため）。
      変数：$trainee、$url（有効な案内がなければ null）、$copyText（同） --}}
 <div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">
-    {{-- 戻り先は会員詳細（S-0305）。案内の操作は会員詳細だけで行うため --}}
+    {{-- 戻り先は会員詳細（S-0305）。案内の操作は会員詳細だけで行うため。
+         会員詳細へのリンクにする（history.back() にしない。発行のあと同じタブでこの画面を開いたとき、
+         発行の前の古い会員詳細に戻ることがあるため。2026-10） --}}
     <a href="{{ route('clients.show', $trainee->client_id) }}" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>
     @if($url)
         {{-- 文面はコントローラ（TraineeIntakeSurveyTokenController::buildCopyText）で組み立て、
