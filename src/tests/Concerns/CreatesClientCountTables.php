@@ -118,4 +118,46 @@ trait CreatesClientCountTables
             $table->timestamps();
         });
     }
+
+    /**
+     * 性格診断用 URL のトークン（DS-1100。2026-10 追加）。trainees の表は各テストで作る。
+     * トレーニーを消したらトークンも消えることを確かめられるよう、本番と同じ外部キーを付ける
+     * （SQLite は接続設定 foreign_key_constraints〔既定 true〕で外部キーが効く）
+     */
+    protected function createTraineePersonalityDiagnosisTokensTable(): void
+    {
+        Schema::create('trainee_personality_diagnosis_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->string('token', 64)->unique();
+            $table->unsignedBigInteger('trainee_id');
+            $table->foreign('trainee_id')->references('id')->on('trainees')->cascadeOnDelete();
+            $table->timestamp('answered_at')->nullable();
+            $table->timestamps();
+            $table->unsignedBigInteger('created_by')->nullable();
+        });
+    }
+
+    /**
+     * 性格診断の結果（D-1200。2026-10 追加）。trainees の表は各テストで作る。外部キーは本番と同じ
+     * （トレーニーを消したら結果も消える、トークンを消したら結果のトークンの列は NULL）
+     */
+    protected function createTraineePersonalityDiagnosisResultsTable(): void
+    {
+        Schema::create('trainee_personality_diagnosis_results', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('trainee_id');
+            $table->foreign('trainee_id')->references('id')->on('trainees')->cascadeOnDelete();
+            $table->unsignedBigInteger('trainee_personality_diagnosis_token_id')->nullable();
+            $table->foreign('trainee_personality_diagnosis_token_id')
+                ->references('id')->on('trainee_personality_diagnosis_tokens')->nullOnDelete();
+            $table->timestamp('answered_at');
+            $table->string('question_version', 10);
+            $table->json('answers');
+            foreach (['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'] as $category) {
+                $table->decimal('score_'.$category, 3, 2);
+            }
+            $table->string('personality_type', 30);
+            $table->timestamps();
+        });
+    }
 }

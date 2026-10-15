@@ -170,6 +170,43 @@ class Trainee extends Model
     }
 
     /**
+     * 性格診断用 URL のトークン（DS-1100。回答済みのものを含む。2026-10 追加）
+     */
+    public function personalityDiagnosisTokens(): HasMany
+    {
+        return $this->hasMany(TraineePersonalityDiagnosisToken::class);
+    }
+
+    /**
+     * 有効な（まだ回答されていない）性格診断用 URL のトークン。同じトレーニーに 1 つまで
+     * （発行のときに守る）。会員詳細（S-0305）でトレーニーをまとめて読むときは
+     * `trainees.activePersonalityDiagnosisToken` を eager load しておく（N+1 にしないため）
+     */
+    public function activePersonalityDiagnosisToken(): HasOne
+    {
+        return $this->hasOne(TraineePersonalityDiagnosisToken::class)->whereNull('answered_at');
+    }
+
+    /**
+     * 性格診断の結果（D-1200。1 頭に何件でも持てる）。新しい順（回答日時の降順。同じ日時なら後に作ったものが先）。
+     * トレーニー詳細（S-0309）の性格診断の欄はこの並び順のまま出し、「前回」は 1 つ後ろの要素
+     */
+    public function personalityDiagnosisResults(): HasMany
+    {
+        return $this->hasMany(TraineePersonalityDiagnosisResult::class)
+            ->orderByDesc('answered_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * 最新の性格診断の結果（回答日時が最も新しいもの）。結果がなければ null
+     */
+    public function latestPersonalityDiagnosisResult(): HasOne
+    {
+        return $this->hasOne(TraineePersonalityDiagnosisResult::class)->latestOfMany('answered_at');
+    }
+
+    /**
      * 最終更新者（トレーナー）
      */
     public function updatedBy(): BelongsTo
