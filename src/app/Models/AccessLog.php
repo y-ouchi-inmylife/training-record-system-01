@@ -46,6 +46,8 @@ class AccessLog extends Model
             'delete_trainee_measurement' => '計測値削除',
             'create_trainee_intake_survey_token' => '受付アンケート案内発行',
             'delete_trainee_intake_survey_token' => '受付アンケート案内取消',
+            'create_trainee_personality_diagnosis_token' => '性格診断案内発行',
+            'delete_trainee_personality_diagnosis_token' => '性格診断案内取消',
             'create_client_contract' => '契約登録',
             'edit_client_contract' => '契約編集',
             'delete_client_contract' => '契約削除',

@@ -35,6 +35,10 @@ class LogAccess
         // お客様の回答は記録しない（access_logs.trainer_id が NOT NULL のため。db-schema.md 5-16）
         'trainee-intake-survey-tokens.store' => 'create_trainee_intake_survey_token',
         'trainee-intake-survey-tokens.destroy' => 'delete_trainee_intake_survey_token',
+        // 性格診断の案内（DS-1100。2026-10 追加）。受付アンケート案内と同じく、対象はトレーニー
+        // （target_type='Trainee'、target_id はルートの {trainee}）。お客様の回答・結果を見たことは記録しない
+        'trainee-personality-diagnosis-tokens.store' => 'create_trainee_personality_diagnosis_token',
+        'trainee-personality-diagnosis-tokens.destroy' => 'delete_trainee_personality_diagnosis_token',
         // 契約（D-0900）・利用（D-1000）。参照は view_client に含めるため view_ 系は作らない。
         'client-contracts.store' => 'create_client_contract',
         'client-contracts.update' => 'edit_client_contract',

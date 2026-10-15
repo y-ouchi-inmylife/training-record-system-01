@@ -24,6 +24,7 @@ use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\SummaryPromptController;
 use App\Http\Controllers\TraineeController;
 use App\Http\Controllers\TraineeIntakeSurveyTokenController;
+use App\Http\Controllers\TraineePersonalityDiagnosisTokenController;
 use App\Http\Controllers\TraineeMeasurementController;
 use App\Http\Controllers\UsageStatsController;
 use Illuminate\Support\Facades\Route;
@@ -125,6 +126,15 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 受付アンケート案内画面（S-0311）。会員詳細の「案内を表示」から別タブで開く
             Route::get('trainees/{trainee}/intake-survey-tokens/print', [TraineeIntakeSurveyTokenController::class, 'print'])
                 ->name('trainee-intake-survey-tokens.print');
+
+            // 性格診断の案内（性格診断用 URL のトークン。DS-1100。2026-10 追加）。受付アンケート案内と同じ形
+            Route::post('trainees/{trainee}/personality-diagnosis-tokens', [TraineePersonalityDiagnosisTokenController::class, 'store'])
+                ->name('trainee-personality-diagnosis-tokens.store');
+            Route::delete('trainees/{trainee}/personality-diagnosis-tokens', [TraineePersonalityDiagnosisTokenController::class, 'destroy'])
+                ->name('trainee-personality-diagnosis-tokens.destroy');
+            // 性格診断案内画面（S-0312）。会員詳細の「性格診断」の行の［案内を表示］から別タブで開く
+            Route::get('trainees/{trainee}/personality-diagnosis-tokens/print', [TraineePersonalityDiagnosisTokenController::class, 'print'])
+                ->name('trainee-personality-diagnosis-tokens.print');
 
             // 契約（D-0900）・利用（D-1000）。会員詳細（S-0305）の「回数」カードのモーダルで
             // 登録・編集・削除する（create / edit / show の画面遷移は持たない）。
@@ -265,6 +275,13 @@ Route::domain(config('subdomain.client_host'))->group(function () {
         ->name('client-portal.intake-survey.show');
     Route::post('client-portal/intake-survey/{token}', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'store'])
         ->name('client-portal.intake-survey.store');
+
+    // 性格診断（S-1415 回答画面、公開URL、認証不要。2026-10 追加）。
+    // 仮の受け口（段階2）：性格診断の案内（S-0312）の QR コード・URL に要るため、GET のルートだけを先に定義する。
+    // 今はどのトークンでも「ご利用いただけません」の画面を返す。送信（POST）と回答完了（thanks。{token} より先に
+    // 定義すること）は段階3で足す
+    Route::get('client-portal/personality-diagnosis/{token}', [\App\Http\Controllers\Client\PersonalityDiagnosisController::class, 'show'])
+        ->name('client-portal.personality-diagnosis.show');
 
     // メールアドレス確認リンク（S-1406 派生、公開URL、認証不要）。段階 4-3。
     // ログイン状態を問わず、切替 → ログアウト → ログイン画面へ遷移する。

@@ -58,10 +58,10 @@ h2 {
     transition: opacity 1s linear;
 }
 
-// 案内を見分ける帯＝ページの見出し（S-0307 マイページ登録案内・S-0311 受付アンケート案内。2026-10 追加）。
+// 案内を見分ける帯＝ページの見出し（S-0307 マイページ登録案内・S-0311 受付アンケート案内・S-0312 性格診断の案内。2026-10 追加）。
 // 部品は resources/views/components/print-band.blade.php（h1）。設計書 screen-design.md S-0307 備考「案内を見分ける帯」。
 // - 色は Bootstrap の primary（#0d6efd）・success（#198754）より 1 段濃い $blue-600・$green-600。
-//   白の文字とのコントラスト比は 6.4:1 以上（primary・success は 4.5:1 ちょうど前後で余裕がないため）
+//   白の文字とのコントラスト比は 6.4:1 以上（primary・success は 4.5:1 ちょうど前後で余裕がないため）。性格診断は $purple（6.51:1）
 // - 印刷で「背景のグラフィック」を出さない設定でも帯の色が出るよう、帯の色は背景ではなく枠線で塗る：
 //   帯の後ろに重ねた疑似要素（::before）に帯より太い border-top を付け、帯の大きさで切り取る（overflow: hidden）。
 //   枠線は背景の設定にかかわらず印刷される。スマホの幅で文字が折り返して帯が高くなっても塗りが足りる。
@@ -95,6 +95,12 @@ h2 {
 
 .print-band--intake {
     --print-band-color: #{$green-600};
+}
+
+// 性格診断（S-0312。2026-10 追加）：Bootstrap の $purple（#6f42c1）。白の文字とのコントラスト比 6.51:1。
+// 青・緑と、白黒の印刷でも濃さに差が出やすい色
+.print-band--personality {
+    --print-band-color: #{$purple};
 }
 
 // 塗り（::before）の上に文字とアイコンを重ねる

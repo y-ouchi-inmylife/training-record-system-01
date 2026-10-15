@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Trainee;
+use App\Services\TraineePersonalityDiagnosisTokenService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+/**
+ * 性格診断の案内（性格診断用 URL のトークン。DS-1100）の発行・取消・表示（2026-10 追加）。
+ *
+ * 要件定義書 6-16-11・6-16-12、api-design.md 4-1-16。受付アンケート案内（TraineeIntakeSurveyTokenController）と
+ * 同じ作り。発行・取消は S-0305 会員詳細のトレーニーカードの「性格診断」の行から呼ばれる（会員詳細だけで行う）。
+ * 違いは、前の結果（回答済みの案内）があっても発行できること（何回でも受けられるため）。
+ *
+ * - 発行のあとは、同じリクエストで S-0312 にリダイレクトする。会員詳細の発行のフォームは別タブで送る
+ *   （target="_blank"）ので、案内は別タブで開く。完了メッセージは載せない
+ * - 取消のあとは S-0305 会員詳細に戻し、完了メッセージは上端の success
+ */
+class TraineePersonalityDiagnosisTokenController extends Controller
+{
+    /**
+     * 性格診断の案内を発行する（POST /trainees/{trainee}/personality-diagnosis-tokens）。
+     * 有効な案内がすでにある（二重送信・ほかのタブで発行済みなど）ときは、新しく作らず今ある案内を開く
+     */
+    public function store(Request $request, Trainee $trainee, TraineePersonalityDiagnosisTokenService $service): RedirectResponse
+    {
+        $service->issue($trainee, $request->user());
+
+        return redirect()->route('trainee-personality-diagnosis-tokens.print', $trainee);
+    }
+
+    /**
+     * 性格診断の案内を取り消す（DELETE /trainees/{trainee}/personality-diagnosis-tokens）。
+     * 有効な（未回答の）トークンだけを物理削除する。回答済みのトークンと結果には触らない。
+     * 有効な案内がなければ 409（受付アンケートと同じ）
+     */
+    public function destroy(Trainee $trainee): RedirectResponse
+    {
+        $deleted = $trainee->personalityDiagnosisTokens()->whereNull('answered_at')->delete();
+        if ($deleted === 0) {
+            abort(409, '取り消す性格診断の案内がありません。');
+        }
+
+        return redirect()->route('clients.show', $trainee->client_id)
+            ->with('success', '性格診断の案内を取り消しました。');
+    }
+
+    /**
+     * 性格診断案内画面（S-0312、GET /trainees/{trainee}/personality-diagnosis-tokens/print）。
+     *
+     * 有効な（未回答の）トークンがあれば、QR コード・URL・手順を載せた案内を出す。なければ同じビューで
+     * 「有効な性格診断の案内がありません。」を出す（未発行・取消済み・前の案内に回答済みのいずれでも同じ）。
+     * 受付アンケート案内画面（S-0311）と同じ作り。表示はアクセスログに記録しない。
+     * お客様の氏名・愛犬の名前はビューに渡さない（受付アンケートと同じ）。
+     */
+    public function print(Trainee $trainee): View
+    {
+        $token = $trainee->activePersonalityDiagnosisToken;
+
+        if (! $token) {
+            return view('trainees.personality-diagnosis-token-print', [
+                'trainee' => $trainee,
+                'url' => null,
+                'copyText' => null,
+            ]);
+        }
+
+        $url = route('client-portal.personality-diagnosis.show', ['token' => $token->token]);
+
+        return view('trainees.personality-diagnosis-token-print', [
+            'trainee' => $trainee,
+            'url' => $url,
+            'copyText' => $this->buildCopyText($url),
+        ]);
+    }
+
+    /**
+     * メール／LINE 送付用の案内文面を組み立てる（screen-design.md S-0312「案内文面のコピー」）。
+     *
+     * S-0311 の決め事にそろえる：件名を入れない・挨拶を入れない・愛犬の名前を使わない・QR コードに触れない・
+     * 事業者名は最後の行で、config('app.client_portal_company') が未設定なら行ごと出さない。
+     *
+     * 文面を直すときは、上の設計書と本メソッドを同時に更新すること。
+     */
+    private function buildCopyText(string $url): string
+    {
+        $company = config('app.client_portal_company');
+
+        $lines = [
+            'トレーニングの参考にするため、性格診断へのご回答をお願いします。',
+            '下のリンクから、50の質問にお答えください。',
+            '',
+            $url,
+            '',
+            'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
+        ];
+
+        // 事業者名が空のときは、直前の空行を含めて丸ごと出さない
+        if (! empty($company)) {
+            $lines[] = '';
+            $lines[] = $company;
+        }
+
+        return implode("\n", $lines);
+    }
+}
