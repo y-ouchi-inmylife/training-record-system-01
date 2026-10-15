@@ -185,8 +185,8 @@
         <div class="d-flex flex-wrap justify-content-end gap-2 mb-2">
             <a href="{{ route('clients.index') }}" class="btn btn-outline-secondary">&laquo; 会員一覧に戻る</a>
             @if($showDeleteEmail)
-                {{-- モーダルのタイトル・本文・完了メッセージは変えていない（役割が違うため揃えない —
-                     詳細は設計書 S-0305「ボタンとモーダル・完了メッセージで語彙が違う理由」） --}}
+                {{-- モーダルの見出しと完了メッセージはこのボタン名にそろえる（2026-10 変更）。本文は具体的なまま —
+                     詳細は設計書 S-0305「ボタン・モーダル・完了メッセージの語彙」） --}}
                 <button type="button" class="btn btn-outline-danger text-nowrap"
                         data-bs-toggle="modal" data-bs-target="#emailDeletionModal">
                     マイページ登録を削除
@@ -680,7 +680,9 @@
     </div>
 
     {{-- メールアドレス削除確認モーダル（S-0305-M02、段階 4-2）。
-         初回設定待ち（期限内・期限切れの両方）と利用中で開く。
+         初回設定待ち（期限内・期限切れの両方）と利用中で開く。見出しは「マイページ登録の削除」（2026-10 変更。
+         開くボタン「マイページ登録を削除」にそろえた。本文と確定ボタンは変えない）。aria-labelledby は見出しの id
+         （emailDeletionModalLabel）を指すので、見出しの文字を変えても参照は切れない。
          ボタン側の $showDeleteEmail と同じ条件でモーダル本体もラップし、
          両者の条件が食い違わないようにする。 --}}
     @if($showDeleteEmail)
@@ -690,7 +692,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="emailDeletionModalLabel">
-                        メールアドレスの削除
+                        マイページ登録の削除
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>

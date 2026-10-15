@@ -1033,8 +1033,12 @@ class ClientCountRenderingTest extends TestCase
         // 「登録を削除」だけの古い名前のボタンはどこにもない
         $this->assertSame(0, preg_match('/>\s*登録を削除\s*</u', $html));
         // 確認のモーダル（M02）の文言は今までどおり
-        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="emailDeletionModalLabel">\s*メールアドレスの削除\s*<\/h5>/u', $html);
+        // 見出しはボタン名にそろえた「マイページ登録の削除」（2026-10 変更）。本文・確定ボタンは今までどおり
+        $this->assertMatchesRegularExpression('/aria-labelledby="emailDeletionModalLabel".*?<h5 class="modal-title" id="emailDeletionModalLabel">\s*マイページ登録の削除\s*<\/h5>/su', $html);
+        $this->assertStringNotContainsString('メールアドレスの削除', $html);
         $this->assertStringContainsString('登録されたメールアドレスが削除され、マイページを使えなくなります。<br>', $html);
+        $this->assertStringContainsString('会員情報とトレーニング記録は残ります。', $html);
+        $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除する</button>', $html);
     }
 
     public function test_初回設定待ちでも上部の並びにマイページ登録を削除を出す(): void

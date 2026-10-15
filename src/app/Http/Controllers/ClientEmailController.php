@@ -52,8 +52,9 @@ class ClientEmailController extends Controller
                 ->delete();
         });
 
+        // 完了メッセージは会員詳細のボタン名「マイページ登録を削除」にそろえる（2026-10 変更）
         return redirect()
             ->route('clients.show', $client)
-            ->with('success', 'メールアドレスを削除しました。');
+            ->with('success', 'マイページ登録を削除しました。');
     }
 }
