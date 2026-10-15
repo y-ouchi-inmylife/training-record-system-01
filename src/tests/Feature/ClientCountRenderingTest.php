@@ -1017,4 +1017,18 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<div class="text-muted small">主担当<\/div>.*?<div class="text-muted small">メールアドレス（マイページ）<\/div>/su', $html);
         $this->assertStringNotContainsString('<div class="text-muted small">メールアドレス</div>', $html);
     }
+
+    public function test_会員一覧の列見出しはマイページでバッジは今までどおり(): void
+    {
+        $this->fakeMediaDisk();
+        $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.index'))->assertOk()->getContent();
+
+        // 列見出しは「マイページ」（2026-10 変更）。主担当と最終トレーニング日の間
+        $this->assertMatchesRegularExpression('/<th>主担当<\/th>\s*(?:\{\{--.*?--\}\}\s*)?<th>マイページ<\/th>\s*<th>最終トレーニング日<\/th>/su', $html);
+        $this->assertStringNotContainsString('<th>メールアドレス</th>', $html);
+        // 列の中身（マイページの状態のバッジ）は今までどおり
+        $this->assertStringContainsString('<td><span class="badge bg-secondary">未登録</span></td>', $this->listRow($html, '山田'));
+    }
 }
