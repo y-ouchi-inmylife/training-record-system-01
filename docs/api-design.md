@@ -71,7 +71,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント管理 | S-0305 クライアント詳細画面 | DELETE | `/clients/{client}/email` | クライアントのメールアドレスとパスワードを削除し、送信済みのメールアドレス登録用 URL・ログイン用リンクを無効化する（6-3-8） | auth | 管理者、一般 |
 | トレーニー管理 | S-0308 トレーニー登録画面 | GET | `/clients/{client}/trainees/create` | トレーニー登録画面を表示する（会員は URL パラメータから取得。ルート名 `trainees.create`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0308 トレーニー登録画面 | POST | `/clients/{client}/trainees` | トレーニーを登録する（ルート名 `trainees.store`） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | GET | `/trainees/{trainee}` | トレーニー詳細画面を表示する（ルート名 `trainees.show`）。性格診断の結果の一覧（新しい順。**2026-10 追加**）も渡す | auth | 管理者、一般 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | GET | `/trainees/{trainee}` | トレーニー詳細画面を表示する（ルート名 `trainees.show`）。性格診断の結果（**2026-10 追加**。レーダーチャートの今回・前回・初回と、古い順の結果の表に使う）も渡す | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | GET | `/trainees/{trainee}/edit` | トレーニー編集画面を表示する（ルート名 `trainees.edit`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | PUT | `/trainees/{trainee}` | トレーニーを更新する（ルート名 `trainees.update`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。受付アンケート・性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック） | auth | 管理者 |
