@@ -84,6 +84,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を発行する（性格診断用 URL のトークンを 1 件作成する。ルート名 `trainee-personality-diagnosis-tokens.store`。**2026-10 追加**）。成功後は S-0312 にリダイレクトする（会員詳細のフォームは別タブで送る。有効な案内がすでにあれば発行せずにその案内を開く） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-personality-diagnosis-tokens.destroy`。**2026-10 追加**）。成功後は S-0305 に戻す | auth | 管理者、一般 |
 | トレーニー管理 | S-0312 性格診断案内画面 | GET | `/trainees/{trainee}/personality-diagnosis-tokens/print` | 性格診断案内画面を表示する（ルート名 `trainee-personality-diagnosis-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{result}` | 性格診断の結果を 1 件削除する（物理削除。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**） | auth | 管理者 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -2222,6 +2223,24 @@ POST /training-records に以下を追加する。
 - 成功：S-0305 へリダイレクトし、フラッシュ `success` に「性格診断の案内を取り消しました。」
 - 有効な案内がない：409
 - 押下時に確認モーダルを挟む（screen-design.md S-0305-M07）
+
+###### DELETE /trainees/{trainee}/personality-diagnosis-results/{result}
+
+**概要**: 性格診断の結果を 1 件削除する（requirements.md 6-16-14。**2026-10 追加**）。
+
+**リクエスト**: パラメータなし
+
+**処理**:
+- `{result}` は `{trainee}` の結果に限る（スコープ付きのルートモデルバインディング。別のトレーニーの結果なら 404）
+- 管理者でなければ 403（トレーニーの削除 `DELETE /trainees/{trainee}` と同じ確かめ方・同じ文言「管理者のみ削除できます。」。システム管理者は、トレーニー管理のルートの `practitioners` ミドルウェアで 403）
+- その結果（`trainee_personality_diagnosis_results` の行）を物理削除する。結果に使った案内（回答済みのトークン）は消さない
+- アクセスログに記録する（`delete_trainee_personality_diagnosis_result`。`target_type='Trainee'`、`target_id` はトレーニーの id）
+
+**レスポンス**:
+- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309。フラグメントは付けない）。フラッシュ `success` に「性格診断の結果を削除しました。」
+- 管理者でない：403
+- 別のトレーニーの結果・存在しない結果：404
+- 押下時に確認モーダルを挟む（screen-design.md S-0309-M01）
 
 ###### GET /trainees/{trainee}/personality-diagnosis-tokens/print
 
