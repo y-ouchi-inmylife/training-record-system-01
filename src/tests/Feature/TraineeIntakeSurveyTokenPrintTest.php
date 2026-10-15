@@ -94,8 +94,9 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         $this->assertSame('/client-portal/intake-survey/'.self::TOKEN, parse_url($url, PHP_URL_PATH));
         $this->assertStringContainsString('<h1 class="print-title">受付アンケートのご案内</h1>', $html);
-        // 愛犬の名前は使わない（2026-10 変更。設計書 S-0311）
-        $this->assertStringContainsString('<p class="print-lead">愛犬のことを教えてください</p>', $html);
+        // 見出しのすぐ下に QR コード。「愛犬のことを教えてください」の行は置かない（2026-10 変更。設計書 S-0311）
+        $this->assertMatchesRegularExpression('/<h1 class="print-title">受付アンケートのご案内<\/h1>\s*<div class="print-qr">/u', $html);
+        $this->assertStringNotContainsString('愛犬のことを教えてください', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
         $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
         $this->assertStringContainsString('<p class="print-section-title">ご回答の手順</p>', $html);
@@ -144,7 +145,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         $html = $this->printPage();
 
-        $this->assertStringContainsString('<p class="print-lead">愛犬のことを教えてください</p>', $html);
+        $this->assertStringNotContainsString('愛犬のことを教えてください', $html);
         $this->assertStringNotContainsString('愛犬ちゃん', $html);
         $this->assertSame(implode("\n", [
             'トレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
@@ -154,6 +155,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
             '',
             'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
         ]), $this->copyText($html));
+        $this->assertStringNotContainsString('愛犬のことを教えてください', $this->copyText($html));
         // 事業者名が未設定なら、訓練所名の行も文面の最後の行も出さない
         $this->assertStringNotContainsString('<p class="print-company">', $html);
     }
