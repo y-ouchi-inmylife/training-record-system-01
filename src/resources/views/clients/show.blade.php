@@ -526,7 +526,8 @@
                                      - 状態は Trainee::intake_survey_status（ClientController::show で
                                        trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）
                                      - 「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
-                                       「登録案内を表示」と同じ）。「回答を見る」は S-0309 の暮らしの様子の欄（#intake-survey）へ移る
+                                       「登録案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。まとまりの中で
+                                       対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は付けない）。「回答を見る」は S-0309 の暮らしの様子の欄（#intake-survey）へ移る
                                      - 読み上げでどのトレーニーの操作かが分かるよう、まとまりを role="group" にして
                                        「{表示名}の受付アンケート」の名前を付ける（ボタンの文字は変えない）。読み上げの順は
                                        名前 → 受付アンケートのまとまり → 属性 → 計測を追加
@@ -548,7 +549,7 @@
                                                    class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示</a>
                                                 <button type="button" class="btn btn-sm btn-outline-danger"
                                                         data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
-                                                        data-intake-survey-trainee-id="{{ $trainee->id }}">案内を取消</button>
+                                                        data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>
                                             @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
                                                 <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
                                                    class="btn btn-sm btn-outline-primary">回答を見る</a>

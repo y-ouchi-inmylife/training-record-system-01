@@ -730,11 +730,11 @@ class ClientCountRenderingTest extends TestCase
             .'<button type="submit" class="btn btn-sm btn-outline-primary">案内を発行<\/button>/u',
             $html
         );
-        $this->assertStringNotContainsString('案内を取消', $html);
+        $this->assertStringNotContainsString('>取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
     }
 
-    public function test_受付アンケートが回答待ちなら案内を表示と案内を取消のボタンを出し発行日は出さない(): void
+    public function test_受付アンケートが回答待ちなら案内を表示と取消のボタンを出し発行日は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -746,11 +746,13 @@ class ClientCountRenderingTest extends TestCase
         $this->assertIntakeRowHasNoStatusText($html, ['2026/10/15']);
         $this->assertMatchesRegularExpression(
             '/<button type="button" class="btn btn-sm btn-outline-danger"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"\s*'
-            .'data-intake-survey-trainee-id="'.$id.'">案内を取消<\/button>/u',
+            .'data-intake-survey-trainee-id="'.$id.'">取消<\/button>/u',
             $html
         );
+        // 取消のボタンの文字は「取消」だけ（2026-10 変更）。「案内を取消」のボタンは出さない
+        $this->assertStringNotContainsString('>案内を取消<', $html);
         $this->assertStringNotContainsString('>案内を発行<', $html);
-        // 「案内を表示」は S-0311 を別タブで開き、「案内を取消」の左に置く（2026-10、段階3b）
+        // 「案内を表示」は S-0311 を別タブで開き、「取消」の左に置く（2026-10、段階3b）
         $printUrl = preg_quote(route('trainee-intake-survey-tokens.print', $id), '/');
         $this->assertMatchesRegularExpression(
             '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger"/u',
@@ -781,7 +783,7 @@ class ClientCountRenderingTest extends TestCase
         $url = preg_quote(route('trainees.show', $id).'#intake-survey', '/');
         $this->assertMatchesRegularExpression('/<a href="'.$url.'"\s*class="btn btn-sm btn-outline-primary">回答を見る<\/a>/u', $html);
         $this->assertStringNotContainsString('>案内を発行<', $html);
-        $this->assertStringNotContainsString('>案内を取消<', $html);
+        $this->assertStringNotContainsString('>取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
     }
 
