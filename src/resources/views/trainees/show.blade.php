@@ -246,13 +246,20 @@
         $pdCategories = \App\Support\PersonalityDiagnosisQuestions::categories();
         $pdIdsByCategory = \App\Support\PersonalityDiagnosisQuestions::questionIdsByCategory();
         $pdChoices = \App\Support\PersonalityDiagnosisQuestions::choices();
-        // レーダーチャートに渡す値：表と同じ表示の値（小数第 1 位）。今回＝いちばん新しい回、前回＝その 1 つ前
-        $pdLatest = $pdResults->first();
-        $pdPrevious = $pdResults->get(1);
-        $pdRadarData = $pdLatest === null ? null : [
+        // レーダーチャートに重ねる回：今回＝いちばん新しい回、前回＝その 1 つ前、初回＝いちばん古い回（結果が 3 つ以上のときだけ。
+        // 2 つのときは前回と初回が同じ回なので重ねない）。間の回は重ねない。値は表と同じ表示の値（小数第 1 位）と回答日
+        $pdSeries = array_filter([
+            'current' => $pdResults->first(),
+            'previous' => $pdResults->get(1),
+            'initial' => $pdResults->count() >= 3 ? $pdResults->last() : null,
+        ]);
+        $pdRadarData = [
             'labels' => array_values($pdCategories),
-            'current' => array_values($pdLatest->displayScores()),
-            'previous' => $pdPrevious === null ? null : array_values($pdPrevious->displayScores()),
+            'series' => collect($pdSeries)->map(fn ($result, $key) => [
+                'key' => $key,
+                'date' => $result->answered_at->format('Y/m/d'),
+                'values' => array_values($result->displayScores()),
+            ])->values()->all(),
         ];
     @endphp
     <div class="card mb-3" id="personality-diagnosis" style="scroll-margin-top: 4.5rem;">
@@ -263,14 +270,16 @@
             @if($pdResults->isEmpty())
                 <p class="mb-0 text-muted">（未回答）</p>
             @else
-                {{-- レーダーチャート（1 つ）。グラフは見た目のためのもので、同じ数字を下の表に出すので、読み上げは role="img" と短い説明だけ --}}
-                <div class="mx-auto mb-3 show" style="max-width: 420px;" data-personality-diagnosis-result>
+                {{-- レーダーチャート（1 つ。今回・前回・初回を重ねる）。グラフは見た目のためのもので、同じ数字を下の表に出すので、
+                     読み上げは role="img" と短い説明だけ --}}
+                <div class="mx-auto mb-3" style="max-width: 420px;">
                     <canvas role="img" aria-label="レーダーチャート（点数は下の表のとおり）"
                             data-personality-radar="{{ json_encode($pdRadarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
                 </div>
 
-                {{-- 結果の表（古い順。スマホの幅では横に流す） --}}
-                <div class="table-responsive">
+                {{-- 結果の表（古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
+                     横に流す枠の外に出てページの幅を広げないよう、枠を位置の基準にする --}}
+                <div class="table-responsive position-relative">
                     <table class="table table-sm align-middle mb-0" data-personality-diagnosis-results>
                         <thead>
                             <tr>

@@ -4,51 +4,60 @@
  * Chart.js を読み込まない純粋な関数だけを置く（vitest で確かめるため。tests/js/personality-radar-config.test.js）。
  * 描くのは personality-radar.js。設計書 S-0309「性格診断の欄」の「レーダーチャート」。
  *
+ * - グラフは欄に 1 つ。今回（いちばん新しい回）・前回（その 1 つ前）・初回（いちばん古い回）を重ねる。
+ *   どれを渡すか（結果が 1 つなら今回だけ、2 つなら今回・前回、3 つ以上なら 3 つとも）は Blade で決める
  * - 7 カテゴリ、目盛りは 0〜4 で固定（1 刻み）
- * - 「今回」は濃い線と薄い塗り、「前回」は灰色の点線（塗りなし）。前回がない回は「今回」だけ
- * - 凡例に「今回」「前回」を出す
- * - 値は、隣の点数の表と同じ表示の値（小数第 1 位の文字列）を数にして使う（表とグラフで数字が食い違わないように）
+ * - 見分け方は色だけに頼らない：今回は紺の実線と薄い塗り、前回は灰色の破線、初回は前回より薄い灰色の点線（どちらも塗りなし）
+ * - 凡例に回答日を添える（「今回（2026/06/01）」など）
+ * - 値は、下の表と同じ表示の値（小数第 1 位の文字列）を数にして使う（表とグラフで数字が食い違わないように）
  */
 
-/** 今回の線の色（トレーナー側の紺。app.scss の .bg-trainer-nav と同じ） */
-export const CURRENT_COLOR = '#0a4fa8';
-
-/** 今回の塗り（同じ紺を薄く） */
-export const CURRENT_FILL = 'rgba(10, 79, 168, 0.15)';
-
-/** 前回の線の色（灰色） */
-export const PREVIOUS_COLOR = '#6c757d';
+/** 回の種類ごとの名前と見た目。並びは凡例の順（今回 → 前回 → 初回） */
+export const SERIES_STYLES = {
+    current: {
+        name: '今回',
+        borderColor: '#0a4fa8', // トレーナー側の紺（app.scss の .bg-trainer-nav と同じ）
+        backgroundColor: 'rgba(10, 79, 168, 0.15)',
+        borderDash: [],
+        fill: true,
+    },
+    previous: {
+        name: '前回',
+        borderColor: '#6c757d', // 灰色
+        backgroundColor: 'transparent',
+        borderDash: [6, 4], // 破線
+        fill: false,
+    },
+    initial: {
+        name: '初回',
+        borderColor: '#adb5bd', // 前回より薄い灰色
+        backgroundColor: 'transparent',
+        borderDash: [2, 3], // 細かい点の点線
+        fill: false,
+    },
+};
 
 /**
- * @param {{labels: string[], current: string[], previous: (string[]|null)}} data
- *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、current・previous は表示の値）
+ * @param {{labels: string[], series: {key: 'current'|'previous'|'initial', date: string, values: string[]}[]}} data
+ *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、series は重ねる回。date は回答日 Y/m/d、
+ *   values は表示の値）
  * @returns {object} Chart.js の設定（type・data・options）
  */
 export function buildRadarConfig(data) {
-    const datasets = [
-        {
-            label: '今回',
-            data: data.current.map(Number),
-            borderColor: CURRENT_COLOR,
-            backgroundColor: CURRENT_FILL,
-            pointBackgroundColor: CURRENT_COLOR,
-            borderWidth: 2,
-            fill: true,
-        },
-    ];
+    const datasets = data.series.map((series) => {
+        const style = SERIES_STYLES[series.key];
 
-    if (Array.isArray(data.previous)) {
-        datasets.push({
-            label: '前回',
-            data: data.previous.map(Number),
-            borderColor: PREVIOUS_COLOR,
-            backgroundColor: 'transparent',
-            pointBackgroundColor: PREVIOUS_COLOR,
+        return {
+            label: `${style.name}（${series.date}）`,
+            data: series.values.map(Number),
+            borderColor: style.borderColor,
+            backgroundColor: style.backgroundColor,
+            pointBackgroundColor: style.borderColor,
             borderWidth: 2,
-            borderDash: [6, 4],
-            fill: false,
-        });
-    }
+            borderDash: style.borderDash,
+            fill: style.fill,
+        };
+    });
 
     return {
         type: 'radar',

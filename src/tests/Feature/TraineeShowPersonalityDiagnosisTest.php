@@ -187,7 +187,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         ], $this->tableRows($card));
         // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・ボタンの列
         $this->assertSame(1, substr_count($card, '<table'));
-        $this->assertStringContainsString('<div class="table-responsive">', $card);
+        $this->assertStringContainsString('<div class="table-responsive position-relative">', $card);
         preg_match_all('/<th scope="col"[^>]*>(.*?)<\/th>/u', $card, $heads);
         $this->assertSame(
             array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['<span class="visually-hidden">50問の回答</span>']),
@@ -255,6 +255,83 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringContainsString('（未回答）', $this->card($html));
         $this->assertStringNotContainsString('聡明・スマート優等生タイプ', $html);
         $this->assertStringNotContainsString('data-personality-diagnosis-answers', $html);
+    }
+
+    // ---- レーダーチャート（1 つ。今回・前回・初回を重ねる） ----
+
+    /** 欄のレーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
+    private function radarData(string $html): array
+    {
+        $this->assertSame(1, preg_match_all('/<canvas role="img" aria-label="レーダーチャート（点数は下の表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $html, $m));
+
+        return json_decode(html_entity_decode($m[1][0], ENT_QUOTES | ENT_HTML5), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function series(string $key, string $caseName, string $date): array
+    {
+        $display = $this->fixtureCase($caseName)['expected']['display'];
+
+        return [
+            'key' => $key,
+            'date' => $date,
+            'values' => array_map(fn ($c) => $display[$c], array_keys(PersonalityDiagnosisQuestions::categories())),
+        ];
+    }
+
+    public function test_グラフ_結果が1件なら今回だけ(): void
+    {
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+
+        $this->assertSame([
+            'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
+            'series' => [$this->series('current', 'past-1', '2026/06/01')],
+        ], $this->radarData($html));
+        $this->assertStringContainsString('personality-radar', $html);
+    }
+
+    public function test_グラフ_結果が2件なら今回と前回で初回は重ねない(): void
+    {
+        $this->addResult('past-2', '2026-03-10 11:00:00');
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $this->assertSame([
+            $this->series('current', 'past-1', '2026/06/01'),
+            $this->series('previous', 'past-2', '2026/03/10'),
+        ], $this->radarData($this->page())['series']);
+    }
+
+    public function test_グラフ_結果が3件なら今回と前回と初回(): void
+    {
+        $this->addResult('past-3', '2025-12-01 10:00:00');
+        $this->addResult('past-2', '2026-03-10 11:00:00');
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $this->assertSame([
+            $this->series('current', 'past-1', '2026/06/01'),
+            $this->series('previous', 'past-2', '2026/03/10'),
+            $this->series('initial', 'past-3', '2025/12/01'),
+        ], $this->radarData($this->page())['series']);
+    }
+
+    public function test_グラフ_結果が4件なら間の回は重ねない(): void
+    {
+        $this->addResult('past-4', '2025-09-01 10:00:00');
+        $this->addResult('past-3', '2025-12-01 10:00:00');
+        $this->addResult('past-2', '2026-03-10 11:00:00');
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+
+        // 今回＝いちばん新しい回、前回＝その 1 つ前、初回＝いちばん古い回。2025/12/01（古い順で 2 つ目）は重ねない
+        $this->assertSame([
+            $this->series('current', 'past-1', '2026/06/01'),
+            $this->series('previous', 'past-2', '2026/03/10'),
+            $this->series('initial', 'past-4', '2025/09/01'),
+        ], $this->radarData($html)['series']);
+        // 表には 4 回とも出る
+        $this->assertCount(4, $this->tableRows($this->card($html)));
     }
 
     public function test_会員詳細の性格診断のリンクの飛び先とこの欄のidが一致する(): void
