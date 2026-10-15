@@ -13,12 +13,12 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニー詳細（S-0309）の受付アンケートの欄と、削除の確認の文言（2026-10 追加）。
+ * トレーニー詳細（S-0309）の暮らしの様子の欄（受付アンケートの回答）と、削除の確認の文言（2026-10 追加）。
  *
- * - 欄はカードに id="intake-survey" と scroll-margin-top を付け、状態を見せるだけ（2026-10 変更：
- *   発行・表示・取消のボタン・取消モーダル・欄の中の完了メッセージは置かない。操作は会員詳細だけ）
- * - 未発行・回答待ちのときは「案内の発行・取消は会員詳細から行えます。」と会員詳細へのリンクを添える
- *   （回答済みのときは添えず、回答日時を出す）
+ * - 欄は回答があるときだけ出し、見出しは「暮らしの様子」。状態の文字・日付は出さない（2026-10 変更。
+ *   案内の状態は会員詳細のボタンで分かるため）。未発行・回答待ちのときは欄を出さない
+ * - 欄はカードに id="intake-survey" と scroll-margin-top を付ける（会員詳細の「回答を見る」の飛び先）
+ * - 発行・表示・取消のボタン・取消モーダル・欄の中の完了メッセージは置かない（操作は会員詳細だけ）
  * - 削除の確認：計測値の文の後ろに、回答があれば回答の文、未回答の案内があれば案内の文をこの順で足し、
  *   最後を「このトレーニーを削除しますか？」で締める（どちらもないときは今までの文のまま）
  *
@@ -119,22 +119,17 @@ class TraineeShowIntakeSurveyTest extends TestCase
         return $m[1];
     }
 
-    public function test_欄にidとscroll_margin_topを付ける(): void
+    public function test_回答済みなら見出しが暮らしの様子の欄にidとscroll_margin_topを付ける(): void
     {
+        $this->addResponse();
+
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
         $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
-        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">受付アンケート<\/h6>\s*<\/div>/u', $html);
+        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">暮らしの様子<\/h6>\s*<\/div>/u', $html);
     }
 
-    /** 会員詳細で操作できることを添える文（「会員詳細」は S-0305 へのリンク） */
-    private function assertGuideToClientDetail(string $html): void
-    {
-        $url = preg_quote(route('clients.show', $this->trainee->client_id), '/');
-        $this->assertMatchesRegularExpression('/<p class="small text-muted mb-0">案内の発行・取消は<a href="'.$url.'">会員詳細<\/a>から行えます。<\/p>/u', $html);
-    }
-
-    /** 欄に操作のボタン・取消モーダル・欄の中の完了メッセージがないこと */
+    /** 欄（と画面全体）に操作のボタン・取消モーダルがないこと */
     private function assertNoOperations(string $html): void
     {
         $this->assertStringNotContainsString('>案内を発行<', $html);
@@ -144,36 +139,53 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString(route('trainee-intake-survey-tokens.store', $this->trainee), $html);
     }
 
-    public function test_未発行なら案内はまだ発行していませんと会員詳細への案内でボタンは出さない(): void
+    /** 欄そのものが出ていないこと（見出し・状態の文字・会員詳細への案内も出ない） */
+    private function assertNoIntakeSurveyCard(string $html): void
+    {
+        $this->assertStringNotContainsString('id="intake-survey"', $html);
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        // 「受付アンケート」は削除の確認の文（「発行済みの受付アンケート案内も…」）には出るため、見出しの形で確かめる
+        $this->assertStringNotContainsString('>受付アンケート<', $html);
+        $this->assertStringNotContainsString('未発行', $html);
+        $this->assertStringNotContainsString('受付アンケートの案内はまだ発行していません。', $html);
+        $this->assertStringNotContainsString('回答待ち', $html);
+        $this->assertStringNotContainsString('2026/10/15', $html);
+        $this->assertStringNotContainsString('会員詳細から行えます', $html);
+    }
+
+    public function test_未発行なら欄を出さない(): void
     {
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertStringContainsString('受付アンケートの案内はまだ発行していません。', $html);
-        $this->assertGuideToClientDetail($html);
+        $this->assertNoIntakeSurveyCard($html);
         $this->assertNoOperations($html);
     }
 
-    public function test_回答待ちなら発行日と会員詳細への案内でボタンも取消モーダルも出さない(): void
+    public function test_回答待ちなら欄を出さない(): void
     {
         $this->issueToken();
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<p class="mb-1">回答待ち（2026/10/15 発行）</p>', $html);
-        $this->assertGuideToClientDetail($html);
+        $this->assertNoIntakeSurveyCard($html);
         $this->assertNoOperations($html);
     }
 
-    public function test_回答済みなら回答日時を出し会員詳細への案内は出さない(): void
+    public function test_回答済みなら状態の文字と回答日時を出さない(): void
     {
         $this->issueToken('2026-10-16 14:32:00');
         $this->addResponse();
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+        $card = $this->intakeCard($html);
 
-        $this->assertStringContainsString('回答済み（2026/10/16 14:32）', $html);
-        $this->assertStringNotContainsString('案内の発行・取消は', $html);
-        $this->assertStringNotContainsString('受付アンケートの案内はまだ発行していません。', $html);
+        $this->assertStringNotContainsString('受付アンケート', $card);
+        $this->assertStringNotContainsString('回答済み', $card);
+        $this->assertStringNotContainsString('2026/10/16', $card);
+        $this->assertStringNotContainsString('14:32', $card);
+        $this->assertStringNotContainsString('会員詳細から行えます', $card);
+        // 本文は自由記述から始まる
+        $this->assertMatchesRegularExpression('/<div class="card-body">\s*<dl class="mb-0" data-intake-survey-answers>/u', $card);
         $this->assertNoOperations($html);
     }
 
@@ -272,7 +284,6 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
         $card = $this->intakeCard($html);
 
-        $this->assertStringContainsString('<p class="mb-3">回答済み（2026/10/16 14:32）</p>', $card);
         foreach (['名前', '犬種', '性別', '誕生日', '去勢・避妊'] as $label) {
             $this->assertStringNotContainsString('>'.$label.'<', $card, $label);
         }
@@ -282,11 +293,9 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString('data-intake-survey-basics', $card);
         // 画面上部のトレーニーの情報は今までどおり出る（欄の外）
         $this->assertStringContainsString('柴', substr($html, 0, strpos($html, 'id="intake-survey"')));
-        // 「回答済み」の行のすぐ下が自由記述（余白は「回答済み」の行の mb-3）
-        $this->assertMatchesRegularExpression('/<p class="mb-3">回答済み（2026\/10\/16 14:32）<\/p>\s*<dl class="mb-0" data-intake-survey-answers>/u', $card);
     }
 
-    public function test_自由記述は設問文と回答の対で改行を保持し答えなかった設問は未回答(): void
+    public function test_自由記述は設問文の先頭に読み上げない印を付け回答の対で改行を保持し答えなかった設問は未回答(): void
     {
         $this->addResponse('2026-10-16 14:32:00', [
             'wish' => "留守番中に鳴き続けてしまう\nのを直したい",
@@ -297,13 +306,15 @@ class TraineeShowIntakeSurveyTest extends TestCase
 
         $questions = TraineeIntakeSurveyResponse::questions();
         $q = fn (string $column) => preg_quote($questions[$column]['question'], '/');
-        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('wish').'<\/dt>\s*<dd class="mb-3" style="white-space: pre-wrap;">留守番中に鳴き続けてしまう\nのを直したい<\/dd>/u', $html);
-        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('recent_events').'<\/dt>\s*<dd class="mb-3 text-muted">（未回答）<\/dd>/u', $html);
-        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('ideal_days').'<\/dt>\s*<dd class="mb-3" style="white-space: pre-wrap;">ドッグランで遊びたい<\/dd>/u', $html);
-        $this->assertMatchesRegularExpression('/<dt class="fw-normal text-muted">'.$q('health_concerns').'<\/dt>\s*<dd class="mb-0 text-muted">（未回答）<\/dd>/u', $html);
-        // 回答の表示は設問文と回答の対だけ（「●」も例文も出さない）
+        // 設問文の先頭の「●」は回答画面（S-1413）と同じ作り（aria-hidden で読み上げない。d-flex でぶら下げ）
+        $dt = fn (string $column) => '<dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●<\/span><span>'.$q($column).'<\/span><\/dt>';
+        $this->assertMatchesRegularExpression('/'.$dt('wish').'\s*<dd class="mb-3" style="white-space: pre-wrap;">留守番中に鳴き続けてしまう\nのを直したい<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/'.$dt('recent_events').'\s*<dd class="mb-3 text-muted">（未回答）<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/'.$dt('ideal_days').'\s*<dd class="mb-3" style="white-space: pre-wrap;">ドッグランで遊びたい<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/'.$dt('health_concerns').'\s*<dd class="mb-0 text-muted">（未回答）<\/dd>/u', $html);
+        // 「●」は 4 問の設問文にだけ付ける（回答の行には付けない）。例文は出さない
+        $this->assertSame(4, substr_count($html, '●'));
         $this->assertStringNotContainsString('例：', $html);
-        $this->assertStringNotContainsString('●', $html);
     }
 
     public function test_回答の内容は受付アンケートの欄の中に出し編集や削除の操作は置かない(): void
@@ -336,7 +347,6 @@ class TraineeShowIntakeSurveyTest extends TestCase
 
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertStringContainsString('回答済み（2026/10/18 09:05）', $html);
         $this->assertStringContainsString('>新しい回答</dd>', $html);
         $this->assertStringNotContainsString('古い回答', $html);
     }

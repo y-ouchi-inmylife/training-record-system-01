@@ -162,7 +162,6 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
         $this->assertNotNull($trainee->activeIntakeSurveyToken);
         $this->assertSame('2026-10-18 09:00:00', $trainee->latestIntakeSurveyResponse->answered_at->format('Y-m-d H:i:s'));
         $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
-        $this->assertSame('回答済み（2026/10/18）', $trainee->intake_survey_status_label);
         $this->assertCount(3, $trainee->intakeSurveyResponses);
     }
 }

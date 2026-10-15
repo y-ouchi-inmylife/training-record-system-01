@@ -23,10 +23,9 @@ class TraineeIntakeSurveyStatusTest extends TestCase
         $trainee->setRelation('latestIntakeSurveyResponse', null);
 
         $this->assertSame(Trainee::INTAKE_NOT_ISSUED, $trainee->intake_survey_status);
-        $this->assertSame('未発行', $trainee->intake_survey_status_label);
     }
 
-    public function test_有効な案内があれば回答待ちで発行日を添える(): void
+    public function test_有効な案内があれば回答待ち(): void
     {
         $token = new TraineeIntakeSurveyToken;
         $token->created_at = Carbon::parse('2026-10-15 09:30:00');
@@ -36,10 +35,9 @@ class TraineeIntakeSurveyStatusTest extends TestCase
         $trainee->setRelation('latestIntakeSurveyResponse', null);
 
         $this->assertSame(Trainee::INTAKE_AWAITING, $trainee->intake_survey_status);
-        $this->assertSame('回答待ち（2026/10/15 発行）', $trainee->intake_survey_status_label);
     }
 
-    public function test_回答があれば回答済みで回答日を添える(): void
+    public function test_回答があれば回答済み(): void
     {
         $response = new TraineeIntakeSurveyResponse;
         $response->answered_at = Carbon::parse('2026-10-16 14:32:00');
@@ -49,7 +47,6 @@ class TraineeIntakeSurveyStatusTest extends TestCase
         $trainee->setRelation('latestIntakeSurveyResponse', $response);
 
         $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
-        $this->assertSame('回答済み（2026/10/16）', $trainee->intake_survey_status_label);
     }
 
     public function test_回答と有効な案内の両方があれば回答済みを先に判定する(): void
@@ -64,7 +61,6 @@ class TraineeIntakeSurveyStatusTest extends TestCase
         $trainee->setRelation('latestIntakeSurveyResponse', $response);
 
         $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
-        $this->assertSame('回答済み（2026/10/16）', $trainee->intake_survey_status_label);
     }
 
     public function test_状態の定数(): void

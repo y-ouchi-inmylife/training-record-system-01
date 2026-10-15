@@ -182,44 +182,40 @@
         @endif
     </div>
 
-    {{-- 受付アンケートの欄（2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
-         「受付アンケートの欄」）。計測値のカードの下に置く（毎日使う計測値を上に残し、一度きりの
-         回答は下に置くため）。
-         - **状態（と、回答済みなら回答の内容）を見せるだけ**。発行・表示・取消のボタン、取消モーダル
-           （S-0305-M06）、欄の中の完了メッセージは置かない。受付アンケート案内の操作は会員詳細（S-0305）
-           だけで行う（案内を渡す相手は会員で、マイページ登録案内も会員詳細でしか操作しないため。
-           要件定義書 6-16-8 備考）。未発行・回答待ちのときは、会員詳細で操作できることを添える
-         - 経緯：2026-10 の段階3a では、この欄の見出しの右に「案内を発行」「案内を取消」を置き、
-           発行・取消のあとはこの欄（#intake-survey）に戻して完了メッセージを欄の中に出していた。
-           同じ 2026-10 に、操作を会員詳細に寄せたため外した
-         - 状態は Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
-           activeIntakeSurveyToken を読み込み済み）。回答済みのときは回答日時（Y/m/d H:i）と回答の内容を出し、
-           会員詳細で操作できる旨は出さない（回答済みでは発行・取消ができないため）
-         - 回答の内容（要件定義書 6-16-10、設計書 S-0309「受付アンケートの欄」）：自由記述 4 欄を、設問文
-           （TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で出し、改行を保持する。
-           答えなかった設問は「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。
-           編集・削除の操作は置かない（閲覧のみ）
-         - 回答した基本情報（名前・犬種・性別・誕生日・去勢・避妊）は出さない（2026-10 変更）：基本情報の回答は
-           トレーニーの基本情報に反映済みで、画面上部と重なるため。回答そのものは trainee_intake_survey_responses に
-           残っている
+    {{-- 暮らしの様子の欄（受付アンケートの回答。2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
+         「暮らしの様子の欄」）。計測値のカードの下に置く（毎日使う計測値を上に残し、一度きりの回答は下に置くため）。
+         - 欄は回答の中身（自由記述）を読むためのもの。案内の状態は会員詳細のボタンで分かるため、ここでは状態・日付を
+           出さず、回答がないとき（未発行・回答待ち）は欄を出さない（2026-10 変更。当初は見出し「受付アンケート」の
+           欄で、状態の文字・発行日・回答日時と「案内の発行・取消は会員詳細から行えます。」を出していた）。
+           見出しは回答画面（S-1413）の小見出しと同じ「暮らしの様子」
+         - 発行・表示・取消のボタン、取消モーダル（S-0305-M06）は置かない。受付アンケート案内の操作は会員詳細
+           （S-0305）だけで行う（要件定義書 6-16-8 備考）
+         - 回答があるかは Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
+           activeIntakeSurveyToken を読み込み済み）が「回答済み」かどうかで見る
+         - 自由記述 4 欄を、設問文（TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で
+           出し、改行を保持する。設問文の先頭の「●」は S-1413 と同じ作り（aria-hidden="true" で読み上げでは読まず、
+           d-flex で折り返したときに 2 行目を「●」の右から始める）。回答の行には付けない。答えなかった設問は
+           「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。編集・削除の操作は置かない
+         - 回答した基本情報（名前・犬種・性別・誕生日・去勢・避妊）は出さない：基本情報の回答はトレーニーの基本情報に
+           反映済みで、画面上部と重なるため。回答そのものは trainee_intake_survey_responses に残っている
          - 回答が複数件あるときに新しい順に並べるのは第 2 段階（第 1 段階では 1 件）。今は最新の 1 件
            （latestIntakeSurveyResponse）だけを出す
-         - id="intake-survey" と scroll-margin-top は、会員詳細の「回答を見る」から飛ぶ先にするため。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
+         - id="intake-survey" と scroll-margin-top は、会員詳細の「回答を見る」から飛ぶ先にするため（見出しを変えても
+           id は変えない）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
            余白 16px を足した 72px（4.5rem） --}}
-    <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
-        <div class="card-header">
-            <h6 class="mb-0">受付アンケート</h6>
-        </div>
-        <div class="card-body">
-            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
-                @php
-                    $intakeResponse = $trainee->latestIntakeSurveyResponse;
-                @endphp
-                <p class="mb-3">回答済み（{{ $intakeResponse->answered_at->format('Y/m/d H:i') }}）</p>
+    @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+        @php
+            $intakeResponse = $trainee->latestIntakeSurveyResponse;
+        @endphp
+        <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
+            <div class="card-header">
+                <h6 class="mb-0">暮らしの様子</h6>
+            </div>
+            <div class="card-body">
                 <dl class="mb-0" data-intake-survey-answers>
                     @foreach(\App\Models\TraineeIntakeSurveyResponse::questions() as $column => $question)
-                        <dt class="fw-normal text-muted">{{ $question['question'] }}</dt>
+                        <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
                         @if(blank($intakeResponse->{$column}))
                             <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted">（未回答）</dd>
                         @else
@@ -227,16 +223,9 @@
                         @endif
                     @endforeach
                 </dl>
-            @else
-                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                    <p class="text-muted mb-1">受付アンケートの案内はまだ発行していません。</p>
-                @else
-                    <p class="mb-1">{{ $trainee->intake_survey_status_label }}</p>
-                @endif
-                <p class="small text-muted mb-0">案内の発行・取消は<a href="{{ route('clients.show', $trainee->client) }}">会員詳細</a>から行えます。</p>
-            @endif
+            </div>
         </div>
-    </div>
+    @endif
 
     {{-- 計測値の登録・編集モーダル（登録・編集で共用）。
          $returnTo は明示せず既定値 'trainee' を使う（S-0309 内で登録・編集した後は

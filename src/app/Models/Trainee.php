@@ -283,20 +283,6 @@ class Trainee extends Model
     }
 
     /**
-     * 受付アンケートの状態の文字（「未発行」「回答待ち（2026/10/15 発行）」「回答済み（2026/10/16）」）。日付は Y/m/d
-     * （アプリのタイムゾーン）。S-0305 のトレーニーカード・S-0309 の受付アンケートの欄で使う。
-     * 状態はバッジにしない（screen-design.md S-0305「バッジにしない理由」）
-     */
-    public function getIntakeSurveyStatusLabelAttribute(): string
-    {
-        return match ($this->intake_survey_status) {
-            self::INTAKE_ANSWERED => '回答済み（'.$this->latestIntakeSurveyResponse->answered_at->format('Y/m/d').'）',
-            self::INTAKE_AWAITING => '回答待ち（'.$this->activeIntakeSurveyToken->created_at->format('Y/m/d').' 発行）',
-            default => '未発行',
-        };
-    }
-
-    /**
      * 最新の計測値（計測日時の降順で先頭）。計測値が 0 件なら null。
      *
      * `measurements()` リレーションが計測日時降順で並ぶ既定を利用し、
