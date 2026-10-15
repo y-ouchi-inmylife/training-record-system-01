@@ -111,3 +111,25 @@ h2 {
         margin-right: 0.5rem;
     }
 }
+
+// トレーニー詳細（S-0309）の計測値の一覧のスクロールの枠（2026-10 追加）。
+// - 縦に積むとき（xl 未満）：最大の高さ（約 10 件分）を決め、超えたら中でスクロールする
+// - xl 以上（写真とグラフのカードの右に並べたとき）：カード（h-100。.card は flex の縦並び）の残りの高さを埋める。
+//   height: 0 と flex: 1 1 0 で、一覧の件数が並びの高さを決めないようにする（並びの高さは左のカードで決まる）
+// - 列の見出し（計測日など）は、スクロールしても上に残す
+.trainee-measurements-scroll {
+    max-height: 28rem;
+    overflow-y: auto;
+
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    @include media-breakpoint-up(xl) {
+        flex: 1 1 0;
+        height: 0;
+        max-height: none;
+    }
+}

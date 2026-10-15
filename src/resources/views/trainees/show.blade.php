@@ -65,113 +65,127 @@
 
     {{-- 写真＋体重推移グラフ（2026-09 追加、S-0309 設計方針「トレーナー側にも写真と
          体重推移グラフを表示する」参照）。
-         位置：属性の下・計測値カードの上。見出しはカード内に置かない（画面上部に
+         位置：属性の下（xl 以上は計測値カードの左、それより狭いときは上）。見出しはカード内に置かない（画面上部に
          トレーニー名 h2 があるため、二重見出しを避ける）。
          内側骨格は会員側 client/dashboard.blade.php と揃える：モバイル（<576px）は
          縦積み・sm 以上は横並び、写真は sm 未満で中央寄せ・sm 以上で上端揃え。
-         .c-session 等の client.scss クラスは使わない（app.scss に定義がないため）。 --}}
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
-                {{-- 左：トレーニー写真（180px 四方、縦横比を保つ）。
-                     トレーナー側は登録・変更・削除の操作を置かない（要件定義書
-                     6-15-15 は会員の機能）。クリックしても何も起きない静的な枠にする。 --}}
-                <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
-                    <div class="d-flex align-items-center justify-content-center"
-                         style="width: 180px; height: 180px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
-                        @if($weightChart['photoUrl'])
-                            {{-- object-fit: contain で枠を超えず、余白は白で埋まる（切り抜かない）。
-                                 会員側 S-1402 と同じ扱い。 --}}
-                            <img src="{{ $weightChart['photoUrl'] }}"
-                                 alt="{{ $trainee->display_name }}の写真"
-                                 style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
-                        @else
-                            {{-- 写真なしのプレースホルダ。会員側は「写真を登録」（登録操作への案内）
-                                 だが、トレーナー側は登録操作をしないため文言を「写真なし」に変える。 --}}
-                            <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
-                        @endif
+         .c-session 等の client.scss クラスは使わない（app.scss に定義がないため）。
+         2026-10 変更：広い画面（xl 以上）では、計測値のカードと横に並べる（左が写真とグラフ、右が計測値）。
+         並びの高さはこのカードで決まり、計測値のカードはこの高さにそろえて一覧を中でスクロールする
+         （app.scss の .trainee-measurements-scroll）。それより狭いときは今までどおり縦に積む。 --}}
+    <div class="row g-3 mb-3" data-trainee-photo-measurements>
+        <div class="col-12 col-xl-7">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
+                        {{-- 左：トレーニー写真（180px 四方、縦横比を保つ）。
+                             トレーナー側は登録・変更・削除の操作を置かない（要件定義書
+                             6-15-15 は会員の機能）。クリックしても何も起きない静的な枠にする。 --}}
+                        <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
+                            <div class="d-flex align-items-center justify-content-center"
+                                 style="width: 180px; height: 180px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
+                                @if($weightChart['photoUrl'])
+                                    {{-- object-fit: contain で枠を超えず、余白は白で埋まる（切り抜かない）。
+                                         会員側 S-1402 と同じ扱い。 --}}
+                                    <img src="{{ $weightChart['photoUrl'] }}"
+                                         alt="{{ $trainee->display_name }}の写真"
+                                         style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
+                                @else
+                                    {{-- 写真なしのプレースホルダ。会員側は「写真を登録」（登録操作への案内）
+                                         だが、トレーナー側は登録操作をしないため文言を「写真なし」に変える。 --}}
+                                    <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- 右：体重推移グラフ。min-width: 0 は flex 子要素の canvas が
+                             親幅を超えて突き抜けるのを防ぐ定石（会員側と同じ）。 --}}
+                        <div class="flex-grow-1 w-100" style="min-width: 0;">
+                            @if(empty($weightChart['datasets']))
+                                {{-- 計測値 0 件（会員側と同じ扱い）。空のグラフを描くと意味のない
+                                     目盛りが出て不具合に見えるため、canvas を出さず案内文を表示する。
+                                     高さは通常のグラフ（180px）と揃える。 --}}
+                                <div class="d-flex align-items-center justify-content-center text-muted"
+                                     style="height: 180px;">
+                                    まだ計測値がありません。
+                                </div>
+                            @else
+                                {{-- data-measurement-chart は datasets のみを渡す（会員側と同じ形）。
+                                     線の色：--c-brand-bright は client.scss にしか定義がなく、
+                                     トレーナー側は measurement-chart.js のフォールバック #2A4A94
+                                     （$brand-bright と同色）が使われる。 --}}
+                                <div style="position: relative; height: 180px;">
+                                    <canvas data-measurement-chart="{{ json_encode([
+                                        'datasets' => $weightChart['datasets'],
+                                    ], JSON_UNESCAPED_UNICODE) }}"></canvas>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                {{-- 右：体重推移グラフ。min-width: 0 は flex 子要素の canvas が
-                     親幅を超えて突き抜けるのを防ぐ定石（会員側と同じ）。 --}}
-                <div class="flex-grow-1 w-100" style="min-width: 0;">
-                    @if(empty($weightChart['datasets']))
-                        {{-- 計測値 0 件（会員側と同じ扱い）。空のグラフを描くと意味のない
-                             目盛りが出て不具合に見えるため、canvas を出さず案内文を表示する。
-                             高さは通常のグラフ（180px）と揃える。 --}}
-                        <div class="d-flex align-items-center justify-content-center text-muted"
-                             style="height: 180px;">
-                            まだ計測値がありません。
-                        </div>
-                    @else
-                        {{-- data-measurement-chart は datasets のみを渡す（会員側と同じ形）。
-                             線の色：--c-brand-bright は client.scss にしか定義がなく、
-                             トレーナー側は measurement-chart.js のフォールバック #2A4A94
-                             （$brand-bright と同色）が使われる。 --}}
-                        <div style="position: relative; height: 180px;">
-                            <canvas data-measurement-chart="{{ json_encode([
-                                'datasets' => $weightChart['datasets'],
-                            ], JSON_UNESCAPED_UNICODE) }}"></canvas>
-                        </div>
-                    @endif
+        {{-- 計測値カード（S-0309 セクション「計測値の登録・編集・削除」）
+             毎日入力する運用で 1 年で数百件になり得るため、一覧はカードの中でスクロールする
+             （件数が増えてもページが伸びないように）。見出し（件数と［新規登録］）はスクロールの外に置き、いつも見える。
+             2026-10 変更：当初は max-height: 60vh のスクロール領域を持たせ、写真とグラフのカードの下に置いていた。
+             - xl 以上（写真とグラフの右に並べたとき）：カードの高さを左のカードにそろえる（h-100。列は行の高さに伸びる）。
+               一覧の枠は .trainee-measurements-scroll で flex: 1 1 0・height: 0 にし、中身（件数）が並びの高さを
+               決めないようにする（残りの高さを埋めて、中でスクロールする）
+             - それより狭いとき（縦に積むとき）：一覧の枠に最大の高さ（約 10 件分）を決め、超えたら中でスクロールする
+             - 列の見出し（計測日など）は、スクロールしても上に残す（position: sticky） --}}
+        <div class="col-12 col-xl-5">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">計測値（{{ $measurementCount }}件）</h6>
+                    <button type="button" class="btn btn-primary"
+                            onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()">新規登録</button>
                 </div>
+                @if($measurementCount > 0)
+                    <div class="table-responsive trainee-measurements-scroll" data-trainee-measurements-scroll>
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>計測日</th>
+                                    <th>計測時刻</th>
+                                    <th class="text-end">体重（kg）</th>
+                                    <th class="text-end" style="min-width: 120px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($trainee->measurements as $m)
+                                    <tr>
+                                        <td>{{ $m->measured_date->format('Y/m/d') }}</td>
+                                        <td>{{ substr($m->measured_time, 0, 5) }}</td>
+                                        <td class="text-end">{{ number_format((float) $m->weight_kg, 2) }}</td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    data-id="{{ $m->id }}"
+                                                    data-measured-date="{{ $m->measured_date->format('Y-m-d') }}"
+                                                    data-measured-time="{{ substr($m->measured_time, 0, 5) }}"
+                                                    data-weight-kg="{{ $m->weight_kg }}"
+                                                    onclick="window.measurementModals[{{ $trainee->id }}].openForEdit(this.dataset)">編集</button>
+                                            <form method="POST" action="{{ route('trainee-measurements.destroy', $m) }}"
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('この計測値を削除しますか？')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="card-body">
+                        <p class="text-muted mb-0">計測値は登録されていません</p>
+                    </div>
+                @endif
             </div>
         </div>
-    </div>
-
-    {{-- 計測値カード（S-0309 セクション「計測値の登録・編集・削除」）
-         毎日入力する運用で 1 年で数百件になり得るため、既存の
-         「トレーニング記録」カード（S-0305 セクション2）と同じく
-         スクロール領域を持たせる（max-height: 60vh）。 --}}
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">計測値（{{ $measurementCount }}件）</h6>
-            <button type="button" class="btn btn-primary"
-                    onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()">新規登録</button>
-        </div>
-        @if($measurementCount > 0)
-            <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
-                <table class="table table-sm mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th>計測日</th>
-                            <th>計測時刻</th>
-                            <th class="text-end">体重（kg）</th>
-                            <th class="text-end" style="min-width: 120px;">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($trainee->measurements as $m)
-                            <tr>
-                                <td>{{ $m->measured_date->format('Y/m/d') }}</td>
-                                <td>{{ substr($m->measured_time, 0, 5) }}</td>
-                                <td class="text-end">{{ number_format((float) $m->weight_kg, 2) }}</td>
-                                <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-id="{{ $m->id }}"
-                                            data-measured-date="{{ $m->measured_date->format('Y-m-d') }}"
-                                            data-measured-time="{{ substr($m->measured_time, 0, 5) }}"
-                                            data-weight-kg="{{ $m->weight_kg }}"
-                                            onclick="window.measurementModals[{{ $trainee->id }}].openForEdit(this.dataset)">編集</button>
-                                    <form method="POST" action="{{ route('trainee-measurements.destroy', $m) }}"
-                                          class="d-inline"
-                                          onsubmit="return confirm('この計測値を削除しますか？')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @else
-            <div class="card-body">
-                <p class="text-muted mb-0">計測値は登録されていません</p>
-            </div>
-        @endif
     </div>
 
     {{-- 暮らしの様子の欄（受付アンケートの回答。2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
