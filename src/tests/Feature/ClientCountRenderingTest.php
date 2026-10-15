@@ -768,7 +768,15 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    public function test_受付アンケートが回答済みなら回答を見るのリンクを出し回答日は出さない(): void
+    /** 「暮らしの様子」のリンク（回答済みのとき、属性の並び〔dl〕のすぐ後ろ）の正規表現 */
+    private function lifeLinkPattern(int $traineeId, string $name): string
+    {
+        $url = preg_quote(route('trainees.show', $traineeId).'#intake-survey', '/');
+
+        return '/<\/dl>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/u';
+    }
+
+    public function test_受付アンケートが回答済みなら名前の行のまとまりを出さず最終計測の下に暮らしの様子のリンクを出す(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -778,13 +786,52 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertIntakeRowHasNoStatusText($html, ['2026/10/16', '14:32']);
-        // 「回答を見る」は S-0309 の受付アンケートの欄へ（同じタブ）
-        $url = preg_quote(route('trainees.show', $id).'#intake-survey', '/');
-        $this->assertMatchesRegularExpression('/<a href="'.$url.'"\s*class="btn btn-sm btn-outline-primary">回答を見る<\/a>/u', $html);
+        // 名前の行のまとまり（role="group" の受付アンケート）と［回答を見る］は出さない
+        $this->assertStringNotContainsString('aria-label="ポチの受付アンケート"', $html);
+        $this->assertStringNotContainsString('<span>受付アンケート</span>', $html);
+        $this->assertStringNotContainsString('回答を見る', $html);
         $this->assertStringNotContainsString('>案内を発行<', $html);
         $this->assertStringNotContainsString('>取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
+        // 名前の行は名前だけ
+        $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="[^"]+">ポチ<\/a><\/h6>\s*<\/div>/u', $html);
+        // 「暮らしの様子」のリンクは、最終計測（と計測を追加）の後ろ、属性の並びのすぐ後ろ。S-0309 の #intake-survey へ
+        $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
+        $this->assertGreaterThan(strpos($html, '>計測を追加</button>'), strpos($html, '>暮らしの様子</a>'));
+        // 回答日時は出さない
+        $this->assertStringNotContainsString('2026/10/16', $html);
+    }
+
+    public function test_回答済みの暮らしの様子のリンクの読み上げ用の名前は名前が未登録なら名前未登録(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, null);
+        $this->intakeResponse($id, $this->intakeToken($id, '2026-10-16 14:32:00'));
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, '名前未登録'), $html);
+    }
+
+    public function test_未発行と回答待ちでは暮らしの様子のリンクを出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $notIssued = $this->trainee($client, 'ポチ');
+        $awaiting = $this->trainee($client, 'たま');
+        $this->intakeToken($awaiting);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('#intake-survey', $html);
+        // 名前の行のまとまりとボタンは今までどおり
+        $this->assertStringContainsString('aria-label="ポチの受付アンケート"', $html);
+        $this->assertStringContainsString('aria-label="たまの受付アンケート"', $html);
+        $this->assertSame(1, substr_count($html, '>案内を発行</button>'));
+        $this->assertSame(1, substr_count($html, '>取消</button>'));
+        $this->assertStringContainsString(route('trainee-intake-survey-tokens.store', $notIssued), $html);
     }
 
     public function test_回答のない回答済みの案内しかなければ未発行として扱う(): void
@@ -799,7 +846,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertIntakeRowHasNoStatusText($html);
         $this->assertStringContainsString('>案内を発行<', $html);
-        $this->assertStringNotContainsString('回答を見る', $html);
+        $this->assertStringNotContainsString('暮らしの様子', $html);
     }
 
     public function test_受付アンケートの行の読み上げ用の名前は名前が未登録なら名前未登録(): void

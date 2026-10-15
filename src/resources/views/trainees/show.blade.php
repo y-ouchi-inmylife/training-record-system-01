@@ -202,7 +202,7 @@
            反映済みで、画面上部と重なるため。回答そのものは trainee_intake_survey_responses に残っている
          - 回答が複数件あるときに新しい順に並べるのは第 2 段階（第 1 段階では 1 件）。今は最新の 1 件
            （latestIntakeSurveyResponse）だけを出す
-         - id="intake-survey" と scroll-margin-top は、会員詳細の「回答を見る」から飛ぶ先にするため（見出しを変えても
+         - id="intake-survey" と scroll-margin-top は、会員詳細の「暮らしの様子」のリンクから飛ぶ先にするため（見出しを変えても
            id は変えない）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
            余白 16px を足した 72px（4.5rem） --}}

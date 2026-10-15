@@ -511,8 +511,10 @@
                                         </div>
                                     </a>
                                     <div class="flex-grow-1" style="min-width: 0;">
-                                {{-- 名前の行。右端に受付アンケートのまとまり（「受付アンケート」の文字とボタン）を右寄せで置く
-                                     （2026-10 変更。要件定義書 6-16-8、設計書 S-0305 セクション3「受付アンケート」）。
+                                {{-- 名前の行。未発行・回答待ちのときは、右端に受付アンケートのまとまり（「受付アンケート」の文字と
+                                     ボタン）を右寄せで置く（2026-10 変更。要件定義書 6-16-8、設計書 S-0305 セクション3「受付アンケート」）。
+                                     回答済みのときはまとまりごと出さず、属性の並びの最後（最終計測の下）に「暮らしの様子」の
+                                     リンクを置く（下の dl の後ろ。回答済みになると案内の操作は終わり、あとは回答を読むだけになるため）。
                                      - 名前とまとまりは縦の中央でそろえる（align-items-center）。幅が足りないとき（スマホの幅、
                                        名前が長いとき、回答待ちでボタンが 2 つのとき）は、flex-wrap でまとまりごと名前の下の行に
                                        折り返し、ms-auto で右寄せのままにする。名前は text-break で長くてもはみ出さない
@@ -527,7 +529,7 @@
                                        trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）
                                      - 「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
                                        「登録案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。まとまりの中で
-                                       対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は付けない）。「回答を見る」は S-0309 の暮らしの様子の欄（#intake-survey）へ移る
+                                       対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は付けない）
                                      - 読み上げでどのトレーニーの操作かが分かるよう、まとまりを role="group" にして
                                        「{表示名}の受付アンケート」の名前を付ける（ボタンの文字は変えない）。読み上げの順は
                                        名前 → 受付アンケートのまとまり → 属性 → 計測を追加
@@ -535,6 +537,7 @@
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                                     <h6 class="mb-0 text-break"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
+                                    @if($trainee->intake_survey_status !== \App\Models\Trainee::INTAKE_ANSWERED)
                                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto small"
                                          role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
                                         <span>受付アンケート</span>
@@ -550,12 +553,10 @@
                                                 <button type="button" class="btn btn-sm btn-outline-danger"
                                                         data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
                                                         data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>
-                                            @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
-                                                <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
-                                                   class="btn btn-sm btn-outline-primary">回答を見る</a>
                                             @endif
                                         </div>
                                     </div>
+                                    @endif
                                 </div>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。備考は改行を保持（S-0309 と同じ）。
@@ -598,6 +599,19 @@
                                                 onclick="window.measurementModals[{{ $trainee->id }}].openForCreate()">計測を追加</button>
                                     </dd>
                                 </dl>
+                                {{-- 暮らしの様子（受付アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。
+                                     属性の並び（dl.row）の最後、最終計測の下に、文字のリンク（ボタンではない）で置く。dl の行には入れず、
+                                     dl のすぐ後ろに置く（値の列がない 1 項目のため。dl.row のラベル列〔col-4〕と同じく左端から始まるので、
+                                     左の位置は属性の見出しにそろう）。「計測を追加」は今までどおり最終計測の値の右に置き、このリンクとは
+                                     別の行なので重ならない。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
+                                     読み上げでどのトレーニーのものかが分かるよう、aria-label を「{表示名}の暮らしの様子」にする
+                                     （見える文字「暮らしの様子」を含む） --}}
+                                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+                                    <div class="small mt-1">
+                                        <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
+                                           aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>
+                                    </div>
+                                @endif
                                     </div>
                                 </div>
                             </div>
