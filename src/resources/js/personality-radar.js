@@ -18,12 +18,34 @@ import {
     Legend,
     Tooltip,
 } from 'chart.js';
-import { buildRadarConfig } from './personality-radar-config';
+import { buildRadarConfig, legendItems, legendSwatchSvg } from './personality-radar-config';
 
 Chart.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Legend, Tooltip);
 
+/**
+ * グラフの下の HTML の凡例を作る（2026-10 変更：Chart.js の凡例はグラフの枠の中に描かれ 2 行に折り返すため、HTML にした）。
+ * 見本の SVG は決まった値だけから作り、凡例の文は textContent で入れる
+ */
+function renderLegend(container, data) {
+    container.replaceChildren();
+    legendItems(data).forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'd-inline-flex align-items-center gap-1';
+        li.innerHTML = legendSwatchSvg(item);
+        const text = document.createElement('span');
+        text.textContent = item.label;
+        li.appendChild(text);
+        container.appendChild(li);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('canvas[data-personality-radar]').forEach((canvas) => {
-        new Chart(canvas, buildRadarConfig(JSON.parse(canvas.dataset.personalityRadar)));
+        const data = JSON.parse(canvas.dataset.personalityRadar);
+        new Chart(canvas, buildRadarConfig(data));
+        const legend = document.querySelector(`[data-personality-radar-legend="${canvas.id}"]`);
+        if (legend) {
+            renderLegend(legend, data);
+        }
     });
 });

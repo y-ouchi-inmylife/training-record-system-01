@@ -262,7 +262,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     /** 欄のレーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
     private function radarData(string $html): array
     {
-        $this->assertSame(1, preg_match_all('/<canvas role="img" aria-label="レーダーチャート（点数は下の表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $html, $m));
+        $this->assertSame(1, preg_match_all('/<canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は下の表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $html, $m));
 
         return json_decode(html_entity_decode($m[1][0], ENT_QUOTES | ENT_HTML5), true, 512, JSON_THROW_ON_ERROR);
     }
@@ -332,6 +332,33 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         ], $this->radarData($html)['series']);
         // 表には 4 回とも出る
         $this->assertCount(4, $this->tableRows($this->card($html)));
+    }
+
+    public function test_凡例はグラフの下のHTMLの枠に出す(): void
+    {
+        foreach ([['past-1'], ['past-1', 'past-2'], ['past-1', 'past-2', 'past-3']] as $count => $names) {
+            TraineePersonalityDiagnosisResult::query()->delete();
+            foreach ($names as $i => $name) {
+                $this->addResult($name, sprintf('2026-0%d-01 09:00:00', 6 - $i));
+            }
+
+            $card = $this->card($this->page());
+
+            // 凡例を入れる枠（中身は JS がグラフと同じ値から作る）。グラフの枠の外（下）に、欄の幅いっぱいで置く
+            $this->assertMatchesRegularExpression(
+                '/<\/canvas>\s*<\/div>\s*<ul class="list-unstyled d-flex flex-wrap justify-content-center column-gap-3 row-gap-1 small mt-2 mb-3"\s*'
+                .'data-personality-radar-legend="personality-diagnosis-radar"><\/ul>/u',
+                $card,
+                ($count + 1).' 件'
+            );
+            // 凡例の項目の数は、グラフに重ねる回の数と同じ（JS が series から作る）
+            $this->assertCount($count + 1, $this->radarData($card)['series']);
+        }
+    }
+
+    public function test_結果がなければ凡例の枠も出さない(): void
+    {
+        $this->assertStringNotContainsString('data-personality-radar-legend', $this->page());
     }
 
     public function test_会員詳細の性格診断のリンクの飛び先とこの欄のidが一致する(): void

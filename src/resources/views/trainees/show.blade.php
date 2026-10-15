@@ -272,10 +272,15 @@
             @else
                 {{-- レーダーチャート（1 つ。今回・前回・初回を重ねる）。グラフは見た目のためのもので、同じ数字を下の表に出すので、
                      読み上げは role="img" と短い説明だけ --}}
-                <div class="mx-auto mb-3" style="max-width: 420px;">
-                    <canvas role="img" aria-label="レーダーチャート（点数は下の表のとおり）"
+                <div class="mx-auto" style="max-width: 420px;">
+                    <canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は下の表のとおり）"
                             data-personality-radar="{{ json_encode($pdRadarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
                 </div>
+                {{-- 凡例（2026-10 変更：Chart.js の凡例はグラフの枠〔最大 420px〕の中に描かれて 2 行に折り返すため、グラフの下に
+                     欄の幅いっぱいを使う HTML の凡例にした）。項目と線の見本は personality-radar.js が、グラフと同じ値（SERIES_STYLES）から作る。
+                     パソコンの幅では 1 行、スマホの幅では収まらなければ折り返す --}}
+                <ul class="list-unstyled d-flex flex-wrap justify-content-center column-gap-3 row-gap-1 small mt-2 mb-3"
+                    data-personality-radar-legend="personality-diagnosis-radar"></ul>
 
                 {{-- 結果の表（古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
                      横に流す枠の外に出てページの幅を広げないよう、枠を位置の基準にする --}}
