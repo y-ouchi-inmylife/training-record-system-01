@@ -811,10 +811,11 @@ class ClientCountRenderingTest extends TestCase
     {
         $url = preg_quote(route('trainees.show', $traineeId).'#intake-survey', '/');
 
-        return '/<\/dl>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/u';
+        // 性格診断の行（外側の div とボタンのまとまりの div）のすぐ後ろ（2026-10 変更：当初は属性の並び〔dl〕のすぐ後ろ）
+        return '/role="group" aria-label="'.preg_quote($name, '/').'の性格診断">.*?<\/div>\s*<\/div>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
     }
 
-    public function test_受付アンケートが回答済みなら名前の行のまとまりを出さず最終計測の下に暮らしの様子のリンクを出す(): void
+    public function test_受付アンケートが回答済みなら名前の行のまとまりを出さず性格診断の行の下に暮らしの様子のリンクを出す(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -833,9 +834,11 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('案内を表示', $html);
         // 名前の行は名前だけ
         $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="[^"]+">ポチ<\/a><\/h6>\s*<\/div>/u', $html);
-        // 「暮らしの様子」のリンクは、最終計測の後ろ、属性の並びのすぐ後ろ。S-0309 の #intake-survey へ
+        // 「暮らしの様子」のリンクは、性格診断の行のすぐ後ろ（トレーニーの欄のいちばん下）。S-0309 の #intake-survey へ
+        // （2026-10 変更：当初は最終計測のすぐ後ろ・性格診断の行の前。トレーニー詳細の欄の順にそろえた）
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
-        $this->assertGreaterThan(strpos($html, '>最終計測</dt>'), strpos($html, '>暮らしの様子</a>'));
+        $this->assertGreaterThan(strpos($html, '>最終計測</dt>'), strpos($html, '>性格診断</a>'));
+        $this->assertGreaterThan(strpos($html, '>性格診断</a>'), strpos($html, '>暮らしの様子</a>'));
         // 回答日時は出さない
         $this->assertStringNotContainsString('2026/10/16', $html);
     }
@@ -1252,7 +1255,7 @@ class ClientCountRenderingTest extends TestCase
         return substr($html, $start, $end - $start);
     }
 
-    public function test_性格診断の行はトレーニーごとに暮らしの様子の後ろにいつも出る(): void
+    public function test_性格診断の行はトレーニーごとに最終計測のすぐ後ろにいつも出て暮らしの様子はその後ろ(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1263,17 +1266,30 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 回答済みのトレーニー：暮らしの様子のリンクの後ろに性格診断のリンク
+        // 並びは 最終計測 → 性格診断の行 → 暮らしの様子（回答済みのときだけ）（2026-10 変更：当初は暮らしの様子の後ろに
+        // 性格診断の行。トレーニー詳細の欄の順にそろえた）
+        // 回答済みのトレーニー：属性の並び（dl）のすぐ後ろに性格診断の行、その後ろに暮らしの様子のリンク
         $this->assertMatchesRegularExpression(
-            '/aria-label="ポチの暮らしの様子">暮らしの様子<\/a>\s*<\/div>\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">\s*'
+            '/<\/dl>\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $answered), '/').'#personality-diagnosis"\s*aria-label="ポチの性格診断">性格診断<\/a>/u',
             $html
         );
-        // 名前未登録・結果も案内もないトレーニーにも出る（読み上げは「名前未登録の性格診断」）
+        $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
+        // 名前未登録・結果も案内もない（受付アンケートも未回答の）トレーニーにも、属性の並びのすぐ後ろに出る
+        // （読み上げは「名前未登録の性格診断」）。暮らしの様子のリンクは出ず、性格診断の行で欄が終わる
         $this->assertMatchesRegularExpression(
-            '/<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis"\s*aria-label="名前未登録の性格診断">性格診断<\/a>/u',
+            '/<\/dl>\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">\s*'
+            .'<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis"\s*aria-label="名前未登録の性格診断">性格診断<\/a>/u',
             $html
         );
+        $afterNotIssued = substr($html, strpos($html, 'aria-label="名前未登録の性格診断">性格診断</a>'));
+        $this->assertStringNotContainsString('暮らしの様子</a>', $afterNotIssued);
+        $this->assertMatchesRegularExpression(
+            '/role="group" aria-label="名前未登録の性格診断">.*?<\/form>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/us',
+            $afterNotIssued,
+            '性格診断の行のあと、トレーニーの欄が閉じる'
+        );
+        $this->assertSame(1, substr_count($html, '>暮らしの様子</a>'));
         $this->assertStringContainsString('role="group" aria-label="名前未登録の性格診断"', $html);
         $this->assertSame(2, substr_count($html, '>性格診断</a>'));
     }

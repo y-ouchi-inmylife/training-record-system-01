@@ -609,20 +609,9 @@
                                     <dt class="col-4 fw-normal text-muted">最終計測</dt>
                                     <dd class="col-8 mb-0">@if($trainee->latest_measurement){{ $trainee->latest_measurement->measured_date->format('Y/m/d') }}（{{ number_format((float) $trainee->latest_measurement->weight_kg, 2) }}kg）@endif</dd>
                                 </dl>
-                                {{-- 暮らしの様子（受付アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。
-                                     属性の並び（dl.row）の最後、最終計測の下に、文字のリンク（ボタンではない）で置く。dl の行には入れず、
-                                     dl のすぐ後ろに置く（値の列がない 1 項目のため。dl.row のラベル列〔col-4〕と同じく左端から始まるので、
-                                     左の位置は属性の見出しにそろう）。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
-                                     読み上げでどのトレーニーのものかが分かるよう、aria-label を「{表示名}の暮らしの様子」にする
-                                     （見える文字「暮らしの様子」を含む） --}}
-                                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
-                                    <div class="small mt-1">
-                                        <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
-                                           aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>
-                                    </div>
-                                @endif
                                 {{-- 性格診断の行（2026-10 追加。要件定義書 6-16-11〜6-16-13、設計書 S-0305 セクション3「性格診断の行」）。
-                                     - いつも出す（結果・案内の有無にかかわらず）。「暮らしの様子」の下（暮らしの様子が出ないときは最終計測の下）
+                                     - いつも出す（結果・案内の有無にかかわらず）。最終計測の下（dl のすぐ後ろ）、「暮らしの様子」のリンクの上
+                                       （2026-10 変更：当初は「暮らしの様子」の下。トレーニー詳細の欄の順にそろえた）
                                      - 左は「性格診断」の文字のリンク。いつもトレーニー詳細（S-0309）の性格診断の欄（#personality-diagnosis、
                                        同じタブ）へ。結果がなくても飛ぶ（欄に「（未回答）」が出る）。左の位置・文字の大きさ・上の間隔は
                                        「暮らしの様子」のリンクにそろえる（small mt-1）
@@ -654,6 +643,19 @@
                                         @endif
                                     </div>
                                 </div>
+                                {{-- 暮らしの様子（受付アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。
+                                     属性の並びの最後、性格診断の行の下に、文字のリンク（ボタンではない）で置く（2026-10 変更：当初は最終計測のすぐ下・
+                                     性格診断の行の上。トレーニー詳細の欄の順〔性格診断 → 暮らしの様子〕にそろえた）。dl の行には入れず、
+                                     dl の後ろに置く（値の列がない 1 項目のため。dl.row のラベル列〔col-4〕と同じく左端から始まるので、
+                                     左の位置は属性の見出しにそろう）。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
+                                     読み上げでどのトレーニーのものかが分かるよう、aria-label を「{表示名}の暮らしの様子」にする
+                                     （見える文字「暮らしの様子」を含む） --}}
+                                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+                                    <div class="small mt-1">
+                                        <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
+                                           aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>
+                                    </div>
+                                @endif
                                     </div>
                                 </div>
                             </div>
