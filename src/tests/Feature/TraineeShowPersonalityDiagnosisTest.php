@@ -13,14 +13,14 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニー詳細（S-0309）の性格診断の欄（2026-10 追加。性格診断 段階4。設計書 S-0309「性格診断の欄」）。
+ * トレーニー詳細（S-0309）の性格診断の欄（2026-10 追加。設計書 S-0309「性格診断の欄」）。
  *
- * - 暮らしの様子の欄の下に、いつも出す（id="personality-diagnosis"・scroll-margin-top）。結果がなければ「（未回答）」
- * - 結果は新しい順。各回の見出しの行で開閉し、いちばん新しい回だけ最初から開いている
- * - 開いた回：7 カテゴリの点数の表（今回・前回。表示の値は保存の値から四捨五入）、50 問の回答（折りたたみ）
+ * - 暮らしの様子の欄の下に、いつも出す（id="personality-diagnosis"・scroll-margin-top）。結果がなければ「（未回答）」だけ
+ * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（古い順。回答日・タイプ・7 カテゴリ・［50問の回答］）
+ * - 50 問の回答は 1 回ごとのモーダル（2026-10 変更：当初は回ごとに見出しの行・グラフ・点数の表を並べ、開閉していた）
  *
- * 点数は固定データ（tests/fixtures/personality-diagnosis-cases.json）の past-1・past-2 を結果として入れ、
- * 表示の値が固定データの display と一致することを確かめる。
+ * 点数は固定データ（tests/fixtures/personality-diagnosis-cases.json）を結果として入れ、表示の値が固定データの display と
+ * 一致することを確かめる。
  */
 class TraineeShowPersonalityDiagnosisTest extends TestCase
 {
@@ -103,38 +103,53 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
     }
 
-    /** 性格診断の欄（カードの始まりから計測値のモーダルの手前まで） */
+    /** 性格診断の欄（カードの始まりから、50 問の回答のモーダル・計測値のモーダルの手前まで） */
     private function card(string $html): string
     {
         $start = strpos($html, '<div class="card mb-3" id="personality-diagnosis"');
         $this->assertNotFalse($start);
-        $end = strpos($html, 'id="measurementModal-', $start);
-        $this->assertNotFalse($end);
+        $ends = array_filter([
+            strpos($html, 'data-personality-diagnosis-answers', $start),
+            strpos($html, 'id="measurementModal-', $start),
+        ]);
+        $end = min($ends);
 
         return substr($html, $start, $end - $start);
     }
 
-    /** 1 つの回の点数の表の行（カテゴリ → [今回, 前回?]） */
-    private function scoreRows(string $resultHtml): array
+    /** 結果の表の行（回答日 → [タイプ, 7 カテゴリの値…]）。表の上から順 */
+    private function tableRows(string $html): array
     {
-        preg_match_all('/<th scope="row" class="fw-normal">([^<]+)<\/th>\s*<td class="text-end">([0-9.]+)<\/td>(?:\s*<td class="text-end text-muted">([0-9.]+)<\/td>)?/u', $resultHtml, $m, PREG_SET_ORDER);
+        preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>\s*<td class="text-nowrap">([^<]+)<\/td>((?:\s*<td class="text-end">[0-9.]+<\/td>){7})/u', $html, $m, PREG_SET_ORDER);
 
         $rows = [];
         foreach ($m as $row) {
-            $rows[$row[1]] = isset($row[3]) && $row[3] !== '' ? [$row[2], $row[3]] : [$row[2]];
+            preg_match_all('/>([0-9.]+)</', $row[3], $values);
+            $rows[$row[1]] = array_merge([$row[2]], $values[1]);
         }
 
         return $rows;
     }
 
-    /** 回の中身（collapse の中） */
-    private function resultBody(string $html, TraineePersonalityDiagnosisResult $result): string
+    /** 1 回分のモーダル */
+    private function modal(string $html, TraineePersonalityDiagnosisResult $result): string
     {
-        $start = strpos($html, 'id="personality-diagnosis-result-'.$result->id.'"');
+        $start = strpos($html, '<div class="modal fade" id="personality-diagnosis-answers-'.$result->id.'"');
         $this->assertNotFalse($start);
-        $end = strpos($html, 'id="personality-diagnosis-result-'.$result->id.'-answers"', $start);
+        $end = strpos($html, '<div class="modal fade"', $start + 10);
 
-        return substr($html, $start, $end - $start);
+        return substr($html, $start, ($end === false ? strlen($html) : $end) - $start);
+    }
+
+    private function expectedRow(string $caseName): array
+    {
+        $case = $this->fixtureCase($caseName);
+        $row = [PersonalityDiagnosisQuestions::types()[$case['expected']['type']]];
+        foreach (array_keys(PersonalityDiagnosisQuestions::categories()) as $category) {
+            $row[] = $case['expected']['display'][$category];
+        }
+
+        return $row;
     }
 
     public function test_暮らしの様子の欄の後ろにidとscroll_margin_topを付けて出す(): void
@@ -146,57 +161,41 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">性格診断<\/h6>\s*<\/div>/u', $this->card($html));
     }
 
-    public function test_結果がなければ未回答とだけ出す(): void
+    public function test_結果がなければ未回答だけで表もグラフもない(): void
     {
-        $card = $this->card($this->page());
+        $html = $this->page();
+        $card = $this->card($html);
 
         $this->assertMatchesRegularExpression('/<div class="card-body">\s*<p class="mb-0 text-muted">（未回答）<\/p>\s*<\/div>/u', $card);
-        $this->assertStringNotContainsString('data-personality-diagnosis-results', $card);
-        $this->assertStringNotContainsString('<button', $card);
+        $this->assertStringNotContainsString('<table', $card);
+        $this->assertStringNotContainsString('<canvas', $card);
+        $this->assertStringNotContainsString('data-personality-diagnosis-answers', $html);
     }
 
-    public function test_結果は新しい順でいちばん新しい回だけ開いている(): void
+    public function test_結果の表は古い順ですべての回を1つの表に出す(): void
     {
-        $old = $this->addResult('past-2', '2026-07-02 10:00:00');
-        $new = $this->addResult('past-1', '2026-10-15 09:00:00');
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->addResult('past-3', '2025-12-01 10:00:00');
+        $this->addResult('past-2', '2026-03-10 11:00:00');
 
         $card = $this->card($this->page());
 
-        $newHeader = '/<button type="button" class="btn btn-link[^"]*"\s*data-bs-toggle="collapse" data-bs-target="#personality-diagnosis-result-'.$new->id.'"\s*'
-            .'aria-expanded="true" aria-controls="personality-diagnosis-result-'.$new->id.'">\s*<span>2026\/10\/15<\/span>\s*<span class="fw-bold">繊細・デリケートタイプ<\/span>/u';
-        $oldHeader = '/<button type="button" class="btn btn-link[^"]*"\s*data-bs-toggle="collapse" data-bs-target="#personality-diagnosis-result-'.$old->id.'"\s*'
-            .'aria-expanded="false" aria-controls="personality-diagnosis-result-'.$old->id.'">\s*<span>2026\/07\/02<\/span>\s*<span class="fw-bold">慎重派・しっかり番犬タイプ<\/span>/u';
-        $this->assertMatchesRegularExpression($newHeader, $card);
-        $this->assertMatchesRegularExpression($oldHeader, $card);
-        $this->assertLessThan(strpos($card, '2026/07/02'), strpos($card, '2026/10/15'));
-        $this->assertStringContainsString('<div class="collapse show mt-3" id="personality-diagnosis-result-'.$new->id.'"', $card);
-        $this->assertStringContainsString('<div class="collapse mt-3" id="personality-diagnosis-result-'.$old->id.'"', $card);
-        // 操作は置かない
-        $this->assertStringNotContainsString('<form', $card);
-        $this->assertStringNotContainsString('案内を', $card);
-    }
-
-    public function test_点数の表は今回と前回の表示の値で最初の回は前回がない(): void
-    {
-        $old = $this->addResult('past-2', '2026-07-02 10:00:00');
-        $new = $this->addResult('past-1', '2026-10-15 09:00:00');
-        $past1 = $this->fixtureCase('past-1')['expected']['display'];
-        $past2 = $this->fixtureCase('past-2')['expected']['display'];
-        $categories = PersonalityDiagnosisQuestions::categories();
-
-        $html = $this->page();
-
-        $expectedNew = [];
-        $expectedOld = [];
-        foreach ($categories as $category => $label) {
-            $expectedNew[$label] = [$past1[$category], $past2[$category]];
-            $expectedOld[$label] = [$past2[$category]];
-        }
-        $this->assertSame($expectedNew, $this->scoreRows($this->resultBody($html, $new)));
-        $this->assertStringContainsString('>前回</th>', $this->resultBody($html, $new));
-        // いちばん古い回は「前回」の列を出さない
-        $this->assertSame($expectedOld, $this->scoreRows($this->resultBody($html, $old)));
-        $this->assertStringNotContainsString('>前回</th>', $this->resultBody($html, $old));
+        $this->assertSame([
+            '2025/12/01' => $this->expectedRow('past-3'),
+            '2026/03/10' => $this->expectedRow('past-2'),
+            '2026/06/01' => $this->expectedRow('past-1'),
+        ], $this->tableRows($card));
+        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・ボタンの列
+        $this->assertSame(1, substr_count($card, '<table'));
+        $this->assertStringContainsString('<div class="table-responsive">', $card);
+        preg_match_all('/<th scope="col"[^>]*>(.*?)<\/th>/u', $card, $heads);
+        $this->assertSame(
+            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['<span class="visually-hidden">50問の回答</span>']),
+            $heads[1]
+        );
+        // 回ごとの開閉はない
+        $this->assertStringNotContainsString('aria-expanded', $card);
+        $this->assertStringNotContainsString('data-bs-toggle="collapse"', $card);
     }
 
     public function test_表示の値は保存の値から四捨五入し固定データのdisplayと一致する(): void
@@ -208,25 +207,42 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         }
     }
 
-    public function test_50問の回答は折りたたみでカテゴリごとに設問と選んだ答えを出す(): void
+    public function test_各行の50問の回答のボタンがその回のモーダルを開く(): void
     {
-        $result = $this->addResult('past-1', '2026-10-15 09:00:00');
-        $answers = $this->fixtureCase('past-1')['answers'];
+        $old = $this->addResult('past-2', '2026-03-10 11:00:00');
+        $new = $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $card = $this->card($this->page());
 
-        $this->assertMatchesRegularExpression('/data-bs-target="#personality-diagnosis-result-'.$result->id.'-answers"\s*aria-expanded="false" aria-controls="personality-diagnosis-result-'.$result->id.'-answers">50問の回答<\/button>/u', $card);
-        $this->assertStringContainsString('<div class="collapse mt-2" id="personality-diagnosis-result-'.$result->id.'-answers" data-personality-diagnosis-answers>', $card);
-        $answersHtml = substr($card, strpos($card, 'data-personality-diagnosis-answers'));
-        foreach (PersonalityDiagnosisQuestions::categories() as $label) {
-            $this->assertStringContainsString('>'.$label.'</p>', $answersHtml);
+        foreach ([[$old, '2026/03/10'], [$new, '2026/06/01']] as [$result, $date]) {
+            $this->assertMatchesRegularExpression(
+                '/<th scope="row" class="fw-normal text-nowrap">'.preg_quote($date, '/').'<\/th>[\s\S]*?'
+                .'<button type="button" class="btn btn-sm btn-outline-primary text-nowrap"\s*'
+                .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-'.$result->id.'"\s*'
+                .'aria-label="'.preg_quote($date, '/').'の50問の回答">50問の回答<\/button>/u',
+                $card
+            );
         }
-        $this->assertSame(50, substr_count($answersHtml, '<dt class="col-sm-8 fw-normal">'));
+    }
+
+    public function test_モーダルにその回の50問の回答をカテゴリごとに出す(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $answers = $this->fixtureCase('past-1')['answers'];
+
+        $modal = $this->modal($this->page(), $result);
+
+        $this->assertStringContainsString('<div class="modal-dialog modal-dialog-scrollable modal-lg">', $modal);
+        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="personality-diagnosis-answers-'.$result->id.'-label">50問の回答（2026\/06\/01）<\/h5>/u', $modal);
+        foreach (PersonalityDiagnosisQuestions::categories() as $label) {
+            $this->assertStringContainsString('>'.$label.'</p>', $modal);
+        }
+        $this->assertSame(50, substr_count($modal, '<dt class="col-sm-8 fw-normal">'));
         // 数字の答えと「未経験」（past-1 の Q01 は na、Q02 は 4）
         $this->assertSame('na', $answers['Q01']);
         $this->assertSame(4, $answers['Q02']);
-        $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">①知らない人が家に入ってきた時に吠える・唸る<\/dt>\s*<dd class="col-sm-4 mb-1">未経験<\/dd>/u', $answersHtml);
-        $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">②窓の外を誰かが通りかかっただけで、敏感に反応して吠える<\/dt>\s*<dd class="col-sm-4 mb-1">4：常にある<\/dd>/u', $answersHtml);
+        $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">①知らない人が家に入ってきた時に吠える・唸る<\/dt>\s*<dd class="col-sm-4 mb-1">未経験<\/dd>/u', $modal);
+        $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">②窓の外を誰かが通りかかっただけで、敏感に反応して吠える<\/dt>\s*<dd class="col-sm-4 mb-1">4：常にある<\/dd>/u', $modal);
     }
 
     public function test_別のトレーニーの結果は出さない(): void
@@ -234,51 +250,11 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $other = Trainee::query()->create(['client_id' => $this->client->id, 'name' => 'ハル']);
         $this->addResult('past-3', '2026-10-15 09:00:00', $other);
 
-        $card = $this->card($this->page());
-
-        $this->assertStringContainsString('（未回答）', $card);
-        $this->assertStringNotContainsString('聡明・スマート優等生タイプ', $card);
-    }
-
-    /** 回の中のレーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
-    private function radarData(string $resultHtml): array
-    {
-        $this->assertSame(1, preg_match('/<canvas role="img" aria-label="レーダーチャート（点数は隣の表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $resultHtml, $m));
-
-        return json_decode(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5), true, 512, JSON_THROW_ON_ERROR);
-    }
-
-    public function test_開いた回にレーダーチャートのcanvasがあり表と同じ値を渡す(): void
-    {
-        $old = $this->addResult('past-2', '2026-07-02 10:00:00');
-        $new = $this->addResult('past-1', '2026-10-15 09:00:00');
-        $categories = array_keys(PersonalityDiagnosisQuestions::categories());
-        $display = fn (string $name) => array_map(fn ($c) => $this->fixtureCase($name)['expected']['display'][$c], $categories);
-
         $html = $this->page();
 
-        // 今回と前回（表と同じ表示の値。小数第 1 位）
-        $this->assertSame([
-            'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
-            'current' => $display('past-1'),
-            'previous' => $display('past-2'),
-        ], $this->radarData($this->resultBody($html, $new)));
-        // いちばん古い回は前回なし
-        $this->assertSame([
-            'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
-            'current' => $display('past-2'),
-            'previous' => null,
-        ], $this->radarData($this->resultBody($html, $old)));
-        // グラフの JS を読み込む
-        $this->assertStringContainsString('personality-radar', $html);
-    }
-
-    public function test_結果がなければレーダーチャートのJSを読み込まない(): void
-    {
-        $html = $this->page();
-
-        $this->assertStringNotContainsString('data-personality-radar', $html);
-        $this->assertStringNotContainsString('personality-radar', $html);
+        $this->assertStringContainsString('（未回答）', $this->card($html));
+        $this->assertStringNotContainsString('聡明・スマート優等生タイプ', $html);
+        $this->assertStringNotContainsString('data-personality-diagnosis-answers', $html);
     }
 
     public function test_会員詳細の性格診断のリンクの飛び先とこの欄のidが一致する(): void
