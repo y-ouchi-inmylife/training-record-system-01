@@ -18,6 +18,7 @@ use Tests\TestCase;
  * - 暮らしの様子の欄の下に、いつも出す（id="personality-diagnosis"・scroll-margin-top）。結果がなければ「（未回答）」だけ
  * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（古い順。回答日・タイプ・7 カテゴリ・［50問の回答］）
  * - 50 問の回答は 1 回ごとのモーダル（2026-10 変更：当初は回ごとに見出しの行・グラフ・点数の表を並べ、開閉していた）
+ * - 管理者にだけ、各行の［削除］と削除確認モーダル（S-0309-M01。1 行ごと）を出す（2026-10 追加。要件定義書 6-16-14）
  *
  * 点数は固定データ（tests/fixtures/personality-diagnosis-cases.json）を結果として入れ、表示の値が固定データの display と
  * 一致することを確かめる。
@@ -103,13 +104,14 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
     }
 
-    /** 性格診断の欄（カードの始まりから、50 問の回答のモーダル・計測値のモーダルの手前まで） */
+    /** 性格診断の欄（カードの始まりから、削除確認・50 問の回答のモーダル、計測値のモーダルの手前まで） */
     private function card(string $html): string
     {
         $start = strpos($html, '<div class="card mb-3" id="personality-diagnosis"');
         $this->assertNotFalse($start);
         $ends = array_filter([
             strpos($html, 'data-personality-diagnosis-answers', $start),
+            strpos($html, 'data-personality-diagnosis-delete', $start),
             strpos($html, 'id="measurementModal-', $start),
         ]);
         $end = min($ends);
@@ -369,5 +371,91 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $this->assertSame('personality-diagnosis', $m[1]);
         $this->assertStringContainsString('id="'.$m[1].'"', $this->page());
+    }
+
+    // ---- 結果の削除（管理者だけ。S-0309-M01。2026-10 追加） ----
+
+    private function actingAsRole(string $role): void
+    {
+        $trainer = new Trainer(['name' => 'テスト', 'role' => $role]);
+        $trainer->id = 200;
+        $trainer->exists = true;
+        $this->actingAs($trainer, 'web');
+    }
+
+    /** 1 回分の削除確認モーダル */
+    private function deleteModal(string $html, TraineePersonalityDiagnosisResult $result): string
+    {
+        $start = strpos($html, '<div class="modal fade" id="personality-diagnosis-delete-'.$result->id.'"');
+        $this->assertNotFalse($start);
+        $end = strpos($html, '<div class="modal fade"', $start + 10);
+
+        return substr($html, $start, ($end === false ? strlen($html) : $end) - $start);
+    }
+
+    public function test_管理者には各行の削除のボタンと確認モーダルを出す(): void
+    {
+        $this->actingAsRole('admin');
+        $old = $this->addResult('past-2', '2026-03-10 11:00:00');
+        $new = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+        $card = $this->card($html);
+
+        // 行の［削除］：［50問の回答］の右・白抜きの赤・読み上げ用の aria-label・その行のモーダルを開く
+        $this->assertSame(2, substr_count($card, 'btn-outline-danger'));
+        foreach ([[$old, '2026/03/10'], [$new, '2026/06/01']] as [$result, $date]) {
+            $this->assertMatchesRegularExpression(
+                '/aria-label="'.preg_quote($date, '/').'の50問の回答">50問の回答<\/button>.*?'
+                .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"\s*'
+                .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-'.$result->id.'"\s*'
+                .'aria-label="'.preg_quote($date, '/').'の性格診断の結果を削除">削除<\/button>/us',
+                $card
+            );
+
+            $modal = $this->deleteModal($html, $result);
+            $this->assertStringContainsString('>性格診断の結果の削除</h5>', $modal);
+            $this->assertStringContainsString($date.' の性格診断の結果を削除します。元に戻せません。', $modal);
+            $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"', $modal);
+            $this->assertStringContainsString('name="_method" value="DELETE"', $modal);
+            $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除する</button>', $modal);
+            $this->assertStringContainsString('<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>', $modal);
+        }
+        $this->assertSame(2, substr_count($html, 'data-personality-diagnosis-delete'));
+    }
+
+    public function test_管理者でなければ削除のボタンも確認モーダルも出さない(): void
+    {
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+
+        $this->assertStringNotContainsString('の性格診断の結果を削除', $html);
+        $this->assertStringNotContainsString('data-personality-diagnosis-delete', $html);
+        $this->assertStringNotContainsString('/personality-diagnosis-results/', $html);
+        $this->assertStringNotContainsString('btn-outline-danger', $this->card($html));
+    }
+
+    public function test_いちばん新しい回を削除するとグラフの今回と前回がずれる(): void
+    {
+        $this->actingAsRole('admin');
+        $this->addResult('past-3', '2025-12-01 10:00:00');
+        $this->addResult('past-2', '2026-03-10 11:00:00');
+        $newest = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $this->delete(route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $newest]))
+            ->assertRedirect(route('trainees.show', $this->trainee));
+
+        $html = $this->page();
+        // 残った 2 件で決め直す：今回＝past-2、前回＝past-3（2 件なので初回は重ねない）
+        $this->assertSame([
+            $this->series('current', 'past-2', '2026/03/10'),
+            $this->series('previous', 'past-3', '2025/12/01'),
+        ], $this->radarData($html)['series']);
+        $this->assertSame([
+            '2025/12/01' => $this->expectedRow('past-3'),
+            '2026/03/10' => $this->expectedRow('past-2'),
+        ], $this->tableRows($this->card($html)));
+        $this->assertStringContainsString('性格診断の結果を削除しました。', $html);
     }
 }

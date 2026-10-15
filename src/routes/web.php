@@ -24,6 +24,7 @@ use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\SummaryPromptController;
 use App\Http\Controllers\TraineeController;
 use App\Http\Controllers\TraineeIntakeSurveyTokenController;
+use App\Http\Controllers\TraineePersonalityDiagnosisResultController;
 use App\Http\Controllers\TraineePersonalityDiagnosisTokenController;
 use App\Http\Controllers\TraineeMeasurementController;
 use App\Http\Controllers\UsageStatsController;
@@ -135,6 +136,11 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 性格診断案内画面（S-0312）。会員詳細の「性格診断」の行の［案内を表示］から別タブで開く
             Route::get('trainees/{trainee}/personality-diagnosis-tokens/print', [TraineePersonalityDiagnosisTokenController::class, 'print'])
                 ->name('trainee-personality-diagnosis-tokens.print');
+            // 性格診断の結果の削除（S-0309 の結果の表の行の［削除］。管理者のみ。2026-10 追加）。
+            // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
+            Route::delete('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'destroy'])
+                ->scopeBindings()
+                ->name('trainee-personality-diagnosis-results.destroy');
 
             // 契約（D-0900）・利用（D-1000）。会員詳細（S-0305）の「回数」カードのモーダルで
             // 登録・編集・削除する（create / edit / show の画面遷移は持たない）。

@@ -305,10 +305,17 @@
                                     @foreach(array_keys($pdCategories) as $category)
                                         <td class="text-end">{{ $display[$category] }}</td>
                                     @endforeach
-                                    <td class="text-end">
+                                    <td class="text-end text-nowrap">
                                         <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
                                                 data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-{{ $result->id }}"
                                                 aria-label="{{ $result->answered_at->format('Y/m/d') }}の50問の回答">50問の回答</button>
+                                        {{-- 結果の削除（管理者だけ。2026-10 追加。要件定義書 6-16-14）。一覧の行の中の削除なので白抜き（4-4）。
+                                             確認は S-0309-M01（1 行ごとのモーダル） --}}
+                                        @if(auth()->user()->isAdmin())
+                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"
+                                                    data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-{{ $result->id }}"
+                                                    aria-label="{{ $result->answered_at->format('Y/m/d') }}の性格診断の結果を削除">削除</button>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -318,6 +325,36 @@
             @endif
         </div>
     </div>
+
+    {{-- 性格診断の結果の削除確認モーダル（S-0309-M01。2026-10 追加。管理者だけ）。1 行ごとに置き、回答日はサーバーで出す
+         （50 問の回答のモーダルと同じ作り）。見せ方は S-0305-M06 と同じ形（説明文・実行ボタン btn-danger・キャンセル）。
+         キャンセルは 4-4 のとおり塗り（btn-secondary）。削除のあとはトレーニー詳細の上から開く（完了メッセージが画面の上端に出るため） --}}
+    @if(auth()->user()->isAdmin())
+        @foreach($pdResults as $result)
+            <div class="modal fade" id="personality-diagnosis-delete-{{ $result->id }}" tabindex="-1"
+                 aria-labelledby="personality-diagnosis-delete-{{ $result->id }}-label" aria-hidden="true" data-personality-diagnosis-delete>
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="personality-diagnosis-delete-{{ $result->id }}-label">性格診断の結果の削除</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-0">{{ $result->answered_at->format('Y/m/d') }} の性格診断の結果を削除します。元に戻せません。</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                            <form method="POST" action="{{ route('trainee-personality-diagnosis-results.destroy', [$trainee, $result]) }}" class="d-inline m-0">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-danger">削除する</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
 
     {{-- 50 問の回答のモーダル（1 回ごと。中身はサーバーで出し、スクリプトで差し替えない）。長いので中身をスクロールできる形 --}}
     @foreach($pdResults as $result)
