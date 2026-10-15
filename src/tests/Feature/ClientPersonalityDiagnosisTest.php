@@ -255,13 +255,16 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $response = $this->submit($this->fixtureCase('all-zero')['answers']);
 
         $html = $this->followRedirects($response)->getContent();
-        $this->assertStringContainsString('<h1 class="mb-4">性格診断</h1>', $html);
-        $this->assertStringContainsString('ご回答ありがとうございました。', $html);
+        // 受付アンケートの回答完了（S-1414）と同じ作り・同じ文言（2026-10 変更）
+        $this->assertStringContainsString('<h1 class="mb-4">ご回答ありがとうございました</h1>', $html);
+        $this->assertStringContainsString('<p>いただいた内容は、トレーニングの参考にさせていただきます。</p>', $html);
+        $this->assertStringContainsString('<p class="mb-0">このページは閉じていただいて構いません。</p>', $html);
         // 結果も名前も出さない
         $this->assertStringNotContainsString('タイプ', $html);
         $this->assertStringNotContainsString('モモ', $html);
 
         $direct = $this->get(route('client-portal.personality-diagnosis.thanks'))->assertOk()->getContent();
-        $this->assertStringContainsString('ご回答ありがとうございました。', $direct);
+        $this->assertStringContainsString('<h1 class="mb-4">ご回答ありがとうございました</h1>', $direct);
+        $this->assertStringContainsString('このページは閉じていただいて構いません。', $direct);
     }
 }
