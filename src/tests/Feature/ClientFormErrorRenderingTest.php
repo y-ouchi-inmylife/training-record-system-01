@@ -29,7 +29,7 @@ class ClientFormErrorRenderingTest extends TestCase
         return $view;
     }
 
-    private function renderForm(array $errors, bool $isEdit = false): TestView
+    private function renderForm(array $errors, bool $isEdit = false, string $email = ''): TestView
     {
         $client = null;
         if ($isEdit) {
@@ -49,7 +49,7 @@ class ClientFormErrorRenderingTest extends TestCase
             $client->address4 = '';
             $client->phone1 = '';
             $client->phone2 = '';
-            $client->email = '';
+            $client->email = $email;
         }
 
         return $this->withViewErrors($errors)->blade(
@@ -142,5 +142,22 @@ class ClientFormErrorRenderingTest extends TestCase
         $view->assertDontSee('validateBeforeSubmit');
         $view->assertDontSee('showFieldError');
         $view->assertDontSee('clearFieldError');
+    }
+
+    /**
+     * メールアドレスの行は登録・編集のどちらにも出さない（2026-10 変更。書き換えられない表示だけの行で、
+     * メールアドレスと状態は会員詳細 S-0305 の「メールアドレス（マイページ）」で確かめられるため）
+     */
+    public function test_登録にも編集にもメールアドレスの行を出さない(): void
+    {
+        $create = $this->renderForm([])->__toString();
+        $edit = $this->renderForm([], isEdit: true, email: 'yamada@example.com')->__toString();
+
+        foreach ([$create, $edit] as $html) {
+            $this->assertStringNotContainsString('メールアドレス', $html);
+            $this->assertStringNotContainsString('form-control-plaintext', $html);
+        }
+        // 登録済みの会員の編集でも値を出さない
+        $this->assertStringNotContainsString('yamada@example.com', $edit);
     }
 }
