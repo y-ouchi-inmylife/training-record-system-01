@@ -119,15 +119,15 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return substr($html, $start, $end - $start);
     }
 
-    /** 結果の表の行（回答日 → [タイプ, 7 カテゴリの値…]）。表の上から順 */
+    /** 結果の表の行（回答日 → [タイプ, 7 カテゴリの値…]）。表の上から順。タイプは折り返しの印（<wbr>）を除いた文 */
     private function tableRows(string $html): array
     {
-        preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>\s*<td style="min-width: 8em;">([^<]+)<\/td>((?:\s*<td class="text-end text-nowrap">[0-9.]+<\/td>){7})/u', $html, $m, PREG_SET_ORDER);
+        preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>\s*<td style="word-break: keep-all;">(.*?)<\/td>((?:\s*<td class="text-end text-nowrap">[0-9.]+<\/td>){7})/u', $html, $m, PREG_SET_ORDER);
 
         $rows = [];
         foreach ($m as $row) {
             preg_match_all('/>([0-9.]+)</', $row[3], $values);
-            $rows[$row[1]] = array_merge([$row[2]], $values[1]);
+            $rows[$row[1]] = array_merge([str_replace('<wbr>', '', $row[2])], $values[1]);
         }
 
         return $rows;
@@ -209,7 +209,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         }
     }
 
-    public function test_各行の50問の回答のボタンがその回のモーダルを開く(): void
+    public function test_各行の回答のボタンがその回のモーダルを開く(): void
     {
         $old = $this->addResult('past-2', '2026-03-10 11:00:00');
         $new = $this->addResult('past-1', '2026-06-01 09:00:00');
@@ -221,10 +221,13 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
                 '/<th scope="row" class="fw-normal text-nowrap">'.preg_quote($date, '/').'<\/th>[\s\S]*?'
                 .'<button type="button" class="btn btn-sm btn-outline-primary text-nowrap"\s*'
                 .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-'.$result->id.'"\s*'
-                .'aria-label="'.preg_quote($date, '/').'の50問の回答">50問の回答<\/button>/u',
+                .'aria-label="'.preg_quote($date, '/').'の50問の回答">回答<\/button>/u',
                 $card
             );
         }
+        // ボタンの文字は［回答］（2026-10 変更：当初は［50問の回答］）。読み上げ用の aria-label は回答日つきのまま
+        $this->assertStringNotContainsString('>50問の回答</button>', $card);
+        $this->assertSame(2, substr_count($card, '">回答</button>'));
     }
 
     public function test_モーダルにその回の50問の回答をカテゴリごとに出す(): void
@@ -264,7 +267,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     /** 欄のレーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
     private function radarData(string $html): array
     {
-        $this->assertSame(1, preg_match_all('/<canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は下の表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $html, $m));
+        $this->assertSame(1, preg_match_all('/<canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は表のとおり）"\s*data-personality-radar="([^"]*)"><\/canvas>/u', $html, $m));
 
         return json_decode(html_entity_decode($m[1][0], ENT_QUOTES | ENT_HTML5), true, 512, JSON_THROW_ON_ERROR);
     }
@@ -396,12 +399,73 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $card = $this->card($this->page());
 
-        $this->assertSame(1, substr_count($card, '<td style="min-width: 8em;">'));
+        $this->assertSame(1, substr_count($card, '<td style="word-break: keep-all;">'));
         $this->assertSame(1, substr_count($card, '<th scope="row" class="fw-normal text-nowrap">'));
         // 点数 7 つ＋ボタンの列
         $this->assertSame(8, substr_count($card, '<td class="text-end text-nowrap">'));
-        // ボタンの列も折り返さない（［50問の回答］と［削除］を横に並べたまま）
+        // ボタンの列も折り返さない（［回答］と［削除］を横に並べたまま）
         $this->assertMatchesRegularExpression('/<td class="text-end text-nowrap">\s*<button type="button" class="btn btn-sm btn-outline-primary text-nowrap"/u', $card);
+    }
+
+    public function test_表の文字は少し小さくしボタンはbtn_smのまま(): void
+    {
+        $this->actingAsRole('admin');
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $card = $this->card($this->page());
+
+        // 表（見出しと中身）に small。行の高さは table-sm
+        $this->assertStringContainsString('<table class="table table-sm small align-middle mb-0" data-personality-diagnosis-results>', $card);
+        // ボタンは btn-sm のまま（表の文字に合わせて小さくしない）
+        $this->assertStringContainsString('class="btn btn-sm btn-outline-primary text-nowrap"', $card);
+        $this->assertStringContainsString('class="btn btn-sm btn-outline-danger text-nowrap ms-1"', $card);
+    }
+
+    public function test_タイプは中点のあとに折り返しの印を入れほかの位置では折り返さない(): void
+    {
+        // 3 つの例：愛情たっぷり・甘えん坊タイプ／エネルギッシュ・アスリートタイプ／慎重派・しっかり番犬タイプ
+        $this->addResult('tie-possessiveness-fear', '2025-12-01 10:00:00');
+        $this->addResult('rounding-two-decimals', '2026-03-10 11:00:00');
+        $this->addResult('past-2', '2026-06-01 09:00:00');
+
+        $card = $this->card($this->page());
+
+        foreach (['愛情たっぷり・<wbr>甘えん坊タイプ', 'エネルギッシュ・<wbr>アスリートタイプ', '慎重派・<wbr>しっかり番犬タイプ'] as $label) {
+            $this->assertStringContainsString('<td style="word-break: keep-all;">'.$label.'</td>', $card);
+        }
+        $this->assertSame(3, substr_count($card, '<wbr>'));
+        // 表示名（types()）そのものは変えない
+        $this->assertSame('愛情たっぷり・甘えん坊タイプ', PersonalityDiagnosisQuestions::types()['affectionate']);
+    }
+
+    public function test_タイプの文はエスケープして出す(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        // 表示名にない値（そのまま出す）でも、HTML として解釈させない
+        $result->forceFill(['personality_type' => '<b>x</b>・y'])->saveQuietly();
+
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertStringNotContainsString('<b>x</b>', $html);
+    }
+
+    public function test_グラフの読み上げ用の説明は位置を言わない(): void
+    {
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('aria-label="レーダーチャート（点数は表のとおり）"', $html);
+        $this->assertStringNotContainsString('点数は下の表のとおり', $html);
+    }
+
+    public function test_モーダルの見出しは今までどおり50問の回答と回答日(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-answers-'.$result->id.'-label">50問の回答（2026/06/01）</h5>', $html);
     }
 
     public function test_結果がなければ並びの枠も出さない(): void
@@ -458,7 +522,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertSame(2, substr_count($card, 'btn-outline-danger'));
         foreach ([[$old, '2026/03/10'], [$new, '2026/06/01']] as [$result, $date]) {
             $this->assertMatchesRegularExpression(
-                '/aria-label="'.preg_quote($date, '/').'の50問の回答">50問の回答<\/button>.*?'
+                '/aria-label="'.preg_quote($date, '/').'の50問の回答">回答<\/button>.*?'
                 .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"\s*'
                 .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-'.$result->id.'"\s*'
                 .'aria-label="'.preg_quote($date, '/').'の性格診断の結果を削除">削除<\/button>/us',

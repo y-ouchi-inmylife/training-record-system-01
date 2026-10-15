@@ -238,7 +238,7 @@
            ように作り直した）。結果がないときは本文に「（未回答）」とだけ出す（グラフも表も出さない）
          - 結果は Trainee::personalityDiagnosisResults()（新しい順。TraineeController::show で読み込み済み）。表は古い順（上が初回）
          - 点数は表示の値（小数第 1 位）。保存の値（小数第 2 位）から四捨五入する（TraineePersonalityDiagnosisResult::displayScores()）
-         - 表の各行の［50問の回答］で、その回の 50 問の回答をモーダルで出す（1 回ごとにモーダルを置き、中身はサーバーで出す）。
+         - 表の各行の［回答］で、その回の 50 問の回答をモーダルで出す（1 回ごとにモーダルを置き、中身はサーバーで出す）。
            設問は結果の設問の版に合った文（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は設問の ID）
          - 操作（発行・表示・取消）は置かない（会員詳細 S-0305 だけで行う）
          - id="personality-diagnosis" と scroll-margin-top は、会員詳細の「性格診断」のリンクの飛び先にするため（暮らしの様子と同じ値） --}}
@@ -279,7 +279,7 @@
                         {{-- レーダーチャート（1 つ。今回・前回・初回を重ねる）。グラフは見た目のためのもので、同じ数字を下の表に出すので、
                              読み上げは role="img" と短い説明だけ。最大 420px（横に並べたときも左の列に収まる） --}}
                         <div class="mx-auto" style="max-width: 420px;">
-                            <canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は下の表のとおり）"
+                            <canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は表のとおり）"
                                     data-personality-radar="{{ json_encode($pdRadarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
                         </div>
                         {{-- 凡例（2026-10 変更：Chart.js の凡例はグラフの枠〔最大 420px〕の中に描かれて 2 行に折り返すため、グラフの下に
@@ -296,10 +296,12 @@
                     <div class="col-12 col-xl-8">
                         {{-- 結果の表（古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
                              横に流す枠の外に出てページの幅を広げないよう、枠を位置の基準にする。
-                             タイプは折り返してよい（横に並べたときに表を収めるため。min-width で 1 文字ずつの折り返しは防ぐ）。
+                             文字は少し小さくする（small。ボタンは btn-sm のままで小さくしない。btn-sm の文字の大きさは rem なので small の影響を受けない）。
+                             タイプは「・」のあとでだけ折り返してよい（横に並べたときに表を収めるため。word-break: keep-all で言葉の途中では
+                             折り返さず、「・」のあとに <wbr> を入れる。表示名〔types()〕そのものは変えない）。
                              回答日・点数・ボタンは折り返さない。それでも収まらなければ枠の中で横にスクロールする --}}
                         <div class="table-responsive position-relative">
-                            <table class="table table-sm align-middle mb-0" data-personality-diagnosis-results>
+                            <table class="table table-sm small align-middle mb-0" data-personality-diagnosis-results>
                                 <thead>
                                     <tr>
                                         <th scope="col" class="fw-normal text-muted text-nowrap">回答日</th>
@@ -315,14 +317,14 @@
                                         @php($display = $result->displayScores())
                                         <tr>
                                             <th scope="row" class="fw-normal text-nowrap">{{ $result->answered_at->format('Y/m/d') }}</th>
-                                            <td style="min-width: 8em;">{{ $result->personality_type_label }}</td>
+                                            <td style="word-break: keep-all;">{!! collect(explode('・', $result->personality_type_label))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</td>
                                             @foreach(array_keys($pdCategories) as $category)
                                                 <td class="text-end text-nowrap">{{ $display[$category] }}</td>
                                             @endforeach
                                             <td class="text-end text-nowrap">
                                                 <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
                                                         data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-{{ $result->id }}"
-                                                        aria-label="{{ $result->answered_at->format('Y/m/d') }}の50問の回答">50問の回答</button>
+                                                        aria-label="{{ $result->answered_at->format('Y/m/d') }}の50問の回答">回答</button>
                                                 {{-- 結果の削除（管理者だけ。2026-10 追加。要件定義書 6-16-14）。一覧の行の中の削除なので白抜き（4-4）。
                                                      確認は S-0309-M01（1 行ごとのモーダル） --}}
                                                 @if(auth()->user()->isAdmin())
