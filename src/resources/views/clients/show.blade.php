@@ -404,9 +404,10 @@
                          狭い幅ではボタンと重ならないよう、card-header の flex-wrap で折り返す。 --}}
                     <h6 class="mb-0">ご利用回数@if(! is_null($ticket['remaining']))<span class="ms-2"><x-remaining-count :value="$ticket['remaining']" class="fs-5" /></span>@endif</h6>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-primary"
+                        {{-- 青いボタンはこの画面ではすべて塗り（btn-primary。2026-10 変更。設計書 S-0305「ボタンの色」） --}}
+                        <button type="button" class="btn btn-sm btn-primary"
                                 onclick="window.contractModal.openForCreate()">契約を追加</button>
-                        <button type="button" class="btn btn-sm btn-outline-primary"
+                        <button type="button" class="btn btn-sm btn-primary"
                                 onclick="window.usageModal.openForCreate()">利用を追加</button>
                     </div>
                 </div>
@@ -560,11 +561,11 @@
                                             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
                                                 <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を発行</button>
+                                                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行</button>
                                                 </form>
                                             @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
                                                 <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示</a>
+                                                   class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示</a>
                                                 <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                                         data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
                                                         data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>
@@ -628,10 +629,10 @@
                      設計方針「『トレーニーを追加』ボタンの位置と文言を変更」参照）。
                      以前はカードヘッダー右上に「新規登録」ボタンを置いていたが、
                      トレーニング記録カードの「新規登録」と同列に並び誤操作の危険が
-                     あったため、位置と文言を変えた。btn-sm btn-outline-primary で
-                     視覚重量を落とし、日常操作ではないことを示す。 --}}
+                     あったため、位置と文言を変えた。btn-sm で小さくし、色はこの画面の
+                     ほかの青いボタンと同じ塗り（btn-primary。2026-10 変更）。 --}}
                 <div class="card-footer text-end">
-                    <a href="{{ route('trainees.create', $client) }}" class="btn btn-sm btn-outline-primary">トレーニーを追加</a>
+                    <a href="{{ route('trainees.create', $client) }}" class="btn btn-sm btn-primary">トレーニーを追加</a>
                 </div>
             </div>
 

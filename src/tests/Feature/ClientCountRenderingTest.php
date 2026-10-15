@@ -750,7 +750,7 @@ class ClientCountRenderingTest extends TestCase
         $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
         $this->assertMatchesRegularExpression(
             '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
-            .'<button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を発行<\/button>/u',
+            .'<button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行<\/button>/u',
             $html
         );
         $this->assertStringNotContainsString('>取消<', $html);
@@ -778,7 +778,7 @@ class ClientCountRenderingTest extends TestCase
         // 「受付アンケートの案内を表示」は S-0311 を別タブで開き、「取消」の左に置く（2026-10、段階3b）
         $printUrl = preg_quote(route('trainee-intake-survey-tokens.print', $id), '/');
         $this->assertMatchesRegularExpression(
-            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
+            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
             $html
         );
     }
@@ -1092,5 +1092,66 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('<th>メールアドレス</th>', $html);
         // 列の中身（マイページの状態のバッジ）は今までどおり
         $this->assertStringContainsString('<td><span class="badge bg-secondary">未登録</span></td>', $this->listRow($html, '山田'));
+    }
+
+    // ---- ボタンの色（2026-10 変更：青いボタンはすべて塗り） ----
+
+    /** モーダルより前（画面の本文）の HTML */
+    private function bodyBeforeModals(string $html): string
+    {
+        $end = strpos($html, '<div class="modal fade"');
+        $this->assertNotFalse($end);
+
+        return substr($html, 0, $end);
+    }
+
+    public function test_青いボタンはすべて塗りにし白抜きの青を残さない(): void
+    {
+        $this->fakeMediaDisk();
+        $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
+        $admin->id = 100;
+        $admin->exists = true;
+        $this->actingAs($admin, 'web');
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $body = $this->bodyBeforeModals($this->get(route('clients.show', $client))->assertOk()->getContent());
+
+        $this->assertStringNotContainsString('btn-outline-primary', $body);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-primary"\s*onclick="window\.contractModal\.openForCreate\(\)">契約を追加<\/button>/u', $body);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-primary"\s*onclick="window\.usageModal\.openForCreate\(\)">利用を追加<\/button>/u', $body);
+        $this->assertStringContainsString('<button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行</button>', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-primary">トレーニーを追加<\/a>/u', $body);
+        $this->assertStringContainsString('<button type="submit" class="btn btn-sm btn-primary text-nowrap">マイページ登録の案内を発行</button>', $body);
+        $this->assertStringContainsString('class="btn btn-primary">編集</a>', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-primary">新規登録<\/a>/u', $body);
+        // 赤・グレーは今のまま
+        $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除</button>', $body);
+        $this->assertStringContainsString('class="btn btn-outline-secondary">&laquo; 会員一覧に戻る</a>', $body);
+    }
+
+    public function test_表示のボタンも塗りにし取消とマイページ登録を削除は赤の白抜きのまま(): void
+    {
+        $this->fakeMediaDisk();
+        // 受付アンケートは回答待ち、マイページは登録待ち（期限内）
+        $waiting = $this->makeClient('0001', '山田');
+        $this->intakeToken($this->trainee($waiting, 'ポチ'), null, '2026-10-15 09:00:00');
+        $this->emailRegToken($waiting, now()->addDays(2)->format('Y-m-d H:i:s'));
+
+        $body = $this->bodyBeforeModals($this->get(route('clients.show', $waiting))->assertOk()->getContent());
+
+        $this->assertStringNotContainsString('btn-outline-primary', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>/u', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $body);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"/u', $body);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#tokenCancellationModal"/u', $body);
+
+        // 利用中なら［マイページ登録を削除］は赤の白抜き
+        $active = $this->makeClient('0002', '佐藤');
+        $active->forceFill(['email' => 'sato@example.com', 'password' => 'hashed'])->save();
+        $body = $this->bodyBeforeModals($this->get(route('clients.show', $active))->assertOk()->getContent());
+
+        $this->assertStringNotContainsString('btn-outline-primary', $body);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#emailDeletionModal">\s*マイページ登録を削除/u', $body);
     }
 }
