@@ -102,6 +102,14 @@ erDiagram
         bigint created_by FK
     }
 
+    trainee_personality_diagnosis_tokens {
+        bigint id PK
+        string token UK
+        timestamp answered_at
+        bigint trainee_id FK
+        bigint created_by FK
+    }
+
     training_records {
         bigint id PK
         bigint client_id FK
@@ -167,6 +175,8 @@ erDiagram
     clients ||--o{ client_password_reset_tokens : "パスワード再設定"
     trainees ||--o{ trainee_intake_survey_tokens : "受付アンケート案内"
     trainers ||--o{ trainee_intake_survey_tokens : "発行"
+    trainees ||--o{ trainee_personality_diagnosis_tokens : "性格診断の案内"
+    trainers ||--o{ trainee_personality_diagnosis_tokens : "発行"
 
 
     trainees {
@@ -196,10 +206,21 @@ erDiagram
         timestamp answered_at
     }
 
+    trainee_personality_diagnosis_results {
+        bigint id PK
+        bigint trainee_id FK
+        bigint trainee_personality_diagnosis_token_id FK
+        timestamp answered_at
+        string question_version
+        string personality_type
+    }
+
     clients ||--o{ trainees : "トレーニングを受ける対象を持つ"
     trainees ||--o{ trainee_measurements : "計測される"
     trainees ||--o{ trainee_intake_survey_responses : "受付アンケートに回答される"
     trainee_intake_survey_tokens |o--o{ trainee_intake_survey_responses : "回答に使う（NULL はトークン削除済み）"
+    trainees ||--o{ trainee_personality_diagnosis_results : "性格診断に回答される"
+    trainee_personality_diagnosis_tokens |o--o{ trainee_personality_diagnosis_results : "回答に使う（NULL はトークン削除済み）"
 
 
     client_contracts {
@@ -825,6 +846,60 @@ erDiagram
 - **回答の保存の流れ**（同時送信の防ぎ方を含む）は DS-1000 の備考参照
 
 
+#### D-1200 trainee_personality_diagnosis_results（性格診断の結果）
+
+**2026-10 追加**（要件定義書 D-1200・6-15-18・6-16-13）
+
+##### カラム定義
+
+| カラム名 | 型 | NULL | デフォルト | 説明 |
+|---------|-----|------|----------|------|
+| id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
+| trainee_id | BIGINT UNSIGNED | NO | — | 回答の対象のトレーニーのID（外部キー） |
+| trainee_personality_diagnosis_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った性格診断用 URL のトークン（DS-1100）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も結果は残すため NULL 許容（D-1100 と同じ） |
+| answered_at | TIMESTAMP | NO | — | 回答日時。送信時に自動設定する。回答の記録を兼ねる（お客様の回答はアクセスログに記録しない） |
+| question_version | VARCHAR(10) | NO | — | 回答に使った設問の版（今は `v1`）。設問はコードに持ち（下の注記）、設問の文を直したときに版を上げる |
+| answers | JSON | NO | — | 50問の回答。キーは `Q01`〜`Q50`、値は `0`〜`4` の整数、または「未経験」を表す文字列 `"na"`（5-25.）。例：`{"Q01": 2, "Q02": "na", …}`。**送られてきたとおりに残す**（採点の決まりが変わっても、ここから計算し直せるように） |
+| score_people | DECIMAL(3,2) | NO | — | カテゴリ「対人」（Q01〜Q08）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| score_dogs | DECIMAL(3,2) | NO | — | カテゴリ「対犬」（Q09〜Q16）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| score_possessiveness | DECIMAL(3,2) | NO | — | カテゴリ「所有欲」（Q17〜Q21）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| score_separation | DECIMAL(3,2) | NO | — | カテゴリ「分離不安」（Q22〜Q28）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| score_fear | DECIMAL(3,2) | NO | — | カテゴリ「恐怖心」（Q29〜Q35）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| score_trainability | DECIMAL(3,2) | NO | — | カテゴリ「訓練性能」（Q36〜Q42）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| score_excitability | DECIMAL(3,2) | NO | — | カテゴリ「興奮性」（Q43〜Q50）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
+| personality_type | VARCHAR(30) | NO | — | タイプ（5-24. の値）。**丸める前の**平均から判定する（要件定義書 6-16「性格診断の採点とタイプの判定」）。表示名はコードに持つ |
+| created_at | TIMESTAMP | YES | NULL | 作成日時 |
+| updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+
+##### インデックス
+
+| インデックス名 | カラム | 種類 | 目的 |
+|---------------|--------|------|------|
+| PRIMARY | id | PRIMARY KEY | 主キー |
+| trainee_personality_diagnosis_results_trainee_id_idx | trainee_id | INDEX | トレーニーによる検索（トレーニー詳細での結果の一覧）。**ユニーク制約は付けない**（1頭に何件でも持てる） |
+| trainee_personality_diagnosis_results_token_id_idx | trainee_personality_diagnosis_token_id | INDEX | トークンによる逆引き。名前は MySQL の識別子の上限（64 文字）に収めるため `token_id` に縮めている（D-1100 と同じ） |
+
+##### 制約
+
+| 制約名 | 種類 | 条件 | ON DELETE | 説明 |
+|--------|------|------|-----------|------|
+| trainee_personality_diagnosis_results_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時は結果も削除する（要件定義書 D-1200。受付アンケートの回答と同じ） |
+| trainee_personality_diagnosis_results_token_id_foreign | FOREIGN KEY | trainee_personality_diagnosis_token_id → trainee_personality_diagnosis_tokens(id) | SET NULL | トークンが削除されても結果は残す（D-1100 と同じ） |
+| trainee_personality_diagnosis_results_type_check | CHECK | personality_type IN ('guardian', 'affectionate', 'sensitive', 'smart', 'energetic', 'calm') | — | タイプの値制限（5-24.） |
+| trainee_personality_diagnosis_results_scores_check | CHECK | 7 つの `score_*` がどれも 0 以上 4 以下 | — | 平均の値の範囲 |
+
+##### 注記
+
+- **設問はコードに持つ**（DB の表にしない）：設問・選択肢・カテゴリの割り当ては、トレーナーさんの今の診断をそのまま移したもので、画面から直す機能は持たない。設問の版（`question_version`）ごとにコードで持ち、結果には回答に使った版を残す。設問の文を直すときは版を上げ、前の版の設問も残す（昔の結果を、答えたときの文で表示するため）
+- **50問の回答は JSON の列 1 つ**：50 個の列にすると表が大きくなり、設問の版が変わったときに列を足し引きすることになるため。1 問 1 行の別の表にすると、何回分も並べて見るときの読み出しが重くなるため。カテゴリの平均とタイプは、一覧と比べる表示によく使うので、別の列に持つ（JSON から毎回計算しない）
+- **「未経験」は文字列 `"na"`**：`null` にすると「答えていない」と区別がつかなくなるため、答えたことが分かる値にする（回答は全問必須なので、答えていない問は保存されない）
+- **平均は小数第2位に丸めて保存**（`DECIMAL(3,2)`。四捨五入。今の GAS の `toFixed(2)` と同じ結果）。**タイプは丸める前の値で判定してから保存する**（丸めた値で比べると、同点の扱いが今の GAS と変わることがあるため）
+- **1頭に何件でも持てる**（ユニーク制約を付けない）。新しい順（`answered_at` の降順）に並べ、「前回」はその 1 つ前の結果
+- **`created_by` / `updated_by` は持たない**：結果はお客様の操作で作られるため（D-1100 と同じ）
+- **「公開」と「AI のレポート」の列は今回は作らない**（要件定義書 6-16-13 備考。次の段階で足す。公開は `published_at`・`published_by` のような列、AI のレポートは別の表または列で足す想定。どちらも本表の行にひも付けて足せる）
+- 結果の保存の流れ（同時送信の防ぎ方を含む）は DS-1100 の備考参照
+
+
 ---
 
 ### 4-2. システム定義データ
@@ -1203,6 +1278,59 @@ erDiagram
 
 ---
 
+#### DS-1100 trainee_personality_diagnosis_tokens（性格診断用 URL のトークン）
+
+**概要**（**2026-10 追加**）: トレーナーがトレーニーごとに発行する、性格診断の案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに性格診断に回答し（結果は D-1200）、送信するとトークンは使用済みになる。**DS-1000（受付アンケート用 URL のトークン）と同じ作り**。
+
+**対応する要件**:
+- 性格診断の案内の発行（6-16-11）
+- 性格診断の案内の取消（6-16-12）
+- 性格診断の回答（6-15-18）
+
+##### カラム定義
+
+| カラム名 | 型 | NULL | デフォルト | 説明 |
+|---------|-----|------|----------|------|
+| id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
+| token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。重複不可。DS-1000 と同じ |
+| trainee_id | BIGINT UNSIGNED | NO | — | 性格診断の対象のトレーニーのID（外部キー） |
+| answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない。DS-1000 と同じ） |
+| created_at | TIMESTAMP | YES | NULL | 発行日時 |
+| updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+| created_by | BIGINT UNSIGNED | YES | NULL | トークンを発行したトレーナーのID（外部キー） |
+
+##### インデックス
+
+| インデックス名 | カラム | 種類 | 目的 |
+|---------------|--------|------|------|
+| PRIMARY | id | PRIMARY KEY | 主キー |
+| trainee_personality_diagnosis_tokens_token_unique | token | UNIQUE | トークン文字列の重複を防ぐ。URLアクセス時の検索にも使用 |
+| trainee_personality_diagnosis_tokens_trainee_id_idx | trainee_id | INDEX | トレーニーによる検索・逆引き（有効な案内の有無の判定） |
+| trainee_personality_diagnosis_tokens_created_by_idx | created_by | INDEX | 発行者による検索・絞り込み |
+
+##### 制約
+
+| 制約名 | 種類 | 条件 | ON DELETE | 説明 |
+|--------|------|------|-----------|------|
+| trainee_personality_diagnosis_tokens_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時はトークンも削除する（DS-1000 と同じ。削除後にその URL を開くと「ご利用いただけません」の画面になる） |
+| trainee_personality_diagnosis_tokens_created_by_foreign | FOREIGN KEY | created_by → trainers(id) | SET NULL | 発行者トレーナー削除時は NULL にする |
+
+**備考**:
+- **有効期限（`expires_at`）は持たない**（要件定義書 6-15-18 備考。DS-1000 と同じ理由）。`architecture.md` §3-1 の有効期限の設定値も持たない
+- **同じトレーニーに有効な（`answered_at` が NULL の）案内は1つまで**：DS-1000 と同じく、アプリ側で担保する。発行時に、トランザクション内で**対象のトレーニーの行を排他ロック**（`SELECT ... FOR UPDATE`）してから、有効な案内がないことを確かめて発行する。**DS-1000 と違い、前の結果（D-1200）があっても発行できる**（何回でも受けられるため）
+- **取消はトークン行の物理削除**（要件定義書 6-16-12）。対象は `answered_at` が NULL の行だけ
+- **回答済みのトークン行は削除せず残す**：回答済みの URL を開いたときに「すでにご回答いただいています」の画面を出すため（DS-1000 と同じ）。トレーニーの状態は「有効な案内（本テーブルで `answered_at` が NULL の行）あり → 回答待ち、なし → 未発行」で判定する（受付アンケートのような「回答済み」の状態はない）
+- **同時送信の防ぎ方**（要件定義書 6-15-18 動作）：回答の送信は次の順で 1 つのトランザクションの中で行う（DS-1000 と同じ作り）
+  1. トークンの行を**排他ロック**する
+  2. `answered_at` が NULL であることを確かめる（NULL でなければ、結果を保存せず「すでに回答済み」の画面を返す）
+  3. 回答を採点し（要件定義書 6-16「性格診断の採点とタイプの判定」）、結果（D-1200）を保存する
+  4. トークンの `answered_at` に回答日時を記録する（D-1200 の `answered_at` と同じ値）
+  - DS-1000 と違い、トレーニー（D-0700）は書き換えない（トレーニーの行のロックは要らない）
+- お客様の回答はアクセスログ（DS-0500）に記録しない。発行・取消はトレーナーの操作として記録する（`create_trainee_personality_diagnosis_token` / `delete_trainee_personality_diagnosis_token`。5-16.）
+
+---
+
+
 
 ## 5. ENUMおよび定数
 
@@ -1255,6 +1383,8 @@ erDiagram
 | delete_trainee_measurement | トレーニー計測値削除 |
 | create_trainee_intake_survey_token | 受付アンケート案内の発行 |
 | delete_trainee_intake_survey_token | 受付アンケート案内の取消 |
+| create_trainee_personality_diagnosis_token | 性格診断の案内の発行（**2026-10 追加**） |
+| delete_trainee_personality_diagnosis_token | 性格診断の案内の取消（**2026-10 追加**） |
 | create_client_contract | 契約登録 |
 | edit_client_contract | 契約編集 |
 | delete_client_contract | 契約削除 |
@@ -1266,6 +1396,7 @@ erDiagram
 
 - **`view_trainee` を持たない注記の前提について**（2026-10 追記）：上の「トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため」は、トレーニーを会員詳細の中だけで扱っていた段階①の前提で書いたもの。その後、トレーニー詳細は独立した画面（S-0309、`trainees.show`）になったが、トレーニー詳細の参照は記録していない（`view_trainee` は持たない）点は変わっていない。2026-10 に受付アンケートの回答（D-1100。愛犬の健康状態などを含む）を S-0309 で表示するようになったが、本書では参照の操作種別を追加していない。**第1段階では記録しない**。受付アンケートの回答を S-0309 で見せるようになっても、参照を記録しない既存の方針のまま。第2段階（回答を AI に送る段階）で、個人情報の扱いと一緒に見直す
 - **受付アンケート案内**（2026-10 追加）：`create_trainee_intake_survey_token`（発行）・`delete_trainee_intake_survey_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（トークンの行は取消で物理削除されるため、トークンではなくトレーニーを対象として記録する）。案内の発行は会員詳細（S-0305）の「受付アンケートの案内を発行」だけで行う（トレーニー登録 S-0308 では発行しない。**2026-10 変更**）ため、発行は必ず `create_trainee_intake_survey_token` として記録される
+- **性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（受付アンケート案内と同じ）。お客様の性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
 - **お客様の受付アンケートの回答は記録しない**：アクセスログはトレーナーの操作の記録で、`access_logs.trainer_id` が NOT NULL のため（お客様の操作を入れる先がない）。回答の記録は D-1100 の `answered_at` が兼ねる
 
 ### 5-17. メディア種別
@@ -1335,6 +1466,47 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケート�
 | dont_know | 分からない。トレーニーに反映するときは 5-21. の `unknown`（不明）に置き換える |
 
 
+### 5-23. 性格診断のカテゴリ
+
+**2026-10 追加**（要件定義書 6-16「性格診断の採点とタイプの判定」・D-1200）。D-1200 の `score_{値}` の列名と、コードでの設問の割り当てに使う。並びは同点のときの優先の順（上が先）
+
+| 値 | 表示 | 設問 |
+|----|------|------|
+| people | 対人 | Q01〜Q08 |
+| dogs | 対犬 | Q09〜Q16 |
+| possessiveness | 所有欲 | Q17〜Q21 |
+| separation | 分離不安 | Q22〜Q28 |
+| fear | 恐怖心 | Q29〜Q35 |
+| trainability | 訓練性能 | Q36〜Q42 |
+| excitability | 興奮性 | Q43〜Q50 |
+
+### 5-24. 性格診断のタイプ
+
+**2026-10 追加**。D-1200 `personality_type` の値。表示名はコードに持つ
+
+| 値 | 表示 | いちばん高いカテゴリ |
+|----|------|----------------------|
+| guardian | 慎重派・しっかり番犬タイプ | 対人・対犬 |
+| affectionate | 愛情たっぷり・甘えん坊タイプ | 所有欲・分離不安 |
+| sensitive | 繊細・デリケートタイプ | 恐怖心 |
+| smart | 聡明・スマート優等生タイプ | 訓練性能 |
+| energetic | エネルギッシュ・アスリートタイプ | 興奮性 |
+| calm | のんびり・平和主義タイプ | （いちばん高い平均が 1.5 未満） |
+
+### 5-25. 性格診断の回答の値
+
+**2026-10 追加**。D-1200 `answers` の各問の値（フォームの選択肢の値も同じ）
+
+| 値 | 表示 | 採点 |
+|----|------|------|
+| 0 | 0：全くない | 0 点 |
+| 1 | 1：ほとんどない | 1 点 |
+| 2 | 2：時々ある | 2 点 |
+| 3 | 3：よくある | 3 点 |
+| 4 | 4：常にある | 4 点 |
+| na | 未経験（その状況になったことがない） | 平均から除く |
+
+
 ---
 
 ## 6. マイグレーション
@@ -1384,6 +1556,8 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケート�
 | 19 | client_usages | clients, client_contracts, trainers |
 | 20 | trainee_intake_survey_tokens | trainees, trainers |
 | 21 | trainee_intake_survey_responses | trainees, trainee_intake_survey_tokens |
+| 22 | trainee_personality_diagnosis_tokens | trainees, trainers |
+| 23 | trainee_personality_diagnosis_results | trainees, trainee_personality_diagnosis_tokens |
 
 ---
 

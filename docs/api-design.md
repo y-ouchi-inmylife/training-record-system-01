@@ -38,11 +38,11 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 
 ### 2-3. LogAccess（操作履歴の記録）
 
-クライアント・トレーニング記録の参照・登録・更新・削除、トレーニー・計測値・契約・利用の登録・更新・削除、受付アンケート案内の発行・取消が成功したとき、操作者・操作種別・操作対象・IPアドレス・ユーザーエージェントを、トレーナー操作履歴（access_logs）に記録する。記録される操作種別は、DB設計書の access_logs テーブル定義を参照。
+クライアント・トレーニング記録の参照・登録・更新・削除、トレーニー・計測値・契約・利用の登録・更新・削除、受付アンケート案内・性格診断の案内の発行・取消が成功したとき、操作者・操作種別・操作対象・IPアドレス・ユーザーエージェントを、トレーナー操作履歴（access_logs）に記録する。記録される操作種別は、DB設計書の access_logs テーブル定義を参照。
 
 なお、ログイン・ログアウトの記録は、このミドルウェアではなく、それぞれのエンドポイントの処理で行う。
 
-お客様（クライアント）の操作は記録しない（`access_logs.trainer_id` が NOT NULL で、アクセスログはトレーナーの操作の記録のため）。受付アンケートの回答（`POST /client-portal/intake-survey/{token}`）も記録せず、回答日時（`trainee_intake_survey_responses.answered_at`）が回答の記録を兼ねる（requirements.md 6-15-17 備考）。
+お客様（クライアント）の操作は記録しない（`access_logs.trainer_id` が NOT NULL で、アクセスログはトレーナーの操作の記録のため）。受付アンケートの回答（`POST /client-portal/intake-survey/{token}`）も記録せず、回答日時（`trainee_intake_survey_responses.answered_at`）が回答の記録を兼ねる（requirements.md 6-15-17 備考）。性格診断の回答（`POST /client-portal/personality-diagnosis/{token}`。**2026-10 追加**）も同じく記録しない（回答日時 `trainee_personality_diagnosis_results.answered_at` が記録を兼ねる。requirements.md 6-15-18 備考）。
 
 ---
 
@@ -71,16 +71,19 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント管理 | S-0305 クライアント詳細画面 | DELETE | `/clients/{client}/email` | クライアントのメールアドレスとパスワードを削除し、送信済みのメールアドレス登録用 URL・ログイン用リンクを無効化する（6-3-8） | auth | 管理者、一般 |
 | トレーニー管理 | S-0308 トレーニー登録画面 | GET | `/clients/{client}/trainees/create` | トレーニー登録画面を表示する（会員は URL パラメータから取得。ルート名 `trainees.create`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0308 トレーニー登録画面 | POST | `/clients/{client}/trainees` | トレーニーを登録する（ルート名 `trainees.store`） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | GET | `/trainees/{trainee}` | トレーニー詳細画面を表示する（ルート名 `trainees.show`） | auth | 管理者、一般 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | GET | `/trainees/{trainee}` | トレーニー詳細画面を表示する（ルート名 `trainees.show`）。性格診断の結果の一覧（新しい順。**2026-10 追加**）も渡す | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | GET | `/trainees/{trainee}/edit` | トレーニー編集画面を表示する（ルート名 `trainees.edit`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | PUT | `/trainees/{trainee}` | トレーニーを更新する（ルート名 `trainees.update`） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック） | auth | 管理者 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。受付アンケート・性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック） | auth | 管理者 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。送信元は S-0309 だけ（**2026-10 変更**）。成功後は S-0309 に戻す（下の「計測値エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。成功後は S-0311 にリダイレクトする（会員詳細のフォームは別タブで送る。有効な案内がすでにあれば発行せずにその案内を開く。**2026-10 変更**。下の「受付アンケート案内エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-intake-survey-tokens.destroy`。**2026-10 追加**）。リダイレクト先は発行と同じ | auth | 管理者、一般 |
 | トレーニー管理 | S-0311 受付アンケート案内画面 | GET | `/trainees/{trainee}/intake-survey-tokens/print` | 受付アンケート案内画面を表示する（ルート名 `trainee-intake-survey-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を発行する（性格診断用 URL のトークンを 1 件作成する。ルート名 `trainee-personality-diagnosis-tokens.store`。**2026-10 追加**）。成功後は S-0312 にリダイレクトする（会員詳細のフォームは別タブで送る。有効な案内がすでにあれば発行せずにその案内を開く） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-personality-diagnosis-tokens.destroy`。**2026-10 追加**）。成功後は S-0305 に戻す | auth | 管理者、一般 |
+| トレーニー管理 | S-0312 性格診断案内画面 | GET | `/trainees/{trainee}/personality-diagnosis-tokens/print` | 性格診断案内画面を表示する（ルート名 `trainee-personality-diagnosis-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -163,6 +166,9 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント閲覧 | S-1414 受付アンケート回答完了画面 | GET | `/client-portal/intake-survey/thanks` | 受付アンケートの回答完了画面を表示する（トークンを持たない固定の画面。ルート名 `client-portal.intake-survey.thanks`。**2026-10 追加**） | public | - |
 | クライアント閲覧 | S-1413 受付アンケート回答画面 | GET | `/client-portal/intake-survey/{token}` | 受付アンケート回答画面を表示する（トークン検証。ルート名 `client-portal.intake-survey.show`。**2026-10 追加**） | public | - |
 | クライアント閲覧 | S-1413 受付アンケート回答画面 | POST | `/client-portal/intake-survey/{token}` | 受付アンケートの回答を保存し、トレーニーの空欄の項目に反映する（ルート名 `client-portal.intake-survey.store`。**2026-10 追加**） | public | - |
+| クライアント閲覧 | S-1416 性格診断回答完了画面 | GET | `/client-portal/personality-diagnosis/thanks` | 性格診断の回答完了画面を表示する（トークンを受け取らない固定の画面。ルート名 `client-portal.personality-diagnosis.thanks`。**2026-10 追加**） | public | - |
+| クライアント閲覧 | S-1415 性格診断回答画面 | GET | `/client-portal/personality-diagnosis/{token}` | 性格診断回答画面を表示する（トークン検証。ルート名 `client-portal.personality-diagnosis.show`。**2026-10 追加**） | public | - |
+| クライアント閲覧 | S-1415 性格診断回答画面 | POST | `/client-portal/personality-diagnosis/{token}` | 性格診断の回答を採点して結果を保存する（ルート名 `client-portal.personality-diagnosis.store`。**2026-10 追加**） | public | - |
 | クライアント管理 | S-0305 クライアント詳細画面 | POST | `/clients/{client}/email-registration-tokens` | マイページ登録案内を発行する（未発行時の発行と期限切れからの発行し直しを同じエンドポイントで扱う。有効な案内がすでにあれば発行せずにその案内を開く。成功後は S-0307 を開く。トークン自体は「メールアドレス登録用 URL」で、URL パスもそのまま） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/clients/search` | クライアントを検索する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/training-records/auto-create` | 音声記録の要約からトレーニング記録を作成する（**2026-10**：画面からは呼ばれなくなった。録音実行は `/api/audio-records/{id}/auto-create-training-record` を使う） | auth | 管理者、一般 |
@@ -187,6 +193,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 **計測値エンドポイントのリダイレクト先**（**2026-10 変更**）：`POST /trainees/{trainee}/measurements` / `PUT /trainee-measurements/{measurement}` / `DELETE /trainee-measurements/{measurement}` の 3 メソッドは、成功後は**常に S-0309 トレーニー詳細画面**（`redirect()->route('trainees.show', $trainee)`）に戻す。計測値の登録・編集・削除はトレーニー詳細（S-0309）の計測値の欄だけで行うため（requirements.md 6-16-5）、送信元を判別する `return_to` は持たない（送られても使わない）。バリデーションエラー時は Laravel の `back()` で S-0309 に戻り、hidden `_trainee_id` で計測値モーダルを開き直す（screen-design.md S-0309「計測値モーダル」参照）。
 
 **受付アンケート案内エンドポイントのリダイレクト先**（**2026-10 変更**）：`DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、成功後は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', $trainee->client_id)`）に戻し、完了メッセージはフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/intake-survey-tokens`（発行）は、成功後は S-0311 受付アンケート案内画面にリダイレクトし（会員詳細のフォームは別タブで送るので、案内は別タブで開く）、完了メッセージは出さない（下の発行のエンドポイント参照）。受付アンケート案内の発行・表示・取消を会員詳細だけで行う形にしたため（requirements.md 6-16-8 備考「操作を会員詳細に寄せた理由」）、`return_to` は持たない（送られても使わない）。
+
+**性格診断の案内エンドポイントのリダイレクト先**（**2026-10 追加**）：受付アンケート案内と同じ。`DELETE /trainees/{trainee}/personality-diagnosis-tokens`（取消）は成功後に S-0305 会員詳細画面に戻し、完了メッセージ「性格診断の案内を取り消しました。」をフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/personality-diagnosis-tokens`（発行）は成功後に S-0312 性格診断案内画面にリダイレクトし、完了メッセージは出さない。`return_to` は持たない。
 
 **経緯：当初の `return_to`**（**2026-10 追加**。同じ 2026-10 に、操作を会員詳細に寄せたため廃止。経緯として残す）：当初は発行・取消を S-0305 と S-0309 の両方から行えるようにし、当時の計測値エンドポイントと同じく hidden `return_to`（`client` / `trainee` の 2 値、既定は `trainee`）で送信元を判別し、成功時のリダイレクト先を切り替えていた（当時の要件定義書 6-16-8・6-16-9「操作した画面に戻る」）。S-0309 に戻るときの完了メッセージは、受付アンケートの欄の中に出すための別のキー（`intake_survey_success`）で渡していた。
 
@@ -2013,11 +2021,89 @@ POST /training-records に以下を追加する。
 **レスポンス**:
 - view（回答完了画面）
 
+##### S-1415 性格診断回答画面
+
+お客様がトレーナーから受け取った性格診断の案内（性格診断用 URL）からアクセスする、認証不要の公開画面（**2026-10 追加**、requirements.md 6-15-18）。ログインはさせない（client guard に触らない）。**受付アンケート（S-1413）と同じ作り**で、違いは下に書く。
+
+**ルートの定義順**：`GET /client-portal/personality-diagnosis/thanks`（S-1416）を `{token}` のルートより**先に**定義する（受付アンケートと同じ）。
+
+###### GET /client-portal/personality-diagnosis/{token}
+
+**概要**: 性格診断用 URL のトークンを検証し、性格診断回答画面を表示する。
+
+**処理**:
+- トークン（`trainee_personality_diagnosis_tokens.token`）を検索し、受付アンケートと同じ順に確かめる（存在しない → 使えない、回答済み → 回答済み、トレーニーが存在しない → 使えない）
+- 有効なら、愛犬の名前（会員側用の表示名。名前が未登録なら「愛犬」）と、設問（今の版 `v1`）を view に渡す。**会員の氏名・連絡先・住所は渡さない**
+- 有効期限の確認はしない（性格診断用 URL は期限を持たない）
+- **開いただけでは使用済みにしない**
+
+**レスポンス**:
+- 有効：view（回答フォーム。50 問・全問とも初期値なし。入力エラーや時間切れで戻ったときは `old()` で選んだ選択肢を選んだ状態にする）
+- 回答済み：性格診断用の使えない URL の画面に「この性格診断はすでにご回答いただいています。」
+- 使えない：同じ画面に「この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。」
+
+###### POST /client-portal/personality-diagnosis/{token}
+
+**概要**: 性格診断の回答を採点し、結果（`trainee_personality_diagnosis_results`）を保存する。トレーニーは書き換えない。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| answers | array | ● | required, array | 50 問の回答。キーは `Q01`〜`Q50` |
+| answers.Q01〜answers.Q50 | string | ● | required, in:0,1,2,3,4,na | 各問の回答（`na` は「未経験」。db-schema.md 5-25.） |
+
+- 50 問より多いキー（`Q51` など、設問にないキー）は使わない（保存しない）
+- 答えていない問があれば、エラーをまとめて返す。上部の案内には未回答の問の数と、最初の未回答の問へのリンクを出す（screen-design.md S-1415「バリデーションチェック」）
+
+**処理**:
+- 以下を 1 つのトランザクションで実行する（同時送信への対策。受付アンケートと同じ）
+  1. トークン行を**排他ロック**して取得する（`lockForUpdate`）。存在しなければ「使えない」画面
+  2. `answered_at` が空であることを確かめる。入っていれば「回答済み」画面
+  3. 対象のトレーニーが存在することを確かめる。存在しなければ「使えない」画面（トレーニーは書き換えないので、ロックは要らない）
+  4. 回答を採点する（requirements.md 6-16「性格診断の採点とタイプの判定」）：カテゴリごとに「未経験」を除いた平均を出し、**丸める前の値**でタイプを判定してから、平均を小数第2位に丸める
+  5. 結果（`trainee_personality_diagnosis_results`）を 1 件保存する。`answered_at` は現在日時、`question_version` は `v1`、`answers` は送られてきたとおり（`Q01`〜`Q50` の 50 件）
+  6. トークンの `answered_at` に回答日時を記録する（使い切り）
+- **アクセスログには記録しない**（§2-3）
+- メールは送らない
+- 採点の処理は 1 か所（例：`PersonalityDiagnosisScorer` のようなクラス）にまとめ、突き合わせ用の固定データ（`tests/fixtures/` の JSON）でテストする（requirements.md 6-16「検証の方針」）
+
+**時間切れ（419）の扱い**（**受付アンケートと違う**。requirements.md 6-15-18 備考）:
+- この POST がセッション切れ（419。CSRF トークンの不一致）になったときは、`bootstrap/app.php` の例外の扱い（受付アンケートの 419 と同じ場所）で、**送られてきた回答を入れたまま S-1415 を出し直す**（ステータスは 419 のままにせず 200 で返す。上部に「時間がたったため送信できませんでした。答えはそのまま残っています。もう一度［送信する］を押してください。」を出す）
+  - 出し直すときも GET と同じ順でトークンを確かめる。回答済み・使えないときは、それぞれの画面を出す
+  - 送られてきた回答は検証せずに選んだ状態にだけ使う（保存しない）。設問にない値・キーは無視する
+  - 出し直した画面には新しい CSRF トークンが入るので、お客様はそのまま送り直せる
+- 受付アンケートの 419（`client-portal/intake-survey/*`。専用の画面を出し、一から入れ直す）は今のまま変えない
+
+**同時送信時の挙動**: 受付アンケートと同じ（先に処理された POST だけが結果を保存し、後の POST は「この性格診断はすでにご回答いただいています。」の画面を返す）
+
+**レスポンス**:
+- 成功：`redirect()->route('client-portal.personality-diagnosis.thanks')`（PRG）
+- 回答済み・使えない：GET と同じ使えない URL の画面
+- バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ（screen-design.md §2-7 の規約で返す）
+
+**備考**:
+- レート制限は付けない（受付アンケートと同じ理由）
+
+
+##### S-1416 性格診断回答完了画面
+
+###### GET /client-portal/personality-diagnosis/thanks
+
+**概要**: 性格診断の回答を受け付けたことを伝える固定の画面を表示する（**2026-10 追加**）。
+
+**処理**:
+- トークンを受け取らず、DB も参照しない。愛犬の名前も結果も出さない（requirements.md 6-15-18 備考）
+- 直接開かれても同じ文面を返す（個人情報を含まないため）
+
+**レスポンス**:
+- view（回答完了画面）
+
 ---
 
 #### 4-1-16. トレーニー管理
 
-トレーニー管理のエンドポイントのうち、受付アンケート（第1段階、**2026-10**）で変わるもの・新しく設けるものの詳細。その他のトレーニー・計測値のエンドポイントは「3. エンドポイント一覧」を参照。
+トレーニー管理のエンドポイントのうち、受付アンケート（第1段階、**2026-10**）・性格診断（**2026-10 追加**）で変わるもの・新しく設けるものの詳細。その他のトレーニー・計測値のエンドポイントは「3. エンドポイント一覧」を参照。
 
 ##### S-0308 トレーニー登録画面 / S-0310 トレーニー編集画面
 
@@ -2104,6 +2190,51 @@ POST /training-records に以下を追加する。
 **レスポンス**:
 - 有効なトークンあり：view（`layouts.print` を使う。S-0307 と同じ構え）
 - 有効なトークンなし（回答済み・取消済み・未発行のいずれでも）：同じ view で「有効な受付アンケート案内がありません。」を出す。QR・URL・コピー文面は出さない
+
+###### POST /trainees/{trainee}/personality-diagnosis-tokens
+
+**概要**: 性格診断の案内を発行する（性格診断用 URL のトークンを 1 件作成する。requirements.md 6-16-11。**2026-10 追加**）。**受付アンケート案内の発行（`POST /trainees/{trainee}/intake-survey-tokens`）と同じ作り**で、違いは「回答があっても発行できる」こと。
+
+**リクエスト**: パラメータなし
+
+**処理**:
+- 以下を 1 つのトランザクションで実行する
+  - 対象トレーニーの行を**排他ロック**する（同じトレーニーへの同時の発行で、有効な案内が 2 つできないようにするため。db-schema.md DS-1100）
+  - 有効な案内（`answered_at` が NULL のトークン）がないことを確かめる。あれば発行しない（下の「レスポンス」）
+  - `Str::random(32)` でトークンを生成し、`trainee_personality_diagnosis_tokens` に 1 件作成する（`created_by` は操作したトレーナー）。有効期限は持たない
+- **前の結果（`trainee_personality_diagnosis_results`）の有無は見ない**（何回でも受けられるため。受付アンケートの「回答済みなら 409」に当たる扱いはない）
+
+**レスポンス**:
+- 成功：`redirect()->route('trainee-personality-diagnosis-tokens.print', $trainee)`（S-0312。会員詳細のフォームは別タブで送るので、案内は別タブで開く）。完了メッセージは載せない
+- 有効な案内がすでにある（二重送信・ほかのタブで発行済みなど）：新しく発行せず、同じく S-0312 にリダイレクトする（今ある有効な案内を開く）
+
+###### DELETE /trainees/{trainee}/personality-diagnosis-tokens
+
+**概要**: 性格診断の案内を取り消す（requirements.md 6-16-12。**2026-10 追加**）。対象トレーニーの未回答のトークンを物理削除する。
+
+**リクエスト**: パラメータなし
+
+**処理**:
+- 対象トレーニーに有効な案内（`answered_at` が NULL のトークン）があることを確かめる。なければ 409
+- `answered_at` が NULL のトークンを物理削除する。**回答済みのトークンと結果には触らない**
+
+**レスポンス**:
+- 成功：S-0305 へリダイレクトし、フラッシュ `success` に「性格診断の案内を取り消しました。」
+- 有効な案内がない：409
+- 押下時に確認モーダルを挟む（screen-design.md S-0305-M07）
+
+###### GET /trainees/{trainee}/personality-diagnosis-tokens/print
+
+**概要**: 対象トレーニーの有効な性格診断用 URL を、QR コード・URL・手順を載せた案内として表示する（S-0312。**2026-10 追加**）。
+
+**処理**:
+- 対象トレーニーの `trainee_personality_diagnosis_tokens` のうち `answered_at` が NULL のトークン 1 件を取得する
+- 有効なトークンがあれば、URL・QR コード用データと、メール／LINE 送付用の案内文面（コントローラで組み立てる。screen-design.md S-0312「案内文面のコピー」）を view に渡す。**お客様の氏名・愛犬の名前は view に渡さない**（受付アンケートと同じ）
+- 表示はアクセスログに記録しない
+
+**レスポンス**:
+- 有効なトークンあり：view（`layouts.print` を使う。S-0311 と同じ構え）
+- 有効なトークンなし（未発行・取消済み・前の案内に回答済みのいずれでも）：同じ view で「有効な性格診断の案内がありません。」を出す。QR・URL・コピー文面は出さない
 
 ---
 
