@@ -622,6 +622,39 @@
                                            aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>
                                     </div>
                                 @endif
+                                {{-- 性格診断の行（2026-10 追加。要件定義書 6-16-11〜6-16-13、設計書 S-0305 セクション3「性格診断の行」）。
+                                     - いつも出す（結果・案内の有無にかかわらず）。「暮らしの様子」の下（暮らしの様子が出ないときは最終計測の下）
+                                     - 左は「性格診断」の文字のリンク。いつもトレーニー詳細（S-0309）の性格診断の欄（#personality-diagnosis、
+                                       同じタブ）へ。結果がなくても飛ぶ（欄に「（未回答）」が出る）。左の位置・文字の大きさ・上の間隔は
+                                       「暮らしの様子」のリンクにそろえる（small mt-1）
+                                     - 右はボタンのまとまり（role="group"、「{表示名}の性格診断」）。有効な案内がないとき（未発行、または前の
+                                       案内に回答済み・取消済み）は［案内を発行］、回答待ちのときは［案内を表示］［取消］。ボタンの文字は短い
+                                       （行の左に「性格診断」の文字があるため。受付アンケートのボタンは左に文字を置かないので長い）
+                                     - 幅が足りないときは、受付アンケートの名前の行と同じく、まとまりごと次の行に折り返して右寄せ（flex-wrap・ms-auto）
+                                     - 状態は Trainee::activePersonalityDiagnosisToken（ClientController::show で先読み済み）
+                                     - ［案内を発行］は受付アンケート・マイページ登録と同じく、別タブで案内の画面（S-0312）を開き、元のタブは
+                                       戻ってきたときに開き直す（target="_blank"・data-issue-in-new-tab。issue-in-new-tab.js）
+                                     - ［取消］は確認（S-0305-M07。trainees/_personality-diagnosis-cancel-modal.blade.php）を開く --}}
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">
+                                    <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis"
+                                       aria-label="{{ $trainee->display_name }}の性格診断">性格診断</a>
+                                    <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"
+                                         role="group" aria-label="{{ $trainee->display_name }}の性格診断">
+                                        @if($trainee->activePersonalityDiagnosisToken === null)
+                                            <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0"
+                                                  target="_blank" rel="noopener" data-issue-in-new-tab>
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行</button>
+                                            </form>
+                                        @else
+                                            <a href="{{ route('trainee-personality-diagnosis-tokens.print', $trainee) }}"
+                                               class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">案内を表示</a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
+                                                    data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"
+                                                    data-personality-diagnosis-trainee-id="{{ $trainee->id }}">取消</button>
+                                        @endif
+                                    </div>
+                                </div>
                                     </div>
                                 </div>
                             </div>
@@ -728,6 +761,8 @@
     {{-- 受付アンケート案内取消確認モーダル（S-0305-M06。2026-10 追加）。トレーニーが何頭いても 1 つ --}}
     @if($client->trainees->isNotEmpty())
         @include('trainees._intake-survey-cancel-modal')
+        {{-- 性格診断の案内の取消確認モーダル（S-0305-M07。2026-10 追加） --}}
+        @include('trainees._personality-diagnosis-cancel-modal')
     @endif
 
     {{-- マイページ登録案内取消確認モーダル（S-0305-M03）--}}

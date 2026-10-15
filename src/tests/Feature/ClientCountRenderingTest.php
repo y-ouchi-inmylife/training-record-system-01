@@ -89,6 +89,8 @@ class ClientCountRenderingTest extends TestCase
         // 受付アンケート用 URL のトークン（トレーニーカードの受付アンケートの行の状態。2026-10 追加）
         $this->createTraineeIntakeSurveyTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
+        // 性格診断の案内（2026-10 追加）。会員詳細の「性格診断」の行のボタンに使う
+        $this->createTraineePersonalityDiagnosisTokensTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;
@@ -1167,7 +1169,7 @@ class ClientCountRenderingTest extends TestCase
         return $m[0];
     }
 
-    public function test_二つの発行のフォームだけを別タブで送り目印を付ける(): void
+    public function test_三つの発行のフォームだけを別タブで送り目印を付ける(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1176,18 +1178,20 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
         $forms = $this->issueInNewTabForms($html);
 
-        $this->assertCount(2, $forms);
+        // マイページ登録・受付アンケート・性格診断（2026-10 追加）の 3 つ
+        $this->assertCount(3, $forms);
         $actions = [
             route('client-email-registration-tokens.store', $client),
             route('trainee-intake-survey-tokens.store', $notIssued),
+            route('trainee-personality-diagnosis-tokens.store', $notIssued),
         ];
         foreach ($actions as $i => $action) {
             $this->assertStringContainsString('action="'.$action.'"', $forms[$i]);
             $this->assertStringContainsString('target="_blank"', $forms[$i]);
             $this->assertStringContainsString('rel="noopener"', $forms[$i]);
         }
-        // target="_blank" のフォームはこの 2 つだけ
-        $this->assertSame(2, preg_match_all('/<form\b[^>]*target="_blank"/u', $html));
+        // target="_blank" のフォームはこの 3 つだけ
+        $this->assertSame(3, preg_match_all('/<form\b[^>]*target="_blank"/u', $html));
         $this->assertStringContainsString('issue-in-new-tab', $html);
     }
 
@@ -1198,10 +1202,12 @@ class ClientCountRenderingTest extends TestCase
         $admin->id = 100;
         $admin->exists = true;
         $this->actingAs($admin, 'web');
-        // マイページは登録待ち（期限内）、受付アンケートは回答待ち：発行のフォームは出ない
+        // マイページは登録待ち（期限内）、受付アンケートと性格診断は回答待ち：発行のフォームは出ない
         $client = $this->makeClient('0001', '山田');
         $this->emailRegToken($client, now()->addDays(2)->format('Y-m-d H:i:s'));
-        $this->intakeToken($this->trainee($client, 'ポチ'), null, '2026-10-15 09:00:00');
+        $traineeId = $this->trainee($client, 'ポチ');
+        $this->intakeToken($traineeId, null, '2026-10-15 09:00:00');
+        $this->personalityToken($traineeId);
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
@@ -1210,5 +1216,149 @@ class ClientCountRenderingTest extends TestCase
         // 取消（M03・M06）・会員の削除のフォームはある
         $this->assertStringContainsString('action="'.route('client-email-registration-tokens.destroy', $client).'" class="d-inline m-0">', $html);
         $this->assertStringContainsString('action="'.route('clients.destroy', $client).'"', $html);
+    }
+
+    // ---- 性格診断の行（2026-10 追加。設計書 S-0305 セクション3「性格診断の行」） ----
+
+    private function personalityToken(int $traineeId, ?string $answeredAt = null): int
+    {
+        return DB::table('trainee_personality_diagnosis_tokens')->insertGetId([
+            'token' => bin2hex(random_bytes(16)), 'trainee_id' => $traineeId, 'answered_at' => $answeredAt,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    /** トレーニー 1 頭分の「性格診断」の行（リンクからボタンのまとまりの終わりまで）の HTML */
+    private function personalityRow(string $html, int $traineeId): string
+    {
+        $link = route('trainees.show', $traineeId).'#personality-diagnosis';
+        $start = strpos($html, '<a href="'.$link.'"');
+        $this->assertNotFalse($start, '性格診断のリンクがない');
+        $end = strpos($html, '</div>', strpos($html, 'role="group"', $start));
+
+        return substr($html, $start, $end - $start);
+    }
+
+    public function test_性格診断の行はトレーニーごとに暮らしの様子の後ろにいつも出る(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $answered = $this->trainee($client, 'ポチ');
+        $tokenId = $this->intakeToken($answered, '2026-10-16 14:32:00');
+        $this->intakeResponse($answered, $tokenId);
+        $notIssued = $this->trainee($client, null);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 回答済みのトレーニー：暮らしの様子のリンクの後ろに性格診断のリンク
+        $this->assertMatchesRegularExpression(
+            '/aria-label="ポチの暮らしの様子">暮らしの様子<\/a>\s*<\/div>\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small mt-1">\s*'
+            .'<a href="'.preg_quote(route('trainees.show', $answered), '/').'#personality-diagnosis"\s*aria-label="ポチの性格診断">性格診断<\/a>/u',
+            $html
+        );
+        // 名前未登録・結果も案内もないトレーニーにも出る（読み上げは「名前未登録の性格診断」）
+        $this->assertMatchesRegularExpression(
+            '/<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis"\s*aria-label="名前未登録の性格診断">性格診断<\/a>/u',
+            $html
+        );
+        $this->assertStringContainsString('role="group" aria-label="名前未登録の性格診断"', $html);
+        $this->assertSame(2, substr_count($html, '>性格診断</a>'));
+    }
+
+    public function test_有効な案内がなければ案内を発行のフォームを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+
+        $row = $this->personalityRow($this->get(route('clients.show', $client))->assertOk()->getContent(), $id);
+
+        $this->assertStringContainsString('role="group" aria-label="ポチの性格診断"', $row);
+        $this->assertMatchesRegularExpression(
+            '/<form method="POST" action="'.preg_quote(route('trainee-personality-diagnosis-tokens.store', $id), '/').'" class="d-inline m-0"\s*'
+            .'target="_blank" rel="noopener" data-issue-in-new-tab>\s*<input type="hidden" name="_token"[^>]*>\s*'
+            .'<button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行<\/button>/u',
+            $row
+        );
+        $this->assertStringNotContainsString('案内を表示', $row);
+        $this->assertStringNotContainsString('>取消<', $row);
+    }
+
+    public function test_回答待ちなら案内を表示と取消を出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->personalityToken($id);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $row = $this->personalityRow($html, $id);
+
+        $this->assertMatchesRegularExpression(
+            '/<a href="'.preg_quote(route('trainee-personality-diagnosis-tokens.print', $id), '/').'"\s*'
+            .'class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">案内を表示<\/a>\s*'
+            .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*'
+            .'data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"\s*data-personality-diagnosis-trainee-id="'.$id.'">取消<\/button>/u',
+            $row
+        );
+        $this->assertStringNotContainsString('案内を発行', $row);
+        // 受付アンケートは未発行のまま（名前の行のボタンは今までどおり）
+        $this->assertStringContainsString('>受付アンケートの案内を発行</button>', $html);
+    }
+
+    public function test_回答済みの案内だけなら案内を発行を出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->personalityToken($id, '2026-10-15 09:00:00');
+
+        $row = $this->personalityRow($this->get(route('clients.show', $client))->assertOk()->getContent(), $id);
+
+        $this->assertStringContainsString('>案内を発行</button>', $row);
+        $this->assertStringNotContainsString('案内を表示', $row);
+    }
+
+    public function test_性格診断の取消の確認M07の見出しと本文と確定ボタン(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->personalityToken($this->trainee($client, 'ポチ'));
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<div class="modal fade" id="personalityDiagnosisCancelModal" tabindex="-1"', $html);
+        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="personalityDiagnosisCancelModalLabel">\s*性格診断の案内の取消\s*<\/h5>/u', $html);
+        $this->assertStringContainsString('発行済みの性格診断の案内が使えなくなります。<br>', $html);
+        $this->assertStringContainsString('すでにお渡しした案内からは回答できなくなります。', $html);
+        $this->assertMatchesRegularExpression('/<form method="POST" action="" class="d-inline m-0" id="personalityDiagnosisCancelForm">[\s\S]*?<button type="submit" class="btn btn-danger">取り消す<\/button>/u', $html);
+        // 送信先のひな形（開いたボタンのトレーニーの id で置き換える）
+        $this->assertStringContainsString(json_encode(route('trainee-personality-diagnosis-tokens.destroy', ['trainee' => '__ID__'])), $html);
+        // 受付アンケートの取消の確認（M06）も今までどおりある
+        $this->assertStringContainsString('id="intakeSurveyCancelModal"', $html);
+    }
+
+    public function test_性格診断の案内の読み込みはトレーニーの数で増えない(): void
+    {
+        $this->fakeMediaDisk();
+        $one = $this->makeClient('0001', '山田');
+        $this->personalityToken($this->trainee($one, 'ポチ'));
+        $three = $this->makeClient('0002', '佐藤');
+        foreach (['ハル', 'ナツ', 'アキ'] as $name) {
+            $this->personalityToken($this->trainee($three, $name));
+        }
+
+        $count = function (Client $client): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->get(route('clients.show', $client))->assertOk();
+            $queries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'trainee_personality_diagnosis_tokens'));
+            DB::disableQueryLog();
+
+            return $queries->count();
+        };
+
+        $this->assertSame(1, $count($one));
+        $this->assertSame(1, $count($three));
     }
 }

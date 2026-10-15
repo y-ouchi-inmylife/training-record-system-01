@@ -165,6 +165,8 @@ class ClientController extends Controller
         // trainees.latestIntakeSurveyResponse と trainees.activeIntakeSurveyToken は受付アンケートの行の
         // 状態（Trainee::intake_survey_status）に使う。トレーニーが何頭いてもクエリはそれぞれ 1 本で済む
         // （2026-10 追加）。
+        // trainees.activePersonalityDiagnosisToken は性格診断の行のボタン（案内を発行／案内を表示・取消）に使う
+        // （2026-10 追加。トレーニーが何頭いてもクエリは 1 本）。
         // measurements は Trainee::measurements() で計測日時降順に並ぶため、
         // Trainee::latest_measurement アクセサが `first()` で最新 1 件を取り出せる
         // （設計書 S-0305 セクション3「最終計測」参照）。
@@ -175,7 +177,7 @@ class ClientController extends Controller
                 ->withCount('mediaRecords')
                 ->orderBy('training_date', 'desc')
                 ->orderBy('training_time', 'desc');
-        }, 'trainees.measurements', 'trainees.latestIntakeSurveyResponse', 'trainees.activeIntakeSurveyToken', 'audioRecords' => function ($query) {
+        }, 'trainees.measurements', 'trainees.latestIntakeSurveyResponse', 'trainees.activeIntakeSurveyToken', 'trainees.activePersonalityDiagnosisToken', 'audioRecords' => function ($query) {
             $query->select(['id', 'client_id']);
         }, 'contracts', 'usages']);
 
