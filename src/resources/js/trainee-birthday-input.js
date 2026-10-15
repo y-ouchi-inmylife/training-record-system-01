@@ -6,7 +6,8 @@
  *       <input data-birthday-part="year"> <input data-birthday-part="month"> <input data-birthday-part="day">
  *       <span data-birthday-display aria-live="polite"></span>
  *     </div>
- * - 入力のたびに判定し、正しければ年齢、空なら何も出さず、それ以外は入力中の案内を出す
+ * - 入力のたびに判定し、正しければ年齢（全角のカッコで囲む。カッコは trainee-age.js の birthdayInputDisplay で付ける）、
+ *   空なら何も出さず、それ以外は入力中の案内（カッコなし）を出す
  *   （年齢は本文と同じ色、入力中の案内は控えめな色〔text-muted〕。送信時のエラーの赤字とは別に出す）
  * - 欄から離れたとき（blur）に、欄の値の全角の数字を半角に直し、前後の空白を取る
  *   （送信される値と画面の値をそろえるため。送信時も同じく直して受け付ける）

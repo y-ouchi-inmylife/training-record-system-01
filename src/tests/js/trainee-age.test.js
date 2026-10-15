@@ -55,14 +55,33 @@ describe('状態の記号 → 入力中の案内（要件定義書 6-16「入力
         expect(Object.keys(INPUT_HINTS).sort()).toEqual([...states].sort());
     });
 
-    it('入力中の表示：ok は年齢、empty は何も出さず、それ以外は案内', () => {
-        expect(birthdayInputDisplay('2020', '3', '15', 2026, 10, 20)).toEqual({ state: 'ok', text: '6歳7ヶ月' });
-        expect(birthdayInputDisplay('２０２０', '０３', '', 2026, 10, 20)).toEqual({ state: 'ok', text: '6歳7ヶ月' });
-        expect(birthdayInputDisplay('2020', null, null, 2026, 10, 20)).toEqual({ state: 'ok', text: '約6歳' });
+    it('入力中の表示：ok は全角のカッコで囲んだ年齢、empty は何も出さず、それ以外は案内（カッコなし）', () => {
+        expect(birthdayInputDisplay('2020', '3', '15', 2026, 10, 20)).toEqual({ state: 'ok', text: '（6歳7ヶ月）' });
+        expect(birthdayInputDisplay('２０２０', '０３', '', 2026, 10, 20)).toEqual({ state: 'ok', text: '（6歳7ヶ月）' });
+        expect(birthdayInputDisplay('2020', null, null, 2026, 10, 20)).toEqual({ state: 'ok', text: '（約6歳）' });
+        expect(birthdayInputDisplay('2025', '12', '', 2026, 10, 20)).toEqual({ state: 'ok', text: '（10ヶ月）' });
+        expect(birthdayInputDisplay('2026', '10', '', 2026, 10, 20)).toEqual({ state: 'ok', text: '（1ヶ月未満）' });
+        expect(birthdayInputDisplay('2026', '', '', 2026, 10, 20)).toEqual({ state: 'ok', text: '（1歳未満）' });
         expect(birthdayInputDisplay('', '', '', 2026, 10, 20)).toEqual({ state: 'empty', text: '' });
         expect(birthdayInputDisplay('', '3', '', 2026, 10, 20)).toEqual({ state: 'month_without_year', text: '年も入力してください' });
         expect(birthdayInputDisplay('2020', '', '15', 2026, 10, 20)).toEqual({ state: 'day_without_month', text: '月も入力してください' });
         expect(birthdayInputDisplay('2027', '', '', 2026, 10, 20)).toEqual({ state: 'future', text: '未来の日付になっています' });
+    });
+});
+
+describe('入力中の表示のカッコ（表示の層だけで付ける。2026-10 変更）', () => {
+    it('入力中の案内にはカッコを付けない', () => {
+        for (const [year, month, day] of [['', '3', ''], ['2020', '', '15'], ['2027', '', ''], ['20x0', '', ''], ['2020', '13', ''], ['2020', '2', '30'], ['1990', '', '']]) {
+            const { state, text } = birthdayInputDisplay(year, month, day, 2026, 10, 20);
+            expect(state).not.toBe(STATE.OK);
+            expect(text).toBe(INPUT_HINTS[state]);
+            expect(text).not.toMatch(/[（）]/);
+        }
+    });
+
+    it('年齢の計算（ageLabel）はカッコを付けない（固定データと PHP の TraineeAge と同じ結果のまま）', () => {
+        expect(ageLabel(2020, 3, 15, 2026, 10, 20)).toBe('6歳7ヶ月');
+        expect(ageLabel(2020, null, null, 2026, 10, 20)).toBe('約6歳');
     });
 });
 

@@ -198,7 +198,12 @@ export function ageLabel(year, month, day, refYear, refMonth, refDay) {
 
 /**
  * 入力中の表示を組み立てる。3 つの欄の値（文字列）と基準日を受け取り、
- * { state, text } を返す（text は ok なら年齢、empty なら ''、それ以外は入力中の案内）。
+ * { state, text } を返す（text は ok なら全角のカッコで囲んだ年齢、empty なら ''、それ以外は入力中の案内）。
+ *
+ * 年齢は保存後の表示（「2020/03/15（6歳7ヶ月）」）にそろえて全角のカッコで囲む（2026-10 変更。
+ * 要件定義書 6-16「入力中の表示」）。入力中の案内はメッセージなので囲まない。
+ * カッコはこの表示の層だけで付け、年齢の計算（ageLabel。PHP の TraineeAge::ageLabel と同じ結果を返し、
+ * 固定データ tests/fixtures/trainee-age-cases.json で確かめる）はカッコなしのままにする。
  */
 export function birthdayInputDisplay(year, month, day, refYear, refMonth, refDay) {
     const state = birthdayInputState(year, month, day, refYear, refMonth, refDay);
@@ -213,7 +218,9 @@ export function birthdayInputDisplay(year, month, day, refYear, refMonth, refDay
     const [y, m, d] = [normalize(year), normalize(month), normalize(day)]
         .map((value) => (value === null ? null : parseInt(value, 10)));
 
-    return { state, text: ageLabel(y, m, d, refYear, refMonth, refDay) ?? '' };
+    const age = ageLabel(y, m, d, refYear, refMonth, refDay);
+
+    return { state, text: age === null ? '' : `（${age}）` };
 }
 
 /**
