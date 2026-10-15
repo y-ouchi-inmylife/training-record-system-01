@@ -2043,7 +2043,7 @@ POST /training-records に以下を追加する。
 - 同じルールを、入力中の年齢表示（JS）でも使う（requirements.md 6-16「年齢の表示規則」）
 
 **処理**:
-- 登録では受付アンケート案内を発行しない（**2026-10 変更**。案内の発行は S-0305 の［案内を発行］〔`POST /trainees/{trainee}/intake-survey-tokens`〕だけで行う。requirements.md 6-16-1）。ほかのパラメータ（以前の `issue_intake_survey` など）が送られてきても使わない
+- 登録では受付アンケート案内を発行しない（**2026-10 変更**。案内の発行は S-0305 の［受付アンケートの案内を発行］〔`POST /trainees/{trainee}/intake-survey-tokens`〕だけで行う。requirements.md 6-16-1）。ほかのパラメータ（以前の `issue_intake_survey` など）が送られてきても使わない
 
 **レスポンス**:
 - 登録成功：`redirect('/clients/{client}')`（S-0305）。完了メッセージは「トレーニーを登録しました。」
