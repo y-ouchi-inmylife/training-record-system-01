@@ -46,7 +46,6 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
         $trainee->birth_year = null;
         $trainee->birth_month = null;
         $trainee->birth_day = null;
-        $trainee->note = null;
         $trainee->exists = true;
         $trainee->setRelation('client', $client);
         $trainee->setRelation('measurements', new EloquentCollection([]));

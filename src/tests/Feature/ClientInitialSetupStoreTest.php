@@ -103,7 +103,6 @@ class ClientInitialSetupStoreTest extends TestCase
             $table->unsignedSmallInteger('birth_year')->nullable();
             $table->unsignedTinyInteger('birth_month')->nullable();
             $table->unsignedTinyInteger('birth_day')->nullable();
-            $table->text('note')->nullable();
             $table->string('photo_path', 500)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -192,7 +191,6 @@ class ClientInitialSetupStoreTest extends TestCase
             'birth_year' => 2022,
             'birth_month' => 3,
             'birth_day' => 15,
-            'note' => 'トレーナーのメモ',
             'photo_path' => null,
             'created_at' => '2026-10-01 10:00:00',
             'updated_at' => '2026-10-01 10:00:00',
@@ -224,7 +222,6 @@ class ClientInitialSetupStoreTest extends TestCase
             'birth_year' => null,
             'birth_month' => null,
             'birth_day' => null,
-            'note' => null,
             'photo_path' => null,
             'created_at' => '2026-10-01 10:00:00',
             'updated_at' => '2026-10-01 10:00:00',

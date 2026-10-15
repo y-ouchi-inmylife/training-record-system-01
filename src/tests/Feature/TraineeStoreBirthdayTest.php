@@ -42,7 +42,6 @@ class TraineeStoreBirthdayTest extends TestCase
             $table->unsignedTinyInteger('birth_month')->nullable();
             $table->unsignedTinyInteger('birth_day')->nullable();
             $table->string('neuter_status', 20)->nullable();
-            $table->text('note')->nullable();
             $table->string('photo_path', 500)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -64,19 +63,19 @@ class TraineeStoreBirthdayTest extends TestCase
 
     public function test_備考の値を送っても登録でも更新でも保存されない(): void
     {
-        // 2026-10 変更：トレーニーの備考をなくした。古い画面から note が送られてきても、TraineeRequest の
-        // ルールにないので validated() に含まれず、保存されない（列はまだあるので、空のままであること）
+        // 2026-10 変更：トレーニーの備考をなくし、列も消した（2026_10_15_000006_drop_note_from_trainees_table）。
+        // 古い画面から note が送られてきても、TraineeRequest のルールにないので validated() に含まれず、
+        // 保存しようとしない（列がないので、保存しようとすれば SQL のエラーになる）
         $this->post(route('trainees.store', $this->client), ['name' => 'モモ', 'note' => '古い画面からの備考'])
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('clients.show', $this->client));
         $trainee = Trainee::query()->sole();
-        $this->assertNull(DB::table('trainees')->where('id', $trainee->id)->value('note'));
+        $this->assertArrayNotHasKey('note', (array) DB::table('trainees')->where('id', $trainee->id)->first());
 
-        $this->put(route('trainees.update', $trainee), ['name' => 'モモ', 'note' => '古い画面からの備考'])
+        $this->put(route('trainees.update', $trainee), ['name' => 'ハナ', 'note' => '古い画面からの備考'])
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('trainees.show', $trainee));
-        $this->assertNull(DB::table('trainees')->where('id', $trainee->id)->value('note'));
-        $this->assertSame('モモ', DB::table('trainees')->where('id', $trainee->id)->value('name'));
+        $this->assertSame('ハナ', DB::table('trainees')->where('id', $trainee->id)->value('name'));
     }
 
     public function test_全角の数字と前後の空白は半角の整数として保存される(): void
