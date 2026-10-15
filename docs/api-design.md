@@ -2123,13 +2123,12 @@ POST /training-records に以下を追加する。
 | birth_month | string | | nullable（同上） | 誕生日（月）。1〜12。入れる場合は年が必須 |
 | birth_day | string | | nullable（同上） | 誕生日（日）。入れる場合は年・月が必須 |
 | neuter_status | string | | nullable, in:neutered,not_neutered,unknown | 去勢・避妊（している／していない／不明） |
-| note | string | | nullable, string | 備考 |
 
 - 誕生日の 3 項目は、FormRequest の `after()` などで次の順に検証し、最初に当てはまった 1 つだけを、1 つにまとめたキーで返す（文言は screen-design.md S-0308「バリデーションチェック」）：数字であること → 月は 1〜12 → 月があるなら年がある → 日があるなら年・月がある → 3 つそろったら実在する日付 → 未来でない（年だけなら今年以前、年・月までなら今月以前、年・月・日なら今日以前）→ 年は今年から 30 年前まで
 - 同じルールを、入力中の年齢表示（JS）でも使う（requirements.md 6-16「年齢の表示規則」）
 
 **処理**:
-- 登録では受付アンケート案内を発行しない（**2026-10 変更**。案内の発行は S-0305 の［受付アンケートの案内を発行］〔`POST /trainees/{trainee}/intake-survey-tokens`〕だけで行う。requirements.md 6-16-1）。ほかのパラメータ（以前の `issue_intake_survey` など）が送られてきても使わない
+- 登録では受付アンケート案内を発行しない（**2026-10 変更**。案内の発行は S-0305 の［受付アンケートの案内を発行］〔`POST /trainees/{trainee}/intake-survey-tokens`〕だけで行う。requirements.md 6-16-1）。ほかのパラメータ（以前の `issue_intake_survey`、**2026-10 になくした備考の `note`** など）が送られてきても使わない
 
 **レスポンス**:
 - 登録成功：`redirect('/clients/{client}')`（S-0305）。完了メッセージは「トレーニーを登録しました。」
