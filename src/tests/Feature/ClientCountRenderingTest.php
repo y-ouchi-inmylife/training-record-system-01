@@ -694,7 +694,22 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    public function test_受付アンケートが未発行なら未発行と案内を発行のボタンを出す(): void
+    /**
+     * 受付アンケートの行（トレーニーカードの下端の 1 行）を取り出し、左が「受付アンケート」の文字だけで、
+     * 状態の文字・発行日・回答日時が出ていないことを確かめる（2026-10 変更。状態はボタンで分かる）。
+     * 行には、読み上げ用に「{表示名}の受付アンケート」の名前を付ける
+     */
+    private function assertIntakeRowHasNoStatusText(string $html, array $dates = [], string $name = 'ポチ'): void
+    {
+        $this->assertSame(1, preg_match('/<div class="border-top mt-2 pt-2 d-flex[^"]*"\s*role="group" aria-label="'.preg_quote($name, '/').'の受付アンケート">(.*?)<\/div>\s*<\/div>/su', $html, $m));
+        $row = $m[1];
+        $this->assertMatchesRegularExpression('/^\s*<span>受付アンケート<\/span>/u', $row);
+        foreach (array_merge(['：', '未発行', '回答待ち', '回答済み', '発行）'], $dates) as $text) {
+            $this->assertStringNotContainsString($text, $row, $text);
+        }
+    }
+
+    public function test_受付アンケートが未発行なら案内を発行のボタンだけを出し状態の文字は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -702,7 +717,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('受付アンケート：未発行', $html);
+        $this->assertIntakeRowHasNoStatusText($html);
         $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
         $this->assertMatchesRegularExpression(
             '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
@@ -713,7 +728,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('案内を表示', $html);
     }
 
-    public function test_受付アンケートが回答待ちなら発行日と案内を表示と案内を取消のボタンを出す(): void
+    public function test_受付アンケートが回答待ちなら案内を表示と案内を取消のボタンを出し発行日は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -722,7 +737,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('受付アンケート：回答待ち（2026/10/15 発行）', $html);
+        $this->assertIntakeRowHasNoStatusText($html, ['2026/10/15']);
         $this->assertMatchesRegularExpression(
             '/<button type="button" class="btn btn-sm btn-outline-danger"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"\s*'
             .'data-intake-survey-trainee-id="'.$id.'">案内を取消<\/button>/u',
@@ -745,7 +760,7 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    public function test_受付アンケートが回答済みなら回答日と回答を見るのリンクを出す(): void
+    public function test_受付アンケートが回答済みなら回答を見るのリンクを出し回答日は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -755,7 +770,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('受付アンケート：回答済み（2026/10/16）', $html);
+        $this->assertIntakeRowHasNoStatusText($html, ['2026/10/16', '14:32']);
         // 「回答を見る」は S-0309 の受付アンケートの欄へ（同じタブ）
         $url = preg_quote(route('trainees.show', $id).'#intake-survey', '/');
         $this->assertMatchesRegularExpression('/<a href="'.$url.'"\s*class="btn btn-sm btn-outline-primary">回答を見る<\/a>/u', $html);
@@ -774,8 +789,20 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('受付アンケート：未発行', $html);
+        $this->assertIntakeRowHasNoStatusText($html);
+        $this->assertStringContainsString('>案内を発行<', $html);
         $this->assertStringNotContainsString('回答を見る', $html);
+    }
+
+    public function test_受付アンケートの行の読み上げ用の名前は名前が未登録なら名前未登録(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, null);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertIntakeRowHasNoStatusText($html, [], '名前未登録');
     }
 
     public function test_取消モーダルはトレーニーが何頭いても1つで送信先のひな形を持つ(): void
@@ -810,7 +837,7 @@ class ClientCountRenderingTest extends TestCase
 
         // 計測を追加のボタン（右の列の最後）より後、次のトレーニー・カードの下部より前
         $posMeasure = strpos($html, '>計測を追加</button>');
-        $posRow = strpos($html, '<div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small">');
+        $posRow = strpos($html, '<div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small"');
         $this->assertNotFalse($posRow);
         $this->assertGreaterThan($posMeasure, $posRow);
         $this->assertLessThan(strpos($html, 'トレーニーを追加'), $posRow);

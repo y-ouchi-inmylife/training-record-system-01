@@ -567,9 +567,14 @@
                                      trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）。
                                      「案内を表示」は S-0311 受付アンケート案内画面を別タブで開く（マイページ登録案内の
                                      「登録案内を表示」と同じ）。「回答を見る」は S-0309 の受付アンケートの欄
-                                     （#intake-survey）へ移る（同じタブ）。 --}}
-                                <div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-                                    <span>受付アンケート：{{ $trainee->intake_survey_status_label }}</span>
+                                     （#intake-survey）へ移る（同じタブ）。
+                                     左は「受付アンケート」の文字だけ（2026-10 変更）：状態はボタンで分かるため、状態の文字・
+                                     発行日・回答日時は出さない（行を短くし、トレーニーの情報の邪魔をしないため。日付は S-0309 で
+                                     確かめる）。読み上げでどのトレーニーの操作かが分かるよう、行を role="group" にして
+                                     「{表示名}の受付アンケート」の名前を付ける（ボタンの文字は変えない） --}}
+                                <div class="border-top mt-2 pt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 small"
+                                     role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
+                                    <span>受付アンケート</span>
                                     <div class="d-flex flex-wrap gap-2 ms-auto">
                                         @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
                                             <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
