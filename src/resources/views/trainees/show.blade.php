@@ -293,7 +293,7 @@
                                 @foreach($pdCategories as $categoryLabel)
                                     <th scope="col" class="fw-normal text-muted text-end text-nowrap">{{ $categoryLabel }}</th>
                                 @endforeach
-                                <th scope="col"><span class="visually-hidden">50問の回答</span></th>
+                                <th scope="col"><span class="visually-hidden">操作</span></th>
                             </tr>
                         </thead>
                         <tbody>

@@ -187,12 +187,12 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             '2026/03/10' => $this->expectedRow('past-2'),
             '2026/06/01' => $this->expectedRow('past-1'),
         ], $this->tableRows($card));
-        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・ボタンの列
+        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・ボタンの列（読み上げ用に「操作」）
         $this->assertSame(1, substr_count($card, '<table'));
         $this->assertStringContainsString('<div class="table-responsive position-relative">', $card);
         preg_match_all('/<th scope="col"[^>]*>(.*?)<\/th>/u', $card, $heads);
         $this->assertSame(
-            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['<span class="visually-hidden">50問の回答</span>']),
+            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['<span class="visually-hidden">操作</span>']),
             $heads[1]
         );
         // 回ごとの開閉はない
@@ -402,6 +402,8 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $html = $this->page();
         $card = $this->card($html);
 
+        // 最後の列の読み上げ用の見出しは、管理者でも「操作」（管理者でないときは上の表のテストで確かめる）
+        $this->assertStringContainsString('<th scope="col"><span class="visually-hidden">操作</span></th>', $card);
         // 行の［削除］：［50問の回答］の右・白抜きの赤・読み上げ用の aria-label・その行のモーダルを開く
         $this->assertSame(2, substr_count($card, 'btn-outline-danger'));
         foreach ([[$old, '2026/03/10'], [$new, '2026/06/01']] as [$result, $date]) {
