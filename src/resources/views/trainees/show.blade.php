@@ -74,16 +74,18 @@
          並びの高さはこのカードで決まり、計測値のカードはこの高さにそろえて一覧を中でスクロールする
          （app.scss の .trainee-measurements-scroll）。それより狭いときは今までどおり縦に積む。 --}}
     <div class="row g-3 mb-3" data-trainee-photo-measurements>
-        <div class="col-12 col-xl-7">
+        <div class="col-12 col-xl-8">
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
-                        {{-- 左：トレーニー写真（180px 四方、縦横比を保つ）。
+                        {{-- 左：トレーニー写真（縦横比を保つ）。大きさは app.scss の .trainee-show-photo（2026-10 変更：
+                             sm 以上はグラフと同じ 280px 四方、写真の下にグラフを置くスマホの幅〔sm 未満〕は今までどおり 180px 四方。
+                             当初はどの幅でも 180px 四方のインライン style。会員側〔client.scss〕とは共有しない）。
                              トレーナー側は登録・変更・削除の操作を置かない（要件定義書
                              6-15-15 は会員の機能）。クリックしても何も起きない静的な枠にする。 --}}
                         <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
-                            <div class="d-flex align-items-center justify-content-center"
-                                 style="width: 180px; height: 180px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
+                            <div class="trainee-show-photo d-flex align-items-center justify-content-center"
+                                 style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
                                 @if($weightChart['photoUrl'])
                                     {{-- object-fit: contain で枠を超えず、余白は白で埋まる（切り抜かない）。
                                          会員側 S-1402 と同じ扱い。 --}}
@@ -104,9 +106,9 @@
                             @if(empty($weightChart['datasets']))
                                 {{-- 計測値 0 件（会員側と同じ扱い）。空のグラフを描くと意味のない
                                      目盛りが出て不具合に見えるため、canvas を出さず案内文を表示する。
-                                     高さは通常のグラフ（180px）と揃える。 --}}
+                                     高さは通常のグラフ（280px）と揃える。 --}}
                                 <div class="d-flex align-items-center justify-content-center text-muted"
-                                     style="height: 180px;">
+                                     style="height: 280px;">
                                     まだ計測値がありません。
                                 </div>
                             @else
@@ -114,7 +116,9 @@
                                      線の色：--c-brand-bright は client.scss にしか定義がなく、
                                      トレーナー側は measurement-chart.js のフォールバック #2A4A94
                                      （$brand-bright と同色）が使われる。 --}}
-                                <div style="position: relative; height: 180px;">
+                                {{-- グラフの高さは 280px（2026-10 変更：当初は会員側と同じ 180px。左のカードを高くして、
+                                     横に並べた計測値のカードで計測値が 5〜6 件見えるようにするため。Chart.js の設定は変えない） --}}
+                                <div style="position: relative; height: 280px;" data-trainee-weight-chart>
                                     <canvas data-measurement-chart="{{ json_encode([
                                         'datasets' => $weightChart['datasets'],
                                     ], JSON_UNESCAPED_UNICODE) }}"></canvas>
@@ -135,7 +139,7 @@
                決めないようにする（残りの高さを埋めて、中でスクロールする）
              - それより狭いとき（縦に積むとき）：一覧の枠に最大の高さ（約 10 件分）を決め、超えたら中でスクロールする
              - 列の見出し（計測日など）は、スクロールしても上に残す（position: sticky） --}}
-        <div class="col-12 col-xl-5">
+        <div class="col-12 col-xl-4">
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">計測値（{{ $measurementCount }}件）</h6>

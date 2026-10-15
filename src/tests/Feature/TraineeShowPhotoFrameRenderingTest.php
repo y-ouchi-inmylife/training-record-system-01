@@ -12,7 +12,8 @@ use Tests\TestCase;
  * 2026-10 追加：会員側 S-1402 の写真枠は、スマホで幅いっぱいに広げるため
  * `.c-trainee-photo-col` / `.c-trainee-photo-frame` を付けるようにした
  * （SCSS のメディアクエリで切り替え）。トレーナー側 S-0309 の写真枠
- * （180px 四方のままにする）には、同クラスが付かないことを確かめる。
+ * （app.scss の .trainee-show-photo。2026-10 変更で sm 以上 280px 四方・スマホ 180px 四方）には、
+ * 同クラスが付かないことを確かめる。
  *
  * クラスが付いてしまうと `client.scss` 側のメディアクエリに引っかかって
  * スマホで枠が広がる可能性があるが、トレーナー側は `app.scss` を使うため
@@ -80,18 +81,39 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
         $this->assertStringNotContainsString('c-trainee-photo-frame', $html);
         $this->assertStringNotContainsString('c-trainee-photo-col', $html);
 
-        // トレーナー側は従前どおり 180px 四方のインライン style を使っていること
-        // （写真なし時は「写真なし」のプレースホルダ枠）
-        $this->assertStringContainsString('width: 180px; height: 180px;', $html);
-        $this->assertStringContainsString('写真なし', $html);
+        // トレーナー側は app.scss の .trainee-show-photo で大きさを決める（2026-10 変更：当初は 180px 四方の
+        // インライン style）。写真なし時も同じ枠に「写真なし」のプレースホルダ
+        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<span class="text-muted" style="font-size: 0.875rem;">写真なし<\/span>/u', $html);
+        $this->assertStringNotContainsString('width: 180px; height: 180px;', $html);
     }
 
-    public function test_写真ありでもトレーナー側は180pxの固定サイズのまま(): void
+    public function test_写真ありでも写真なしと同じ固定サイズの枠(): void
     {
         $html = $this->renderTraineeShow(photoUrl: 'https://example.com/photo.jpg');
 
         $this->assertStringNotContainsString('c-trainee-photo-frame', $html);
         $this->assertStringNotContainsString('c-trainee-photo-col', $html);
-        $this->assertStringContainsString('width: 180px; height: 180px;', $html);
+        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<img src="https:\/\/example.com\/photo.jpg"/u', $html);
+    }
+
+    public function test_写真の枠の大きさはsm以上280pxでスマホは180px(): void
+    {
+        $scss = file_get_contents(resource_path('sass/app.scss'));
+
+        $this->assertMatchesRegularExpression(
+            '/\.trainee-show-photo \{\s*width: 180px;\s*height: 180px;\s*@include media-breakpoint-up\(sm\) \{\s*width: 280px;\s*height: 280px;\s*\}\s*\}/u',
+            $scss
+        );
+    }
+
+    public function test_会員側の写真の枠とグラフの大きさは変えない(): void
+    {
+        // 会員側 S-1402 は client.scss の .c-trainee-photo-frame（180px 四方）とグラフの高さ 180px のまま
+        $clientScss = file_get_contents(resource_path('sass/client.scss'));
+        $this->assertMatchesRegularExpression('/\.c-trainee-photo-frame \{\s*width: 180px;\s*height: 180px;/u', $clientScss);
+        $this->assertStringContainsString("\$weightChartHeight = '180px';", file_get_contents(resource_path('views/client/dashboard.blade.php')));
+        // トレーナー側のクラスは会員側に出さない
+        $this->assertDoesNotMatchRegularExpression('/\.trainee-show-photo\s*\{/u', $clientScss);
+        $this->assertStringNotContainsString('trainee-show-photo', file_get_contents(resource_path('views/client/dashboard.blade.php')));
     }
 }
