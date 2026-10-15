@@ -85,7 +85,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         return route('client-portal.intake-survey.show', ['token' => self::TOKEN]);
     }
 
-    public function test_有効な案内があるとき_見出し_名前_QR_URL_手順_1回かぎり_戻る_文面をコピー(): void
+    public function test_有効な案内があるとき_見出し_名前_QR_URL_手順_1回かぎり_閉じる_文面をコピー(): void
     {
         $this->issueToken();
         $url = $this->surveyUrl();
@@ -108,7 +108,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertStringNotContainsString('<p class="print-expiry-date">', $html);
         // 戻り先は会員詳細。操作エリアは印刷では出さない
         $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
-        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>', $html);
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
         // 文面をコピー（S-0307 と共用の copy-message.js）と QR の JS
         $this->assertMatchesRegularExpression('/<button type="button"\\s+class="btn btn-outline-primary btn-sm"\\s+data-copy-message\\s+data-copy-text="[^"]*">文面をコピー<\\/button>/u', $html);
         $this->assertStringContainsString('copy-message', $html);
@@ -186,7 +186,9 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertStringNotContainsString('<div class="print-url">', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
         $this->assertStringNotContainsString('発行', $html);
-        $this->assertStringContainsString('&laquo; 戻る</a>', $html);
+        // ［閉じる］は出す（会員詳細へのリンクと目印。2026-10 変更。前の「« 戻る」は出さない）
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
+        $this->assertStringNotContainsString('戻る</a>', $html);
     }
 
     public function test_回答済みの案内しかなければ有効な案内がないとして扱う(): void

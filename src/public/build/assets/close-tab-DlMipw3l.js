@@ -1,0 +1,1 @@
+function i(n,{win:t,setTimer:d=(e,o)=>setTimeout(e,o),fallbackMs:c=500}){for(const e of n)e.addEventListener("click",o=>{o.preventDefault(),t.close(),d(()=>{t.closed||(t.location.href=e.href)},c)})}typeof document<"u"&&document.addEventListener("DOMContentLoaded",()=>{i(document.querySelectorAll("a[data-close-tab]"),{win:window})});

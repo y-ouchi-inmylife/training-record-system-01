@@ -127,14 +127,16 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
     }
 
-    public function test_S0311の戻るは会員詳細へのリンク(): void
+    public function test_S0311の閉じるは会員詳細へのリンクで目印がある(): void
     {
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee));
 
         $html = $this->get(route('trainee-intake-survey-tokens.print', $this->trainee))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<a href="'.route('clients.show', 7).'" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>', $html);
+        $this->assertStringContainsString('<a href="'.route('clients.show', 7).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
         $this->assertStringNotContainsString('history.back', $html);
+        $this->assertStringNotContainsString('&laquo; 戻る', $html);
+        $this->assertStringContainsString('close-tab', $html);
     }
 
     public function test_回答済みなら409で作らない(): void

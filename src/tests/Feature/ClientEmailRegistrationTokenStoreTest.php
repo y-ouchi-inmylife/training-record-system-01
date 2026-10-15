@@ -137,13 +137,15 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
         $this->assertNotSame('expired-token-0000', $tokens[1]);
     }
 
-    public function test_S0307の戻るは会員詳細へのリンク(): void
+    public function test_S0307の閉じるは会員詳細へのリンクで目印がある(): void
     {
         $this->post(route('client-email-registration-tokens.store', $this->client));
 
         $html = $this->get(route('client-email-registration-tokens.print', $this->client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">&laquo; 戻る</a>', $html);
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
         $this->assertStringNotContainsString('history.back', $html);
+        $this->assertStringNotContainsString('&laquo; 戻る', $html);
+        $this->assertStringContainsString('close-tab', $html);
     }
 }

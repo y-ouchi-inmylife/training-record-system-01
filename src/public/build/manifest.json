@@ -30,6 +30,12 @@
       "_bootstrap.esm-CiZvvyki.js"
     ]
   },
+  "resources/js/close-tab.js": {
+    "file": "assets/close-tab-DlMipw3l.js",
+    "name": "close-tab",
+    "src": "resources/js/close-tab.js",
+    "isEntry": true
+  },
   "resources/js/copy-message.js": {
     "file": "assets/copy-message-CQBA5I39.js",
     "name": "copy-message",
