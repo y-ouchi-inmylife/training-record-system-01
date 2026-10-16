@@ -13,7 +13,8 @@ describe('性格診断のレーダーチャートの共有（トレーナー側�
         const entry = read('../../resources/js/personality-radar.js');
 
         expect(entry).toMatch(/import \{ buildRadarConfig, legendItems, legendSwatchSvg \} from '\.\/personality-radar-config';/);
-        expect(entry).toContain('new Chart(canvas, buildRadarConfig(data))');
+        // data-personality-radar-compact が付いた canvas（会員側）だけ、小さなグラフの設定にする（2026-10 追加）
+        expect(entry).toContain("new Chart(canvas, buildRadarConfig(data, { compact: 'personalityRadarCompact' in canvas.dataset }))");
         // canvas の data-personality-radar と、凡例の枠 data-personality-radar-legend="{canvas の id}" で見つける（画面に依らない）
         expect(entry).toContain("document.querySelectorAll('canvas[data-personality-radar]')");
         expect(entry).toContain('[data-personality-radar-legend="${canvas.id}"]');
@@ -47,5 +48,41 @@ describe('性格診断のレーダーチャートの共有（トレーナー側�
         expect(config.data.datasets.map((d) => d.label)).toEqual(['今回（2026/06/01）', '前回（2026/03/10）', '初回（2025/12/01）']);
         expect(legendItems(data).map((i) => i.label)).toEqual(config.data.datasets.map((d) => d.label));
         legendItems(data).forEach((item) => expect(legendSwatchSvg(item)).not.toContain('<rect'));
+    });
+
+    it('compact の設定（会員側）は、枠の高さいっぱいに描き文字を小さくする。トレーナー側（指定なし）は今までどおり', () => {
+        const data = {
+            labels: ['対人', '対犬', '所有欲', '分離不安', '恐怖心', '訓練性能', '興奮性'],
+            series: [{ key: 'current', date: '2026/06/01', values: ['2.0', '1.9', '1.0', '1.4', '2.7', '0.9', '1.0'] }],
+        };
+        const trainer = buildRadarConfig(data);
+        const client = buildRadarConfig(data, { compact: true });
+
+        // トレーナー側：今までと同じ（正方形の枠・Chart.js の既定の文字の大きさ・余白）
+        expect(trainer.options.maintainAspectRatio).toBe(true);
+        expect(trainer.options.layout).toBeUndefined();
+        expect(trainer.options.scales.r.pointLabels).toBeUndefined();
+        expect(trainer.options.scales.r.ticks).toEqual({ stepSize: 1 });
+        expect(buildRadarConfig(data, { compact: false })).toEqual(trainer);
+        expect(buildRadarConfig(data, {})).toEqual(trainer);
+
+        // 会員側：枠の高さいっぱい・項目名 11px・目盛り 9px・余白なし。データと色・線の形は同じ
+        expect(client.options.maintainAspectRatio).toBe(false);
+        expect(client.options.layout).toEqual({ padding: 0 });
+        expect(client.options.scales.r.pointLabels.font.size).toBe(11);
+        expect(client.options.scales.r.ticks.font.size).toBe(9);
+        expect(client.options.scales.r.ticks.stepSize).toBe(1);
+        expect(client.options.scales.r.min).toBe(0);
+        expect(client.options.scales.r.max).toBe(4);
+        expect(client.data).toEqual(trainer.data);
+        expect(client.options.plugins).toEqual(trainer.options.plugins);
+    });
+
+    it('トレーナー側のビューの canvas には compact の印を付けない', () => {
+        const trainerView = read('../../resources/views/trainees/show.blade.php');
+        const clientView = read('../../resources/views/client/dashboard.blade.php');
+
+        expect(trainerView).not.toContain('data-personality-radar-compact');
+        expect(clientView).toContain('data-personality-radar-compact');
     });
 });

@@ -43,9 +43,13 @@ export const SERIES_STYLES = {
  * @param {{labels: string[], series: {key: 'current'|'previous'|'initial', date: string, values: string[]}[]}} data
  *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、series は重ねる回。date は回答日 Y/m/d、
  *   values は表示の値）
+ * @param {{compact?: boolean}} [options]
+ *   compact：会員側のマイページ（S-1402）の小さなグラフ用（2026-10 追加）。枠の縦横比に合わせず（maintainAspectRatio: false）、
+ *   枠の高さいっぱいに描き、項目名と目盛りの文字を小さくし、周りの余白をなくす。指定しなければ（トレーナー側 S-0309）
+ *   今までと同じ設定を返す（トレーナー側の見た目を変えないため）
  * @returns {object} Chart.js の設定（type・data・options）
  */
-export function buildRadarConfig(data) {
+export function buildRadarConfig(data, { compact = false } = {}) {
     const datasets = data.series.map((series) => {
         const style = SERIES_STYLES[series.key];
 
@@ -61,7 +65,7 @@ export function buildRadarConfig(data) {
         };
     });
 
-    return {
+    const config = {
         type: 'radar',
         data: {
             labels: data.labels,
@@ -85,7 +89,22 @@ export function buildRadarConfig(data) {
             },
         },
     };
+
+    if (compact) {
+        // 正方形の枠だと、項目名が左右に張り出す分だけグラフが小さくなり、上下に空きが残る。
+        // 枠（横長）の高さいっぱいに描き、文字を小さくして項目名が欠けないようにする
+        config.options.maintainAspectRatio = false;
+        config.options.layout = { padding: 0 };
+        config.options.scales.r.pointLabels = { font: { size: COMPACT_POINT_LABEL_SIZE }, padding: 4 };
+        config.options.scales.r.ticks = { stepSize: 1, font: { size: COMPACT_TICK_SIZE }, backdropPadding: 1 };
+    }
+
+    return config;
 }
+
+/** 会員側の小さなグラフ（compact）の項目名と目盛りの文字の大きさ（px）。トレーナー側は Chart.js の既定（12px） */
+export const COMPACT_POINT_LABEL_SIZE = 11;
+export const COMPACT_TICK_SIZE = 9;
 
 /**
  * 凡例の文（「今回（2026/06/01）」など）

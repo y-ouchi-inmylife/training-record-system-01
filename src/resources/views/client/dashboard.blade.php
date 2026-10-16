@@ -7,6 +7,9 @@
     // 体重推移グラフ 1 枚あたりの高さ（暫定値）。値をここで一元管理し、
     // 各 canvas の親要素のインラインスタイルで使い回す。
     $weightChartHeight = '180px';
+    // 性格診断の結果がある愛犬の体重推移グラフの高さ（2026-10 追加）。横に並べた性格診断（約 300px）との
+    // 下の空きを小さくするため、少し高くする。結果がない愛犬は今までどおり $weightChartHeight
+    $weightChartHeightWithPersonality = '240px';
 @endphp
 
 @section('content')
@@ -40,6 +43,8 @@
                     // 共通の部品 <x-form-error> は共有のエラーバッグを見るため、ここで囲まないと
                     // 他のトレーニーのカードにもエラーが出てしまう（設計書 S-1402「バリデーションチェック」）。
                     $shouldShowPhotoError = $errors->any() && (int) old('_trainee_id') === (int) $chart['id'];
+                    // 体重推移グラフ（と計測値 0 件の案内）の高さ。性格診断の結果があるときだけ高くする（2026-10 追加）
+                    $chartHeight = ($chart['personality'] ?? null) ? $weightChartHeightWithPersonality : $weightChartHeight;
                 @endphp
                 <article class="c-session" style="margin-bottom: 1rem;">
                     <div class="c-session-body">
@@ -176,14 +181,14 @@
                                                      `datasets` の空判定に切り替えた（2026-09 変更。詳細は
                                                      screen-design.md S-1402「体重推移」設計方針参照）。 --}}
                                                 <div class="d-flex align-items-center justify-content-center text-muted"
-                                                     style="height: {{ $weightChartHeight }};">
+                                                     style="height: {{ $chartHeight }};">
                                                     まだ計測値がありません。
                                                 </div>
                                             @else
                                                 {{-- data-measurement-chart は datasets のみを渡す（2026-09 変更。
                                                      時間軸化で labels / tooltips の別配列は廃止し、Chart.js は
                                                      各点の {x, y} オブジェクトから軸・ツールチップを組み立てる）。 --}}
-                                                <div style="position: relative; height: {{ $weightChartHeight }};">
+                                                <div style="position: relative; height: {{ $chartHeight }};">
                                                     <canvas data-measurement-chart="{{ json_encode([
                                                         'datasets' => $chart['datasets'],
                                                     ], JSON_UNESCAPED_UNICODE) }}"></canvas>
@@ -201,16 +206,21 @@
                                            （点数は出さないものなので読み上げにも出さない。タイプは上の文字で読まれる）
                                          - 出さないもの：点数の表・50 問の回答・［回答］［削除］・案内の発行と取消 --}}
                                     <div class="col-12 col-lg-4" data-client-personality-diagnosis>
-                                        <p class="eyebrow mb-1 text-center text-lg-start">性格診断</p>
-                                        <p class="mb-2 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>{!! collect(explode('・', $chart['personality']['type']))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
-                                        <div class="mx-auto" style="max-width: 320px;">
+                                        {{-- 2026-10 変更：カードを低くするため詰めた（小見出しとタイプの間・タイプとグラフの間の余白をなくし、
+                                             グラフを小さく〔.c-personality-radar。compact の設定〕、凡例の文字を小さくした〔.c-personality-legend〕） --}}
+                                        <p class="eyebrow mb-0 text-center text-lg-start">性格診断</p>
+                                        <p class="mb-1 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>{!! collect(explode('・', $chart['personality']['type']))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
+                                        {{-- グラフの枠は横長（.c-personality-radar。client.scss）。data-personality-radar-compact で、枠の高さいっぱいに
+                                             描き、項目名と目盛りの文字を小さくする（personality-radar-config.js の compact。トレーナー側には付けない） --}}
+                                        <div class="c-personality-radar mx-auto">
                                             <canvas id="personality-radar-{{ $chart['id'] }}" role="img" aria-label="{{ $chart['callName'] }}の性格診断のグラフ"
-                                                    data-personality-radar="{{ json_encode($chart['personality']['radar'], JSON_UNESCAPED_UNICODE) }}"></canvas>
+                                                    data-personality-radar="{{ json_encode($chart['personality']['radar'], JSON_UNESCAPED_UNICODE) }}"
+                                                    data-personality-radar-compact></canvas>
                                         </div>
                                         {{-- 凡例（トレーナー側と同じく、項目と線の見本は personality-radar.js が SERIES_STYLES から作る）。
                                              横に並べたとき（lg 以上）は列が狭いので縦に並べ、それより狭いときは 1 行（収まらなければ折り返す） --}}
-                                        <div class="d-flex justify-content-center mt-2">
-                                            <ul class="list-unstyled d-flex flex-wrap flex-lg-column align-items-lg-start justify-content-center column-gap-3 row-gap-1 small mb-0"
+                                        <div class="d-flex justify-content-center mt-1">
+                                            <ul class="c-personality-legend list-unstyled d-flex flex-wrap flex-lg-column align-items-lg-start justify-content-center column-gap-3 row-gap-0 mb-0"
                                                 data-personality-radar-legend="personality-radar-{{ $chart['id'] }}"></ul>
                                         </div>
                                     </div>

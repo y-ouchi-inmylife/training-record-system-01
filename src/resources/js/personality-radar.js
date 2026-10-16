@@ -42,7 +42,8 @@ function renderLegend(container, data) {
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('canvas[data-personality-radar]').forEach((canvas) => {
         const data = JSON.parse(canvas.dataset.personalityRadar);
-        new Chart(canvas, buildRadarConfig(data));
+        // data-personality-radar-compact：会員側のマイページの小さなグラフ（2026-10 追加）。トレーナー側には付けない
+        new Chart(canvas, buildRadarConfig(data, { compact: 'personalityRadarCompact' in canvas.dataset }));
         const legend = document.querySelector(`[data-personality-radar-legend="${canvas.id}"]`);
         if (legend) {
             renderLegend(legend, data);

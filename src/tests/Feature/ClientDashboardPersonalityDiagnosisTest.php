@@ -159,15 +159,16 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         $card = $this->cardRow($html, 'モモちゃん');
 
         // 小見出しと最新のタイプ（「・」のあとでだけ折り返す）
-        $this->assertStringContainsString('<p class="eyebrow mb-1 text-center text-lg-start">性格診断</p>', $card);
+        // 2026-10 変更：カードを低くするため、小見出しとタイプの間・タイプとグラフの間を詰めた
+        $this->assertStringContainsString('<p class="eyebrow mb-0 text-center text-lg-start">性格診断</p>', $card);
         $this->assertStringContainsString(
-            '<p class="mb-2 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>愛情たっぷり・<wbr>甘えん坊タイプ</p>',
+            '<p class="mb-1 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>愛情たっぷり・<wbr>甘えん坊タイプ</p>',
             $card
         );
         $this->assertStringNotContainsString('慎重派', $card);
         // レーダーチャート（読み上げは点数を言わない）と凡例の枠。id はトレーニーごと
         $this->assertMatchesRegularExpression(
-            '/<canvas id="personality-radar-'.$id.'" role="img" aria-label="モモちゃんの性格診断のグラフ"\s*data-personality-radar="/u',
+            '/<canvas id="personality-radar-'.$id.'" role="img" aria-label="モモちゃんの性格診断のグラフ"\s*data-personality-radar="[^"]*"\s*data-personality-radar-compact><\/canvas>/u',
             $card
         );
         $this->assertStringContainsString('data-personality-radar-legend="personality-radar-'.$id.'"', $card);
@@ -264,12 +265,44 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         // 並びは 写真 → 体重のグラフ → 性格診断
         $this->assertLessThan(strpos($card, 'data-measurement-chart'), strpos($card, 'c-trainee-photo-frame'));
         $this->assertLessThan(strpos($card, 'data-client-personality-diagnosis'), strpos($card, 'data-measurement-chart'));
-        // レーダーの大きさは最大 320px。凡例は横に並べたとき縦に、それより狭いときは 1 行
-        $this->assertStringContainsString('<div class="mx-auto" style="max-width: 320px;">', $card);
-        $this->assertStringContainsString('<ul class="list-unstyled d-flex flex-wrap flex-lg-column align-items-lg-start justify-content-center column-gap-3 row-gap-1 small mb-0"', $card);
-        // 写真（180px の枠のクラス）と体重のグラフの高さ（180px）は変えない
+        // レーダーは会員側の小さな枠（.c-personality-radar。横 260px・高さ 200px）で、compact の設定（2026-10 変更：当初は最大 320px の正方形）。
+        // 凡例は文字を小さく（.c-personality-legend）、横に並べたとき縦に、それより狭いときは 1 行
+        $this->assertStringContainsString('<div class="c-personality-radar mx-auto">', $card);
+        $this->assertStringNotContainsString('max-width: 320px', $card);
+        $this->assertStringContainsString('<ul class="c-personality-legend list-unstyled d-flex flex-wrap flex-lg-column align-items-lg-start justify-content-center column-gap-3 row-gap-0 mb-0"', $card);
+        // 写真（180px の枠のクラス）は変えない。結果がある愛犬の体重のグラフは 240px（下の空きを小さくするため）
         $this->assertStringContainsString('c-trainee-photo-frame', $card);
-        $this->assertStringContainsString('height: 180px;', $card);
+        $this->assertStringContainsString('<div style="position: relative; height: 240px;">', $card);
+        $this->assertStringNotContainsString('height: 180px;', $card);
+    }
+
+    public function test_結果がない愛犬の体重のグラフは今までどおり180pxで結果がある愛犬は240px(): void
+    {
+        $with = $this->trainee('モモ');
+        $this->measurement($with);
+        $this->addResult($with, 'past-1', '2026-06-01 09:00:00');
+        $without = $this->trainee('ハナ');
+        $this->measurement($without);
+        // 計測値がなく結果だけある愛犬：「まだ計測値がありません。」の枠も 240px
+        $noMeasurement = $this->trainee('ソラ');
+        $this->addResult($noMeasurement, 'past-1', '2026-06-01 09:00:00');
+
+        $html = $this->open();
+
+        $this->assertStringContainsString('<div style="position: relative; height: 240px;">', $this->cardRow($html, 'モモちゃん'));
+        $this->assertStringContainsString('<div style="position: relative; height: 180px;">', $this->cardRow($html, 'ハナちゃん'));
+        $this->assertMatchesRegularExpression('/style="height: 240px;">\s*まだ計測値がありません。/u', $this->cardRow($html, 'ソラちゃん'));
+    }
+
+    public function test_会員側の小さなグラフと凡例の大きさはclient_scssにありトレーナー側のscssにはない(): void
+    {
+        $client = file_get_contents(resource_path('sass/client.scss'));
+        $trainer = file_get_contents(resource_path('sass/app.scss'));
+
+        $this->assertMatchesRegularExpression('/\.c-personality-radar \{\s*position: relative;\s*max-width: 260px;\s*height: 200px;\s*\}/u', $client);
+        $this->assertMatchesRegularExpression('/\.c-personality-legend \{\s*font-size: 0\.75rem;\s*line-height: 1\.3;\s*\}/u', $client);
+        $this->assertStringNotContainsString('c-personality-radar', $trainer);
+        $this->assertStringNotContainsString('c-personality-legend', $trainer);
     }
 
     public function test_点数の表や回答や削除や案内の操作は出さない(): void
