@@ -62,15 +62,17 @@ describe('性格診断のレーダーチャートの HTML の凡例', () => {
         expect(config.options.plugins.legend.display).toBe(false);
     });
 
-    it('今回だけ：項目は 1 つで、見本は紺の実線と薄い塗り', () => {
+    it('今回だけ：項目は 1 つで、見本は紺の実線だけ（塗りの四角は描かない）', () => {
         const items = legendItems({ series: [CURRENT] });
 
         expect(items.map((i) => i.label)).toEqual(['今回（2026/06/01）']);
         const svg = legendSwatchSvg(items[0]);
         expect(svg).toContain('aria-hidden="true"');
         expect(svg).toContain('stroke="#0a4fa8"');
-        expect(svg).toContain('fill="rgba(10, 79, 168, 0.15)"');
         expect(svg).not.toContain('stroke-dasharray');
+        // 2026-10 変更：当初は線の下に塗りの色の四角を描いていた
+        expect(svg).not.toContain('<rect');
+        expect(svg).not.toContain('rgba(10, 79, 168, 0.15)');
     });
 
     it('今回・前回：前回の見本は灰色の破線で塗りなし', () => {
@@ -97,5 +99,30 @@ describe('性格診断のレーダーチャートの HTML の凡例', () => {
             expect(item.borderColor).toBe(datasets[i].borderColor);
             expect(item.borderDash).toEqual(datasets[i].borderDash);
         });
+    });
+
+    it('見本は今回・前回・初回のどれでも線 1 本だけで、大きさと線の位置・太さは今までどおり', () => {
+        const items = legendItems({ series: [CURRENT, PREVIOUS, INITIAL] });
+        const expected = [
+            ['#0a4fa8', ''],
+            ['#6c757d', ' stroke-dasharray="6 4"'],
+            ['#adb5bd', ' stroke-dasharray="2 3"'],
+        ];
+
+        items.forEach((item, i) => {
+            const [color, dash] = expected[i];
+            expect(legendSwatchSvg(item)).toBe(
+                '<svg width="32" height="14" viewBox="0 0 32 14" aria-hidden="true" focusable="false">'
+                + `<line x1="1" y1="7" x2="31" y2="7" stroke="${color}" stroke-width="2"${dash} /></svg>`,
+            );
+            expect(legendSwatchSvg(item)).not.toMatch(/<rect|<path|<polygon|fill=/);
+        });
+    });
+
+    it('グラフ本体の今回の塗りは今までどおり', () => {
+        const dataset = buildRadarConfig({ labels: LABELS, series: [CURRENT] }).data.datasets[0];
+
+        expect(dataset.fill).toBe(true);
+        expect(dataset.backgroundColor).toBe('rgba(10, 79, 168, 0.15)');
     });
 });

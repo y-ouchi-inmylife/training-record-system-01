@@ -819,6 +819,9 @@ class ClientCountRenderingTest extends TestCase
 
     public function test_受付アンケートが回答済みなら名前の行のまとまりを出さず性格診断の行の下に暮らしの様子のリンクを出す(): void
     {
+        // 「今日」を回答日（2026/10/16）と別の日にする（画面のほかの場所に今日の日付が出るため。今日が回答日と
+        // 同じ日だと、下の「回答日時は出さない」の確かめが、今日の日付に引っかかって失敗していた）
+        $this->travelTo(Carbon::parse('2026-10-20 10:00:00', config('app.timezone')));
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $id = $this->trainee($client, 'ポチ');

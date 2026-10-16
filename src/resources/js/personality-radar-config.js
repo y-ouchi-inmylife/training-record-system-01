@@ -117,16 +117,18 @@ export function legendItems(data) {
 }
 
 /**
- * 凡例の線の見本（幅 32・高さ 14 の小さな SVG の文字列）。グラフの線と同じ色・線の形（実線／破線／点線）にし、
- * 塗りのある回（今回）は線の下を薄く塗る。見た目の印なので aria-hidden を付ける（凡例の文は別に読み上げる）。
+ * 凡例の線の見本（幅 32・高さ 14 の小さな SVG の文字列）。グラフの線と同じ色・線の形（実線／破線／点線）の**線だけ**にする。
+ * グラフの今回の薄い塗りは、見本では表さない（2026-10 変更：当初は塗りのある回〔今回〕の線の下に、塗りの色の四角を描いていたが、
+ * 小さな四角だと青に見えず灰色の背景に見えたため。今回は太い紺の実線で見分けられる）。
+ * 線は今までどおり縦の真ん中（y=7）に引くので、文字との縦のそろいは変わらない。
+ * 見た目の印なので aria-hidden を付ける（凡例の文は別に読み上げる）。
  * 値はすべて SERIES_STYLES の決まった値で、お客様の入力を含まないので、文字列で組み立ててよい
  *
  * @param {{borderColor: string, backgroundColor: string, borderDash: number[], fill: boolean}} item
  */
 export function legendSwatchSvg(item) {
-    const fill = item.fill ? `<rect x="1" y="1" width="30" height="12" fill="${item.backgroundColor}" />` : '';
     const dash = item.borderDash.length > 0 ? ` stroke-dasharray="${item.borderDash.join(' ')}"` : '';
 
-    return `<svg width="32" height="14" viewBox="0 0 32 14" aria-hidden="true" focusable="false">${fill}`
+    return '<svg width="32" height="14" viewBox="0 0 32 14" aria-hidden="true" focusable="false">'
         + `<line x1="1" y1="7" x2="31" y2="7" stroke="${item.borderColor}" stroke-width="2"${dash} /></svg>`;
 }
