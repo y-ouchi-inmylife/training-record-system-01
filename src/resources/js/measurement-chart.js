@@ -30,6 +30,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { format, addDays, parseISO } from 'date-fns';
+import { measurementTickLabel } from './measurement-chart-ticks';
 
 Chart.register(
     LineController,
@@ -172,7 +173,7 @@ function renderChart(canvas, data) {
                         // でも時刻分だけ横に離れて表示される。
                         //
                         // **displayFormats.day は指定しない**：下の ticks.callback で
-                        // 描画書式を配列で返しており、`callback` を指定すると `displayFormats`
+                        // 描画書式（M/d の文字列）を返しており、`callback` を指定すると `displayFormats`
                         // は Chart.js 内部で無視される仕様のため。残しておくと「使われている」
                         // と誤解を招くので削除した（設計書「横軸ラベルを 2 行にした経緯」参照）。
                         unit: 'day',
@@ -181,40 +182,13 @@ function renderChart(canvas, data) {
                         // 目盛りが密なときは自動で間引く。ラベルは回転させない。
                         autoSkip: true,
                         maxRotation: 0,
-                        // 日付と時刻を 2 行に分けて表示する（設計書 S-1402「横軸ラベルを
-                        // 2 行にした経緯」参照）。当初は displayFormats.day を「M/d H:mm」に
-                        // して 1 行で「9/15 0:00」を出していたが、ラベルが横に長く読みにくかった
-                        // ため、日付（M/d）と時刻（H:mm）で改行する形にした。Chart.js は
-                        // callback から配列を返すと各要素を別の行として描画する。
-                        //
-                        // 書式は date-fns の format を直接使う：既に chartjs-adapter-date-fns
-                        // 経由で date-fns が入っており、アダプタと同じ書式トークンで表記を
-                        // 揃えられるため（素の Date.toLocaleString より意図が明確）。
-                        // `value` はタイムスタンプ（ミリ秒）で渡ってくる Chart.js の仕様。
-                        //
-                        // ツールチップには影響しない：`tooltipFormat: 'yyyy/M/d HH:mm'` は
-                        // 別系統で有効なままで、ツールチップは「2026/9/15 08:00」の 1 行表示。
-                        //
-                        // **時刻の 2 行目は最初の目盛り（index === 0）のみに出す**：全目盛りに
-                        // 「0:00」が並ぶと目立ちすぎるため、日付を読むときのノイズを減らす。
-                        // 「目盛りが 1 日の始まりを指す」ことは左端で 1 回示せば伝わる。
-                        // 他の目盛りは日付だけ（1 要素の配列 `['9/15']`）で、文字列ではなく
-                        // 配列で返す理由は縦位置を統一するため：Chart.js の縦位置計算は
-                        // 軸領域全体の行数と各 tick 自身の行数で分岐がある場合があり、
-                        // 配列で明示することで先頭ティックと他ティックの日付ラベルの縦位置が
-                        // 揃う。
-                        // autoSkip との関係：callback は tick 生成直後（autoSkip 前）に全 tick
-                        // に対して呼ばれ、`index` は生成された全 tick 配列における通し番号な
-                        // ので autoSkip の影響を受けない。autoSkip はレンダリング時に一部の
-                        // tick を非表示にするが、**最初と最後の tick は原則保持**されるため、
-                        // 日数が多くても左端の時刻ラベルは表示され続ける。
-                        callback(value, index) {
-                            const d = new Date(value);
-                            const dateLabel = format(d, 'M/d');
-                            if (index === 0) {
-                                return [dateLabel, format(d, 'H:mm')];
-                            }
-                            return [dateLabel];
+                        // 目盛りの文字は、最初の目盛りも含めてすべて日付だけ（「9/15」。measurement-chart-ticks.js）。
+                        // 2026-10 変更：当初は最初の目盛りだけ 2 行目に時刻（「0:00」）を出していた（設計書 S-1402
+                        // 「横軸ラベルを 2 行にした経緯」）。ユーザーレビューで、すべての目盛りを日付だけにそろえた。
+                        // ツールチップには影響しない（`tooltipFormat: 'yyyy/M/d HH:mm'` は別系統で、「2026/9/15 08:00」のまま）。
+                        // callback を指定すると time.displayFormats は使われない仕様のため、displayFormats は指定しない
+                        callback(value) {
+                            return measurementTickLabel(value);
                         },
                     },
                 },
