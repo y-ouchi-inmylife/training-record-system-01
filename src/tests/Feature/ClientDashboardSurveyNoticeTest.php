@@ -113,13 +113,14 @@ class ClientDashboardSurveyNoticeTest extends TestCase
             ->get(route('client-portal.dashboard'))->assertOk()->getContent();
     }
 
-    /** 愛犬 1 頭分のカード（名前の見出しから、カードの終わりまで） */
+    /** 愛犬 1 頭分のカード（カード〔article〕の始まりから終わりまで。お知らせは名前の見出しより前にあるため） */
     private function card(string $html, string $callName): string
     {
-        $start = strpos($html, '>'.$callName.'</h2>');
-        $this->assertNotFalse($start, $callName.' のカードがない');
+        $heading = strpos($html, '>'.$callName.'</h2>');
+        $this->assertNotFalse($heading, $callName.' のカードがない');
+        $start = strrpos(substr($html, 0, $heading), '<article');
 
-        return substr($html, $start, strpos($html, '</article>', $start) - $start);
+        return substr($html, $start, strpos($html, '</article>', $heading) - $start);
     }
 
     private function noticeKinds(string $card): array
@@ -165,7 +166,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         );
     }
 
-    public function test_両方が回答待ちなら受付アンケートから性格診断の順で名前の行のすぐ下(): void
+    public function test_両方が回答待ちなら受付アンケートから性格診断の順でカードのいちばん上(): void
     {
         $id = $this->trainee('モモ');
         $this->measurement($id);
@@ -175,9 +176,14 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $card = $this->card($this->open(), 'モモちゃん');
 
         $this->assertSame(['intake', 'personality'], $this->noticeKinds($card));
-        // 名前の行のすぐ下、写真・体重のグラフの段の上
-        $this->assertMatchesRegularExpression('/^>モモちゃん<\/h2>\s*(?:\{\{--.*?--\}\}\s*)?<div class="d-flex flex-column gap-2 mb-2" data-client-survey-notices>/us', $card);
-        $this->assertLessThan(strpos($card, 'data-trainee-card-row'), strpos($card, 'data-client-survey-notices'));
+        // カードの中のいちばん上（名前の行の上）。2026-10 変更：当初は名前の行のすぐ下（タイプとレーダーが離れるため移した）
+        $this->assertMatchesRegularExpression(
+            '/<div class="c-session-content">\s*<div class="d-flex flex-column gap-2 mb-2" data-client-survey-notices>/u',
+            $card
+        );
+        $this->assertLessThan(strpos($card, '>モモちゃん</h2>'), strpos($card, 'data-client-survey-notices'));
+        // 名前の見出しのあとは、すぐ写真・体重のグラフの段（お知らせが間に入らない）
+        $this->assertMatchesRegularExpression('/>モモちゃん<\/h2>\s*(?:\{\{--.*?--\}\}\s*)*<div class="row g-3 align-items-start" data-trainee-card-row>/us', $card);
     }
 
     public function test_回答済みや取消済みの案内では出さない(): void
@@ -229,7 +235,8 @@ class ClientDashboardSurveyNoticeTest extends TestCase
 
         $this->assertStringNotContainsString('data-client-survey-notice', $card);
         $this->assertStringNotContainsString('回答する', $card);
-        $this->assertMatchesRegularExpression('/^>モモちゃん<\/h2>\s*(?:\{\{--.*?--\}\}\s*)*<div class="row g-3 align-items-start" data-trainee-card-row>/us', $card);
+        // カードのいちばん上は今までどおり名前の見出し、そのあとすぐ写真・体重のグラフの段
+        $this->assertMatchesRegularExpression('/<div class="c-session-content">\s*<h2 class="mb-2" style="font-size: 1\.1rem;">モモちゃん<\/h2>\s*<div class="row g-3 align-items-start" data-trainee-card-row>/u', $card);
     }
 
     public function test_案内の読み込みはトレーニーの数で増えない(): void

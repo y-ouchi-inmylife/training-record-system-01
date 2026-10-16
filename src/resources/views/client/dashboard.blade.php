@@ -54,6 +54,17 @@
                 <article class="c-session" style="margin-bottom: 1rem;">
                     <div class="c-session-body">
                         <div class="c-session-content">
+                            {{-- 回答待ちの案内のお知らせ（受付アンケート・性格診断。2026-10 追加）。カードの中のいちばん上（名前の行の上）。
+                                 ページの上にまとめず、愛犬のカードの中に置く（名前が未登録・複数頭のときに、どの愛犬の案内か分かるように）。
+                                 2026-10 変更：当初は名前の行のすぐ下に置いていたが、名前の行の右の「性格診断：{タイプ}」と、その下の
+                                 レーダーが離れてしまうため、名前の行の上に移した。名前の行との間は、下の余白（mb-2）と
+                                 .c-session-content の gap で約 20px（移す前の「名前とお知らせの間」と同じ）。お知らせがないカードは変わらない --}}
+                            @if(! empty($chart['surveyNotices'] ?? []))
+                                <div class="d-flex flex-column gap-2 mb-2" data-client-survey-notices>
+                                    @include('client._survey-notices', ['notices' => $chart['surveyNotices']])
+                                </div>
+                            @endif
+
                             {{-- 呼び名は「モモちゃん」、名前が未登録なら「愛犬」（「ちゃん」を付けない）。
                                  Trainee::client_call_name（weight_chart_data の callName）。2026-10 変更 --}}
                             {{-- 性格診断の結果があるときは、名前の行を下の段と同じ 8：4 に分け、lg 以上だけ右の列（レーダーの真上）に
@@ -72,14 +83,6 @@
                                 </div>
                             @else
                                 <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
-                            @endif
-
-                            {{-- 回答待ちの案内のお知らせ（受付アンケート・性格診断。2026-10 追加）。名前の行のすぐ下、写真・体重のグラフの段の上。
-                                 ページの上にまとめず、愛犬のカードの中に置く（名前が未登録・複数頭のときに、どの愛犬の案内か分かるように） --}}
-                            @if(! empty($chart['surveyNotices'] ?? []))
-                                <div class="d-flex flex-column gap-2 mb-2" data-client-survey-notices>
-                                    @include('client._survey-notices', ['notices' => $chart['surveyNotices']])
-                                </div>
                             @endif
 
                             {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7
