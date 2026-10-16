@@ -227,12 +227,13 @@
                 <div class="row gy-3 align-items-start" data-personality-diagnosis-layout>
                     <div class="col-12 col-xl-4">
                         {{-- レーダーチャート（1 つ。今回・前回・初回を重ねる）。グラフは見た目のためのもので、同じ数字を下の表に出すので、
-                             読み上げは role="img" と短い説明だけ。最大 420px（横に並べたときも左の列に収まる） --}}
-                        <div class="mx-auto" style="max-width: 420px;">
+                             読み上げは role="img" と短い説明だけ。最大 300px の正方形（trainee-personality-radar。列の中で中央。
+                             2026-10 変更：当初は最大 420px で、欄が縦に長くなっていた）。文字は Chart.js の標準のまま（会員側の compact は使わない） --}}
+                        <div class="trainee-personality-radar mx-auto">
                             <canvas id="personality-diagnosis-radar" role="img" aria-label="レーダーチャート（点数は表のとおり）"
                                     data-personality-radar="{{ json_encode($pdRadarData, JSON_UNESCAPED_UNICODE) }}"></canvas>
                         </div>
-                        {{-- 凡例（2026-10 変更：Chart.js の凡例はグラフの枠〔最大 420px〕の中に描かれて 2 行に折り返すため、グラフの下に
+                        {{-- 凡例（2026-10 変更：Chart.js の凡例はグラフの枠の中に描かれて 2 行に折り返すため、グラフの下に
                              HTML の凡例にした）。項目と線の見本は personality-radar.js が、グラフと同じ値（SERIES_STYLES）から作る。
                              並べ方だけ画面の幅で切り替える（クラスだけ。JS では切り替えない）：グラフが上・表が下のときは 1 行
                              （スマホの幅では収まらなければ折り返す）、xl 以上で横に並べたときは左の列が狭いので縦に 3 行（flex-xl-column）。

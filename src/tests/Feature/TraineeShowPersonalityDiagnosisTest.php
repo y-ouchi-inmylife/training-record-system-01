@@ -403,8 +403,31 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         // グラフ（と凡例）が左の列、表が右の列
         $this->assertTrue($graphCol < strpos($card, '<canvas') && strpos($card, 'data-personality-radar-legend') < $tableCol);
         $this->assertGreaterThan($tableCol, strpos($card, '<div class="table-responsive position-relative">'));
-        // グラフは最大 420px の枠のまま
-        $this->assertStringContainsString('<div class="mx-auto" style="max-width: 420px;">', $card);
+        // グラフの枠（trainee-personality-radar。列の中で中央）。左右の列の割合は今までどおり（4：8）
+        $this->assertStringContainsString('<div class="trainee-personality-radar mx-auto">', $card);
+    }
+
+    // ---- レーダーチャートの大きさ（最大 300px。2026-10 変更：当初は最大 420px） ----
+
+    public function test_レーダーチャートは最大300pxの正方形の枠に入れ文字は小さくしない(): void
+    {
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $card = $this->card($this->page());
+
+        // 枠はクラスだけで指定する（以前の style="max-width: 420px;" は使わない）
+        $this->assertStringContainsString('<div class="trainee-personality-radar mx-auto">', $card);
+        $this->assertStringNotContainsString('max-width: 420px', $card);
+        // 会員側の小さな表示（compact。文字を小さくする）は使わない
+        $this->assertStringNotContainsString('data-personality-radar-compact', $card);
+        $this->assertStringNotContainsString('c-personality-radar', $card);
+
+        // 枠の指定は app.scss に最大 300px だけ（高さは決めない＝Chart.js の正方形のまま）
+        $trainer = file_get_contents(resource_path('sass/app.scss'));
+        $this->assertMatchesRegularExpression('/\.trainee-personality-radar \{\s*max-width: 300px;\s*\}/u', $trainer);
+        $this->assertSame(1, substr_count($trainer, '.trainee-personality-radar'));
+        // 会員側の CSS には置かない
+        $this->assertStringNotContainsString('trainee-personality-radar', file_get_contents(resource_path('sass/client.scss')));
     }
 
     public function test_表はタイプだけ折り返してよくほかは折り返さない(): void
