@@ -160,9 +160,10 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
 
         // 小見出しと最新のタイプ（「・」のあとでだけ折り返す）
         // 2026-10 変更：カードを低くするため、小見出しとタイプの間・タイプとグラフの間を詰めた
-        $this->assertStringContainsString('<p class="eyebrow mb-0 text-center text-lg-start">性格診断</p>', $card);
+        // 2026-10 変更：lg 未満だけ、性格診断の列の中に小見出しとタイプ（lg 以上は名前の行の右。下のテスト）
+        $this->assertStringContainsString('<p class="eyebrow mb-0 text-center d-lg-none">性格診断</p>', $card);
         $this->assertStringContainsString(
-            '<p class="mb-1 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>愛情たっぷり・<wbr>甘えん坊タイプ</p>',
+            '<p class="mb-1 fw-bold text-center d-lg-none" style="word-break: keep-all;" data-client-personality-type>愛情たっぷり・<wbr>甘えん坊タイプ</p>',
             $card
         );
         $this->assertStringNotContainsString('慎重派', $card);
@@ -180,6 +181,69 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         ], $this->radarData($card)['series']);
         // スクリプトはトレーナー側と共有の personality-radar.js
         $this->assertStringContainsString('personality-radar', $html);
+    }
+
+    public function test_lg以上はタイプを名前の行の右に出しlg未満は性格診断の列に出す(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->measurement($id);
+        $this->addResult($id, 'past-2', '2026-03-10 11:00:00');
+        $this->addResult($id, 'rounding-two-decimals', '2026-06-01 09:00:00');
+
+        $html = $this->open();
+        $start = strpos($html, '<div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>');
+        $this->assertNotFalse($start);
+        $card = substr($html, $start, strpos($html, '</article>', $start) - $start);
+
+        // 名前の行：下の段と同じ 8：4。名前（見出し）の右に、lg 以上だけ「性格診断：{最新のタイプ}」（中央寄せ）。文字の下の線をそろえる
+        $this->assertMatchesRegularExpression(
+            '/<div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>\s*'
+            .'<div class="col-12 col-lg-8">\s*<h2 class="mb-0" style="font-size: 1\.1rem;">モモちゃん<\/h2>\s*<\/div>\s*'
+            .'<div class="col-lg-4 d-none d-lg-block" data-client-personality-type-wide>\s*'
+            .'<p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">性格診断：<\/span>'
+            .'<span class="fw-bold">エネルギッシュ・<wbr>アスリートタイプ<\/span><\/p>\s*<\/div>\s*<\/div>/u',
+            $card
+        );
+        // lg 未満だけの小見出しとタイプも、同じ最新のタイプ。幅でどちらか一方だけが出る（隠れたほうは display: none で読まれない）
+        $this->assertStringContainsString('<p class="mb-1 fw-bold text-center d-lg-none" style="word-break: keep-all;" data-client-personality-type>エネルギッシュ・<wbr>アスリートタイプ</p>', $card);
+        $this->assertSame(2, substr_count($card, 'エネルギッシュ・<wbr>アスリートタイプ'));
+        $this->assertStringNotContainsString('慎重派', $card);
+        // 名前の見出しが先、性格診断が後（読み上げの順）
+        $this->assertLessThan(strpos($card, '性格診断：'), strpos($card, 'モモちゃん</h2>'));
+    }
+
+    public function test_lg以上の右の列はレーダーと凡例だけ(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->addResult($id, 'past-1', '2026-06-01 09:00:00');
+
+        $card = $this->cardRow($this->open(), 'モモちゃん');
+        $start = strpos($card, '<div class="col-12 col-lg-4" data-client-personality-diagnosis>');
+        $this->assertNotFalse($start);
+        $column = substr($card, $start);
+
+        // 列の中の小見出しとタイプは lg 未満だけ（d-lg-none）。lg 以上で見えるのはレーダーと凡例だけ
+        preg_match_all('/<p class="([^"]*)"/u', $column, $m);
+        $this->assertCount(2, $m[1]);
+        foreach ($m[1] as $class) {
+            $this->assertStringContainsString('d-lg-none', $class);
+        }
+        $this->assertStringNotContainsString('text-lg-start', $column);
+        $this->assertStringContainsString('<div class="c-personality-radar mx-auto">', $column);
+        $this->assertStringContainsString('data-personality-radar-legend="personality-radar-'.$id.'"', $column);
+    }
+
+    public function test_結果がなければ名前の行は今までどおりで性格診断を出さない(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->measurement($id);
+
+        $html = $this->open();
+
+        $this->assertStringContainsString('<h2 class="mb-2" style="font-size: 1.1rem;">モモちゃん</h2>', $html);
+        $this->assertStringNotContainsString('data-trainee-name-row', $html);
+        $this->assertStringNotContainsString('data-client-personality-type-wide', $html);
+        $this->assertStringNotContainsString('性格診断：', $html);
     }
 
     public function test_結果が3件以上ならグラフに渡すのは今回と前回と初回でトレーナー側と同じ値(): void

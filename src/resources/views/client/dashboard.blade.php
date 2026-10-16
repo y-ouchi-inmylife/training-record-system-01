@@ -45,13 +45,34 @@
                     $shouldShowPhotoError = $errors->any() && (int) old('_trainee_id') === (int) $chart['id'];
                     // 体重推移グラフ（と計測値 0 件の案内）の高さ。性格診断の結果があるときだけ高くする（2026-10 追加）
                     $chartHeight = ($chart['personality'] ?? null) ? $weightChartHeightWithPersonality : $weightChartHeight;
+                    // 性格診断のタイプ（「・」のあとでだけ折り返す印 <wbr> を入れた HTML。各部分はエスケープ済み）。
+                    // 名前の行（lg 以上）と、性格診断の列（lg 未満）の 2 か所で使う（2026-10 追加）
+                    $personalityTypeHtml = ($chart['personality'] ?? null)
+                        ? collect(explode('・', $chart['personality']['type']))->map(fn ($part) => e($part))->implode('・<wbr>')
+                        : null;
                 @endphp
                 <article class="c-session" style="margin-bottom: 1rem;">
                     <div class="c-session-body">
                         <div class="c-session-content">
                             {{-- 呼び名は「モモちゃん」、名前が未登録なら「愛犬」（「ちゃん」を付けない）。
                                  Trainee::client_call_name（weight_chart_data の callName）。2026-10 変更 --}}
-                            <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
+                            {{-- 性格診断の結果があるときは、名前の行を下の段と同じ 8：4 に分け、lg 以上だけ右の列（レーダーの真上）に
+                                 「性格診断：{タイプ}」を置く（2026-10 変更。名前の行の右が空き、右の列の下に情報が集まって見えたため）。
+                                 lg 未満は出さず（d-none d-lg-block）、性格診断の列の中の小見出しとタイプ（d-lg-none）を出す。
+                                 どちらか一方だけが表示され、隠れたほうは display: none なので、読み上げでタイプが二重に読まれない。
+                                 名前と文字の下の線をそろえる（align-items-baseline）。中央寄せでレーダー（mx-auto）の真上に置く --}}
+                            @if($chart['personality'] ?? null)
+                                <div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>
+                                    <div class="col-12 col-lg-8">
+                                        <h2 class="mb-0" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
+                                    </div>
+                                    <div class="col-lg-4 d-none d-lg-block" data-client-personality-type-wide>
+                                        <p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">性格診断：</span><span class="fw-bold">{!! $personalityTypeHtml !!}</span></p>
+                                    </div>
+                                </div>
+                            @else
+                                <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
+                            @endif
 
                             {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7
                                  「入力エラー以外の失敗を入力の項目のキーで返さないルール」）。
@@ -208,8 +229,9 @@
                                     <div class="col-12 col-lg-4" data-client-personality-diagnosis>
                                         {{-- 2026-10 変更：カードを低くするため詰めた（小見出しとタイプの間・タイプとグラフの間の余白をなくし、
                                              グラフを小さく〔.c-personality-radar。compact の設定〕、凡例の文字を小さくした〔.c-personality-legend〕） --}}
-                                        <p class="eyebrow mb-0 text-center text-lg-start">性格診断</p>
-                                        <p class="mb-1 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>{!! collect(explode('・', $chart['personality']['type']))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
+                                        {{-- 小見出しとタイプは lg 未満だけ（lg 以上は名前の行の右に出す。2026-10 変更）。lg 以上はレーダーと凡例だけ --}}
+                                        <p class="eyebrow mb-0 text-center d-lg-none">性格診断</p>
+                                        <p class="mb-1 fw-bold text-center d-lg-none" style="word-break: keep-all;" data-client-personality-type>{!! $personalityTypeHtml !!}</p>
                                         {{-- グラフの枠は横長（.c-personality-radar。client.scss）。data-personality-radar-compact で、枠の高さいっぱいに
                                              描き、項目名と目盛りの文字を小さくする（personality-radar-config.js の compact。トレーナー側には付けない） --}}
                                         <div class="c-personality-radar mx-auto">
