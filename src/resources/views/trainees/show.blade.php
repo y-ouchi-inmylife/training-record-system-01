@@ -198,7 +198,7 @@
            xl 以上はグラフが左・表が右、それより狭いときはグラフが上・表が下（2026-10 変更）
            （2026-10 変更：当初は回ごとに見出しの行・レーダーチャート・点数の表を並べ、開閉していた。回数が増えても欄が長くならない
            ように作り直した）。結果がないときは本文に「（未回答）」とだけ出す（グラフも表も出さない）
-         - 結果は Trainee::personalityDiagnosisResults()（新しい順。TraineeController::show で読み込み済み）。表は古い順（上が初回）
+         - 結果は Trainee::personalityDiagnosisResults()（新しい順。TraineeController::show で読み込み済み）。表は新しい順（2026-10 変更。当初は古い順で、上が初回）
          - 点数は表示の値（小数第 1 位）。保存の値（小数第 2 位）から四捨五入する（TraineePersonalityDiagnosisResult::displayScores()）
          - 表の各行の［回答］で、その回の 50 問の回答をモーダルで出す（1 回ごとにモーダルを置き、中身はサーバーで出す）。
            設問は結果の設問の版に合った文（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は設問の ID）
@@ -244,7 +244,7 @@
                     </div>
 
                     <div class="col-12 col-xl-8">
-                        {{-- 結果の表（古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
+                        {{-- 結果の表（新しい順。最新を上。並びはグラフの今回・前回・初回と同じ personalityDiagnosisResults の並び〔回答日時の降順、同じ日時なら id の降順〕。2026-10 変更：当初は古い順。スマホの幅では横に流す）。position-relative：最後の列の見出しの visually-hidden（絶対位置）が
                              横に流す枠の外に出てページの幅を広げないよう、枠を位置の基準にする。
                              文字は少し小さくする（small。ボタンは btn-sm のままで小さくしない。btn-sm の文字の大きさは rem なので small の影響を受けない）。
                              タイプは「・」のあとでだけ折り返してよい（横に並べたときに表を収めるため。word-break: keep-all で言葉の途中では
@@ -263,7 +263,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($pdResults->reverse() as $result)
+                                    @foreach($pdResults as $result)
                                         {{-- 1 行の php ディレクティブ（括弧の書き方）にせず、開始と終了の対の書き方にする。この下の暮らしの様子の欄に
                                              対の書き方のブロックがあり、その前に括弧の書き方を置くと、Blade が 2 つを取り違えて構文エラーになるため
                                              （2026-10 に欄の順を入れ替えたときに起きた） --}}

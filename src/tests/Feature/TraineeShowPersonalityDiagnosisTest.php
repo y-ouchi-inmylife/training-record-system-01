@@ -16,7 +16,7 @@ use Tests\TestCase;
  * トレーニー詳細（S-0309）の性格診断の欄（2026-10 追加。設計書 S-0309「性格診断の欄」）。
  *
  * - 計測値の下・暮らしの様子の欄の上に、いつも出す（id="personality-diagnosis"・scroll-margin-top。2026-10 変更：当初は暮らしの様子の欄の下）。結果がなければ「（未回答）」だけ
- * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（古い順。回答日・タイプ・7 カテゴリ・［50問の回答］）
+ * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（新しい順。2026-10 変更：当初は古い順。回答日・タイプ・7 カテゴリ・［回答］）
  * - 50 問の回答は 1 回ごとのモーダル（2026-10 変更：当初は回ごとに見出しの行・グラフ・点数の表を並べ、開閉していた）
  * - 管理者にだけ、各行の［削除］と削除確認モーダル（S-0309-M01。1 行ごと）を出す（2026-10 追加。要件定義書 6-16-14）
  *
@@ -134,6 +134,14 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return $rows;
     }
 
+    /** 結果の表の行の結果の id（表の上から順。各行の［回答］が開くモーダルの id から取る） */
+    private function tableRowIds(string $html): array
+    {
+        preg_match_all('/data-bs-target="#personality-diagnosis-answers-(\d+)"/u', $html, $m);
+
+        return array_map('intval', $m[1]);
+    }
+
     /** 1 回分のモーダル */
     private function modal(string $html, TraineePersonalityDiagnosisResult $result): string
     {
@@ -179,7 +187,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('data-personality-diagnosis-answers', $html);
     }
 
-    public function test_結果の表は古い順ですべての回を1つの表に出す(): void
+    public function test_結果の表は新しい順ですべての回を1つの表に出す(): void
     {
         $this->addResult('past-1', '2026-06-01 09:00:00');
         $this->addResult('past-3', '2025-12-01 10:00:00');
@@ -187,10 +195,11 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $card = $this->card($this->page());
 
+        // 新しい順（最新を上。2026-10 変更：当初は古い順）
         $this->assertSame([
-            '2025/12/01' => $this->expectedRow('past-3'),
-            '2026/03/10' => $this->expectedRow('past-2'),
             '2026/06/01' => $this->expectedRow('past-1'),
+            '2026/03/10' => $this->expectedRow('past-2'),
+            '2025/12/01' => $this->expectedRow('past-3'),
         ], $this->tableRows($card));
         // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・ボタンの列（読み上げ用に「操作」）
         $this->assertSame(1, substr_count($card, '<table'));
@@ -574,9 +583,56 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             $this->series('previous', 'past-3', '2025/12/01'),
         ], $this->radarData($html)['series']);
         $this->assertSame([
-            '2025/12/01' => $this->expectedRow('past-3'),
             '2026/03/10' => $this->expectedRow('past-2'),
+            '2025/12/01' => $this->expectedRow('past-3'),
         ], $this->tableRows($this->card($html)));
         $this->assertStringContainsString('性格診断の結果を削除しました。', $html);
+    }
+
+    // ---- 結果の表の並び（新しい順。2026-10 変更） ----
+
+    public function test_同じ日に2件あっても表のいちばん上がグラフの今回で並びはグラフと同じ基準(): void
+    {
+        // 同じ日（同じ日時）の 2 件は、後に作ったほう（id の大きいほう）を新しいとする
+        $initial = $this->addResult('past-3', '2026-10-15 09:00:00');
+        $previous = $this->addResult('past-2', '2026-10-15 09:00:00');
+        $current = $this->addResult('past-1', '2026-10-16 09:00:00');
+
+        $html = $this->page();
+
+        $this->assertSame([$current->id, $previous->id, $initial->id], $this->tableRowIds($this->card($html)));
+        // 表のいちばん上・2 番目・いちばん下が、グラフの今回・前回・初回と同じ結果（値と回答日）
+        $this->assertSame([
+            $this->series('current', 'past-1', '2026/10/16'),
+            $this->series('previous', 'past-2', '2026/10/15'),
+            $this->series('initial', 'past-3', '2026/10/15'),
+        ], $this->radarData($html)['series']);
+    }
+
+    public function test_各行の回答と削除はその行の結果を開く(): void
+    {
+        $this->actingAsRole('admin');
+        $old = $this->addResult('past-3', '2025-12-01 10:00:00');
+        $mid = $this->addResult('past-2', '2026-03-10 11:00:00');
+        $new = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+        $card = $this->card($html);
+
+        // 行ごとに、回答日・［回答］の開くモーダル・［削除］の開く確認のモーダルが同じ結果
+        preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>.*?<\/tr>/us', $card, $rows);
+        $this->assertCount(3, $rows[0]);
+        foreach ([[$new, '2026/06/01'], [$mid, '2026/03/10'], [$old, '2025/12/01']] as $i => [$result, $date]) {
+            $this->assertSame($date, $rows[1][$i]);
+            $this->assertStringContainsString('data-bs-target="#personality-diagnosis-answers-'.$result->id.'"', $rows[0][$i]);
+            $this->assertStringContainsString('data-bs-target="#personality-diagnosis-delete-'.$result->id.'"', $rows[0][$i]);
+            // モーダルの中身もその結果のもの（50 問の回答の見出しの日付、削除の送り先）
+            $this->assertStringContainsString('50問の回答（'.$date.'）', $this->modal($html, $result));
+            $this->assertStringContainsString(
+                'action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"',
+                $this->deleteModal($html, $result)
+            );
+            $this->assertStringContainsString($date.' の性格診断の結果を削除します。', $this->deleteModal($html, $result));
+        }
     }
 }
