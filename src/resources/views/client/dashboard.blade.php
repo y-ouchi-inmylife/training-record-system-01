@@ -63,10 +63,10 @@
                                  名前と文字の下の線をそろえる（align-items-baseline）。中央寄せでレーダー（mx-auto）の真上に置く --}}
                             @if($chart['personality'] ?? null)
                                 <div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>
-                                    <div class="col-12 col-lg-8">
+                                    <div class="col-12 col-lg-8 col-xxl-9">
                                         <h2 class="mb-0" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
                                     </div>
-                                    <div class="col-lg-4 d-none d-lg-block" data-client-personality-type-wide>
+                                    <div class="col-lg-4 col-xxl-3 d-none d-lg-block" data-client-personality-type-wide>
                                         <p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">性格診断：</span><span class="fw-bold">{!! $personalityTypeHtml !!}</span></p>
                                     </div>
                                 </div>
@@ -99,7 +99,7 @@
                                  - 結果がないとき：性格診断の枠は出さず、写真＋体重のグラフを今までどおりの横幅（col-12）で出す
                                  - 上端をそろえる（align-items-start） --}}
                             <div class="row g-3 align-items-start" data-trainee-card-row>
-                                <div class="{{ ($chart['personality'] ?? null) ? 'col-12 col-lg-8' : 'col-12' }}">
+                                <div class="{{ ($chart['personality'] ?? null) ? 'col-12 col-lg-8 col-xxl-9' : 'col-12' }}">
                                     <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
                                         {{-- 左：トレーニー写真。
                                              モバイル（<576px、親が flex-column）では**中央寄せ**、sm 以上
@@ -226,7 +226,7 @@
                                          - 読み上げ：会員側には点数の表がないので、canvas には「{呼び名}の性格診断のグラフ」とだけ付ける
                                            （点数は出さないものなので読み上げにも出さない。タイプは上の文字で読まれる）
                                          - 出さないもの：点数の表・50 問の回答・［回答］［削除］・案内の発行と取消 --}}
-                                    <div class="col-12 col-lg-4" data-client-personality-diagnosis>
+                                    <div class="col-12 col-lg-4 col-xxl-3" data-client-personality-diagnosis>
                                         {{-- 2026-10 変更：カードを低くするため詰めた（小見出しとタイプの間・タイプとグラフの間の余白をなくし、
                                              グラフを小さく〔.c-personality-radar。compact の設定〕、凡例の文字を小さくした〔.c-personality-legend〕） --}}
                                         {{-- 小見出しとタイプは lg 未満だけ（lg 以上は名前の行の右に出す。2026-10 変更）。lg 以上はレーダーと凡例だけ --}}

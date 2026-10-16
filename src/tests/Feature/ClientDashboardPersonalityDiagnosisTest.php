@@ -16,7 +16,7 @@ use Tests\TestCase;
  *
  * - 回答したらすぐ出す（公開の操作はない）。結果がなければ性格診断の部分を出さない（カードは今までどおり）
  * - タイプは最新の結果。レーダーチャートはトレーナー側（S-0309）と同じ値（Trainee::personality_radar_data。今回・前回・初回）
- * - lg 以上は 写真｜体重のグラフ｜性格診断 を横に並べ（col-lg-8／col-lg-4）、それより狭いときは下に置く
+ * - lg 以上は 写真｜体重のグラフ｜性格診断 を横に並べ（992〜1399px は col-lg-8／col-lg-4、1400px 以上は col-xxl-9／col-xxl-3）、それより狭いときは下に置く
  * - 点数の表・50 問の回答・［回答］［削除］・案内の操作は出さない。自分のトレーニーの結果だけ
  *
  * 実際の HTTP で開く（ClientPortalContractRenderingTest と同じく、CLIENT_HOST は phpunit.xml で空）。
@@ -198,8 +198,8 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         // 名前の行：下の段と同じ 8：4。名前（見出し）の右に、lg 以上だけ「性格診断：{最新のタイプ}」（中央寄せ）。文字の下の線をそろえる
         $this->assertMatchesRegularExpression(
             '/<div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>\s*'
-            .'<div class="col-12 col-lg-8">\s*<h2 class="mb-0" style="font-size: 1\.1rem;">モモちゃん<\/h2>\s*<\/div>\s*'
-            .'<div class="col-lg-4 d-none d-lg-block" data-client-personality-type-wide>\s*'
+            .'<div class="col-12 col-lg-8 col-xxl-9">\s*<h2 class="mb-0" style="font-size: 1\.1rem;">モモちゃん<\/h2>\s*<\/div>\s*'
+            .'<div class="col-lg-4 col-xxl-3 d-none d-lg-block" data-client-personality-type-wide>\s*'
             .'<p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">性格診断：<\/span>'
             .'<span class="fw-bold">エネルギッシュ・<wbr>アスリートタイプ<\/span><\/p>\s*<\/div>\s*<\/div>/u',
             $card
@@ -218,7 +218,7 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         $this->addResult($id, 'past-1', '2026-06-01 09:00:00');
 
         $card = $this->cardRow($this->open(), 'モモちゃん');
-        $start = strpos($card, '<div class="col-12 col-lg-4" data-client-personality-diagnosis>');
+        $start = strpos($card, '<div class="col-12 col-lg-4 col-xxl-3" data-client-personality-diagnosis>');
         $this->assertNotFalse($start);
         $column = substr($card, $start);
 
@@ -319,13 +319,17 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
 
         $card = $this->cardRow($this->open(), 'モモちゃん');
 
-        // 1 行（上をそろえる）に、写真＋体重のグラフ（lg で 8/12）と性格診断（lg で 4/12）。lg 未満はどちらも col-12（縦）
+        // 1 行（上をそろえる）に、写真＋体重のグラフ（lg で 8/12、xxl で 9/12）と性格診断（lg で 4/12、xxl で 3/12）。
+        // lg 未満はどちらも col-12（縦）。2026-10 変更：xxl（1400px）以上は 9：3（体重のグラフと性格診断のグラフの間を詰めるため）。
+        // xl（1200px）では右の列にレーダーの枠（横 260px）が入らないので、xl では 9：3 にしない
         $this->assertMatchesRegularExpression(
-            '/<div class="row g-3 align-items-start" data-trainee-card-row>\s*<div class="col-12 col-lg-8">\s*'
+            '/<div class="row g-3 align-items-start" data-trainee-card-row>\s*<div class="col-12 col-lg-8 col-xxl-9">\s*'
             .'<div class="d-flex flex-column flex-sm-row gap-3 align-items-start">/u',
             $card
         );
-        $this->assertStringContainsString('<div class="col-12 col-lg-4" data-client-personality-diagnosis>', $card);
+        $this->assertStringContainsString('<div class="col-12 col-lg-4 col-xxl-3" data-client-personality-diagnosis>', $card);
+        // 名前の行も同じ割合（test_lg以上はタイプを名前の行の右に出しlg未満は性格診断の列に出す で確かめる）
+        $this->assertStringNotContainsString('col-xl-', $card);
         // 並びは 写真 → 体重のグラフ → 性格診断
         $this->assertLessThan(strpos($card, 'data-measurement-chart'), strpos($card, 'c-trainee-photo-frame'));
         $this->assertLessThan(strpos($card, 'data-client-personality-diagnosis'), strpos($card, 'data-measurement-chart'));
