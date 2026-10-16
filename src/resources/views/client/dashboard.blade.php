@@ -74,6 +74,14 @@
                                 <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
                             @endif
 
+                            {{-- 回答待ちの案内のお知らせ（受付アンケート・性格診断。2026-10 追加）。名前の行のすぐ下、写真・体重のグラフの段の上。
+                                 ページの上にまとめず、愛犬のカードの中に置く（名前が未登録・複数頭のときに、どの愛犬の案内か分かるように） --}}
+                            @if(! empty($chart['surveyNotices'] ?? []))
+                                <div class="d-flex flex-column gap-2 mb-2" data-client-survey-notices>
+                                    @include('client._survey-notices', ['notices' => $chart['surveyNotices']])
+                                </div>
+                            @endif
+
                             {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7
                                  「入力エラー以外の失敗を入力の項目のキーで返さないルール」）。
                                  入力項目（photo）のエラーに対する上部の 1 文の案内は、本画面が小さなフォーム

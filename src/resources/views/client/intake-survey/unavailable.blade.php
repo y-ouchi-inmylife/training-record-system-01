@@ -23,6 +23,8 @@
         </div>
     </div>
 
+    @include('client._mypage-back-link')
+
     @if($companyName)
         <p class="c-login-footer">&copy; {{ date('Y') }} {{ $companyName }}</p>
     @endif

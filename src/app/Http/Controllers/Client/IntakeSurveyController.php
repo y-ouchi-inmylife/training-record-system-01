@@ -7,6 +7,7 @@ use App\Http\Requests\ClientIntakeSurveyRequest;
 use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\TraineeIntakeSurveyToken;
+use App\Support\ClientMypageLink;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -32,14 +33,14 @@ class IntakeSurveyController extends Controller
     {
         $tokenRecord = TraineeIntakeSurveyToken::query()->where('token', $token)->first();
         if ($tokenRecord === null) {
-            return $this->unavailableView(self::UNAVAILABLE);
+            return $this->unavailableView(self::UNAVAILABLE, $token);
         }
         if ($tokenRecord->answered_at !== null) {
-            return $this->unavailableView(self::ANSWERED);
+            return $this->unavailableView(self::ANSWERED, $token);
         }
         $trainee = Trainee::query()->find($tokenRecord->trainee_id);
         if ($trainee === null) {
-            return $this->unavailableView(self::UNAVAILABLE);
+            return $this->unavailableView(self::UNAVAILABLE, $token);
         }
 
         return view('client.intake-survey.show', [
@@ -105,10 +106,15 @@ class IntakeSurveyController extends Controller
         });
 
         if ($result !== true) {
-            return $this->unavailableView($result);
+            return $this->unavailableView($result, $token);
         }
 
-        return redirect()->route('client-portal.intake-survey.thanks');
+        // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加）。
+        // 完了の画面はトークンを持たないので、ここで判定してフラッシュで渡す
+        $traineeId = TraineeIntakeSurveyToken::query()->where('token', $token)->value('trainee_id');
+
+        return redirect()->route('client-portal.intake-survey.thanks')
+            ->with('showMypageLink', ClientMypageLink::shouldShow($traineeId));
     }
 
     /**
@@ -117,7 +123,9 @@ class IntakeSurveyController extends Controller
      */
     public function thanks(): View
     {
-        return view('client.intake-survey.thanks');
+        return view('client.intake-survey.thanks', [
+            'showMypageLink' => (bool) session('showMypageLink', false),
+        ]);
     }
 
     /**
@@ -161,12 +169,16 @@ class IntakeSurveyController extends Controller
     /**
      * 使えない URL の画面（回答済み／使えない。設計書 S-1413「使えない URL の画面」）
      */
-    private function unavailableView(string $reason): View
+    private function unavailableView(string $reason, string $token): View
     {
         return view('client.intake-survey.unavailable', [
             'message' => $reason === self::ANSWERED
                 ? 'このアンケートはすでにご回答いただいています。'
                 : 'このアンケートはご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+            // ［マイページへ戻る］：ログインしている会員の、自分の愛犬の案内のときだけ（2026-10 追加）
+            'showMypageLink' => ClientMypageLink::shouldShow(
+                TraineeIntakeSurveyToken::query()->where('token', $token)->value('trainee_id')
+            ),
         ]);
     }
 }

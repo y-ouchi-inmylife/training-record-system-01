@@ -66,6 +66,9 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
             $table->time('measured_time');
             $table->decimal('weight_kg', 5, 2);
         });
+        // 受付アンケート（回答待ちの案内のお知らせの判定に使う。2026-10 追加）
+        $this->createTraineeIntakeSurveyTokensTable();
+        $this->createTraineeIntakeSurveyResponsesTable();
         $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();
 

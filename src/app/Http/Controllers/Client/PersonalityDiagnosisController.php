@@ -7,6 +7,7 @@ use App\Http\Requests\ClientPersonalityDiagnosisRequest;
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\TraineePersonalityDiagnosisToken;
+use App\Support\ClientMypageLink;
 use App\Support\PersonalityDiagnosisQuestions;
 use App\Support\PersonalityDiagnosisScorer;
 use Illuminate\Contracts\View\View;
@@ -47,7 +48,7 @@ class PersonalityDiagnosisController extends Controller
     {
         $reason = self::checkToken(TraineePersonalityDiagnosisToken::query()->where('token', $token)->first());
         if ($reason !== true) {
-            return self::unavailableView($reason);
+            return self::unavailableView($reason, $token);
         }
 
         return view('client.personality-diagnosis.show', [
@@ -97,10 +98,15 @@ class PersonalityDiagnosisController extends Controller
         });
 
         if ($result !== true) {
-            return self::unavailableView($result);
+            return self::unavailableView($result, $token);
         }
 
-        return redirect()->route('client-portal.personality-diagnosis.thanks');
+        // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加。受付アンケートと同じ）。
+        // 完了の画面はトークンを持たないので、ここで判定してフラッシュで渡す
+        $traineeId = TraineePersonalityDiagnosisToken::query()->where('token', $token)->value('trainee_id');
+
+        return redirect()->route('client-portal.personality-diagnosis.thanks')
+            ->with('showMypageLink', ClientMypageLink::shouldShow($traineeId));
     }
 
     /**
@@ -109,7 +115,9 @@ class PersonalityDiagnosisController extends Controller
      */
     public function thanks(): View
     {
-        return view('client.personality-diagnosis.thanks');
+        return view('client.personality-diagnosis.thanks', [
+            'showMypageLink' => (bool) session('showMypageLink', false),
+        ]);
     }
 
     /**
@@ -134,12 +142,16 @@ class PersonalityDiagnosisController extends Controller
     /**
      * 使えない URL の画面（回答済み／使えない。設計書 S-1415「使えない URL の画面」）
      */
-    private static function unavailableView(string $reason): View
+    private static function unavailableView(string $reason, string $token): View
     {
         return view('client.personality-diagnosis.unavailable', [
             'message' => $reason === self::ANSWERED
                 ? 'この性格診断はすでにご回答いただいています。'
                 : 'この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+            // ［マイページへ戻る］：ログインしている会員の、自分の愛犬の案内のときだけ（2026-10 追加）
+            'showMypageLink' => ClientMypageLink::shouldShow(
+                TraineePersonalityDiagnosisToken::query()->where('token', $token)->value('trainee_id')
+            ),
         ]);
     }
 }

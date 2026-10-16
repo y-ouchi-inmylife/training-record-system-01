@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MediaRecordController as TrainerMediaRecordController;
+use App\Models\Trainee;
 use Illuminate\Contracts\View\View;
 
 /**
@@ -93,7 +94,12 @@ class DashboardController extends Controller
         // $trainee->load('measurements') 済み）。
         // personalityDiagnosisResults は性格診断（タイプ・レーダーチャート）に使う（2026-10 追加。要件定義書 6-15-19）。
         // トレーニーが何頭いてもクエリは 1 本。自分のトレーニーの結果だけ（$client->trainees() の絞り込みのまま）
-        $trainees = $client->trainees()->with(['measurements', 'personalityDiagnosisResults'])->get();
+        // latestIntakeSurveyResponse・activeIntakeSurveyToken・activePersonalityDiagnosisToken は、回答待ちの案内の
+        // お知らせ（2026-10 追加。要件定義書 6-15-3）に使う。どれもトレーニーが何頭いてもクエリは 1 本
+        $trainees = $client->trainees()->with([
+            'measurements', 'personalityDiagnosisResults',
+            'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'activePersonalityDiagnosisToken',
+        ])->get();
 
         // personality：結果がなければ null。あれば最新の結果のタイプ（表示名）と、レーダーチャートの値
         // （今回・前回・初回。トレーナー側 S-0309 と同じ Trainee::personality_radar_data）
@@ -102,6 +108,38 @@ class DashboardController extends Controller
                 'type' => $trainee->personalityDiagnosisResults->first()->personality_type_label,
                 'radar' => $trainee->personality_radar_data,
             ],
+            'surveyNotices' => $this->surveyNotices($trainee),
         ])->all();
+    }
+
+    /**
+     * 回答待ちの案内のお知らせ（2026-10 追加。設計書 S-1402「回答待ちの案内のお知らせ」）。
+     * 並びは 受付アンケート → 性格診断。kind は文（lang/ja/messages.php の client_survey_notice）と見た目を、
+     * url は印刷した案内と同じ回答の URL（トークンの URL）。
+     *
+     * 「回答待ち」の判定は、会員詳細（S-0305）で［案内を表示］［取消］を出す条件と同じ：
+     * - 受付アンケート：Trainee::intake_survey_status が回答待ち（回答がなく、有効な案内〔未回答のトークン〕がある）
+     * - 性格診断：有効な案内（Trainee::activePersonalityDiagnosisToken。未回答のトークン）がある
+     * 取消した案内はトークンの行ごと消えるので、ここには出ない
+     *
+     * @return array<int, array{kind: string, url: string}>
+     */
+    private function surveyNotices($trainee): array
+    {
+        $notices = [];
+        if ($trainee->intake_survey_status === Trainee::INTAKE_AWAITING) {
+            $notices[] = [
+                'kind' => 'intake',
+                'url' => route('client-portal.intake-survey.show', ['token' => $trainee->activeIntakeSurveyToken->token]),
+            ];
+        }
+        if ($trainee->activePersonalityDiagnosisToken !== null) {
+            $notices[] = [
+                'kind' => 'personality',
+                'url' => route('client-portal.personality-diagnosis.show', ['token' => $trainee->activePersonalityDiagnosisToken->token]),
+            ];
+        }
+
+        return $notices;
     }
 }
