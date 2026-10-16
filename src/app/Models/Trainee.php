@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PersonalityDiagnosisQuestions;
 use App\Support\TraineeAge;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -454,6 +455,40 @@ class Trainee extends Model
             'datasets' => [
                 ['data' => $points],
             ],
+        ];
+    }
+
+    /**
+     * 性格診断のレーダーチャートに渡す値（canvas の data-personality-radar の JSON。2026-10 追加）。
+     * トレーナー側のトレーニー詳細（S-0309）と、会員側のマイページ（S-1402）で同じものを使う。
+     * 結果がなければ null。
+     *
+     * 重ねる回：今回＝いちばん新しい回、前回＝その 1 つ前、初回＝いちばん古い回（結果が 3 つ以上のときだけ。
+     * 2 つのときは前回と初回が同じ回なので重ねない）。間の回は重ねない。値は表示の値（小数第 1 位）と回答日。
+     * 結果は personalityDiagnosisResults（新しい順）。呼ぶ側で先に読み込んでおく（N+1 にしないため）
+     *
+     * @return array{labels: string[], series: array{key: string, date: string, values: string[]}[]}|null
+     */
+    public function getPersonalityRadarDataAttribute(): ?array
+    {
+        $results = $this->personalityDiagnosisResults;
+        if ($results->isEmpty()) {
+            return null;
+        }
+
+        $series = array_filter([
+            'current' => $results->first(),
+            'previous' => $results->get(1),
+            'initial' => $results->count() >= 3 ? $results->last() : null,
+        ]);
+
+        return [
+            'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
+            'series' => collect($series)->map(fn (TraineePersonalityDiagnosisResult $result, string $key) => [
+                'key' => $key,
+                'date' => $result->answered_at->format('Y/m/d'),
+                'values' => array_values($result->displayScores()),
+            ])->values()->all(),
         ];
     }
 }

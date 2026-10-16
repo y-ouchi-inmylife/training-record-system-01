@@ -91,8 +91,17 @@ class DashboardController extends Controller
         // アクセサ内で $this->measurements を触るため、ここで eager load しておく
         // （load しないと 1+N のクエリになる。単頭ケースは S-0309 側で別途
         // $trainee->load('measurements') 済み）。
-        $trainees = $client->trainees()->with('measurements')->get();
+        // personalityDiagnosisResults は性格診断（タイプ・レーダーチャート）に使う（2026-10 追加。要件定義書 6-15-19）。
+        // トレーニーが何頭いてもクエリは 1 本。自分のトレーニーの結果だけ（$client->trainees() の絞り込みのまま）
+        $trainees = $client->trainees()->with(['measurements', 'personalityDiagnosisResults'])->get();
 
-        return $trainees->map(fn ($trainee) => $trainee->weight_chart_data)->all();
+        // personality：結果がなければ null。あれば最新の結果のタイプ（表示名）と、レーダーチャートの値
+        // （今回・前回・初回。トレーナー側 S-0309 と同じ Trainee::personality_radar_data）
+        return $trainees->map(fn ($trainee) => $trainee->weight_chart_data + [
+            'personality' => $trainee->personalityDiagnosisResults->isEmpty() ? null : [
+                'type' => $trainee->personalityDiagnosisResults->first()->personality_type_label,
+                'radar' => $trainee->personality_radar_data,
+            ],
+        ])->all();
     }
 }

@@ -209,21 +209,9 @@
         $pdCategories = \App\Support\PersonalityDiagnosisQuestions::categories();
         $pdIdsByCategory = \App\Support\PersonalityDiagnosisQuestions::questionIdsByCategory();
         $pdChoices = \App\Support\PersonalityDiagnosisQuestions::choices();
-        // レーダーチャートに重ねる回：今回＝いちばん新しい回、前回＝その 1 つ前、初回＝いちばん古い回（結果が 3 つ以上のときだけ。
-        // 2 つのときは前回と初回が同じ回なので重ねない）。間の回は重ねない。値は表と同じ表示の値（小数第 1 位）と回答日
-        $pdSeries = array_filter([
-            'current' => $pdResults->first(),
-            'previous' => $pdResults->get(1),
-            'initial' => $pdResults->count() >= 3 ? $pdResults->last() : null,
-        ]);
-        $pdRadarData = [
-            'labels' => array_values($pdCategories),
-            'series' => collect($pdSeries)->map(fn ($result, $key) => [
-                'key' => $key,
-                'date' => $result->answered_at->format('Y/m/d'),
-                'values' => array_values($result->displayScores()),
-            ])->values()->all(),
-        ];
+        // レーダーチャートに重ねる回（今回・前回・初回）と値。会員側のマイページ（S-1402）と同じ組み立てを使う
+        // （Trainee::personality_radar_data。2026-10 変更：当初はここで組み立てていた）。結果がなければ null
+        $pdRadarData = $trainee->personality_radar_data;
     @endphp
     <div class="card mb-3" id="personality-diagnosis" style="scroll-margin-top: 4.5rem;">
         <div class="card-header">

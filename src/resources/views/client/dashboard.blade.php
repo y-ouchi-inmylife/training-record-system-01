@@ -67,122 +67,154 @@
                                  gap は写真とグラフの間の余白。align-items-start で上端揃え。
                                  SCSS は触らず、Bootstrap の flex ユーティリティとインラインで組む
                                  （設計書 S-1402「トレーニー写真」設計方針参照）。 --}}
-                            <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
-                                {{-- 左：トレーニー写真。
-                                     モバイル（<576px、親が flex-column）では**中央寄せ**、sm 以上
-                                     （親が flex-sm-row）では**上端揃え**にする。親の align-items-start
-                                     は cross 軸に対する既定で、flex-column では横方向・flex-sm-row では
-                                     縦方向の意味が入れ替わる。photo は sm 未満で中央、sm 以上で先頭
-                                     という個別要望のため、この要素だけ align-self でオーバーライドする
-                                     （align-self は align-items より個別指定として優先される。Bootstrap
-                                     の align-self-* は !important 付きで確実に上書きされる）。 --}}
-                                {{-- 写真の列の幅：パソコン（sm 以上、横並び）は 180px 固定、スマホ（<576px、
-                                     縦積み）はカード幅いっぱい（100%）。sm 以上では flex-shrink: 0 で縮まず、
-                                     width: 180px で伸びもしない。エラーの文言はこの列の幅で折り返し、グラフ側の
-                                     列の幅はエラーの有無で変わらない。幅の切り替えは `.c-trainee-photo-col` に集約
-                                    （2026-10 変更、設計書 S-1402「トレーニー写真」設計方針参照）。 --}}
-                                <div class="c-trainee-photo-col align-self-center align-self-sm-start">
-                                    {{-- アップロード用フォーム：隠しファイル入力のみを持つ。
-                                         写真ありの場合はモーダル内「変更」ボタンから、写真なしの場合は
-                                         <label for="..."> から <input> をクリックさせる。form は
-                                         見た目の <label>/<button> の外側に置き、CSRF・enctype を保つ。 --}}
-                                    {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
-                                         accept 属性は残す（ブラウザのファイル選択ダイアログで形式を絞るための属性）。 --}}
-                                    <form action="{{ route('client-portal.trainee-photo.store', $chart['id']) }}"
-                                          method="POST"
-                                          enctype="multipart/form-data"
-                                          id="trainee-photo-form-{{ $chart['id'] }}"
-                                          style="margin: 0; display: contents;"
-                                          novalidate>
-                                        @csrf
-                                        {{-- どのトレーニーのフォームからの送信かを判別する hidden。
-                                             バリデーションエラー・変換失敗で戻ったとき、old('_trainee_id') と
-                                             各カードの $chart['id'] を比較して該当トレーニーのカードだけに
-                                             エラーを出す。TraineePhotoController の validate() のルールに
-                                             入れないため validated() に混入しない（計測値モーダル S-0309 と同じ流儀）。 --}}
-                                        <input type="hidden" name="_trainee_id" value="{{ $chart['id'] }}">
-                                        {{-- 非表示のファイル入力。選択即送信（JavaScript で form.submit()）。
-                                             accept は MIME と拡張子の両方を列挙（HEIC は iOS 側で MIME が空に
-                                             なるケースがあるため拡張子も入れる。既存メディア機能と同じ考え方）。 --}}
-                                        <input type="file"
-                                               name="photo"
-                                               id="trainee-photo-input-{{ $chart['id'] }}"
-                                               accept="image/jpeg,image/png,image/heic,image/heif,.jpg,.jpeg,.png,.heic,.heif"
-                                               style="display: none;"
-                                               onchange="document.getElementById('trainee-photo-form-{{ $chart['id'] }}').submit();">
-                                    </form>
+                            {{-- 写真＋体重のグラフと、性格診断（タイプ・レーダーチャート・凡例）の並び（2026-10 追加。設計書 S-1402「性格診断」）。
+                                 - 性格診断の結果があるとき：lg（992px）以上は 写真｜体重のグラフ｜性格診断 を横に並べる（写真＋体重 8・性格診断 4）。
+                                   それより狭いときは、写真＋体重のグラフの下に性格診断を置く（スマホは 写真 → 体重のグラフ → 性格診断 の順に縦）
+                                 - 結果がないとき：性格診断の枠は出さず、写真＋体重のグラフを今までどおりの横幅（col-12）で出す
+                                 - 上端をそろえる（align-items-start） --}}
+                            <div class="row g-3 align-items-start" data-trainee-card-row>
+                                <div class="{{ ($chart['personality'] ?? null) ? 'col-12 col-lg-8' : 'col-12' }}">
+                                    <div class="d-flex flex-column flex-sm-row gap-3 align-items-start">
+                                        {{-- 左：トレーニー写真。
+                                             モバイル（<576px、親が flex-column）では**中央寄せ**、sm 以上
+                                             （親が flex-sm-row）では**上端揃え**にする。親の align-items-start
+                                             は cross 軸に対する既定で、flex-column では横方向・flex-sm-row では
+                                             縦方向の意味が入れ替わる。photo は sm 未満で中央、sm 以上で先頭
+                                             という個別要望のため、この要素だけ align-self でオーバーライドする
+                                             （align-self は align-items より個別指定として優先される。Bootstrap
+                                             の align-self-* は !important 付きで確実に上書きされる）。 --}}
+                                        {{-- 写真の列の幅：パソコン（sm 以上、横並び）は 180px 固定、スマホ（<576px、
+                                             縦積み）はカード幅いっぱい（100%）。sm 以上では flex-shrink: 0 で縮まず、
+                                             width: 180px で伸びもしない。エラーの文言はこの列の幅で折り返し、グラフ側の
+                                             列の幅はエラーの有無で変わらない。幅の切り替えは `.c-trainee-photo-col` に集約
+                                            （2026-10 変更、設計書 S-1402「トレーニー写真」設計方針参照）。 --}}
+                                        <div class="c-trainee-photo-col align-self-center align-self-sm-start">
+                                            {{-- アップロード用フォーム：隠しファイル入力のみを持つ。
+                                                 写真ありの場合はモーダル内「変更」ボタンから、写真なしの場合は
+                                                 <label for="..."> から <input> をクリックさせる。form は
+                                                 見た目の <label>/<button> の外側に置き、CSRF・enctype を保つ。 --}}
+                                            {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。
+                                                 accept 属性は残す（ブラウザのファイル選択ダイアログで形式を絞るための属性）。 --}}
+                                            <form action="{{ route('client-portal.trainee-photo.store', $chart['id']) }}"
+                                                  method="POST"
+                                                  enctype="multipart/form-data"
+                                                  id="trainee-photo-form-{{ $chart['id'] }}"
+                                                  style="margin: 0; display: contents;"
+                                                  novalidate>
+                                                @csrf
+                                                {{-- どのトレーニーのフォームからの送信かを判別する hidden。
+                                                     バリデーションエラー・変換失敗で戻ったとき、old('_trainee_id') と
+                                                     各カードの $chart['id'] を比較して該当トレーニーのカードだけに
+                                                     エラーを出す。TraineePhotoController の validate() のルールに
+                                                     入れないため validated() に混入しない（計測値モーダル S-0309 と同じ流儀）。 --}}
+                                                <input type="hidden" name="_trainee_id" value="{{ $chart['id'] }}">
+                                                {{-- 非表示のファイル入力。選択即送信（JavaScript で form.submit()）。
+                                                     accept は MIME と拡張子の両方を列挙（HEIC は iOS 側で MIME が空に
+                                                     なるケースがあるため拡張子も入れる。既存メディア機能と同じ考え方）。 --}}
+                                                <input type="file"
+                                                       name="photo"
+                                                       id="trainee-photo-input-{{ $chart['id'] }}"
+                                                       accept="image/jpeg,image/png,image/heic,image/heif,.jpg,.jpeg,.png,.heic,.heif"
+                                                       style="display: none;"
+                                                       onchange="document.getElementById('trainee-photo-form-{{ $chart['id'] }}').submit();">
+                                            </form>
 
-                                    {{-- 写真枠。サイズはパソコン（sm 以上）で 180px 四方、スマホ（<576px）で
-                                         カード幅いっぱいの正方形。`.c-trainee-photo-frame` に集約（2026-10 変更、
-                                         設計書 S-1402「トレーニー写真」設計方針参照）。
-                                         クリック時の挙動は写真の有無で分かれる（2026-09 変更）：
-                                         - 写真あり : <button> でモーダルを開く（データ属性で Bootstrap にトリガー）
-                                         - 写真なし : <label> でファイル選択を直接開く（1 クリック少ない）
-                                         見た目（枠の色・角丸・境界）は両方で完全に同じ。 --}}
-                                    @if($chart['photoUrl'])
-                                        <button type="button"
-                                                class="c-trainee-photo-frame d-flex align-items-center justify-content-center p-0"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#trainee-photo-modal-{{ $chart['id'] }}"
-                                                style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
-                                                aria-label="{{ $chart['callName'] }}の写真を操作する">
-                                            {{-- 縦横比を保ったまま枠内に収める（切り抜きはしない）。
-                                                 max-width/height 100% で枠を超えず、object-fit: contain で
-                                                 余白は枠の背景色（白）で埋まる（設計書「トレーニー写真」の
-                                                 切り抜きしない方針）。 --}}
-                                            <img src="{{ $chart['photoUrl'] }}"
-                                                 alt="{{ $chart['callName'] }}の写真"
-                                                 style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
-                                        </button>
-                                    @else
-                                        <label for="trainee-photo-input-{{ $chart['id'] }}"
-                                               class="c-trainee-photo-frame d-flex align-items-center justify-content-center"
-                                               style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
-                                               title="写真を登録します"
-                                               aria-label="{{ $chart['callName'] }}の写真を登録する">
-                                            <span class="text-muted" style="font-size: 0.875rem;">写真を登録</span>
-                                        </label>
-                                    @endif
+                                            {{-- 写真枠。サイズはパソコン（sm 以上）で 180px 四方、スマホ（<576px）で
+                                                 カード幅いっぱいの正方形。`.c-trainee-photo-frame` に集約（2026-10 変更、
+                                                 設計書 S-1402「トレーニー写真」設計方針参照）。
+                                                 クリック時の挙動は写真の有無で分かれる（2026-09 変更）：
+                                                 - 写真あり : <button> でモーダルを開く（データ属性で Bootstrap にトリガー）
+                                                 - 写真なし : <label> でファイル選択を直接開く（1 クリック少ない）
+                                                 見た目（枠の色・角丸・境界）は両方で完全に同じ。 --}}
+                                            @if($chart['photoUrl'])
+                                                <button type="button"
+                                                        class="c-trainee-photo-frame d-flex align-items-center justify-content-center p-0"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#trainee-photo-modal-{{ $chart['id'] }}"
+                                                        style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
+                                                        aria-label="{{ $chart['callName'] }}の写真を操作する">
+                                                    {{-- 縦横比を保ったまま枠内に収める（切り抜きはしない）。
+                                                         max-width/height 100% で枠を超えず、object-fit: contain で
+                                                         余白は枠の背景色（白）で埋まる（設計書「トレーニー写真」の
+                                                         切り抜きしない方針）。 --}}
+                                                    <img src="{{ $chart['photoUrl'] }}"
+                                                         alt="{{ $chart['callName'] }}の写真"
+                                                         style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
+                                                </button>
+                                            @else
+                                                <label for="trainee-photo-input-{{ $chart['id'] }}"
+                                                       class="c-trainee-photo-frame d-flex align-items-center justify-content-center"
+                                                       style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; cursor: pointer; overflow: hidden; margin: 0;"
+                                                       title="写真を登録します"
+                                                       aria-label="{{ $chart['callName'] }}の写真を登録する">
+                                                    <span class="text-muted" style="font-size: 0.875rem;">写真を登録</span>
+                                                </label>
+                                            @endif
 
-                                    {{-- 写真枠（ファイル選択のまとまり）の下の文言（設計書 §2-7）。
-                                         ファイル入力自体は display: none なので、Bootstrap の
-                                         .is-invalid ~ .invalid-feedback の兄弟セレクタでは出せない。
-                                         block で独立して描画する。幅は写真の列と同じ（パソコンでは
-                                         180px、スマホではカード幅いっぱい）。折り返しは発生するが、
-                                         カード幅ではなく枠の下に紐づく位置に出すことで、どの入力に
-                                         対するエラーかを明確にする。 --}}
-                                    @if($shouldShowPhotoError)
-                                        <x-form-error field="photo" block />
-                                    @endif
-                                </div>
-
-                                {{-- 右：体重推移グラフ（既存の作りを維持し、横並び対応のため
-                                     flex-grow-1 と min-width: 0 を付ける。min-width: 0 は
-                                     flex 子要素の canvas が親幅を超えて突き抜けるのを防ぐ定石）。 --}}
-                                <div class="flex-grow-1 w-100" style="min-width: 0;">
-                                    @if(empty($chart['datasets']))
-                                        {{-- 計測値 0 件のトレーニー（2026-09 追加）。空のグラフ（軸だけ）を
-                                             描くと意味のない目盛りが出て不具合に見えるため、canvas を出さず
-                                             案内文を表示する。高さは通常のグラフ（180px）と揃え、複数
-                                             トレーニーが並んだときのカード高さの一貫性を保つ。空判定のキーは
-                                             かつて `labels` だったが、時間軸への変更で `labels` を廃止したため
-                                             `datasets` の空判定に切り替えた（2026-09 変更。詳細は
-                                             screen-design.md S-1402「体重推移」設計方針参照）。 --}}
-                                        <div class="d-flex align-items-center justify-content-center text-muted"
-                                             style="height: {{ $weightChartHeight }};">
-                                            まだ計測値がありません。
+                                            {{-- 写真枠（ファイル選択のまとまり）の下の文言（設計書 §2-7）。
+                                                 ファイル入力自体は display: none なので、Bootstrap の
+                                                 .is-invalid ~ .invalid-feedback の兄弟セレクタでは出せない。
+                                                 block で独立して描画する。幅は写真の列と同じ（パソコンでは
+                                                 180px、スマホではカード幅いっぱい）。折り返しは発生するが、
+                                                 カード幅ではなく枠の下に紐づく位置に出すことで、どの入力に
+                                                 対するエラーかを明確にする。 --}}
+                                            @if($shouldShowPhotoError)
+                                                <x-form-error field="photo" block />
+                                            @endif
                                         </div>
-                                    @else
-                                        {{-- data-measurement-chart は datasets のみを渡す（2026-09 変更。
-                                             時間軸化で labels / tooltips の別配列は廃止し、Chart.js は
-                                             各点の {x, y} オブジェクトから軸・ツールチップを組み立てる）。 --}}
-                                        <div style="position: relative; height: {{ $weightChartHeight }};">
-                                            <canvas data-measurement-chart="{{ json_encode([
-                                                'datasets' => $chart['datasets'],
-                                            ], JSON_UNESCAPED_UNICODE) }}"></canvas>
+
+                                        {{-- 右：体重推移グラフ（既存の作りを維持し、横並び対応のため
+                                             flex-grow-1 と min-width: 0 を付ける。min-width: 0 は
+                                             flex 子要素の canvas が親幅を超えて突き抜けるのを防ぐ定石）。 --}}
+                                        <div class="flex-grow-1 w-100" style="min-width: 0;">
+                                            @if(empty($chart['datasets']))
+                                                {{-- 計測値 0 件のトレーニー（2026-09 追加）。空のグラフ（軸だけ）を
+                                                     描くと意味のない目盛りが出て不具合に見えるため、canvas を出さず
+                                                     案内文を表示する。高さは通常のグラフ（180px）と揃え、複数
+                                                     トレーニーが並んだときのカード高さの一貫性を保つ。空判定のキーは
+                                                     かつて `labels` だったが、時間軸への変更で `labels` を廃止したため
+                                                     `datasets` の空判定に切り替えた（2026-09 変更。詳細は
+                                                     screen-design.md S-1402「体重推移」設計方針参照）。 --}}
+                                                <div class="d-flex align-items-center justify-content-center text-muted"
+                                                     style="height: {{ $weightChartHeight }};">
+                                                    まだ計測値がありません。
+                                                </div>
+                                            @else
+                                                {{-- data-measurement-chart は datasets のみを渡す（2026-09 変更。
+                                                     時間軸化で labels / tooltips の別配列は廃止し、Chart.js は
+                                                     各点の {x, y} オブジェクトから軸・ツールチップを組み立てる）。 --}}
+                                                <div style="position: relative; height: {{ $weightChartHeight }};">
+                                                    <canvas data-measurement-chart="{{ json_encode([
+                                                        'datasets' => $chart['datasets'],
+                                                    ], JSON_UNESCAPED_UNICODE) }}"></canvas>
+                                                </div>
+                                            @endif
                                         </div>
-                                    @endif
+                                    </div>
                                 </div>
+                                @if($chart['personality'] ?? null)
+                                    {{-- 性格診断（2026-10 追加。要件定義書 6-15-19）。会員が回答したらすぐ出す（トレーナーの公開の操作はない）。
+                                         - 小見出し「性格診断」（.eyebrow）の下に、最新の結果のタイプ。縦に積むとき（lg 未満）はグラフと同じく中央、横に並べたときは左。タイプは「・」のあとでだけ折り返す（トレーナー側 S-0309 と同じ作り）
+                                         - レーダーチャートと HTML の凡例はトレーナー側と同じもの（personality-radar.js・personality-radar-config.js を共有）。
+                                           値は Trainee::personality_radar_data（今回・前回・初回）
+                                         - 読み上げ：会員側には点数の表がないので、canvas には「{呼び名}の性格診断のグラフ」とだけ付ける
+                                           （点数は出さないものなので読み上げにも出さない。タイプは上の文字で読まれる）
+                                         - 出さないもの：点数の表・50 問の回答・［回答］［削除］・案内の発行と取消 --}}
+                                    <div class="col-12 col-lg-4" data-client-personality-diagnosis>
+                                        <p class="eyebrow mb-1 text-center text-lg-start">性格診断</p>
+                                        <p class="mb-2 fw-bold text-center text-lg-start" style="word-break: keep-all;" data-client-personality-type>{!! collect(explode('・', $chart['personality']['type']))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
+                                        <div class="mx-auto" style="max-width: 320px;">
+                                            <canvas id="personality-radar-{{ $chart['id'] }}" role="img" aria-label="{{ $chart['callName'] }}の性格診断のグラフ"
+                                                    data-personality-radar="{{ json_encode($chart['personality']['radar'], JSON_UNESCAPED_UNICODE) }}"></canvas>
+                                        </div>
+                                        {{-- 凡例（トレーナー側と同じく、項目と線の見本は personality-radar.js が SERIES_STYLES から作る）。
+                                             横に並べたとき（lg 以上）は列が狭いので縦に並べ、それより狭いときは 1 行（収まらなければ折り返す） --}}
+                                        <div class="d-flex justify-content-center mt-2">
+                                            <ul class="list-unstyled d-flex flex-wrap flex-lg-column align-items-lg-start justify-content-center column-gap-3 row-gap-1 small mb-0"
+                                                data-personality-radar-legend="personality-radar-{{ $chart['id'] }}"></ul>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -433,6 +465,10 @@
 {{-- 体重推移グラフ用スクリプト（Chart.js を npm でビルドに含める。段階③）。 --}}
 @if(!empty($weightCharts))
     @vite('resources/js/measurement-chart.js')
+@endif
+{{-- 性格診断のレーダーチャート用スクリプト（トレーナー側 S-0309 と共有。結果のあるトレーニーがいるときだけ読み込む。2026-10 追加） --}}
+@if(collect($weightCharts)->contains(fn ($chart) => ($chart['personality'] ?? null) !== null))
+    @vite('resources/js/personality-radar.js')
 @endif
 @endsection
 
