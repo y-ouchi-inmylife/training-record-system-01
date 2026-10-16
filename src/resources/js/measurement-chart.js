@@ -30,7 +30,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import { format, addDays, parseISO } from 'date-fns';
-import { measurementTickLabel } from './measurement-chart-ticks';
+import { applyYearLabels, measurementTickLabelReserved } from './measurement-chart-ticks';
 
 Chart.register(
     LineController,
@@ -182,14 +182,19 @@ function renderChart(canvas, data) {
                         // 目盛りが密なときは自動で間引く。ラベルは回転させない。
                         autoSkip: true,
                         maxRotation: 0,
-                        // 目盛りの文字は、最初の目盛りも含めてすべて日付だけ（「9/15」。measurement-chart-ticks.js）。
-                        // 2026-10 変更：当初は最初の目盛りだけ 2 行目に時刻（「0:00」）を出していた（設計書 S-1402
-                        // 「横軸ラベルを 2 行にした経緯」）。ユーザーレビューで、すべての目盛りを日付だけにそろえた。
+                        // 目盛りの文字はすべて日付（「9/15」）。左端と、年が変わってから最初の目盛りだけ 2 行目に年
+                        // （measurement-chart-ticks.js。設計書 S-1402「横軸の年の出し方」）。
+                        // ここ（間引く前の目盛り）では、いったんすべてに 2 行（日付と年）を付けて横軸の高さを 2 行分取り、
+                        // 間引いたあとに下の afterFit で、画面に出ている目盛りの文字を付け直す。
                         // ツールチップには影響しない（`tooltipFormat: 'yyyy/M/d HH:mm'` は別系統で、「2026/9/15 08:00」のまま）。
                         // callback を指定すると time.displayFormats は使われない仕様のため、displayFormats は指定しない
                         callback(value) {
-                            return measurementTickLabel(value);
+                            return measurementTickLabelReserved(value);
                         },
+                    },
+                    // 間引いた（autoSkip）あとの、画面に出ている目盛りで年を付けるかどうかを決める（2026-10 追加）
+                    afterFit(axis) {
+                        applyYearLabels(axis);
                     },
                 },
             },
