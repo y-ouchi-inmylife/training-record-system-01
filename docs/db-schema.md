@@ -319,7 +319,8 @@ erDiagram
 | first_name_kana | VARCHAR(50) | YES | NULL | めい。ひらがなのみ |
 | primary_trainer_id | BIGINT UNSIGNED | YES | NULL | 主担当トレーナーのID（外部キー） |
 | phone1 | VARCHAR(20) | YES | NULL | 電話番号。ハイフンあり/なし両対応 |
-| phone2 | VARCHAR(20) | YES | NULL | 電話番号（予備）。ハイフンあり/なし両対応 |
+| phone2 | VARCHAR(20) | YES | NULL | 緊急連絡先（ご家族等）の電話番号。ハイフンあり/なし両対応（**2026-10-17 変更**：その前は「電話番号（予備）」。画面の名前だけを変え、列の名前は変えない〔本番のデータの移し替えと参照の直しを増やさないため〕。値はそのまま緊急連絡先として引き継ぐ） |
+| emergency_contact_relationship | VARCHAR(20) | YES | NULL | 緊急連絡先の方と会員との続柄（例：母、夫、娘）。自由入力（**2026-10-17 追加**） |
 | email | VARCHAR(255) | YES | NULL | メールアドレス。クライアント閲覧機能のログインIDを兼ねる。**クライアント自身がメールアドレス登録用 URL から登録する**（トレーナーは入力・書き換えできない）。UNIQUE制約あり（未登録=NULLは複数許容） |
 | postal_code | VARCHAR(10) | YES | NULL | 郵便番号。ハイフンあり/なし両対応 |
 | address1 | VARCHAR(50) | YES | NULL | 住所1（都道府県） |

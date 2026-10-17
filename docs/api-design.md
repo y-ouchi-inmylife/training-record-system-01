@@ -370,7 +370,8 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 | initial_consultation_date | date | ● | required, date | |
 | last_name | string | ● | nullable, string, max:50 | |
 | *_kana | string | | nullable, string, max:50, regex:/^[\p{Hiragana}\s　]+$/u | |
-| phone* | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | |
+| phone* | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | phone2 は緊急連絡先（ご家族等）（**2026-10-17 変更**：その前は電話番号（予備）） |
+| emergency_contact_relationship | string | | nullable, string, max:20 | 続柄（**2026-10-17 追加**） |
 | email | string | | nullable, email, max:255 | |
 | primary_trainer_id | integer | | nullable, exists:trainers,id | |
 
@@ -1558,7 +1559,8 @@ POST /training-records に以下を追加する。
 | last_name_kana | string | | nullable, string, max:50, regex:ひらがな | せい |
 | first_name_kana | string | | nullable, string, max:50, regex:ひらがな | めい |
 | phone1 | string | ● | required, string, max:20, regex:/^[0-9\-]+$/ | 電話番号 |
-| phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 電話番号（予備） |
+| phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 緊急連絡先（ご家族等）（**2026-10-17 変更**：その前は電話番号（予備）） |
+| emergency_contact_relationship | string | | nullable, string, max:20 | 続柄（**2026-10-17 追加**） |
 | postal_code | string |  | nullable, string, regex:/^\d{3}-?\d{4}$/ | 郵便番号（任意。入力された場合のみ形式チェック） |
 | address1 | string | ● | required, string, max:50 | 都道府県 |
 | address2 | string | ● | required, string, max:50 | 市区町村 |
@@ -1731,7 +1733,8 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | phone1 | string | ● | required, string, max:20, regex:/^[0-9\-]+$/ | 電話番号 |
-| phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 電話番号（予備） |
+| phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 緊急連絡先（ご家族等）（**2026-10-17 変更**：その前は電話番号（予備）） |
+| emergency_contact_relationship | string | | nullable, string, max:20 | 続柄（**2026-10-17 追加**） |
 | postal_code | string |  | nullable, string, regex:/^\d{3}-?\d{4}$/ | 郵便番号（任意。入力された場合のみ形式チェック） |
 | address1 | string | ● | required, string, max:50 | 都道府県 |
 | address2 | string | ● | required, string, max:50 | 市区町村 |
