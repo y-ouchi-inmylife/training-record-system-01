@@ -1544,33 +1544,46 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, $count($three));
     }
 
-    // ---- 連絡先の緊急連絡先（ご家族等）と続柄（2026-10-17 変更：その前は「電話番号（予備）」） ----
+    // ---- 連絡先の緊急連絡先（ご家族等）（2026-10-17 変更：その前は「電話番号（予備）」。
+    //      2026-10-18 変更：続柄を別の項目にせず「電話番号（続柄）」の 1 つの値で出す） ----
 
-    public function test_会員詳細の連絡先に緊急連絡先と続柄を並べ電話番号予備の文字は出さない(): void
+    public function test_会員詳細の緊急連絡先は電話番号と続柄を1つの値で出し続柄の項目は出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
-        $client->forceFill(['phone1' => '03-0000-0000', 'phone2' => '090-1111-2222', 'emergency_contact_relationship' => '母'])->save();
 
-        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        foreach ([
+            '両方' => ['090-1111-2222', '母', '090-1111-2222（母）'],
+            '電話番号だけ' => ['090-1111-2222', null, '090-1111-2222'],
+            '続柄だけ' => [null, '母', '（続柄：母）'],
+            'どちらもない' => [null, null, ''],
+        ] as $case => [$phone, $relationship, $expected]) {
+            $client->forceFill(['phone1' => '03-0000-0000', 'phone2' => $phone, 'emergency_contact_relationship' => $relationship])->save();
 
-        $this->assertMatchesRegularExpression('/電話番号<\/div>\s*<div[^>]*>\s*03-0000-0000\s*<\/div>/u', $html);
-        $this->assertMatchesRegularExpression('/緊急連絡先（ご家族等）<\/div>\s*<div[^>]*>\s*090-1111-2222\s*<\/div>/u', $html);
-        $this->assertMatchesRegularExpression('/続柄<\/div>\s*<div[^>]*>\s*母\s*<\/div>/u', $html);
-        // 並び：電話番号 → 緊急連絡先 → 続柄
-        $this->assertTrue(strpos($html, '03-0000-0000') < strpos($html, '緊急連絡先（ご家族等）')
-            && strpos($html, '緊急連絡先（ご家族等）') < strpos($html, '続柄</div>'));
-        $this->assertStringNotContainsString('電話番号（予備）', $html);
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+            $this->assertMatchesRegularExpression(
+                '/緊急連絡先（ご家族等）<\/div>\s*<div style="min-height: 1.5rem;">\s*'.preg_quote($expected, '/').'\s*<\/div>/u',
+                $html,
+                $case
+            );
+            $this->assertStringNotContainsString('>続柄</div>', $html, $case);
+            $this->assertStringNotContainsString('電話番号（予備）', $html, $case);
+        }
     }
 
-    public function test_会員詳細の続柄と緊急連絡先は空でもラベルを出す(): void
+    public function test_会員詳細の連絡先は2行目の3列目を1行目と同じく空ける(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $start = strpos($html, '<h6 class="mb-0">連絡先</h6>');
+        $card = substr($html, $start, strpos($html, '最終更新', $start) - $start);
 
-        $this->assertStringContainsString('緊急連絡先（ご家族等）', $html);
-        $this->assertStringContainsString('続柄</div>', $html);
+        // 郵便番号・住所・（空き）／電話番号・緊急連絡先（続柄の列はない）
+        $this->assertSame(5, substr_count($card, '<div class="col-6 col-md-4">'));
+        $this->assertSame(4, substr_count($card, '<div class="text-muted small mb-1">'));
+        $this->assertTrue(strpos($card, '>電話番号</div>') < strpos($card, '>緊急連絡先（ご家族等）</div>'));
     }
 }

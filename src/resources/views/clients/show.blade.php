@@ -725,9 +725,10 @@
                 <x-detail-cell label="住所" :value="$fullAddress" />
                 <div class="col-6 col-md-4"></div>
                 <x-detail-cell label="電話番号" :value="$client->phone1" />
-                {{-- 2026-10-17 変更：「電話番号（予備）」を「緊急連絡先（ご家族等）」にし、空いていた 3 列目に続柄を置く --}}
-                <x-detail-cell label="緊急連絡先（ご家族等）" :value="$client->phone2" />
-                <x-detail-cell label="続柄" :value="$client->emergency_contact_relationship" />
+                {{-- 緊急連絡先（ご家族等）は「電話番号（続柄）」の 1 つの値で出す（Client::emergency_contact_display）。
+                     2026-10-17 に「電話番号（予備）」から変え、2026-10-18 に続柄の列をやめてまとめた（続柄が単独の項目に見えたため）。
+                     2 行目の 3 列目は 1 行目と同じく空く --}}
+                <x-detail-cell label="緊急連絡先（ご家族等）" :value="$client->emergency_contact_display" />
             </div>
         </div>
     </div>

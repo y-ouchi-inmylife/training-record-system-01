@@ -59,14 +59,11 @@
                         <div class="text-muted small mb-1">電話番号</div>
                         <div style="min-height: 1.5rem;">{{ $client->phone1 }}</div>
                     </div>
-                    {{-- 2026-10-17 変更：「電話番号（予備）」を「緊急連絡先（ご家族等）」にし、続柄を足す --}}
-                    <div class="py-3 border-bottom">
-                        <div class="text-muted small mb-1">緊急連絡先（ご家族等）</div>
-                        <div style="min-height: 1.5rem;">{{ $client->phone2 }}</div>
-                    </div>
+                    {{-- 緊急連絡先（ご家族等）は「電話番号（続柄）」の 1 つの値で出す（Client::emergency_contact_display。
+                         2026-10-18 変更：その前は「続柄」を別の行に出していたが、緊急連絡先の方の続柄だとわからなかった） --}}
                     <div class="py-3">
-                        <div class="text-muted small mb-1">続柄</div>
-                        <div style="min-height: 1.5rem;">{{ $client->emergency_contact_relationship }}</div>
+                        <div class="text-muted small mb-1">緊急連絡先（ご家族等）</div>
+                        <div style="min-height: 1.5rem;">{{ $client->emergency_contact_display }}</div>
                     </div>
                 </div>
             </div>

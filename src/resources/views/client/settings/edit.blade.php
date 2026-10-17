@@ -54,21 +54,31 @@
                                value="{{ old('phone1', $client->phone1) }}">
                         <x-form-error field="phone1" />
                     </div>
-                    {{-- 2026-10-17 変更：「電話番号（予備）」を「緊急連絡先（ご家族等）」にし、すぐ下に続柄を足す --}}
-                    <div class="mb-2">
-                        <label for="phone2" class="form-label">緊急連絡先（ご家族等）</label>
-                        <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
-                               id="phone2" name="phone2" maxlength="20"
-                               value="{{ old('phone2', $client->phone2) }}">
-                        <x-form-error field="phone2" />
-                    </div>
-                    <div class="mb-3">
-                        <label for="emergency_contact_relationship" class="form-label">続柄</label>
-                        <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
-                               id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"
-                               value="{{ old('emergency_contact_relationship', $client->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘">
-                        <x-form-error field="emergency_contact_relationship" />
-                    </div>
+                    {{-- 緊急連絡先（ご家族等）：見出し（legend）の下に「電話番号」「続柄」を横に並べる（7：5。スマホの幅でも横に並べ、576px 未満は 6：6。
+                         375px の幅では 7：5 だと続柄の欄が狭く、例の文「例: 母、夫、娘」が欄に収まらなかったため）。
+                         fieldset と legend で、読み上げでは「緊急連絡先（ご家族等）」の中の「電話番号」「続柄」と読まれる。
+                         legend は Bootstrap の既定で大きな文字・左に浮くので、form-label と fs-6 で欄のラベルと同じ大きさにする。
+                         2026-10-18 変更：その前（2026-10-17）は「緊急連絡先（ご家族等）」「続柄」を縦一列の別々の項目にしていたが、
+                         続柄が緊急連絡先の方の続柄だとわからなかった --}}
+                    <fieldset class="mb-3">
+                        <legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）</legend>
+                        <div class="row g-2">
+                            <div class="col-6 col-sm-7">
+                                <label for="phone2" class="form-label small mb-1">電話番号</label>
+                                <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
+                                       id="phone2" name="phone2" maxlength="20"
+                                       value="{{ old('phone2', $client->phone2) }}">
+                                <x-form-error field="phone2" />
+                            </div>
+                            <div class="col-6 col-sm-5">
+                                <label for="emergency_contact_relationship" class="form-label small mb-1">続柄</label>
+                                <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
+                                       id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"
+                                       value="{{ old('emergency_contact_relationship', $client->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘">
+                                <x-form-error field="emergency_contact_relationship" />
+                            </div>
+                        </div>
+                    </fieldset>
 
                     <div class="mb-2">
                         {{-- 郵便番号は任意（住所検索の入口という位置づけで、DB も NULL 許容。

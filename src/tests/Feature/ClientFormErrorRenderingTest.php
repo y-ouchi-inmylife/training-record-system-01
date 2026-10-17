@@ -165,17 +165,32 @@ class ClientFormErrorRenderingTest extends TestCase
 
     // ---- 緊急連絡先（ご家族等）と続柄（2026-10-17 変更：その前は「電話番号（予備）」） ----
 
-    public function test_登録と編集に緊急連絡先と続柄の欄を出し電話番号予備の文字は出さない(): void
+    public function test_緊急連絡先と続柄は電話番号とは別の行に並べ続柄は緊急連絡先の続柄と読まれる(): void
     {
         foreach ([false, true] as $isEdit) {
-            $view = $this->renderForm([], isEdit: $isEdit);
+            $html = (string) $this->renderForm([], isEdit: $isEdit);
 
+            // 行（row g-3 mb-2）ごとに分けて、電話番号の行と緊急連絡先・続柄の行が別であることを確かめる
+            $rows = preg_split('/<div class="row g-3 mb-2">/u', $html);
+            $phoneRow = array_values(array_filter($rows, fn ($r) => str_contains($r, 'id="phone1"')));
+            $emergencyRow = array_values(array_filter($rows, fn ($r) => str_contains($r, 'id="phone2"')));
+            $this->assertCount(1, $phoneRow);
+            $this->assertCount(1, $emergencyRow);
+            $this->assertNotSame($phoneRow[0], $emergencyRow[0]);
+            $this->assertStringNotContainsString('id="phone2"', $phoneRow[0]);
+            $this->assertStringContainsString('id="emergency_contact_relationship"', $emergencyRow[0]);
+            $this->assertTrue(strpos($emergencyRow[0], 'id="phone2"') < strpos($emergencyRow[0], 'id="emergency_contact_relationship"'));
+
+            // 緊急連絡先の行はラベルと入力欄を上にそろえる（ラベルが 2 行でも、入力欄の上が続柄の欄とそろう）
+            $this->assertSame(2, substr_count($emergencyRow[0], '<div class="row g-2 align-items-start">'));
+            $this->assertStringNotContainsString('align-items-center', $emergencyRow[0]);
             // 緊急連絡先のラベルは「（ご家族等）」の前で折り返す（固定幅に収まらないため）
-            $view->assertSee('<label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>', false);
-            $view->assertSee('<label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>', false);
-            $view->assertSee('id="emergency_contact_relationship" name="emergency_contact_relationship"', false);
-            $view->assertSee('placeholder="例: 母、夫、娘"', false);
-            $view->assertDontSee('電話番号（予備）');
+            $this->assertStringContainsString('<label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>', $emergencyRow[0]);
+            // 続柄：見た目のラベルは「続柄」、読み上げは「緊急連絡先の続柄」
+            $this->assertStringContainsString('<label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>', $emergencyRow[0]);
+            $this->assertStringContainsString('name="emergency_contact_relationship" aria-label="緊急連絡先の続柄"', $emergencyRow[0]);
+            $this->assertStringContainsString('placeholder="例: 母、夫、娘"', $emergencyRow[0]);
+            $this->assertStringNotContainsString('電話番号（予備）', $html);
         }
     }
 }

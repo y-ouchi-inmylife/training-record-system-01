@@ -234,14 +234,19 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $this->assertLessThan($posLoginHeading, $posLine);
     }
 
-    public function test_初回設定_緊急連絡先のすぐ下に続柄の欄を出し電話番号予備の文字は出さない(): void
+    public function test_初回設定_緊急連絡先の見出しの下に電話番号と続柄を横に並べる(): void
     {
-        $view = $this->renderSetup([]);
+        $html = (string) $this->renderSetup([]);
 
-        $view->assertSeeInOrder(['<label for="phone2" class="form-label">緊急連絡先（ご家族等）</label>', '<label for="emergency_contact_relationship" class="form-label">続柄</label>', 'id="postal_code"'], false);
-        $view->assertSee('id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"', false);
-        $view->assertSee('placeholder="例: 母、夫、娘"', false);
-        $view->assertDontSee('電話番号（予備）');
+        $this->assertSame(1, preg_match('/<fieldset class="mb-3">\s*<legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）<\/legend>(.*?)<\/fieldset>/us', $html, $m));
+        $this->assertMatchesRegularExpression('/<div class="row g-2">\s*<div class="col-6 col-sm-7">\s*<label for="phone2" class="form-label small mb-1">電話番号<\/label>/u', $m[1]);
+        $this->assertMatchesRegularExpression('/<div class="col-6 col-sm-5">\s*<label for="emergency_contact_relationship" class="form-label small mb-1">続柄<\/label>/u', $m[1]);
+        $this->assertStringContainsString('id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"', $m[1]);
+        $this->assertStringContainsString('placeholder="例: 母、夫、娘"', $m[1]);
+        // 電話番号（必須）の欄は見出しの外、郵便番号は見出しのあと
+        $this->assertTrue(strpos($html, 'id="phone1"') < strpos($html, '<fieldset class="mb-3">'));
+        $this->assertTrue(strpos($html, '</fieldset>') < strpos($html, 'id="postal_code"'));
+        $this->assertStringNotContainsString('電話番号（予備）', $html);
     }
 
     public function test_初回設定_続柄だけのエラーでも上部案内とパスワード再入力の案内が出る(): void

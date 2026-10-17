@@ -115,6 +115,28 @@ class Client extends Authenticatable
     }
 
     /**
+     * 緊急連絡先（ご家族等）の表示の値（電話番号 phone2 と続柄 emergency_contact_relationship をひとまとまりに出す）。
+     *
+     * 会員詳細（S-0305）と会員側の登録情報（S-1406）で使う（2026-10-18 追加。続柄が別の項目として並ぶと、
+     * 緊急連絡先の方の続柄だとわからなかったため）。括弧は全角。電話番号は入力されたとおりに出す。
+     * - 両方：「090-1234-5678（母）」
+     * - 電話番号だけ：「090-1234-5678」
+     * - 続柄だけ：「（続柄：母）」（まれなので、続柄だとわかる形にする）
+     * - どちらもない：null（ほかの空の項目と同じく、値を空にする）
+     */
+    public function getEmergencyContactDisplayAttribute(): ?string
+    {
+        $phone = (string) $this->phone2;
+        $relationship = (string) $this->emergency_contact_relationship;
+
+        if ($phone === '') {
+            return $relationship === '' ? null : '（続柄：'.$relationship.'）';
+        }
+
+        return $relationship === '' ? $phone : $phone.'（'.$relationship.'）';
+    }
+
+    /**
      * 一覧表示用の氏名
      */
     public function getDisplayNameAttribute(): string

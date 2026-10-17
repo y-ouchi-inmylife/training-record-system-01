@@ -227,8 +227,7 @@
                 </div>
 
                 <div class="row g-3 mb-2">
-                    {{-- 行3: 電話番号 + 緊急連絡先（ご家族等）+ 続柄（2026-10-17 変更：その前は「電話番号（予備）」で、3 列目は空き）。
-                         緊急連絡先のラベルは固定幅（140px）に収まらないので、「（ご家族等）」の前で折り返す（言葉の途中で折り返さない） --}}
+                    {{-- 行3: 電話番号（2026-10-18 変更：その前は同じ行に緊急連絡先と続柄も並べていた。右は空ける） --}}
                     <div class="col-md-4">
                         <div class="row g-2 align-items-center">
                             <label for="phone1" class="col-md-auto col-form-label text-md-end form-label-fixed">電話番号</label>
@@ -240,8 +239,17 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="row g-3 mb-2">
+                    {{-- 行4: 緊急連絡先（ご家族等）+ 続柄（2026-10-18 変更：電話番号の行から次の行に分け、ひとまとまりに見せる。
+                         続柄が緊急連絡先の方の続柄だとわからなかったため）。
+                         緊急連絡先のラベルは固定幅（140px）に収まらないので「（ご家族等）」の前で 2 行に折り返す。
+                         この行だけラベルと入力欄を上にそろえる（align-items-start）：上下の中央にそろえると、ラベルが 2 行の
+                         緊急連絡先の欄だけ入力欄が下にずれ、続柄の欄と上の位置がそろわないため。
+                         続柄の欄は、見た目のラベルは「続柄」のまま、読み上げでは「緊急連絡先の続柄」と読む（aria-label） --}}
                     <div class="col-md-4">
-                        <div class="row g-2 align-items-center">
+                        <div class="row g-2 align-items-start">
                             <label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>
                             <div class="col-12 col-md">
                                 <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
@@ -252,11 +260,11 @@
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="row g-2 align-items-center">
+                        <div class="row g-2 align-items-start">
                             <label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>
                             <div class="col-12 col-md">
                                 <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
-                                       id="emergency_contact_relationship" name="emergency_contact_relationship"
+                                       id="emergency_contact_relationship" name="emergency_contact_relationship" aria-label="緊急連絡先の続柄"
                                        value="{{ old('emergency_contact_relationship', $client?->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘"
                                        autocomplete="off">
                                 <x-form-error field="emergency_contact_relationship" />

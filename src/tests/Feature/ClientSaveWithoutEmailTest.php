@@ -63,6 +63,21 @@ class ClientSaveWithoutEmailTest extends TestCase
 
     // ---- 緊急連絡先（ご家族等）と続柄（2026-10-17 変更） ----
 
+    public function test_緊急連絡先の表示の値は電話番号と続柄から組み立てる(): void
+    {
+        foreach ([
+            '両方' => ['090-1111-2222', '母', '090-1111-2222（母）'],
+            '電話番号だけ' => ['090-1111-2222', null, '090-1111-2222'],
+            '続柄だけ' => [null, '母', '（続柄：母）'],
+            'どちらもない' => [null, null, null],
+        ] as $case => [$phone, $relationship, $expected]) {
+            $client = new Client(['phone2' => $phone, 'emergency_contact_relationship' => $relationship]);
+            $this->assertSame($expected, $client->emergency_contact_display, $case);
+        }
+        // 空の文字列も「ない」として扱う
+        $this->assertNull((new Client(['phone2' => '', 'emergency_contact_relationship' => '']))->emergency_contact_display);
+    }
+
     public function test_編集で緊急連絡先と続柄を保存でき空にすると空で保存できる(): void
     {
         $client = Client::query()->create(['internal_id' => '1', 'last_name' => '山田', 'initial_consultation_date' => '2026-10-01']);

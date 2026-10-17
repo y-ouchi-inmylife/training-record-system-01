@@ -213,36 +213,72 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $view->assertSee('has-validation', false);
     }
 
-    // ---- 緊急連絡先（ご家族等）と続柄（2026-10-17 変更：その前は「電話番号（予備）」） ----
+    // ---- 緊急連絡先（ご家族等）と続柄（2026-10-17 変更：その前は「電話番号（予備）」。2026-10-18 変更：ひとまとまりに見せる） ----
 
-    public function test_登録情報変更_緊急連絡先のすぐ下に続柄の欄を出し電話番号予備の文字は出さない(): void
+    public function test_登録情報変更_緊急連絡先の見出しの下に電話番号と続柄を横に並べる(): void
     {
         $client = $this->dummyClient();
         $client->phone2 = '090-1111-2222';
         $client->emergency_contact_relationship = '娘';
-        $view = $this->withViewErrors([])->view('client.settings.edit', ['client' => $client]);
+        $html = (string) $this->withViewErrors([])->view('client.settings.edit', ['client' => $client]);
 
-        $view->assertSeeInOrder(['<label for="phone2" class="form-label">緊急連絡先（ご家族等）</label>', 'value="090-1111-2222"', '<label for="emergency_contact_relationship" class="form-label">続柄</label>', 'value="娘"', 'id="postal_code"'], false);
-        $view->assertSee('placeholder="例: 母、夫、娘"', false);
-        $view->assertDontSee('電話番号（予備）');
+        $this->assertEmergencyFieldset($html, '090-1111-2222', '娘');
     }
 
-    public function test_登録情報の表示_緊急連絡先と続柄を出し電話番号予備の文字は出さない(): void
+    public function test_登録情報の表示_緊急連絡先は電話番号と続柄を1つの値で出し続柄の項目は出さない(): void
     {
-        $client = $this->dummyClient();
-        $client->phone2 = '090-1111-2222';
-        $client->emergency_contact_relationship = '娘';
-        $view = $this->view('client.settings.show', ['client' => $client]);
+        foreach ([
+            '両方' => ['090-1111-2222', '母', '090-1111-2222（母）'],
+            '電話番号だけ' => ['090-1111-2222', null, '090-1111-2222'],
+            '続柄だけ' => [null, '母', '（続柄：母）'],
+            'どちらもない' => [null, null, ''],
+        ] as $case => [$phone, $relationship, $expected]) {
+            $client = $this->dummyClient();
+            $client->phone2 = $phone;
+            $client->emergency_contact_relationship = $relationship;
+            $html = (string) $this->view('client.settings.show', ['client' => $client]);
 
-        $view->assertSeeInOrder(['電話番号', '03-0000-0000', '緊急連絡先（ご家族等）', '090-1111-2222', '続柄', '娘']);
-        $view->assertDontSee('電話番号（予備）');
+            $this->assertMatchesRegularExpression(
+                '/<div class="text-muted small mb-1">緊急連絡先（ご家族等）<\/div>\s*<div style="min-height: 1.5rem;">'.preg_quote($expected, '/').'<\/div>/u',
+                $html,
+                $case
+            );
+            $this->assertStringNotContainsString('>続柄</div>', $html, $case);
+            $this->assertStringNotContainsString('電話番号（予備）', $html, $case);
+        }
     }
 
-    public function test_登録情報の表示_緊急連絡先と続柄が空でもラベルを出す(): void
+    public function test_登録情報の表示_緊急連絡先が空でもラベルを出す(): void
     {
         $view = $this->view('client.settings.show', ['client' => $this->dummyClient()]);
 
-        $view->assertSee('緊急連絡先（ご家族等）');
-        $view->assertSee('<div class="text-muted small mb-1">続柄</div>', false);
+        $view->assertSee('<div class="text-muted small mb-1">緊急連絡先（ご家族等）</div>', false);
+    }
+
+    /**
+     * 会員側の入力（S-1403・S-1411）：「緊急連絡先（ご家族等）」の fieldset と legend の中に、「電話番号」「続柄」の欄を横に並べる
+     * （576px 以上は 7：5、それより狭いときは 6：6）
+     */
+    private function assertEmergencyFieldset(string $html, string $phone, string $relationship): void
+    {
+        $this->assertSame(1, preg_match('/<fieldset class="mb-3">\s*<legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）<\/legend>(.*?)<\/fieldset>/us', $html, $m));
+        $inner = $m[1];
+        $this->assertMatchesRegularExpression('/<div class="row g-2">\s*<div class="col-6 col-sm-7">\s*<label for="phone2" class="form-label small mb-1">電話番号<\/label>/u', $inner);
+        $this->assertMatchesRegularExpression('/<div class="col-6 col-sm-5">\s*<label for="emergency_contact_relationship" class="form-label small mb-1">続柄<\/label>/u', $inner);
+        $this->assertStringContainsString('value="'.$phone.'"', $inner);
+        $this->assertStringContainsString('value="'.$relationship.'"', $inner);
+        $this->assertStringContainsString('placeholder="例: 母、夫、娘"', $inner);
+        // 欄下のエラーの置き場所は、それぞれの欄の中
+        $this->assertStringContainsString('id="phone2"', $inner);
+        $this->assertStringContainsString('id="emergency_contact_relationship"', $inner);
+        $this->assertStringNotContainsString('電話番号（予備）', $html);
+    }
+
+    public function test_登録情報変更_緊急連絡先と続柄のエラーはそれぞれの欄の下に出る(): void
+    {
+        $html = (string) $this->renderEdit(['phone2' => 'ERR_phone2', 'emergency_contact_relationship' => 'ERR_rel']);
+
+        $this->assertMatchesRegularExpression('/id="phone2".*?ERR_phone2.*?<div class="col-6 col-sm-5">/us', $html);
+        $this->assertMatchesRegularExpression('/id="emergency_contact_relationship".*?ERR_rel.*?<\/fieldset>/us', $html);
     }
 }
