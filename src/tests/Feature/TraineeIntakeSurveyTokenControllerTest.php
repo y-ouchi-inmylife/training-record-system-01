@@ -76,12 +76,13 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         return route('client-portal.intake-survey.show', ['token' => $token]);
     }
 
-    public function test_発行するとS0311を開き新しい案内のURLが出る(): void
+    public function test_発行すると会員詳細に戻り完了メッセージを出す_案内はS0311で見られる(): void
     {
         $response = $this->post(route('trainee-intake-survey-tokens.store', $this->trainee));
 
-        $response->assertRedirect(route('trainee-intake-survey-tokens.print', $this->trainee));
-        $response->assertSessionMissing('success');
+        // 発行のあとは会員詳細（ページの上）に戻る。S-0311 には移らない（2026-10-17 変更）
+        $response->assertRedirect(route('clients.show', 7));
+        $response->assertSessionHas('success', 'モモの受付アンケートの案内を発行しました。');
 
         $token = TraineeIntakeSurveyToken::query()->sole();
         $this->assertSame($this->trainee->id, (int) $token->trainee_id);
@@ -90,39 +91,43 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
         $html = $this->get(route('trainee-intake-survey-tokens.print', $this->trainee))->assertOk()->getContent();
         $this->assertStringContainsString(e($this->surveyUrl($token->token)), $html);
-        // 完了メッセージは S-0311 に出さない
-        $this->assertStringNotContainsString('発行しました', $html);
     }
 
-    public function test_return_toにtraineeを送ってもS0311を開く(): void
+    public function test_名前がないトレーニーは完了メッセージで名前未登録と出す(): void
+    {
+        $this->trainee->forceFill(['name' => null])->save();
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', 7))
+            ->assertSessionHas('success', '名前未登録の受付アンケートの案内を発行しました。');
+    }
+
+    public function test_return_toにtraineeを送っても会員詳細に戻る(): void
     {
         $response = $this->post(route('trainee-intake-survey-tokens.store', $this->trainee), ['return_to' => 'trainee']);
 
-        $response->assertRedirect(route('trainee-intake-survey-tokens.print', $this->trainee));
-        $response->assertSessionMissing('success');
+        $response->assertRedirect(route('clients.show', 7));
         $response->assertSessionMissing('intake_survey_success');
     }
 
-    public function test_有効な案内があれば新しく作らず今ある案内のS0311を開く(): void
+    public function test_有効な案内があれば新しく作らず完了メッセージも出さずに会員詳細に戻る(): void
     {
         $tokenId = $this->insertToken();
-        $token = TraineeIntakeSurveyToken::query()->findOrFail($tokenId)->token;
 
         $response = $this->post(route('trainee-intake-survey-tokens.store', $this->trainee));
 
-        $response->assertRedirect(route('trainee-intake-survey-tokens.print', $this->trainee));
+        $response->assertRedirect(route('clients.show', 7));
         $response->assertSessionMissing('success');
         $this->assertSame([$tokenId], TraineeIntakeSurveyToken::query()->pluck('id')->all());
-
-        $html = $this->get(route('trainee-intake-survey-tokens.print', $this->trainee))->assertOk()->getContent();
-        $this->assertStringContainsString(e($this->surveyUrl($token)), $html);
     }
 
     public function test_二重に送っても有効な案内は1つのまま(): void
     {
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee));
+        $this->flushSession();
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
-            ->assertRedirect(route('trainee-intake-survey-tokens.print', $this->trainee));
+            ->assertRedirect(route('clients.show', 7))
+            ->assertSessionMissing('success');
 
         $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
     }
@@ -215,7 +220,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->actingAsRole('admin');
 
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
-            ->assertRedirect(route('trainee-intake-survey-tokens.print', $this->trainee));
+            ->assertRedirect(route('clients.show', 7));
     }
 
     public function test_システム管理者は発行も取消も403(): void

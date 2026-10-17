@@ -74,25 +74,25 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
         return route('client-portal.email-registration.show', ['token' => $token]);
     }
 
-    public function test_発行するとS0307を開き新しい案内のURLが出る(): void
+    public function test_発行すると会員詳細に戻り完了メッセージを出す_案内はS0307で見られる(): void
     {
         $response = $this->post(route('client-email-registration-tokens.store', $this->client));
 
-        $response->assertRedirect(route('client-email-registration-tokens.print', $this->client));
-        $response->assertSessionMissing('success');
+        // 発行のあとは会員詳細（ページの上）に戻る。S-0307 には移らない（2026-10-17 変更）
+        $response->assertRedirect(route('clients.show', $this->client));
+        $response->assertSessionHas('success', 'マイページ登録の案内を発行しました。');
 
         $token = ClientEmailRegistrationToken::query()->sole();
         $this->assertFalse($token->is_used);
         $this->assertSame('2026-10-17 10:00:00', $token->expires_at->format('Y-m-d H:i:s'));
         $this->assertSame(200, (int) $token->created_by);
 
+        // 案内は［マイページ登録の案内を表示］から S-0307 で見る
         $html = $this->get(route('client-email-registration-tokens.print', $this->client))->assertOk()->getContent();
         $this->assertStringContainsString(e($this->registrationUrl($token->token)), $html);
-        // 完了メッセージは S-0307 に出さない
-        $this->assertStringNotContainsString('発行しました', $html);
     }
 
-    public function test_有効な案内があれば新しく作らず今ある案内のS0307を開く(): void
+    public function test_有効な案内があれば新しく作らず完了メッセージも出さずに会員詳細に戻る(): void
     {
         $this->insertToken('active-token-0000', '2026-10-16 10:00:00');
         DB::table('client_login_link_tokens')->insert([
@@ -102,7 +102,7 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
 
         $response = $this->post(route('client-email-registration-tokens.store', $this->client));
 
-        $response->assertRedirect(route('client-email-registration-tokens.print', $this->client));
+        $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionMissing('success');
         // 何も作らず・消さない
         $this->assertSame(['active-token-0000'], ClientEmailRegistrationToken::query()->pluck('token')->all());
@@ -114,11 +114,14 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
 
     public function test_二重に送っても有効な案内は1つのまま(): void
     {
-        $this->post(route('client-email-registration-tokens.store', $this->client));
+        $this->post(route('client-email-registration-tokens.store', $this->client))
+            ->assertSessionHas('success', 'マイページ登録の案内を発行しました。');
         $first = ClientEmailRegistrationToken::query()->sole()->token;
+        $this->flushSession();
 
         $this->post(route('client-email-registration-tokens.store', $this->client))
-            ->assertRedirect(route('client-email-registration-tokens.print', $this->client));
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionMissing('success');
 
         $this->assertSame([$first], ClientEmailRegistrationToken::query()->pluck('token')->all());
     }
@@ -130,7 +133,8 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
 
         $response = $this->post(route('client-email-registration-tokens.store', $this->client));
 
-        $response->assertRedirect(route('client-email-registration-tokens.print', $this->client));
+        $response->assertRedirect(route('clients.show', $this->client));
+        $response->assertSessionHas('success', 'マイページ登録の案内を発行しました。');
         $tokens = ClientEmailRegistrationToken::query()->orderBy('id')->pluck('token')->all();
         $this->assertCount(2, $tokens);
         $this->assertSame('used-token-0000', $tokens[0]);

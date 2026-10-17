@@ -275,7 +275,8 @@
                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"
                          @if($showIssue || $showPrint || $showCancel) role="group" aria-label="マイページ登録の案内" @endif>
                         @if($showIssue)
-                            {{-- 押下でその場で発行し、同じタブで案内の画面（S-0307）を開く（モーダルは開かない）。
+                            {{-- 押下でその場で発行し、会員詳細に戻って完了メッセージを出す（モーダルは開かない。案内の画面は開かない。
+                                 2026-10-17 変更：その前は発行のあとに案内の画面〔S-0307〕を開いていた）。
                                  2026-10-17 変更：当初は target="_blank" で別のタブに送っていたが、Android のタブレットの Chrome で
                                  新しいタブが送信の中身を持たずに GET で開き、405 になったため、同じタブに戻した --}}
                             <form method="POST" action="{{ route('client-email-registration-tokens.store', $client) }}"
@@ -285,7 +286,7 @@
                             </form>
                         @endif
                         @if($showPrint)
-                            {{-- 表示はオプションの操作なので白抜き（発行すると案内の画面が開くので、あとで見直すときだけ使う。
+                            {{-- 表示はオプションの操作なので白抜き（案内を見せる・送るときだけ開く。
                                  2026-10 変更。設計書 4-4・S-0305「ボタンの色」）。同じタブで開く（2026-10-17 変更） --}}
                             <a href="{{ route('client-email-registration-tokens.print', $client) }}"
                                class="btn btn-sm btn-outline-primary text-nowrap">マイページ登録の案内を表示</a>
@@ -563,7 +564,7 @@
                                          role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                                                {{-- マイページ登録の案内を発行と同じく、同じタブで案内の画面（S-0311）を開く（2026-10-17 変更） --}}
+                                                {{-- マイページ登録の案内を発行と同じく、発行のあとは会員詳細に戻って完了メッセージを出す（2026-10-17 変更） --}}
                                                 <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行</button>
@@ -618,8 +619,8 @@
                                        （行の左に「性格診断」の文字があるため。受付アンケートのボタンは左に文字を置かないので長い）
                                      - 幅が足りないときは、受付アンケートの名前の行と同じく、まとまりごと次の行に折り返して右寄せ（flex-wrap・ms-auto）
                                      - 状態は Trainee::activePersonalityDiagnosisToken（ClientController::show で先読み済み）
-                                     - ［案内を発行］［案内を表示］は受付アンケート・マイページ登録と同じく、同じタブで案内の画面（S-0312）を開く
-                                       （2026-10-17 変更。当初は別のタブ）
+                                     - ［案内を発行］は受付アンケート・マイページ登録と同じく、発行のあとは会員詳細に戻って完了メッセージを出す。
+                                       ［案内を表示］は同じタブで案内の画面（S-0312）を開く（2026-10-17 変更。当初はどちらも別のタブ）
                                      - ［取消］は確認（S-0305-M07。trainees/_personality-diagnosis-cancel-modal.blade.php）を開く
                                      - 最新の診断の日付（2026-10 追加）：リンクとボタンの間に、最新の結果の回答日（Y/m/d）を出す。
                                        結果がないときは「診断なし」（text-muted）。回答待ちの案内があっても、出すのは結果の日付。

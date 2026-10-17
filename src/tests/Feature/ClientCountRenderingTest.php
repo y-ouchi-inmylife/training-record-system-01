@@ -1203,6 +1203,31 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('issue-in-new-tab', $html);
     }
 
+    public function test_トレーニーの案内の発行のあとは会員詳細の上に完了メッセージが出てボタンが表示に変わる(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $traineeId = $this->trainee($client, 'ポチ');
+        // 2026-10-17 変更：発行のあとは案内の画面を開かず、会員詳細（ページの上）に戻る。
+        // マイページ登録案内の発行のリダイレクトと完了メッセージは ClientEmailRegistrationTokenStoreTest で確かめる
+        // （このテストの表はトークンの列を持たないため）。出し方はトレーニーの案内と同じ session('success')
+        $cases = [
+            [route('trainee-intake-survey-tokens.store', $traineeId), 'ポチの受付アンケートの案内を発行しました。', '>受付アンケートの案内を表示</a>'],
+            [route('trainee-personality-diagnosis-tokens.store', $traineeId), 'ポチの性格診断の案内を発行しました。', '>案内を表示</a>'],
+        ];
+        foreach ($cases as [$url, $message, $printLink]) {
+            $response = $this->post($url);
+            $response->assertRedirect(route('clients.show', $client));
+
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+            $this->assertMatchesRegularExpression(
+                '/<div class="alert alert-success alert-dismissible fade show" role="alert" data-auto-dismiss>\s*'.preg_quote($message, '/').'/u',
+                $html
+            );
+            $this->assertStringContainsString($printLink, $html);
+        }
+    }
+
     public function test_三つの案内を表示のリンクは同じタブで開く(): void
     {
         $this->fakeMediaDisk();

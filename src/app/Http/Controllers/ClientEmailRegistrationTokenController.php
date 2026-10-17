@@ -29,34 +29,32 @@ class ClientEmailRegistrationTokenController extends Controller
     /**
      * メールアドレス登録用 URL の発行処理
      *
-     * 発行のあとは、同じタブで案内シート（S-0307）にリダイレクトする（2026-10 変更）。
-     * 発行のあとの次の作業は案内を見せる・印刷する・文面をコピーすることなので、
-     * 「マイページ登録の案内を表示」を押し直す手間をなくす。完了メッセージは載せない
-     * （S-0307 は印刷用の画面のため。S-0307 が開くこと自体が発行できたことの知らせになる）。
-     * S-0307 の［戻る］は会員詳細へのリンクなので、戻ると会員詳細が新しい状態で開く（2026-10-17 変更：
-     * 別のタブで開いて［閉じる］で閉じる形をやめ、同じタブに戻した）。
+     * 発行のあとは会員詳細（S-0305）に戻り、完了メッセージ（success）を出す（2026-10-17 変更）。
+     * 案内シート（S-0307）は開かない。案内は必要なときに［マイページ登録の案内を表示］から開く
+     * （ユーザーレビューで、発行のあとに自動で案内の画面を開く機能は要らないとわかったため。
+     * その前は発行のあとに S-0307 にリダイレクトし、完了メッセージは載せなかった）。
      *
-     * 有効な（未使用で期限内の）トークンがすでにあるとき（二重送信・ほかのタブで発行済みなど）は、
-     * 新しく発行せず、今ある案内の S-0307 を開く（お客様に渡すものは同じため）。
+     * 有効な（未使用で期限内の）トークンがすでにあるとき（二重送信・古い画面から押し直したなど）は、
+     * 新しく発行せず、完了メッセージも載せずに会員詳細に戻る（発行していないため）。
      * 期限切れの未使用トークンしかないときは、それを消して作り直す（期限切れからの発行し直し）。
      *
      * 2 回の送信がほぼ同時に届いても有効な案内を作り直さないよう、トランザクションの中で
      * 会員の行をロックしてから確かめる（受付アンケート案内の発行と同じ作り）。
      *
-     * 設計書: requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」
+     * 設計書: requirements.md 6-3-6 備考「発行のあとの戻り先」
      */
     public function store(Client $client): RedirectResponse
     {
-        DB::transaction(function () use ($client) {
+        $issued = DB::transaction(function () use ($client) {
             Client::query()->whereKey($client->id)->lockForUpdate()->first();
 
-            // 有効な案内がすでにあれば、何も作らず・消さずにその案内を開く
+            // 有効な案内がすでにあれば、何も作らず・消さない
             $hasActive = $client->emailRegistrationTokens()
                 ->where('is_used', false)
                 ->where('expires_at', '>', now())
                 ->exists();
             if ($hasActive) {
-                return;
+                return false;
             }
 
             // 対象クライアントの未使用メールアドレス登録用トークン（期限切れ）を物理削除
@@ -80,9 +78,13 @@ class ClientEmailRegistrationTokenController extends Controller
                 'is_used' => false,
                 'created_by' => Auth::id(),
             ]);
+
+            return true;
         });
 
-        return redirect()->route('client-email-registration-tokens.print', $client);
+        $redirect = redirect()->route('clients.show', $client);
+
+        return $issued ? $redirect->with('success', 'マイページ登録の案内を発行しました。') : $redirect;
     }
 
     /**

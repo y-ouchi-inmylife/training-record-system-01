@@ -18,8 +18,8 @@ use Illuminate\View\View;
  *
  * ## 戻り先と完了メッセージ（2026-10 変更）
  *
- * 発行のあとは、同じタブで S-0311 を開き、完了メッセージは載せない（下の store()）。
- * 取消のあとは**常に S-0305 会員詳細**に戻し、完了メッセージはいつもの `success`（画面の上端）。
+ * 発行のあとも取消のあとも**常に S-0305 会員詳細**に戻し、完了メッセージはいつもの `success`（画面の上端）
+ * （2026-10-17 変更：その前は、発行のあとは S-0311 を開き、完了メッセージは載せなかった。下の store()）。
  * 受付アンケート案内の発行・表示・取消は会員詳細だけで行う（案内を渡す相手は会員で、マイページ登録案内も
  * 会員詳細でしか操作しないため。要件定義書 6-16-8 備考）。
  *
@@ -33,17 +33,17 @@ class TraineeIntakeSurveyTokenController extends Controller
     /**
      * 受付アンケート案内を発行する（POST /trainees/{trainee}/intake-survey-tokens）。
      *
-     * 発行のあとは、同じタブで S-0311 にリダイレクトする（2026-10 変更）。発行のあとの次の作業は
-     * 案内を見せる・印刷する・文面をコピーすることなので、「受付アンケートの案内を表示」を押し直す
-     * 手間をなくす。完了メッセージは載せない（S-0311 は印刷用の画面のため。S-0311 が開くこと自体が
-     * 発行できたことの知らせになる）。S-0311 の［戻る］は会員詳細へのリンク。
+     * 発行のあとは会員詳細（S-0305）に戻り、完了メッセージ「{表示名}の受付アンケートの案内を発行しました。」を
+     * 出す（2026-10-17 変更。表示名は会員詳細のトレーニーの名前と同じ display_name）。S-0311 は開かない
+     * （案内は必要なときに［受付アンケートの案内を表示］から開く。マイページ登録案内と同じ）。
+     * 戻る位置はページの上（完了メッセージがページの上に出るため、トレーニーの欄の位置には移さない）。
      *
      * 発行できなかったとき：
-     * - 有効な案内がすでにある（回答待ち。二重送信・ほかのタブで発行済みなど）：新しく発行せず、
-     *   今ある案内の S-0311 を開く（お客様に渡すものは同じため）
+     * - 有効な案内がすでにある（回答待ち。二重送信・古い画面から押し直したなど）：新しく発行せず、
+     *   完了メッセージも載せずに会員詳細に戻る
      * - 回答済み：今までどおり 409（UI 側でボタンを出し分けているため通常は到達しない）
      *
-     * 設計書: requirements.md 6-16-8、6-3-6 備考「発行のあとに案内の画面を開く理由」
+     * 設計書: requirements.md 6-16-8、6-3-6 備考「発行のあとの戻り先」
      */
     public function store(Request $request, Trainee $trainee, TraineeIntakeSurveyTokenService $service): RedirectResponse
     {
@@ -53,7 +53,9 @@ class TraineeIntakeSurveyTokenController extends Controller
             abort(409, '受付アンケートの案内はすでに発行されています。');
         }
 
-        return redirect()->route('trainee-intake-survey-tokens.print', $trainee);
+        $redirect = redirect()->route('clients.show', $trainee->client_id);
+
+        return $token ? $redirect->with('success', $trainee->display_name.'の受付アンケートの案内を発行しました。') : $redirect;
     }
 
     /**

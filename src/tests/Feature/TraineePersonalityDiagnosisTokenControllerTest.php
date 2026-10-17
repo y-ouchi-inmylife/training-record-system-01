@@ -98,12 +98,13 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     // ---- 発行 ----
 
-    public function test_有効な案内がなければ作りS0312を開きアクセスログが1件残る(): void
+    public function test_有効な案内がなければ作り会員詳細に戻って完了メッセージを出しアクセスログが1件残る(): void
     {
         $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
 
-        $response->assertRedirect(route('trainee-personality-diagnosis-tokens.print', $this->trainee));
-        $response->assertSessionMissing('success');
+        // 発行のあとは会員詳細（ページの上）に戻る。S-0312 には移らない（2026-10-17 変更）
+        $response->assertRedirect(route('clients.show', $this->client));
+        $response->assertSessionHas('success', 'モモの性格診断の案内を発行しました。');
 
         $token = TraineePersonalityDiagnosisToken::query()->sole();
         $this->assertSame($this->trainee->id, (int) $token->trainee_id);
@@ -119,13 +120,22 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertSame('性格診断案内発行', AccessLog::actionLabels()[$logs[0]->action]);
     }
 
-    public function test_有効な案内があれば作らず今ある案内のS0312を開く(): void
+    public function test_名前がないトレーニーは完了メッセージで名前未登録と出す(): void
+    {
+        $this->trainee->forceFill(['name' => null])->save();
+
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionHas('success', '名前未登録の性格診断の案内を発行しました。');
+    }
+
+    public function test_有効な案内があれば作らず完了メッセージも出さずに会員詳細に戻る(): void
     {
         $tokenId = $this->insertToken();
 
         $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
 
-        $response->assertRedirect(route('trainee-personality-diagnosis-tokens.print', $this->trainee));
+        $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionMissing('success');
         $this->assertSame([$tokenId], TraineePersonalityDiagnosisToken::query()->pluck('id')->all());
     }
@@ -133,8 +143,10 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
     public function test_二重に送っても有効な案内は1つのまま(): void
     {
         $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
+        $this->flushSession();
         $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertRedirect(route('trainee-personality-diagnosis-tokens.print', $this->trainee));
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionMissing('success');
 
         $this->assertSame(1, TraineePersonalityDiagnosisToken::query()->count());
     }
@@ -146,7 +158,8 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
 
-        $response->assertRedirect(route('trainee-personality-diagnosis-tokens.print', $this->trainee));
+        $response->assertRedirect(route('clients.show', $this->client));
+        $response->assertSessionHas('success', 'モモの性格診断の案内を発行しました。');
         $this->assertSame(2, TraineePersonalityDiagnosisToken::query()->count());
         $this->assertNotNull($this->trainee->fresh()->activePersonalityDiagnosisToken);
         $this->assertSame(1, TraineePersonalityDiagnosisResult::query()->count());
@@ -192,7 +205,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->actingAsRole('admin');
 
         $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertRedirect(route('trainee-personality-diagnosis-tokens.print', $this->trainee));
+            ->assertRedirect(route('clients.show', $this->client));
         $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
             ->assertRedirect(route('clients.show', $this->client));
     }

@@ -15,21 +15,24 @@ use Illuminate\View\View;
  * 同じ作り。発行・取消は S-0305 会員詳細のトレーニーカードの「性格診断」の行から呼ばれる（会員詳細だけで行う）。
  * 違いは、前の結果（回答済みの案内）があっても発行できること（何回でも受けられるため）。
  *
- * - 発行のあとは、同じリクエストで S-0312 にリダイレクトする（同じタブで開く。2026-10-17 変更：当初は
- *   会員詳細の発行のフォームを別タブで送っていた）。完了メッセージは載せない
+ * - 発行のあとは S-0305 会員詳細に戻し、完了メッセージは上端の success（2026-10-17 変更：その前は
+ *   S-0312 にリダイレクトし、完了メッセージは載せなかった。受付アンケート案内と同じ）
  * - 取消のあとは S-0305 会員詳細に戻し、完了メッセージは上端の success
  */
 class TraineePersonalityDiagnosisTokenController extends Controller
 {
     /**
      * 性格診断の案内を発行する（POST /trainees/{trainee}/personality-diagnosis-tokens）。
-     * 有効な案内がすでにある（二重送信・ほかのタブで発行済みなど）ときは、新しく作らず今ある案内を開く
+     * 発行のあとは会員詳細に戻り、完了メッセージ「{表示名}の性格診断の案内を発行しました。」を出す（2026-10-17 変更）。
+     * 有効な案内がすでにある（二重送信・古い画面から押し直したなど）ときは、新しく作らず、完了メッセージも載せずに戻る
      */
     public function store(Request $request, Trainee $trainee, TraineePersonalityDiagnosisTokenService $service): RedirectResponse
     {
-        $service->issue($trainee, $request->user());
+        $token = $service->issue($trainee, $request->user());
 
-        return redirect()->route('trainee-personality-diagnosis-tokens.print', $trainee);
+        $redirect = redirect()->route('clients.show', $trainee->client_id);
+
+        return $token ? $redirect->with('success', $trainee->display_name.'の性格診断の案内を発行しました。') : $redirect;
     }
 
     /**
