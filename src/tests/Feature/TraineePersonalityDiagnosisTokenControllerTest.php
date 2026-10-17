@@ -218,7 +218,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     // ---- 案内の画面（S-0312） ----
 
-    public function test_S0312は紫の帯の見出し_QR_URL_手順_1回かぎり_閉じる_文面をコピーを出す(): void
+    public function test_S0312は紫の帯の見出し_QR_URL_手順_1回かぎり_戻る_文面をコピーを出す(): void
     {
         $this->insertToken(null, 'personality-diagnosis-token-000001');
         $url = route('client-portal.personality-diagnosis.show', ['token' => 'personality-diagnosis-token-000001']);
@@ -243,13 +243,14 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         // 愛犬の名前・お客様の氏名は出さない
         $this->assertStringNotContainsString('モモ', $html);
         $this->assertStringNotContainsString('山田', $html);
-        // ［閉じる］（会員詳細へのリンクと目印）と［文面をコピー］。操作エリアは印刷では出さない
+        // ［戻る］（会員詳細へのふつうのリンク。グレーの白抜き。2026-10-17 変更：その前は［閉じる］）と［文面をコピー］。操作エリアは印刷では出さない
         $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
-        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
         $this->assertMatchesRegularExpression('/<button type="button"\s+class="btn btn-outline-primary btn-sm"\s+data-copy-message\s+data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
         $this->assertStringContainsString('copy-message', $html);
         $this->assertStringContainsString('qr-code', $html);
-        $this->assertStringContainsString('close-tab', $html);
+        $this->assertStringNotContainsString('close-tab', $html);
+        $this->assertStringNotContainsString('閉じる', $html);
     }
 
     public function test_S0312のコピーの文面_事業者名があるときとないとき(): void
@@ -285,7 +286,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('<div class="print-url">', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
-        $this->assertStringContainsString('data-close-tab>閉じる</a>', $html);
+        $this->assertStringContainsString('btn-sm">戻る</a>', $html);
     }
 
     public function test_表示はアクセスログに記録しない(): void
@@ -309,5 +310,27 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $this->assertStringContainsString('<h1 class="mb-2">性格診断</h1>', $html);
         $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
+    }
+
+    // ---- 発行の URL を GET で開いたとき（2026-10-17 追加。405 にしない） ----
+
+    public function test_発行のURLをGETで開くと発行せず会員詳細に移る(): void
+    {
+        $this->get('/trainees/'.$this->trainee->id.'/personality-diagnosis-tokens')
+            ->assertRedirect(route('clients.show', $this->client));
+        $this->assertSame(0, TraineePersonalityDiagnosisToken::query()->count());
+        $this->assertSame([], $this->logs());
+    }
+
+    public function test_発行のURLをGETで開いたとき_ないトレーニーは404_ログインしていなければログインへ_システム管理者は403(): void
+    {
+        $this->get('/trainees/999/personality-diagnosis-tokens')->assertNotFound();
+
+        $this->actingAsRole('system_admin');
+        $this->get('/trainees/'.$this->trainee->id.'/personality-diagnosis-tokens')->assertForbidden();
+
+        auth('web')->logout();
+        $this->get('/trainees/'.$this->trainee->id.'/personality-diagnosis-tokens')->assertRedirect(route('login'));
+        $this->assertSame(0, TraineePersonalityDiagnosisToken::query()->count());
     }
 }

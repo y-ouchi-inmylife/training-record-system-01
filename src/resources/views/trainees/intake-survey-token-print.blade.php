@@ -5,16 +5,15 @@
 @section('content')
 {{-- 受付アンケート案内画面（S-0311。2026-10 追加。要件定義書 6-16-8）。
      マイページ登録案内の印刷画面（S-0307、clients/email-registration-token-print.blade.php）と同じ作り：
-     印刷専用レイアウト・ページ上部の操作エリア（「閉じる」と「文面をコピー」。d-print-none で印刷時は
+     印刷専用レイアウト・ページ上部の操作エリア（「戻る」と「文面をコピー」。d-print-none で印刷時は
      出さない。S-0307 と S-0311 の 2 画面だけに認めた例外）・QR コード（qr-code.js）・文面のコピー
      （copy-message.js）。S-0307 との違い：有効期限を載せない（代わりに「1回かぎり」の文）、
-     手順の中身、閉じられないときに開く先は常に会員詳細。お客様の氏名は載せない（紛失時に氏名と URL が同時に漏れないため）。
+     手順の中身、戻る先は常に会員詳細。お客様の氏名は載せない（紛失時に氏名と URL が同時に漏れないため）。
      変数：$trainee、$url（有効な案内がなければ null）、$copyText（同） --}}
 <div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">
-    {{-- 閉じる（2026-10 変更。前は「« 戻る」）：S-0307 と同じく、押すとタブを閉じて元の会員詳細のタブに戻る。
-         リンク先は会員詳細（S-0305。案内の操作は会員詳細だけで行うため）で、閉じられないときやスクリプトが
-         動かないときはここを開く（close-tab.js、data-close-tab） --}}
-    <a href="{{ route('clients.show', $trainee->client_id) }}" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>
+    {{-- 戻る（2026-10-17 変更。その前は「閉じる」）：S-0307 と同じく、会員詳細（S-0305。案内の操作は会員詳細だけで
+         行うため）へのふつうのリンク --}}
+    <a href="{{ route('clients.show', $trainee->client_id) }}" class="btn btn-outline-secondary btn-sm">戻る</a>
     @if($url)
         {{-- 文面はコントローラ（TraineeIntakeSurveyTokenController::buildCopyText）で組み立て、
              data-copy-text で受け取る（S-0307 と同じ）。ボタンは copy-message.js が拾う --}}
@@ -76,7 +75,3 @@
     @endpush
 @endif
 
-{{-- ［閉じる］（data-close-tab）は有効な案内の有無を問わず出すので、条件の外で読み込む --}}
-@push('scripts')
-    @vite(['resources/js/close-tab.js'])
-@endpush

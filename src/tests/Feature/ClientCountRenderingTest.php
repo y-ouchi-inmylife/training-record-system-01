@@ -766,7 +766,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertIntakeRowHasNoStatusText($html);
         $url = preg_quote(route('trainee-intake-survey-tokens.store', $id), '/');
         $this->assertMatchesRegularExpression(
-            '/<form method="POST" action="'.$url.'" class="d-inline m-0"\s*target="_blank" rel="noopener" data-issue-in-new-tab>\s*<input type="hidden" name="_token"[^>]*>\s*'
+            '/<form method="POST" action="'.$url.'" class="d-inline m-0">\s*<input type="hidden" name="_token"[^>]*>\s*'
             .'<button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行<\/button>/u',
             $html
         );
@@ -792,10 +792,10 @@ class ClientCountRenderingTest extends TestCase
         // 取消のボタンの文字は「取消」だけ（2026-10 変更）。「案内を取消」のボタンは出さない
         $this->assertStringNotContainsString('>案内を取消<', $html);
         $this->assertStringNotContainsString('>受付アンケートの案内を発行<', $html);
-        // 「受付アンケートの案内を表示」は S-0311 を別タブで開き、「取消」の左に置く（2026-10、段階3b）
+        // 「受付アンケートの案内を表示」は S-0311 を同じタブで開き（2026-10-17 変更）、「取消」の左に置く（2026-10、段階3b）
         $printUrl = preg_quote(route('trainee-intake-survey-tokens.print', $id), '/');
         $this->assertMatchesRegularExpression(
-            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
+            '/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を表示<\/a>\s*<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"/u',
             $html
         );
     }
@@ -993,7 +993,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringContainsString('role="group" aria-label="マイページ登録の案内"', $buttons);
         $printUrl = preg_quote(route('client-email-registration-tokens.print', $client), '/');
-        $this->assertMatchesRegularExpression('/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $buttons);
+        $this->assertMatchesRegularExpression('/<a href="'.$printUrl.'"\s*class="btn btn-sm btn-outline-primary text-nowrap">マイページ登録の案内を表示<\/a>/u', $buttons);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#tokenCancellationModal">\s*取消\s*<\/button>/u', $buttons);
         // 古い文字のボタンは出さない
         $this->assertSame(0, preg_match('/>\s*登録案内を(発行|表示|取消)\s*</u', $buttons));
@@ -1165,9 +1165,8 @@ class ClientCountRenderingTest extends TestCase
 
         // 白抜きの青は［…の案内を表示］の 2 つだけ（オプションの操作。2026-10 変更）
         $this->assertSame(2, substr_count($body, 'btn-outline-primary'));
-        $this->assertStringNotContainsString('btn-primary text-nowrap" target="_blank"', $body);
-        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示<\/a>/u', $body);
-        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示<\/a>/u', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を表示<\/a>/u', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-sm btn-outline-primary text-nowrap">マイページ登録の案内を表示<\/a>/u', $body);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"/u', $body);
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#tokenCancellationModal"/u', $body);
 
@@ -1180,50 +1179,34 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#emailDeletionModal">\s*マイページ登録を削除/u', $body);
     }
 
-    // ---- 案内の発行は別タブで送る（2026-10 変更） ----
+    // ---- 案内の発行と表示は同じタブで開く（2026-10-17 変更：当初は発行のフォームを別タブで送っていた） ----
 
-    /** data-issue-in-new-tab を付けたフォームの開始タグ */
-    private function issueInNewTabForms(string $html): array
-    {
-        preg_match_all('/<form\b[^>]*\bdata-issue-in-new-tab\b[^>]*>/u', $html, $m);
-
-        return $m[0];
-    }
-
-    public function test_三つの発行のフォームだけを別タブで送り目印を付ける(): void
+    public function test_三つの発行のフォームは同じタブで送り別タブの目印もスクリプトも読み込まない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $notIssued = $this->trainee($client, 'ポチ');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
-        $forms = $this->issueInNewTabForms($html);
 
-        // マイページ登録・受付アンケート・性格診断（2026-10 追加）の 3 つ
-        $this->assertCount(3, $forms);
+        // マイページ登録・受付アンケート・性格診断の 3 つの発行のフォームは、target も目印も付けない
         $actions = [
             route('client-email-registration-tokens.store', $client),
             route('trainee-intake-survey-tokens.store', $notIssued),
             route('trainee-personality-diagnosis-tokens.store', $notIssued),
         ];
-        foreach ($actions as $i => $action) {
-            $this->assertStringContainsString('action="'.$action.'"', $forms[$i]);
-            $this->assertStringContainsString('target="_blank"', $forms[$i]);
-            $this->assertStringContainsString('rel="noopener"', $forms[$i]);
+        foreach ($actions as $action) {
+            $this->assertMatchesRegularExpression('/<form method="POST" action="'.preg_quote($action, '/').'"\s*class="d-inline m-0">/u', $html);
         }
-        // target="_blank" のフォームはこの 3 つだけ
-        $this->assertSame(3, preg_match_all('/<form\b[^>]*target="_blank"/u', $html));
-        $this->assertStringContainsString('issue-in-new-tab', $html);
+        $this->assertStringNotContainsString('target="_blank"', $html);
+        $this->assertStringNotContainsString('data-issue-in-new-tab', $html);
+        $this->assertStringNotContainsString('issue-in-new-tab', $html);
     }
 
-    public function test_取消や削除のフォームは別タブにせず目印も付けない(): void
+    public function test_三つの案内を表示のリンクは同じタブで開く(): void
     {
         $this->fakeMediaDisk();
-        $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
-        $admin->id = 100;
-        $admin->exists = true;
-        $this->actingAs($admin, 'web');
-        // マイページは登録待ち（期限内）、受付アンケートと性格診断は回答待ち：発行のフォームは出ない
+        // マイページは登録待ち（期限内）、受付アンケートと性格診断は回答待ち：［…を表示］が 3 つ出る
         $client = $this->makeClient('0001', '山田');
         $this->emailRegToken($client, now()->addDays(2)->format('Y-m-d H:i:s'));
         $traineeId = $this->trainee($client, 'ポチ');
@@ -1232,11 +1215,21 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertSame([], $this->issueInNewTabForms($html));
-        $this->assertSame(0, preg_match_all('/<form\b[^>]*target="_blank"/u', $html));
-        // 取消（M03・M06）・会員の削除のフォームはある
+        $printUrls = [
+            route('client-email-registration-tokens.print', $client) => 'マイページ登録の案内を表示',
+            route('trainee-intake-survey-tokens.print', $traineeId) => '受付アンケートの案内を表示',
+            route('trainee-personality-diagnosis-tokens.print', $traineeId) => '案内を表示',
+        ];
+        foreach ($printUrls as $url => $label) {
+            $this->assertMatchesRegularExpression(
+                '/<a href="'.preg_quote($url, '/').'"\s*class="btn btn-sm btn-outline-primary text-nowrap">'.$label.'<\/a>/u',
+                $html
+            );
+        }
+        $this->assertStringNotContainsString('target="_blank"', $html);
+        // 発行のフォームは出ない（マイページ登録案内の取消のフォームはある）
+        $this->assertStringNotContainsString('<button type="submit" class="btn btn-sm btn-primary text-nowrap">', $html);
         $this->assertStringContainsString('action="'.route('client-email-registration-tokens.destroy', $client).'" class="d-inline m-0">', $html);
-        $this->assertStringContainsString('action="'.route('clients.destroy', $client).'"', $html);
     }
 
     // ---- 性格診断の行（2026-10 追加。設計書 S-0305 セクション3「性格診断の行」） ----
@@ -1310,7 +1303,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('role="group" aria-label="ポチの性格診断"', $row);
         $this->assertMatchesRegularExpression(
             '/<form method="POST" action="'.preg_quote(route('trainee-personality-diagnosis-tokens.store', $id), '/').'" class="d-inline m-0"\s*'
-            .'target="_blank" rel="noopener" data-issue-in-new-tab>\s*<input type="hidden" name="_token"[^>]*>\s*'
+            .'>\s*<input type="hidden" name="_token"[^>]*>\s*'
             .'<button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行<\/button>/u',
             $row
         );
@@ -1330,7 +1323,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertMatchesRegularExpression(
             '/<a href="'.preg_quote(route('trainee-personality-diagnosis-tokens.print', $id), '/').'"\s*'
-            .'class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">案内を表示<\/a>\s*'
+            .'class="btn btn-sm btn-outline-primary text-nowrap">案内を表示<\/a>\s*'
             .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*'
             .'data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"\s*data-personality-diagnosis-trainee-id="'.$id.'">取消<\/button>/u',
             $row

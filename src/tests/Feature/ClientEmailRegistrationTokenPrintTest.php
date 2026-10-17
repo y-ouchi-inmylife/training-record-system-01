@@ -84,7 +84,7 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5);
     }
 
-    public function test_有効な案内があるとき_見出し_QR_URL_手順_有効期限_閉じる_文面をコピーを出す(): void
+    public function test_有効な案内があるとき_見出し_QR_URL_手順_有効期限_戻る_文面をコピーを出す(): void
     {
         $this->issueToken();
         $url = route('client-portal.email-registration.show', ['token' => self::TOKEN]);
@@ -104,7 +104,7 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringNotContainsString('<li>届いたメールのリンクを開いて、パスワードを設定します</li>', $html);
         $this->assertStringNotContainsString('3. 届いたメールのリンクを開いて、パスワードを設定します', $this->copyText($html));
         $this->assertStringContainsString('<p class="print-expiry-date">2026年10月17日まで</p>', $html);
-        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
         // 操作エリアは印刷では出さない
         $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
         // 文面をコピーのボタン（2026-10 に属性名を data-copy-registration-message から data-copy-message に変えた）と QR の JS
@@ -171,9 +171,10 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('<div class="print-url">', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
-        // ［閉じる］は出す（会員詳細へのリンクと目印。2026-10 変更。前の「« 戻る」は出さない）
-        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
-        $this->assertStringNotContainsString('戻る</a>', $html);
+        // ［戻る］は出す（会員詳細へのふつうのリンク。2026-10-17 変更：その前は［閉じる］）
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
+        $this->assertStringNotContainsString('閉じる', $html);
+        $this->assertStringNotContainsString('data-close-tab', $html);
     }
 
     public function test_期限切れや使用済みの案内は有効な案内として扱わない(): void

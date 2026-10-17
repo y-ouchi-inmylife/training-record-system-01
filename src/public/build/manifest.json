@@ -34,12 +34,6 @@
       "_bootstrap.esm-CiZvvyki.js"
     ]
   },
-  "resources/js/close-tab.js": {
-    "file": "assets/close-tab-DlMipw3l.js",
-    "name": "close-tab",
-    "src": "resources/js/close-tab.js",
-    "isEntry": true
-  },
   "resources/js/copy-message.js": {
     "file": "assets/copy-message-CQBA5I39.js",
     "name": "copy-message",
@@ -50,12 +44,6 @@
     "file": "assets/form-errors-CyNqwsPL.js",
     "name": "form-errors",
     "src": "resources/js/form-errors.js",
-    "isEntry": true
-  },
-  "resources/js/issue-in-new-tab.js": {
-    "file": "assets/issue-in-new-tab-D5jEW6Bo.js",
-    "name": "issue-in-new-tab",
-    "src": "resources/js/issue-in-new-tab.js",
     "isEntry": true
   },
   "resources/js/measurement-chart.js": {

@@ -83,6 +83,8 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // マイページ登録案内の発行（6-3-6、段階 4-1）
             Route::post('clients/{client}/email-registration-tokens', [ClientEmailRegistrationTokenController::class, 'store'])
                 ->name('client-email-registration-tokens.store');
+            // 発行の URL を GET で開かれたとき（古いタブ・読み込み直し・履歴など）は、発行せずに会員詳細へ（405 にしない。2026-10-17 追加）
+            Route::get('clients/{client}/email-registration-tokens', [ClientEmailRegistrationTokenController::class, 'redirectToClient']);
             // マイページ登録案内の取消（6-3-7）
             Route::delete('clients/{client}/email-registration-tokens', [ClientEmailRegistrationTokenController::class, 'destroy'])
                 ->name('client-email-registration-tokens.destroy');
@@ -122,18 +124,22 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 発行と取消は同じリソース URL に対する POST / DELETE（マイページ登録案内と同じ考え方）。
             Route::post('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'store'])
                 ->name('trainee-intake-survey-tokens.store');
+            // 発行の URL を GET で開かれたときは、発行せずに会員詳細へ（マイページ登録案内と同じ。2026-10-17 追加）
+            Route::get('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'redirectToClient']);
             Route::delete('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'destroy'])
                 ->name('trainee-intake-survey-tokens.destroy');
-            // 受付アンケート案内画面（S-0311）。会員詳細の「案内を表示」から別タブで開く
+            // 受付アンケート案内画面（S-0311）。会員詳細の「受付アンケートの案内を表示」から開く（2026-10-17 変更：当初は別タブ）
             Route::get('trainees/{trainee}/intake-survey-tokens/print', [TraineeIntakeSurveyTokenController::class, 'print'])
                 ->name('trainee-intake-survey-tokens.print');
 
             // 性格診断の案内（性格診断用 URL のトークン。DS-1100。2026-10 追加）。受付アンケート案内と同じ形
             Route::post('trainees/{trainee}/personality-diagnosis-tokens', [TraineePersonalityDiagnosisTokenController::class, 'store'])
                 ->name('trainee-personality-diagnosis-tokens.store');
+            // 発行の URL を GET で開かれたときは、発行せずに会員詳細へ（マイページ登録案内と同じ。2026-10-17 追加）
+            Route::get('trainees/{trainee}/personality-diagnosis-tokens', [TraineePersonalityDiagnosisTokenController::class, 'redirectToClient']);
             Route::delete('trainees/{trainee}/personality-diagnosis-tokens', [TraineePersonalityDiagnosisTokenController::class, 'destroy'])
                 ->name('trainee-personality-diagnosis-tokens.destroy');
-            // 性格診断案内画面（S-0312）。会員詳細の「性格診断」の行の［案内を表示］から別タブで開く
+            // 性格診断案内画面（S-0312）。会員詳細の「性格診断」の行の［案内を表示］から開く（2026-10-17 変更：当初は別タブ）
             Route::get('trainees/{trainee}/personality-diagnosis-tokens/print', [TraineePersonalityDiagnosisTokenController::class, 'print'])
                 ->name('trainee-personality-diagnosis-tokens.print');
             // 性格診断の結果の削除（S-0309 の結果の表の行の［削除］。管理者のみ。2026-10 追加）。

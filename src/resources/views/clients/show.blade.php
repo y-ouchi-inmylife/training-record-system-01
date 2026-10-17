@@ -275,20 +275,20 @@
                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"
                          @if($showIssue || $showPrint || $showCancel) role="group" aria-label="マイページ登録の案内" @endif>
                         @if($showIssue)
-                            {{-- 押下でその場で発行し、別タブで案内の画面（S-0307）を開く（モーダルは開かない。2026-10 変更）。
-                                 target="_blank" でクリックそのものから新しいタブに送るので、ポップアップブロックにかからない。
-                                 元のタブは data-issue-in-new-tab（issue-in-new-tab.js）で、戻ってきたときに開き直す --}}
+                            {{-- 押下でその場で発行し、同じタブで案内の画面（S-0307）を開く（モーダルは開かない）。
+                                 2026-10-17 変更：当初は target="_blank" で別のタブに送っていたが、Android のタブレットの Chrome で
+                                 新しいタブが送信の中身を持たずに GET で開き、405 になったため、同じタブに戻した --}}
                             <form method="POST" action="{{ route('client-email-registration-tokens.store', $client) }}"
-                                  class="d-inline m-0" target="_blank" rel="noopener" data-issue-in-new-tab>
+                                  class="d-inline m-0">
                                 @csrf
                                 <button type="submit" class="btn btn-sm btn-primary text-nowrap">マイページ登録の案内を発行</button>
                             </form>
                         @endif
                         @if($showPrint)
-                            {{-- 表示はオプションの操作なので白抜き（発行すると案内が別タブで開くので、あとで見直すときだけ使う。
-                                 2026-10 変更。設計書 4-4・S-0305「ボタンの色」） --}}
+                            {{-- 表示はオプションの操作なので白抜き（発行すると案内の画面が開くので、あとで見直すときだけ使う。
+                                 2026-10 変更。設計書 4-4・S-0305「ボタンの色」）。同じタブで開く（2026-10-17 変更） --}}
                             <a href="{{ route('client-email-registration-tokens.print', $client) }}"
-                               class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">マイページ登録の案内を表示</a>
+                               class="btn btn-sm btn-outline-primary text-nowrap">マイページ登録の案内を表示</a>
                         @endif
                         @if($showCancel)
                             <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
@@ -563,16 +563,14 @@
                                          role="group" aria-label="{{ $trainee->display_name }}の受付アンケート">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
-                                                {{-- マイページ登録の案内を発行と同じく、別タブで案内の画面（S-0311）を開き、
-                                                     元のタブは戻ってきたときに開き直す（2026-10 変更） --}}
-                                                <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0"
-                                                      target="_blank" rel="noopener" data-issue-in-new-tab>
+                                                {{-- マイページ登録の案内を発行と同じく、同じタブで案内の画面（S-0311）を開く（2026-10-17 変更） --}}
+                                                <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-primary text-nowrap">受付アンケートの案内を発行</button>
                                                 </form>
                                             @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
                                                 <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">受付アンケートの案内を表示</a>
+                                                   class="btn btn-sm btn-outline-primary text-nowrap">受付アンケートの案内を表示</a>
                                                 <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                                         data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
                                                         data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>
@@ -620,8 +618,8 @@
                                        （行の左に「性格診断」の文字があるため。受付アンケートのボタンは左に文字を置かないので長い）
                                      - 幅が足りないときは、受付アンケートの名前の行と同じく、まとまりごと次の行に折り返して右寄せ（flex-wrap・ms-auto）
                                      - 状態は Trainee::activePersonalityDiagnosisToken（ClientController::show で先読み済み）
-                                     - ［案内を発行］は受付アンケート・マイページ登録と同じく、別タブで案内の画面（S-0312）を開き、元のタブは
-                                       戻ってきたときに開き直す（target="_blank"・data-issue-in-new-tab。issue-in-new-tab.js）
+                                     - ［案内を発行］［案内を表示］は受付アンケート・マイページ登録と同じく、同じタブで案内の画面（S-0312）を開く
+                                       （2026-10-17 変更。当初は別のタブ）
                                      - ［取消］は確認（S-0305-M07。trainees/_personality-diagnosis-cancel-modal.blade.php）を開く
                                      - 最新の診断の日付（2026-10 追加）：リンクとボタンの間に、最新の結果の回答日（Y/m/d）を出す。
                                        結果がないときは「診断なし」（text-muted）。回答待ちの案内があっても、出すのは結果の日付。
@@ -644,14 +642,13 @@
                                         <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"
                                              role="group" aria-label="{{ $trainee->display_name }}の性格診断">
                                             @if($trainee->activePersonalityDiagnosisToken === null)
-                                                <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0"
-                                                      target="_blank" rel="noopener" data-issue-in-new-tab>
+                                                <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行</button>
                                                 </form>
                                             @else
                                                 <a href="{{ route('trainee-personality-diagnosis-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-outline-primary text-nowrap" target="_blank" rel="noopener">案内を表示</a>
+                                                   class="btn btn-sm btn-outline-primary text-nowrap">案内を表示</a>
                                                 <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
                                                         data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"
                                                         data-personality-diagnosis-trainee-id="{{ $trainee->id }}">取消</button>
@@ -815,8 +812,3 @@
 
 </div>
 @endsection
-
-@push('scripts')
-    {{-- 案内の発行のフォーム（data-issue-in-new-tab）を送ったあと、元のタブを開き直す（2026-10 追加） --}}
-    @vite(['resources/js/issue-in-new-tab.js'])
-@endpush

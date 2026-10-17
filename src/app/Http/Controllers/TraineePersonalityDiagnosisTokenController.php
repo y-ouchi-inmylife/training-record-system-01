@@ -15,8 +15,8 @@ use Illuminate\View\View;
  * 同じ作り。発行・取消は S-0305 会員詳細のトレーニーカードの「性格診断」の行から呼ばれる（会員詳細だけで行う）。
  * 違いは、前の結果（回答済みの案内）があっても発行できること（何回でも受けられるため）。
  *
- * - 発行のあとは、同じリクエストで S-0312 にリダイレクトする。会員詳細の発行のフォームは別タブで送る
- *   （target="_blank"）ので、案内は別タブで開く。完了メッセージは載せない
+ * - 発行のあとは、同じリクエストで S-0312 にリダイレクトする（同じタブで開く。2026-10-17 変更：当初は
+ *   会員詳細の発行のフォームを別タブで送っていた）。完了メッセージは載せない
  * - 取消のあとは S-0305 会員詳細に戻し、完了メッセージは上端の success
  */
 class TraineePersonalityDiagnosisTokenController extends Controller
@@ -30,6 +30,15 @@ class TraineePersonalityDiagnosisTokenController extends Controller
         $service->issue($trainee, $request->user());
 
         return redirect()->route('trainee-personality-diagnosis-tokens.print', $trainee);
+    }
+
+    /**
+     * 発行の URL を GET で開かれたとき（GET /trainees/{trainee}/personality-diagnosis-tokens。2026-10-17 追加）。
+     * 発行せずに、そのトレーニーの会員の会員詳細（S-0305）に移す（405 にしない。受付アンケート案内と同じ）
+     */
+    public function redirectToClient(Trainee $trainee): RedirectResponse
+    {
+        return redirect()->route('clients.show', $trainee->client_id);
     }
 
     /**

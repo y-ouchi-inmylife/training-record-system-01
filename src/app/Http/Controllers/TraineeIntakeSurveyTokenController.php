@@ -13,7 +13,8 @@ use Illuminate\View\View;
  *
  * 要件定義書 6-16-8・6-16-9、api-design.md 4-1-16。発行・取消は S-0305 会員詳細の
  * トレーニーカードから呼ばれる（発行は会員詳細だけ。トレーニー登録 S-0308 では発行しない。2026-10 変更）。
- * 案内画面（S-0311、GET …/print）は、会員詳細の「受付アンケートの案内を表示」から別タブで開く。
+ * 案内画面（S-0311、GET …/print）は、会員詳細の「受付アンケートの案内を表示」から同じタブで開く
+ * （2026-10-17 変更：当初は別タブ）。
  *
  * ## 戻り先と完了メッセージ（2026-10 変更）
  *
@@ -35,7 +36,7 @@ class TraineeIntakeSurveyTokenController extends Controller
      * 発行のあとは、同じタブで S-0311 にリダイレクトする（2026-10 変更）。発行のあとの次の作業は
      * 案内を見せる・印刷する・文面をコピーすることなので、「受付アンケートの案内を表示」を押し直す
      * 手間をなくす。完了メッセージは載せない（S-0311 は印刷用の画面のため。S-0311 が開くこと自体が
-     * 発行できたことの知らせになる）。S-0311 の「« 戻る」は会員詳細へのリンク。
+     * 発行できたことの知らせになる）。S-0311 の［戻る］は会員詳細へのリンク。
      *
      * 発行できなかったとき：
      * - 有効な案内がすでにある（回答待ち。二重送信・ほかのタブで発行済みなど）：新しく発行せず、
@@ -53,6 +54,16 @@ class TraineeIntakeSurveyTokenController extends Controller
         }
 
         return redirect()->route('trainee-intake-survey-tokens.print', $trainee);
+    }
+
+    /**
+     * 発行の URL を GET で開かれたとき（GET /trainees/{trainee}/intake-survey-tokens。2026-10-17 追加）。
+     * 発行せずに、そのトレーニーの会員の会員詳細（S-0305）に移す（405 にしない）。
+     * マイページ登録案内（ClientEmailRegistrationTokenController::redirectToClient）と同じ
+     */
+    public function redirectToClient(Trainee $trainee): RedirectResponse
+    {
+        return redirect()->route('clients.show', $trainee->client_id);
     }
 
     /**

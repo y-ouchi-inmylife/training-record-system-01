@@ -137,15 +137,49 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
         $this->assertNotSame('expired-token-0000', $tokens[1]);
     }
 
-    public function test_S0307の閉じるは会員詳細へのリンクで目印がある(): void
+    public function test_S0307の戻るは会員詳細へのふつうのリンクで閉じるのスクリプトを読み込まない(): void
     {
         $this->post(route('client-email-registration-tokens.store', $this->client));
 
         $html = $this->get(route('client-email-registration-tokens.print', $this->client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm" data-close-tab>閉じる</a>', $html);
+        $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
         $this->assertStringNotContainsString('history.back', $html);
         $this->assertStringNotContainsString('&laquo; 戻る', $html);
-        $this->assertStringContainsString('close-tab', $html);
+        $this->assertStringNotContainsString('close-tab', $html);
+        $this->assertStringNotContainsString('閉じる', $html);
+    }
+
+    // ---- 発行の URL を GET で開いたとき（2026-10-17 追加。405 にしない） ----
+
+    public function test_発行のURLをGETで開くと発行せず会員詳細に移る(): void
+    {
+        $this->get('/clients/'.$this->client->id.'/email-registration-tokens')
+            ->assertRedirect(route('clients.show', $this->client));
+        $this->assertSame(0, ClientEmailRegistrationToken::query()->count());
+    }
+
+    public function test_発行のURLをGETで開いても有効な案内には触らない(): void
+    {
+        $this->insertToken('active-token', '2026-10-16 10:00:00');
+
+        $this->get('/clients/'.$this->client->id.'/email-registration-tokens')
+            ->assertRedirect(route('clients.show', $this->client));
+        $this->assertSame(['active-token'], ClientEmailRegistrationToken::query()->pluck('token')->all());
+    }
+
+    public function test_発行のURLをGETで開いたとき_ない会員は404_ログインしていなければログインへ_システム管理者は403(): void
+    {
+        $this->get('/clients/999/email-registration-tokens')->assertNotFound();
+
+        $admin = new Trainer(['name' => 'システム', 'role' => 'system_admin']);
+        $admin->id = 201;
+        $admin->exists = true;
+        $this->actingAs($admin, 'web');
+        $this->get('/clients/'.$this->client->id.'/email-registration-tokens')->assertForbidden();
+
+        auth('web')->logout();
+        $this->get('/clients/'.$this->client->id.'/email-registration-tokens')->assertRedirect(route('login'));
+        $this->assertSame(0, ClientEmailRegistrationToken::query()->count());
     }
 }

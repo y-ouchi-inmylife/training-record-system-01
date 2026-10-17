@@ -33,7 +33,8 @@ class ClientEmailRegistrationTokenController extends Controller
      * 発行のあとの次の作業は案内を見せる・印刷する・文面をコピーすることなので、
      * 「マイページ登録の案内を表示」を押し直す手間をなくす。完了メッセージは載せない
      * （S-0307 は印刷用の画面のため。S-0307 が開くこと自体が発行できたことの知らせになる）。
-     * S-0307 の「« 戻る」は会員詳細へのリンクなので、戻ると会員詳細が新しい状態で開く。
+     * S-0307 の［戻る］は会員詳細へのリンクなので、戻ると会員詳細が新しい状態で開く（2026-10-17 変更：
+     * 別のタブで開いて［閉じる］で閉じる形をやめ、同じタブに戻した）。
      *
      * 有効な（未使用で期限内の）トークンがすでにあるとき（二重送信・ほかのタブで発行済みなど）は、
      * 新しく発行せず、今ある案内の S-0307 を開く（お客様に渡すものは同じため）。
@@ -82,6 +83,20 @@ class ClientEmailRegistrationTokenController extends Controller
         });
 
         return redirect()->route('client-email-registration-tokens.print', $client);
+    }
+
+    /**
+     * 発行の URL を GET で開かれたとき（GET /clients/{client}/email-registration-tokens。2026-10-17 追加）。
+     *
+     * 古いタブ・ブラウザの読み込み直し・履歴などで発行の URL が GET で開かれても、405 のエラー画面を出さず、
+     * 発行もせずに会員詳細（S-0305）に移す。権限はふつうの画面と同じ（auth・practitioners）。
+     * 会員がなければルートモデルバインディングで 404。
+     *
+     * 設計書: api-design.md `GET /clients/{client}/email-registration-tokens`
+     */
+    public function redirectToClient(Client $client): RedirectResponse
+    {
+        return redirect()->route('clients.show', $client);
     }
 
     /**
