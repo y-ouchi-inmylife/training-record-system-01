@@ -78,11 +78,11 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。送信元は S-0309 だけ（**2026-10 変更**）。成功後は S-0309 に戻す（下の「計測値エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
-| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。成功後は S-0311 にリダイレクトする（同じタブで開く。有効な案内がすでにあれば発行せずにその案内を開く。**2026-10 変更**。下の「受付アンケート案内エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を発行する（受付アンケート用 URL のトークンを 1 件作成する。ルート名 `trainee-intake-survey-tokens.store`。**2026-10 追加**）。成功後は S-0305 会員詳細画面にリダイレクトし、完了メッセージを出す（有効な案内がすでにあれば発行せず、メッセージも出さずに会員詳細に戻る。**2026-10-17 変更**。下の「受付アンケート案内エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | （発行の URL を GET で開いたとき） | GET | `/trainees/{trainee}/intake-survey-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（405 にしない。**2026-10-17 追加**。下の「発行の URL を GET で開いたとき」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/intake-survey-tokens` | 受付アンケート案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-intake-survey-tokens.destroy`。**2026-10 追加**）。リダイレクト先は発行と同じ | auth | 管理者、一般 |
 | トレーニー管理 | S-0311 受付アンケート案内画面 | GET | `/trainees/{trainee}/intake-survey-tokens/print` | 受付アンケート案内画面を表示する（ルート名 `trainee-intake-survey-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
-| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を発行する（性格診断用 URL のトークンを 1 件作成する。ルート名 `trainee-personality-diagnosis-tokens.store`。**2026-10 追加**）。成功後は S-0312 にリダイレクトする（同じタブで開く。有効な案内がすでにあれば発行せずにその案内を開く） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を発行する（性格診断用 URL のトークンを 1 件作成する。ルート名 `trainee-personality-diagnosis-tokens.store`。**2026-10 追加**）。成功後は S-0305 会員詳細画面にリダイレクトし、完了メッセージを出す（有効な案内がすでにあれば発行せず、メッセージも出さずに会員詳細に戻る。**2026-10-17 変更**） | auth | 管理者、一般 |
 | トレーニー管理 | （発行の URL を GET で開いたとき） | GET | `/trainees/{trainee}/personality-diagnosis-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（405 にしない。**2026-10-17 追加**。下の「発行の URL を GET で開いたとき」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-tokens` | 性格診断の案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-personality-diagnosis-tokens.destroy`。**2026-10 追加**）。成功後は S-0305 に戻す | auth | 管理者、一般 |
 | トレーニー管理 | S-0312 性格診断案内画面 | GET | `/trainees/{trainee}/personality-diagnosis-tokens/print` | 性格診断案内画面を表示する（ルート名 `trainee-personality-diagnosis-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
@@ -172,7 +172,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント閲覧 | S-1416 性格診断回答完了画面 | GET | `/client-portal/personality-diagnosis/thanks` | 性格診断の回答完了画面を表示する（トークンを受け取らない固定の画面。ルート名 `client-portal.personality-diagnosis.thanks`。**2026-10 追加**） | public | - |
 | クライアント閲覧 | S-1415 性格診断回答画面 | GET | `/client-portal/personality-diagnosis/{token}` | 性格診断回答画面を表示する（トークン検証。ルート名 `client-portal.personality-diagnosis.show`。**2026-10 追加**） | public | - |
 | クライアント閲覧 | S-1415 性格診断回答画面 | POST | `/client-portal/personality-diagnosis/{token}` | 性格診断の回答を採点して結果を保存する（ルート名 `client-portal.personality-diagnosis.store`。**2026-10 追加**） | public | - |
-| クライアント管理 | S-0305 クライアント詳細画面 | POST | `/clients/{client}/email-registration-tokens` | マイページ登録案内を発行する（未発行時の発行と期限切れからの発行し直しを同じエンドポイントで扱う。有効な案内がすでにあれば発行せずにその案内を開く。成功後は S-0307 を開く。トークン自体は「メールアドレス登録用 URL」で、URL パスもそのまま） | auth | 管理者、一般 |
+| クライアント管理 | S-0305 クライアント詳細画面 | POST | `/clients/{client}/email-registration-tokens` | マイページ登録案内を発行する（未発行時の発行と期限切れからの発行し直しを同じエンドポイントで扱う。有効な案内がすでにあれば発行せずに会員詳細に戻る。成功後は S-0305 会員詳細画面に戻り、完了メッセージを出す〔**2026-10-17 変更**〕。トークン自体は「メールアドレス登録用 URL」で、URL パスもそのまま） | auth | 管理者、一般 |
 | クライアント管理 | （発行の URL を GET で開いたとき） | GET | `/clients/{client}/email-registration-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（405 にしない。**2026-10-17 追加**。下の「発行の URL を GET で開いたとき」参照） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/clients/search` | クライアントを検索する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/training-records/auto-create` | 音声記録の要約からトレーニング記録を作成する（**2026-10**：画面からは呼ばれなくなった。録音実行は `/api/audio-records/{id}/auto-create-training-record` を使う） | auth | 管理者、一般 |
@@ -196,9 +196,9 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 
 **計測値エンドポイントのリダイレクト先**（**2026-10 変更**）：`POST /trainees/{trainee}/measurements` / `PUT /trainee-measurements/{measurement}` / `DELETE /trainee-measurements/{measurement}` の 3 メソッドは、成功後は**常に S-0309 トレーニー詳細画面**（`redirect()->route('trainees.show', $trainee)`）に戻す。計測値の登録・編集・削除はトレーニー詳細（S-0309）の計測値の欄だけで行うため（requirements.md 6-16-5）、送信元を判別する `return_to` は持たない（送られても使わない）。バリデーションエラー時は Laravel の `back()` で S-0309 に戻り、hidden `_trainee_id` で計測値モーダルを開き直す（screen-design.md S-0309「計測値モーダル」参照）。
 
-**受付アンケート案内エンドポイントのリダイレクト先**（**2026-10 変更**）：`DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、成功後は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', $trainee->client_id)`）に戻し、完了メッセージはフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/intake-survey-tokens`（発行）は、成功後は S-0311 受付アンケート案内画面にリダイレクトし（同じタブで開く。2026-10-17 変更：当初は会員詳細のフォームを別タブで送っていた）、完了メッセージは出さない（下の発行のエンドポイント参照）。受付アンケート案内の発行・表示・取消を会員詳細だけで行う形にしたため（requirements.md 6-16-8 備考「操作を会員詳細に寄せた理由」）、`return_to` は持たない（送られても使わない）。
+**受付アンケート案内エンドポイントのリダイレクト先**（**2026-10 変更**）：`DELETE /trainees/{trainee}/intake-survey-tokens`（取消）は、成功後は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', $trainee->client_id)`）に戻し、完了メッセージはフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/intake-survey-tokens`（発行）も、成功後は S-0305 会員詳細画面に戻し、完了メッセージをフラッシュ `success` で出す（**2026-10-17 変更**：当初は S-0311 受付アンケート案内画面にリダイレクトし、完了メッセージは出さなかった。下の発行のエンドポイント参照）。受付アンケート案内の発行・表示・取消を会員詳細だけで行う形にしたため（requirements.md 6-16-8 備考「操作を会員詳細に寄せた理由」）、`return_to` は持たない（送られても使わない）。
 
-**性格診断の案内エンドポイントのリダイレクト先**（**2026-10 追加**）：受付アンケート案内と同じ。`DELETE /trainees/{trainee}/personality-diagnosis-tokens`（取消）は成功後に S-0305 会員詳細画面に戻し、完了メッセージ「性格診断の案内を取り消しました。」をフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/personality-diagnosis-tokens`（発行）は成功後に S-0312 性格診断案内画面にリダイレクトし、完了メッセージは出さない。`return_to` は持たない。
+**性格診断の案内エンドポイントのリダイレクト先**（**2026-10 追加**）：受付アンケート案内と同じ。`DELETE /trainees/{trainee}/personality-diagnosis-tokens`（取消）は成功後に S-0305 会員詳細画面に戻し、完了メッセージ「性格診断の案内を取り消しました。」をフラッシュ `success`（画面の上端）で出す。`POST /trainees/{trainee}/personality-diagnosis-tokens`（発行）も成功後に S-0305 会員詳細画面に戻し、完了メッセージ「{表示名}の性格診断の案内を発行しました。」をフラッシュ `success` で出す（**2026-10-17 変更**：当初は S-0312 性格診断案内画面にリダイレクトし、完了メッセージは出さなかった）。`return_to` は持たない。
 
 **経緯：当初の `return_to`**（**2026-10 追加**。同じ 2026-10 に、操作を会員詳細に寄せたため廃止。経緯として残す）：当初は発行・取消を S-0305 と S-0309 の両方から行えるようにし、当時の計測値エンドポイントと同じく hidden `return_to`（`client` / `trainee` の 2 値、既定は `trainee`）で送信元を判別し、成功時のリダイレクト先を切り替えていた（当時の要件定義書 6-16-8・6-16-9「操作した画面に戻る」）。S-0309 に戻るときの完了メッセージは、受付アンケートの欄の中に出すための別のキー（`intake_survey_success`）で渡していた。
 
@@ -434,9 +434,10 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 - **この時点で決まる `expires_at` が初回設定完了までの全体の期限**となる。以降、対応する `client_login_link_tokens`（ログイン用リンク）を作成する際は、この `expires_at` をそのまま引き継ぐ
 
 **レスポンス**:
-- 成功（新規発行・期限切れからの発行し直しとも）：`redirect()->route('client-email-registration-tokens.print', $client)` — **発行のあとは S-0307 印刷ページを開く**（**2026-10 変更**。同じタブで開く。2026-10-17 変更：当初は会員詳細のフォームに `target="_blank"` を付けて別タブで送っていた）。完了メッセージ（フラッシュ `success`）は載せない（S-0307 は印刷用の画面のため出さず、［戻る］で会員詳細に戻ったときにも出さない。S-0307 が開くこと自体が、発行できたことの知らせになる）
-- 有効な URL がすでにある（二重送信・ほかのタブで発行済みなど）：新しく発行せず、同じく `redirect()->route('client-email-registration-tokens.print', $client)`（今ある有効な案内の S-0307 を開く。お客様に渡すものは同じため）
-- 発行のあとに案内の画面を開く理由と、別のタブをやめた理由（2026-10-17）は requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」
+- 成功（新規発行・期限切れからの発行し直しとも）：`redirect()->route('clients.show', $client)` — **発行のあとは S-0305 会員詳細画面に戻る**（**2026-10-17 変更**）。完了メッセージ「マイページ登録の案内を発行しました。」をフラッシュ `success` に載せ、`layouts.app` の `session('success')` 表示で描画する（取消と同じ出し方）。案内は［マイページ登録の案内を表示］から S-0307 を開いて見る
+  - 経緯：2026-10 に、発行のあとは S-0307 印刷ページにリダイレクトし、完了メッセージは載せない作りにしていた（当初は会員詳細のフォームに `target="_blank"` を付けて別タブで送り、2026-10-17 に同じタブに直した）
+- 有効な URL がすでにある（二重送信・古い画面から押し直したなど）：新しく発行せず、完了メッセージも載せずに `redirect()->route('clients.show', $client)`（会員詳細は新しい状態で開くので、ボタンは［…を表示］［取消］になっている）
+- 発行のあとの戻り先と、その理由は requirements.md 6-3-6 備考「発行のあとの戻り先」
 - 発行の URL を GET で開いたときは、下の「発行の URL を GET で開いたとき」
 
 **備考**:
@@ -466,7 +467,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 
 **ルート**: 名前は付けない（画面からは使わないため）。コントローラは各案内のコントローラの `redirectToClient`。
 
-**理由**: 2026-10-17、本番で、Android のタブレットの Chrome で、別のタブに送っていた発行のフォームが新しいタブで GET になり、405 のエラー画面になった。発行と表示を同じタブで開く形に戻したが（requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」）、それでも古いタブや履歴から発行の URL が GET で開かれることはあるため、エラー画面にせず会員詳細に戻す。
+**理由**: 2026-10-17、本番で、Android のタブレットの Chrome で、別のタブに送っていた発行のフォームが新しいタブで GET になり、405 のエラー画面になった。発行と表示を同じタブで開く形に戻し、発行のあとは会員詳細に戻す形にしたが（requirements.md 6-3-6 備考「発行のあとの戻り先」）、それでも古いタブや履歴から発行の URL が GET で開かれることはあるため、エラー画面にせず会員詳細に戻す。
 
 ###### DELETE /clients/{client}/email-registration-tokens
 
@@ -2177,8 +2178,8 @@ POST /training-records に以下を追加する。
 - **発行し直しはしない**（未回答のトークンがあれば発行できない。マイページ登録案内の発行と違い、既存のトークンを消して作り直す処理は持たない。requirements.md 6-16-8 備考）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainee-intake-survey-tokens.print', $trainee)` — **発行のあとは S-0311 を開く**（**2026-10 変更**。同じタブで開く〔2026-10-17 変更：当初は別タブ〕。理由は requirements.md 6-3-6 備考「発行のあとに案内の画面を開く理由」）。完了メッセージ（フラッシュ `success`）は載せない（マイページ登録案内の発行と同じ）
-- 有効な案内がすでにある（状態が「回答待ち」。二重送信・ほかのタブで発行済みなど）：新しく発行せず、同じく `redirect()->route('trainee-intake-survey-tokens.print', $trainee)`（今ある有効な案内の S-0311 を開く）
+- 成功：`redirect()->route('clients.show', $trainee->client_id)` — **発行のあとは S-0305 会員詳細画面に戻る**（**2026-10-17 変更**：当初は S-0311 を開き、完了メッセージは載せなかった。理由は requirements.md 6-3-6 備考「発行のあとの戻り先」）。完了メッセージ「{表示名}の受付アンケートの案内を発行しました。」をフラッシュ `success` に載せる（表示名は `Trainee::display_name`。名前がなければ「名前未登録」。マイページ登録案内の発行と同じ出し方）。戻る位置はページの上（`#…` は付けない）
+- 有効な案内がすでにある（状態が「回答待ち」。二重送信・古い画面から押し直したなど）：新しく発行せず、完了メッセージも載せずに `redirect()->route('clients.show', $trainee->client_id)`
 - 回答済み：409（今までどおり。UI 側でボタンを出し分けているため通常は到達しない）
 
 
@@ -2230,8 +2231,8 @@ POST /training-records に以下を追加する。
 - **前の結果（`trainee_personality_diagnosis_results`）の有無は見ない**（何回でも受けられるため。受付アンケートの「回答済みなら 409」に当たる扱いはない）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainee-personality-diagnosis-tokens.print', $trainee)`（S-0312。同じタブで開く。2026-10-17 変更：当初は別タブ）。完了メッセージは載せない
-- 有効な案内がすでにある（二重送信・ほかのタブで発行済みなど）：新しく発行せず、同じく S-0312 にリダイレクトする（今ある有効な案内を開く）
+- 成功：`redirect()->route('clients.show', $trainee->client_id)`（S-0305。**2026-10-17 変更**：当初は S-0312 を開き、完了メッセージは載せなかった）。完了メッセージ「{表示名}の性格診断の案内を発行しました。」をフラッシュ `success` に載せる（受付アンケート案内と同じ）
+- 有効な案内がすでにある（二重送信・古い画面から押し直したなど）：新しく発行せず、完了メッセージも載せずに S-0305 に戻る
 
 ###### DELETE /trainees/{trainee}/personality-diagnosis-tokens
 
