@@ -121,6 +121,7 @@ class ClientInitialSetupStoreTest extends TestCase
             'first_name_kana' => 'たろう',
             'phone1' => '03-1234-5678',
             'phone2' => '090-0000-0000',
+            'emergency_contact_relationship' => '夫',
             'postal_code' => '100-0014',
             'address1' => '東京都',
             'address2' => '千代田区',
@@ -154,6 +155,7 @@ class ClientInitialSetupStoreTest extends TestCase
         $this->assertSame('たろう', $client->first_name_kana);
         $this->assertSame('03-1234-5678', $client->phone1);
         $this->assertSame('090-0000-0000', $client->phone2);
+        $this->assertSame('夫', $client->emergency_contact_relationship);
         $this->assertSame('100-0014', $client->postal_code);
         $this->assertSame('東京都', $client->address1);
         $this->assertSame('千代田区', $client->address2);
@@ -253,5 +255,22 @@ class ClientInitialSetupStoreTest extends TestCase
         ]))->assertRedirect(route('client-portal.dashboard'));
 
         $this->assertSame(0, DB::table('trainees')->count());
+    }
+
+    public function test_緊急連絡先と続柄は空でも完了でき続柄が21文字以上だとエラー(): void
+    {
+        $this->postSetup($this->validInput(['phone2' => '', 'emergency_contact_relationship' => '']))
+            ->assertRedirect(route('client-portal.dashboard'))
+            ->assertSessionHasNoErrors();
+        $client = $this->client->fresh();
+        $this->assertNull($client->phone2);
+        $this->assertNull($client->emergency_contact_relationship);
+    }
+
+    public function test_続柄が21文字以上だと初回設定はエラーになる(): void
+    {
+        $this->postSetup($this->validInput(['emergency_contact_relationship' => str_repeat('あ', 21)]))
+            ->assertSessionHasErrors(['emergency_contact_relationship' => '続柄は20文字以内で入力してください。']);
+        $this->assertNull($this->client->fresh()->password);
     }
 }

@@ -29,7 +29,7 @@ class ClientRequest extends FormRequest
      * バリデーションルール。
      *
      * 元 ClientController::validationRules() の内容をそのまま移した。
-     * 電話番号／電話番号（予備）（phone1 / phone2）のラベル差替は
+     * 電話番号／緊急連絡先（ご家族等）／続柄（phone1 / phone2 / emergency_contact_relationship）のラベル差替は
      * `lang/ja/validation.php` の attributes セクションで解決している。
      */
     public function rules(): array
@@ -48,6 +48,8 @@ class ClientRequest extends FormRequest
             // カテゴリー2: 連絡先
             'phone1' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\-]+$/'],
             'phone2' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\-]+$/'],
+            // 続柄（2026-10-17 追加）。任意・自由入力・20文字以内。緊急連絡先（phone2）との組み合わせのきまりは作らない
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:20'],
             'postal_code' => ['nullable', 'string', 'regex:/^\d{3}-?\d{4}$/'],
             'address1' => 'nullable|string|max:50',
             'address2' => 'nullable|string|max:50',

@@ -42,7 +42,8 @@ class Client extends Authenticatable
         'last_name_kana', 'first_name_kana',
         'primary_trainer_id',
         // カテゴリー2: 連絡先
-        'phone1', 'phone2', 'email',
+        // phone2 は緊急連絡先（ご家族等）の電話番号（2026-10-17 変更。列の名前は変えない）。続柄は emergency_contact_relationship
+        'phone1', 'phone2', 'emergency_contact_relationship', 'email',
         'postal_code', 'address1', 'address2', 'address3', 'address4',
         // クライアント閲覧機能（柱2）
         'password',

@@ -227,7 +227,8 @@
                 </div>
 
                 <div class="row g-3 mb-2">
-                    {{-- 行3: 電話番号 + 電話番号（予備） --}}
+                    {{-- 行3: 電話番号 + 緊急連絡先（ご家族等）+ 続柄（2026-10-17 変更：その前は「電話番号（予備）」で、3 列目は空き）。
+                         緊急連絡先のラベルは固定幅（140px）に収まらないので、「（ご家族等）」の前で折り返す（言葉の途中で折り返さない） --}}
                     <div class="col-md-4">
                         <div class="row g-2 align-items-center">
                             <label for="phone1" class="col-md-auto col-form-label text-md-end form-label-fixed">電話番号</label>
@@ -241,12 +242,24 @@
                     </div>
                     <div class="col-md-4">
                         <div class="row g-2 align-items-center">
-                            <label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed">電話番号（予備）</label>
+                            <label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>
                             <div class="col-12 col-md">
                                 <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
                                        id="phone2" name="phone2" value="{{ old('phone2', $client?->phone2) }}" placeholder="例: 090-1234-5678"
                                        autocomplete="off">
                                 <x-form-error field="phone2" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="row g-2 align-items-center">
+                            <label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>
+                            <div class="col-12 col-md">
+                                <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
+                                       id="emergency_contact_relationship" name="emergency_contact_relationship"
+                                       value="{{ old('emergency_contact_relationship', $client?->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘"
+                                       autocomplete="off">
+                                <x-form-error field="emergency_contact_relationship" />
                             </div>
                         </div>
                     </div>

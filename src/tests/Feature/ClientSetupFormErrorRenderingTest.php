@@ -63,6 +63,7 @@ class ClientSetupFormErrorRenderingTest extends TestCase
             'first_name_kana' => 'ERR_first_name_kana',
             'phone1' => 'ERR_phone1',
             'phone2' => 'ERR_phone2',
+            'emergency_contact_relationship' => 'ERR_emergency_contact_relationship',
             'postal_code' => 'ERR_postal_code',
             'address1' => 'ERR_address1',
             'address2' => 'ERR_address2',
@@ -80,6 +81,7 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $view->assertSee('ERR_first_name_kana');
         $view->assertSee('ERR_phone1');
         $view->assertSee('ERR_phone2');
+        $view->assertSee('ERR_emergency_contact_relationship');
         $view->assertSee('ERR_postal_code');
         $view->assertSee('ERR_address1');
         $view->assertSee('ERR_address2');
@@ -230,5 +232,23 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $this->assertGreaterThan($posAddress3, $posLine);
         $this->assertLessThan($posAddress4, $posLine);
         $this->assertLessThan($posLoginHeading, $posLine);
+    }
+
+    public function test_初回設定_緊急連絡先のすぐ下に続柄の欄を出し電話番号予備の文字は出さない(): void
+    {
+        $view = $this->renderSetup([]);
+
+        $view->assertSeeInOrder(['<label for="phone2" class="form-label">緊急連絡先（ご家族等）</label>', '<label for="emergency_contact_relationship" class="form-label">続柄</label>', 'id="postal_code"'], false);
+        $view->assertSee('id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"', false);
+        $view->assertSee('placeholder="例: 母、夫、娘"', false);
+        $view->assertDontSee('電話番号（予備）');
+    }
+
+    public function test_初回設定_続柄だけのエラーでも上部案内とパスワード再入力の案内が出る(): void
+    {
+        $view = $this->renderSetup(['emergency_contact_relationship' => 'ERR_rel']);
+
+        $view->assertSee('入力内容に誤りがあります。');
+        $view->assertSee('確認のため、パスワードをもう一度入力してください。');
     }
 }

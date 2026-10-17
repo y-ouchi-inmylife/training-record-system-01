@@ -173,6 +173,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $view = $this->renderEdit([
             'phone1' => 'ERR_phone1',
             'phone2' => 'ERR_phone2',
+            'emergency_contact_relationship' => 'ERR_emergency_contact_relationship',
             'postal_code' => 'ERR_postal_code',
             'address1' => 'ERR_address1',
             'address2' => 'ERR_address2',
@@ -183,6 +184,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('ERR_phone1');
         $view->assertSee('ERR_phone2');
+        $view->assertSee('ERR_emergency_contact_relationship');
         $view->assertSee('ERR_postal_code');
         $view->assertSee('ERR_address1');
         $view->assertSee('ERR_address2');
@@ -209,5 +211,38 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $view->assertSee('id="address-search-message"', false);
         $view->assertSee('ERR_postal_code');
         $view->assertSee('has-validation', false);
+    }
+
+    // ---- 緊急連絡先（ご家族等）と続柄（2026-10-17 変更：その前は「電話番号（予備）」） ----
+
+    public function test_登録情報変更_緊急連絡先のすぐ下に続柄の欄を出し電話番号予備の文字は出さない(): void
+    {
+        $client = $this->dummyClient();
+        $client->phone2 = '090-1111-2222';
+        $client->emergency_contact_relationship = '娘';
+        $view = $this->withViewErrors([])->view('client.settings.edit', ['client' => $client]);
+
+        $view->assertSeeInOrder(['<label for="phone2" class="form-label">緊急連絡先（ご家族等）</label>', 'value="090-1111-2222"', '<label for="emergency_contact_relationship" class="form-label">続柄</label>', 'value="娘"', 'id="postal_code"'], false);
+        $view->assertSee('placeholder="例: 母、夫、娘"', false);
+        $view->assertDontSee('電話番号（予備）');
+    }
+
+    public function test_登録情報の表示_緊急連絡先と続柄を出し電話番号予備の文字は出さない(): void
+    {
+        $client = $this->dummyClient();
+        $client->phone2 = '090-1111-2222';
+        $client->emergency_contact_relationship = '娘';
+        $view = $this->view('client.settings.show', ['client' => $client]);
+
+        $view->assertSeeInOrder(['電話番号', '03-0000-0000', '緊急連絡先（ご家族等）', '090-1111-2222', '続柄', '娘']);
+        $view->assertDontSee('電話番号（予備）');
+    }
+
+    public function test_登録情報の表示_緊急連絡先と続柄が空でもラベルを出す(): void
+    {
+        $view = $this->view('client.settings.show', ['client' => $this->dummyClient()]);
+
+        $view->assertSee('緊急連絡先（ご家族等）');
+        $view->assertSee('<div class="text-muted small mb-1">続柄</div>', false);
     }
 }

@@ -725,7 +725,9 @@
                 <x-detail-cell label="住所" :value="$fullAddress" />
                 <div class="col-6 col-md-4"></div>
                 <x-detail-cell label="電話番号" :value="$client->phone1" />
-                <x-detail-cell label="電話番号（予備）" :value="$client->phone2" />
+                {{-- 2026-10-17 変更：「電話番号（予備）」を「緊急連絡先（ご家族等）」にし、空いていた 3 列目に続柄を置く --}}
+                <x-detail-cell label="緊急連絡先（ご家族等）" :value="$client->phone2" />
+                <x-detail-cell label="続柄" :value="$client->emergency_contact_relationship" />
             </div>
         </div>
     </div>

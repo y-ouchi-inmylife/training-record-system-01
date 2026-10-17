@@ -59,9 +59,14 @@
                         <div class="text-muted small mb-1">電話番号</div>
                         <div style="min-height: 1.5rem;">{{ $client->phone1 }}</div>
                     </div>
-                    <div class="py-3">
-                        <div class="text-muted small mb-1">電話番号（予備）</div>
+                    {{-- 2026-10-17 変更：「電話番号（予備）」を「緊急連絡先（ご家族等）」にし、続柄を足す --}}
+                    <div class="py-3 border-bottom">
+                        <div class="text-muted small mb-1">緊急連絡先（ご家族等）</div>
                         <div style="min-height: 1.5rem;">{{ $client->phone2 }}</div>
+                    </div>
+                    <div class="py-3">
+                        <div class="text-muted small mb-1">続柄</div>
+                        <div style="min-height: 1.5rem;">{{ $client->emergency_contact_relationship }}</div>
                     </div>
                 </div>
             </div>

@@ -32,7 +32,7 @@
             @if ($errors->hasAny([
                 'password',
                 'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
-                'phone1', 'phone2',
+                'phone1', 'phone2', 'emergency_contact_relationship',
                 'postal_code', 'address1', 'address2', 'address3', 'address4',
             ]))
                 <x-form-error-summary />
@@ -122,12 +122,20 @@
                            value="{{ old('phone1', $client->phone1) }}">
                     <x-form-error field="phone1" />
                 </div>
-                <div class="mb-3">
-                    <label for="phone2" class="form-label">電話番号（予備）</label>
+                {{-- 2026-10-17 変更：「電話番号（予備）」を「緊急連絡先（ご家族等）」にし、すぐ下に続柄を足す --}}
+                <div class="mb-2">
+                    <label for="phone2" class="form-label">緊急連絡先（ご家族等）</label>
                     <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
                            id="phone2" name="phone2" maxlength="20"
                            value="{{ old('phone2', $client->phone2) }}">
                     <x-form-error field="phone2" />
+                </div>
+                <div class="mb-3">
+                    <label for="emergency_contact_relationship" class="form-label">続柄</label>
+                    <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
+                           id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"
+                           value="{{ old('emergency_contact_relationship', $client->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘">
+                    <x-form-error field="emergency_contact_relationship" />
                 </div>
 
                 <div class="mb-2">
@@ -218,7 +226,7 @@
                      パスワードだけのエラーのときは、欄の下の赤字で原因が伝わるため出さない。 --}}
                 @if ($errors->hasAny([
                     'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
-                    'phone1', 'phone2',
+                    'phone1', 'phone2', 'emergency_contact_relationship',
                     'postal_code', 'address1', 'address2', 'address3', 'address4',
                 ]))
                     <div class="form-text mb-2">確認のため、パスワードをもう一度入力してください。</div>

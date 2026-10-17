@@ -107,6 +107,7 @@ class InitialSetupController extends Controller
                     'first_name_kana' => $validated['first_name_kana'] ?? null,
                     'phone1' => $validated['phone1'],
                     'phone2' => $validated['phone2'] ?? null,
+                    'emergency_contact_relationship' => $validated['emergency_contact_relationship'] ?? null,
                     'postal_code' => $validated['postal_code'],
                     'address1' => $validated['address1'],
                     'address2' => $validated['address2'],

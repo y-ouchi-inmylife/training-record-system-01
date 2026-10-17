@@ -42,6 +42,8 @@ class ClientInitialSetupRequest extends FormRequest
             // 位置づけのため。設計書 S-1403 備考 / 6-15-5 参照）
             'phone1' => ['required', 'string', 'max:20', 'regex:/^[0-9\-]+$/'],
             'phone2' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\-]+$/'],
+            // 続柄（2026-10-17 追加）。任意・自由入力・20文字以内。緊急連絡先（phone2）との組み合わせのきまりは作らない
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:20'],
             'postal_code' => ['nullable', 'string', 'regex:/^\d{3}-?\d{4}$/'],
             'address1' => 'required|string|max:50',
             'address2' => 'required|string|max:50',

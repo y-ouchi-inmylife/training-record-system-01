@@ -49,6 +49,7 @@ class ClientFormErrorRenderingTest extends TestCase
             $client->address4 = '';
             $client->phone1 = '';
             $client->phone2 = '';
+            $client->emergency_contact_relationship = '';
             $client->email = $email;
         }
 
@@ -115,6 +116,7 @@ class ClientFormErrorRenderingTest extends TestCase
             'address4' => 'ERR_address4',
             'phone1' => 'ERR_phone1',
             'phone2' => 'ERR_phone2',
+            'emergency_contact_relationship' => 'ERR_emergency_contact_relationship',
         ];
 
         // 編集画面で全項目をチェック（登録画面は internal_id 以外同じ構造）
@@ -159,5 +161,21 @@ class ClientFormErrorRenderingTest extends TestCase
         }
         // 登録済みの会員の編集でも値を出さない
         $this->assertStringNotContainsString('yamada@example.com', $edit);
+    }
+
+    // ---- 緊急連絡先（ご家族等）と続柄（2026-10-17 変更：その前は「電話番号（予備）」） ----
+
+    public function test_登録と編集に緊急連絡先と続柄の欄を出し電話番号予備の文字は出さない(): void
+    {
+        foreach ([false, true] as $isEdit) {
+            $view = $this->renderForm([], isEdit: $isEdit);
+
+            // 緊急連絡先のラベルは「（ご家族等）」の前で折り返す（固定幅に収まらないため）
+            $view->assertSee('<label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>', false);
+            $view->assertSee('<label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>', false);
+            $view->assertSee('id="emergency_contact_relationship" name="emergency_contact_relationship"', false);
+            $view->assertSee('placeholder="例: 母、夫、娘"', false);
+            $view->assertDontSee('電話番号（予備）');
+        }
     }
 }

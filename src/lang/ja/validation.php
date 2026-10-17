@@ -319,7 +319,9 @@ return [
         'first_name_kana' => 'めい',
         'initial_consultation_date' => '初回日',
         'phone1' => '電話番号',
-        'phone2' => '電話番号（予備）',
+        // phone2 は緊急連絡先（ご家族等）の電話番号（2026-10-17 変更。その前は「電話番号（予備）」）
+        'phone2' => '緊急連絡先（ご家族等）',
+        'emergency_contact_relationship' => '続柄',
         'email' => 'メールアドレス',
         'new_email' => '新しいメールアドレス',
         'postal_code' => '郵便番号',

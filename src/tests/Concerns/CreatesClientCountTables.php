@@ -26,6 +26,7 @@ trait CreatesClientCountTables
             $table->string('first_name_kana')->nullable();
             $table->string('phone1')->nullable();
             $table->string('phone2')->nullable();
+            $table->string('emergency_contact_relationship')->nullable();
             $table->string('email')->nullable();
             $table->string('postal_code')->nullable();
             $table->string('address1')->nullable();
