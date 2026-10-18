@@ -52,7 +52,8 @@ class TraineePersonalityDiagnosisTokenController extends Controller
      */
     public function destroy(Trainee $trainee): RedirectResponse
     {
-        $deleted = $trainee->personalityDiagnosisTokens()->whereNull('answered_at')->delete();
+        // 有効な（未回答で期限内の）案内だけを消す。期限が切れた案内は記録として残す（2026-10-19 変更）
+        $deleted = $trainee->personalityDiagnosisTokens()->active()->delete();
         if ($deleted === 0) {
             abort(409, '取り消す'.__('messages.personality_diagnosis_name').'の案内がありません。');
         }
@@ -87,7 +88,8 @@ class TraineePersonalityDiagnosisTokenController extends Controller
             'trainee' => $trainee,
             'url' => $url,
             // LINE・メールで送る文面（画面に出す文とコピーする文は同じ。2026-10-18 変更：InvitationMessage に移した）
-            'copyText' => InvitationMessage::personalityDiagnosis($trainee, $url),
+            // 有効期限があれば文面に「リンクの有効期限：…まで」の行を入れる（2026-10-19 追加。期限なしの案内は今までどおり）
+            'copyText' => InvitationMessage::personalityDiagnosis($trainee, $url, $token->expires_at),
         ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyResponse;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsIntakeSurveyName;
@@ -471,5 +472,36 @@ class ClientIntakeSurveyShowTest extends TestCase
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
         $this->assertSame(4, preg_match_all('/rows="4" maxlength="2000"><\/textarea>/u', $html));
+    }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_期限の日の23時59分59秒までは開け翌日0時からは期限切れの画面(): void
+    {
+        $this->traineeWithToken('モモ');
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+
+        $this->travelTo(Carbon::parse('2026-10-26 23:59:59.900000'));
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬アンケート</h1>', $this->get($this->showPath())->assertOk()->getContent());
+
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->assertUnavailable($this->get($this->showPath())->assertOk()->getContent(), 'このリンクは有効期限が切れています。お手数ですがトレーナーにお問い合わせください。');
+    }
+
+    public function test_期限が空の前からの案内は今までどおり開ける(): void
+    {
+        $this->traineeWithToken('モモ');
+        $this->travelTo(Carbon::parse('2030-01-01 10:00:00'));
+
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬アンケート</h1>', $this->get($this->showPath())->assertOk()->getContent());
+    }
+
+    public function test_回答済みの案内は期限が切れていても回答済みの画面(): void
+    {
+        $this->traineeWithToken('モモ', '2026-10-20 10:00:00');
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+
+        $this->assertUnavailable($this->get($this->showPath())->assertOk()->getContent(), 'このアンケートはすでにご回答いただいています。');
     }
 }

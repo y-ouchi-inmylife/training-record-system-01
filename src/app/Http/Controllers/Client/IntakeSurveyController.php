@@ -26,6 +26,9 @@ class IntakeSurveyController extends Controller
 
     private const ANSWERED = 'answered';
 
+    // 有効期限が切れた案内（2026-10-19 追加。案内に 1 週間の有効期限を付けた。期限が空の案内は期限切れにしない）
+    private const EXPIRED = 'expired';
+
     /**
      * 愛犬アンケート回答画面（S-1413。GET /client-portal/intake-survey/{token}）
      */
@@ -37,6 +40,9 @@ class IntakeSurveyController extends Controller
         }
         if ($tokenRecord->answered_at !== null) {
             return $this->unavailableView(self::ANSWERED, $token);
+        }
+        if ($tokenRecord->isExpired()) {
+            return $this->unavailableView(self::EXPIRED, $token);
         }
         $trainee = Trainee::query()->find($tokenRecord->trainee_id);
         if ($trainee === null) {
@@ -80,6 +86,9 @@ class IntakeSurveyController extends Controller
             }
             if ($tokenRecord->answered_at !== null) {
                 return self::ANSWERED;
+            }
+            if ($tokenRecord->isExpired()) {
+                return self::EXPIRED;
             }
             $trainee = Trainee::query()->whereKey($tokenRecord->trainee_id)->lockForUpdate()->first();
             if ($trainee === null) {
@@ -177,9 +186,12 @@ class IntakeSurveyController extends Controller
     private function unavailableView(string $reason, string $token): View
     {
         return view('client.intake-survey.unavailable', [
-            'message' => $reason === self::ANSWERED
-                ? 'このアンケートはすでにご回答いただいています。'
-                : 'このアンケートはご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+            'message' => match ($reason) {
+                self::ANSWERED => 'このアンケートはすでにご回答いただいています。',
+                // 期限切れの文はマイページ登録のご案内の期限切れの文に合わせた（2026-10-19 追加）
+                self::EXPIRED => 'このリンクは有効期限が切れています。お手数ですがトレーナーにお問い合わせください。',
+                default => 'このアンケートはご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+            },
             // ［マイページへ戻る］：ログインしている会員の、自分の愛犬の案内のときだけ（2026-10 追加）
             'showMypageLink' => ClientMypageLink::shouldShow(
                 TraineeIntakeSurveyToken::query()->where('token', $token)->value('trainee_id')

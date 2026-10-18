@@ -10,6 +10,7 @@ use App\Models\TraineePersonalityDiagnosisToken;
 use App\Models\Trainer;
 use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsPersonalityDiagnosisName;
@@ -442,5 +443,97 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
             ->assertSessionHas('success', 'テスト診断の案内を取り消しました。');
         $this->assertSame('テスト診断案内発行', AccessLog::actionLabels()['create_trainee_personality_diagnosis_token']);
+    }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_発行した案内の有効期限は発行した日から7日後の日の終わり(): void
+    {
+        $this->assertSame(7, config('client_tokens.personality_diagnosis_expires_days'));
+        foreach (['2026-10-19 10:00:00', '2026-10-19 23:30:00'] as $now) {
+            $this->travelTo(Carbon::parse($now));
+            DB::table('trainee_personality_diagnosis_tokens')->delete();
+
+            $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('success');
+
+            $this->assertSame('2026-10-26 23:59:59', TraineePersonalityDiagnosisToken::query()->sole()->expires_at->format('Y-m-d H:i:s'), $now);
+            $this->assertSame('2026-10-26 23:59:59', DB::table('trainee_personality_diagnosis_tokens')->value('expires_at'), $now);
+        }
+    }
+
+    public function test_期限が切れた案内しかなければ発行でき期限が切れた行は残す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $expired = DB::table('trainee_personality_diagnosis_tokens')->insertGetId([
+            'token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => '2026-10-19 10:00:00', 'updated_at' => '2026-10-19 10:00:00',
+        ]);
+
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('success');
+
+        $tokens = TraineePersonalityDiagnosisToken::query()->orderBy('id')->get();
+        $this->assertCount(2, $tokens);
+        $this->assertSame($expired, $tokens[0]->id);
+        $this->assertSame('2026-11-03 23:59:59', $tokens[1]->expires_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_期限が切れた案内は取消の対象にせず行も残す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))->assertStatus(409);
+        $this->assertSame(1, DB::table('trainee_personality_diagnosis_tokens')->count());
+    }
+
+    public function test_期限が空の前からの案内は今までどおり有効で新しく作らない(): void
+    {
+        $this->travelTo(Carbon::parse('2030-01-01 10:00:00'));
+        $old = DB::table('trainee_personality_diagnosis_tokens')->insertGetId([
+            'token' => str_repeat('n', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => null,
+            'created_at' => '2026-10-01 10:00:00', 'updated_at' => '2026-10-01 10:00:00',
+        ]);
+
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionMissing('success');
+
+        $this->assertSame([$old], TraineePersonalityDiagnosisToken::query()->pluck('id')->all());
+        $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))->assertSessionHas('success');
+        $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->count());
+    }
+
+    public function test_有効期限のある案内の文面は有効期限の行で画面とコピーする文が同じ_期限なしは今までどおり(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 10:00:00'));
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => str_repeat('x', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $html = $this->printPage();
+        $copy = $this->copyText($html);
+        $this->assertStringContainsString('愛犬性格診断のご案内をお送りします。', $copy);
+        $this->assertStringContainsString("\n\nリンクの有効期限：2026年10月26日（月）まで\nご不明な点がございましたら、お気軽にお問い合わせください。", $copy);
+        $this->assertStringNotContainsString('ご回答は1回かぎり', $copy);
+        $this->assertSame($copy, $this->shownText($html));
+
+        // 期限なしの案内（期限を付ける前に発行したもの）は今までどおり 1 回かぎりの文
+        DB::table('trainee_personality_diagnosis_tokens')->update(['expires_at' => null]);
+        $copy = $this->copyText($this->printPage());
+        $this->assertStringContainsString("\n\nご回答は1回かぎりです。送信すると、このリンクは使えなくなります。\n", $copy);
+        $this->assertStringNotContainsString('リンクの有効期限', $copy);
+    }
+
+    public function test_期限が切れた案内しかなければ有効な案内がないとして扱う(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => str_repeat('x', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->assertStringContainsString('<strong>有効な愛犬性格診断の案内がありません。</strong>', $this->printPage());
     }
 }

@@ -30,6 +30,9 @@ class PersonalityDiagnosisController extends Controller
 
     public const ANSWERED = 'answered';
 
+    // 有効期限が切れた案内（2026-10-19 追加。愛犬アンケートと同じ。期限が空の案内は期限切れにしない）
+    public const EXPIRED = 'expired';
+
     /**
      * 性格診断回答画面（S-1415。GET /client-portal/personality-diagnosis/{token}）
      */
@@ -121,8 +124,8 @@ class PersonalityDiagnosisController extends Controller
     }
 
     /**
-     * トークンが使えるか。使えれば true、使えなければ理由（UNAVAILABLE / ANSWERED）。
-     * 確かめる順は愛犬アンケートと同じ（存在しない → 回答済み → トレーニーが存在しない）
+     * トークンが使えるか。使えれば true、使えなければ理由（UNAVAILABLE / ANSWERED / EXPIRED）。
+     * 確かめる順は愛犬アンケートと同じ（存在しない → 回答済み → 期限切れ → トレーニーが存在しない。期限切れは 2026-10-19 追加）
      */
     private static function checkToken(?TraineePersonalityDiagnosisToken $tokenRecord): true|string
     {
@@ -131,6 +134,9 @@ class PersonalityDiagnosisController extends Controller
         }
         if ($tokenRecord->answered_at !== null) {
             return self::ANSWERED;
+        }
+        if ($tokenRecord->isExpired()) {
+            return self::EXPIRED;
         }
         if (! Trainee::query()->whereKey($tokenRecord->trainee_id)->exists()) {
             return self::UNAVAILABLE;
@@ -145,9 +151,12 @@ class PersonalityDiagnosisController extends Controller
     private static function unavailableView(string $reason, string $token): View
     {
         return view('client.personality-diagnosis.unavailable', [
-            'message' => $reason === self::ANSWERED
-                ? 'この'.__('messages.personality_diagnosis_name').'はすでにご回答いただいています。'
-                : 'この'.__('messages.personality_diagnosis_name').'はご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+            'message' => match ($reason) {
+                self::ANSWERED => 'この'.__('messages.personality_diagnosis_name').'はすでにご回答いただいています。',
+                // 期限切れの文は愛犬アンケート・マイページ登録のご案内と同じ（2026-10-19 追加）
+                self::EXPIRED => 'このリンクは有効期限が切れています。お手数ですがトレーナーにお問い合わせください。',
+                default => 'この'.__('messages.personality_diagnosis_name').'はご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+            },
             // ［マイページへ戻る］：ログインしている会員の、自分の愛犬の案内のときだけ（2026-10 追加）
             'showMypageLink' => ClientMypageLink::shouldShow(
                 TraineePersonalityDiagnosisToken::query()->where('token', $token)->value('trainee_id')

@@ -49,4 +49,19 @@ return [
     */
     'password_reset_expires_days' => 3,
 
+    /*
+    |--------------------------------------------------------------------------
+    | 愛犬アンケート用 URL・愛犬性格診断用 URL の有効日数（2026-10-19 追加）
+    |--------------------------------------------------------------------------
+    |
+    | 愛犬アンケート案内（DS-1000 trainee_intake_survey_tokens.expires_at）と愛犬性格診断の案内
+    | （DS-1100 trainee_personality_diagnosis_tokens.expires_at）の有効日数。期限は発行した日から N 日後の日の終わり
+    | （マイページ登録のご案内と同じ決め方。App\Support\InvitationExpiry）。
+    | ユーザーレビューで、期限がないとお客様が答えるのを忘れてしまうので、1 週間の有効期限を付けた（その前は期限なし）。
+    | 期限を付ける前に発行した案内は expires_at が NULL（期限なし）のまま。
+    |
+    */
+    'intake_survey_expires_days' => 7,
+    'personality_diagnosis_expires_days' => 7,
+
 ];

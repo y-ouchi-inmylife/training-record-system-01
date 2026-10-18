@@ -89,6 +89,7 @@ trait CreatesClientCountTables
             $table->id();
             $table->string('token', 64)->unique();
             $table->unsignedBigInteger('trainee_id');
+            $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -132,6 +133,7 @@ trait CreatesClientCountTables
             $table->string('token', 64)->unique();
             $table->unsignedBigInteger('trainee_id');
             $table->foreign('trainee_id')->references('id')->on('trainees')->cascadeOnDelete();
+            $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('created_by')->nullable();

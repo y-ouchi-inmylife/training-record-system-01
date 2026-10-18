@@ -151,7 +151,8 @@ class Trainee extends Model
      */
     public function activeIntakeSurveyToken(): HasOne
     {
-        return $this->hasOne(TraineeIntakeSurveyToken::class)->whereNull('answered_at');
+        // 未回答で期限内のもの（2026-10-19 変更：期限が切れた案内は有効に数えない。その前は未回答だけで決めていた）
+        return $this->hasOne(TraineeIntakeSurveyToken::class)->active();
     }
 
     /**
@@ -187,7 +188,8 @@ class Trainee extends Model
      */
     public function activePersonalityDiagnosisToken(): HasOne
     {
-        return $this->hasOne(TraineePersonalityDiagnosisToken::class)->whereNull('answered_at');
+        // 未回答で期限内のもの（2026-10-19 変更：期限が切れた案内は有効に数えない）
+        return $this->hasOne(TraineePersonalityDiagnosisToken::class)->active();
     }
 
     /**

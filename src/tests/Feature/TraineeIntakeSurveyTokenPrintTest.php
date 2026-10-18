@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Trainee;
 use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsIntakeSurveyName;
@@ -290,5 +291,40 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->overrideIntakeSurveyName('テストアンケート');
 
         $this->assertStringContainsString('<strong>有効なテストアンケートの案内がありません。</strong>', $this->printPage());
+    }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_有効期限のある案内の文面は有効期限の行で画面とコピーする文が同じ_期限なしは今までどおり(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 10:00:00'));
+        DB::table('trainee_intake_survey_tokens')->insert([
+            'token' => str_repeat('x', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $html = $this->printPage();
+        $copy = $this->copyText($html);
+        $this->assertStringContainsString('愛犬アンケートのご案内をお送りします。', $copy);
+        $this->assertStringContainsString("\n\nリンクの有効期限：2026年10月26日（月）まで\nご不明な点がございましたら、お気軽にお問い合わせください。", $copy);
+        $this->assertStringNotContainsString('ご回答は1回かぎり', $copy);
+        $this->assertSame($copy, $this->shownText($html));
+
+        // 期限なしの案内（期限を付ける前に発行したもの）は今までどおり 1 回かぎりの文
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => null]);
+        $copy = $this->copyText($this->printPage());
+        $this->assertStringContainsString("\n\nご回答は1回かぎりです。送信すると、このリンクは使えなくなります。\n", $copy);
+        $this->assertStringNotContainsString('リンクの有効期限', $copy);
+    }
+
+    public function test_期限が切れた案内しかなければ有効な案内がないとして扱う(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        DB::table('trainee_intake_survey_tokens')->insert([
+            'token' => str_repeat('x', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->assertStringContainsString('<strong>有効な愛犬アンケートの案内がありません。</strong>', $this->printPage());
     }
 }

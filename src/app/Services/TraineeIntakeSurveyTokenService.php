@@ -42,9 +42,11 @@ class TraineeIntakeSurveyTokenService
         return DB::transaction(function () use ($trainee, $practitioner) {
             Trainee::query()->whereKey($trainee->id)->lockForUpdate()->first();
 
+            // 有効な案内＝未回答で期限内のもの（2026-10-19 変更：期限が切れた案内は数えないので、期限が切れたら
+            // すぐ発行し直せる。期限が切れた行は消さずに残す）
             $hasActive = TraineeIntakeSurveyToken::query()
                 ->where('trainee_id', $trainee->id)
-                ->whereNull('answered_at')
+                ->active()
                 ->exists();
             if ($hasActive) {
                 return null;
@@ -53,6 +55,8 @@ class TraineeIntakeSurveyTokenService
             return TraineeIntakeSurveyToken::query()->create([
                 'token' => Str::random(32),
                 'trainee_id' => $trainee->id,
+                // 有効期限は発行した日から 7 日後の日の終わり（2026-10-19 追加。マイページ登録のご案内と同じ決め方）
+                'expires_at' => TraineeIntakeSurveyToken::expiresAtForNewToken(),
                 'created_by' => $practitioner->id,
             ]);
         });

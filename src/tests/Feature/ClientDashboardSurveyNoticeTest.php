@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsIntakeSurveyName;
@@ -347,5 +348,29 @@ class ClientDashboardSurveyNoticeTest extends TestCase
 
         $this->assertSame(['intake'], $this->noticeKinds($card));
         $this->assertStringContainsString(route('client-portal.intake-survey.show', ['token' => 'intaketoken000000000000000000011']), $card);
+    }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_期限が切れた案内のお知らせは出さず期限が空の案内は出す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $expired = $this->trainee('モモ');
+        $this->intakeToken($expired, 'intaketoken-expired-0000000000001');
+        $this->personalityToken($expired, 'pdtoken-expired-00000000000000001');
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        DB::table('trainee_personality_diagnosis_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        $noExpiry = $this->trainee('ハナ');
+        $this->intakeToken($noExpiry, 'intaketoken-noexpiry-000000000001');
+        $this->personalityToken($noExpiry, 'pdtoken-noexpiry-0000000000000001');
+
+        $html = $this->open();
+
+        $this->assertSame([], $this->noticeKinds($this->card($html, 'モモちゃん')));
+        $this->assertSame(['intake', 'personality'], $this->noticeKinds($this->card($html, 'ハナちゃん')));
+
+        // 期限の日のうちは出す
+        $this->travelTo(Carbon::parse('2026-10-26 23:59:59'));
+        $this->assertSame(['intake', 'personality'], $this->noticeKinds($this->card($this->open(), 'モモちゃん')));
     }
 }

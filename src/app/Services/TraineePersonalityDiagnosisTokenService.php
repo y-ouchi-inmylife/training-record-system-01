@@ -20,7 +20,7 @@ class TraineePersonalityDiagnosisTokenService
     /**
      * トレーニーに性格診断の案内を発行する。
      *
-     * 有効な（answered_at が NULL の）案内がなければ発行して、作ったトークンを返す。有効な案内がすでにあるときは
+     * 有効な（answered_at が NULL で期限内の）案内がなければ発行して、作ったトークンを返す。有効な案内がすでにあるときは
      * 発行せず null を返す（呼び出し側は完了メッセージを出さずに会員詳細に戻る）。
      *
      * ロックについて：同じトレーニーに有効な案内を 2 つ作らないため、トランザクションの中でトレーニーの行を
@@ -31,9 +31,11 @@ class TraineePersonalityDiagnosisTokenService
         return DB::transaction(function () use ($trainee, $practitioner) {
             Trainee::query()->whereKey($trainee->id)->lockForUpdate()->first();
 
+            // 有効な案内＝未回答で期限内のもの（2026-10-19 変更：期限が切れた案内は数えないので、期限が切れたら
+            // すぐ発行し直せる。期限が切れた行は消さずに残す）
             $hasActive = TraineePersonalityDiagnosisToken::query()
                 ->where('trainee_id', $trainee->id)
-                ->whereNull('answered_at')
+                ->active()
                 ->exists();
             if ($hasActive) {
                 return null;
@@ -42,6 +44,8 @@ class TraineePersonalityDiagnosisTokenService
             return TraineePersonalityDiagnosisToken::query()->create([
                 'token' => Str::random(32),
                 'trainee_id' => $trainee->id,
+                // 有効期限は発行した日から 7 日後の日の終わり（2026-10-19 追加。マイページ登録のご案内と同じ決め方）
+                'expires_at' => TraineePersonalityDiagnosisToken::expiresAtForNewToken(),
                 'created_by' => $practitioner->id,
             ]);
         });

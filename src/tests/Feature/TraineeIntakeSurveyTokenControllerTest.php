@@ -7,6 +7,7 @@ use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyToken;
 use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsIntakeSurveyName;
@@ -303,5 +304,64 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
     {
         $this->assertSame('愛犬アンケート案内発行', AccessLog::actionLabels()['create_trainee_intake_survey_token']);
         $this->assertSame('愛犬アンケート案内取消', AccessLog::actionLabels()['delete_trainee_intake_survey_token']);
+    }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_発行した案内の有効期限は発行した日から7日後の日の終わり(): void
+    {
+        $this->assertSame(7, config('client_tokens.intake_survey_expires_days'));
+        foreach (['2026-10-19 10:00:00', '2026-10-19 23:30:00'] as $now) {
+            $this->travelTo(Carbon::parse($now));
+            DB::table('trainee_intake_survey_tokens')->delete();
+
+            $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertSessionHas('success');
+
+            $this->assertSame('2026-10-26 23:59:59', TraineeIntakeSurveyToken::query()->sole()->expires_at->format('Y-m-d H:i:s'), $now);
+            $this->assertSame('2026-10-26 23:59:59', DB::table('trainee_intake_survey_tokens')->value('expires_at'), $now);
+        }
+    }
+
+    public function test_期限が切れた案内しかなければ発行でき期限が切れた行は残す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $expired = DB::table('trainee_intake_survey_tokens')->insertGetId([
+            'token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => '2026-10-19 10:00:00', 'updated_at' => '2026-10-19 10:00:00',
+        ]);
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertSessionHas('success');
+
+        $tokens = TraineeIntakeSurveyToken::query()->orderBy('id')->get();
+        $this->assertCount(2, $tokens);
+        $this->assertSame($expired, $tokens[0]->id);
+        $this->assertSame('2026-11-03 23:59:59', $tokens[1]->expires_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_期限が切れた案内は取消の対象にせず行も残す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        DB::table('trainee_intake_survey_tokens')->insert([
+            'token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee))->assertStatus(409);
+        $this->assertSame(1, DB::table('trainee_intake_survey_tokens')->count());
+    }
+
+    public function test_期限が空の前からの案内は今までどおり有効で新しく作らない(): void
+    {
+        $this->travelTo(Carbon::parse('2030-01-01 10:00:00'));
+        $old = DB::table('trainee_intake_survey_tokens')->insertGetId([
+            'token' => str_repeat('n', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => null,
+            'created_at' => '2026-10-01 10:00:00', 'updated_at' => '2026-10-01 10:00:00',
+        ]);
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertSessionMissing('success');
+
+        $this->assertSame([$old], TraineeIntakeSurveyToken::query()->pluck('id')->all());
+        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee))->assertSessionHas('success');
+        $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
     }
 }

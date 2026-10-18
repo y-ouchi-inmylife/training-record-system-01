@@ -307,4 +307,31 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $this->assertStringContainsString('<h1 class="mb-2">テスト診断</h1>', $html);
         $this->assertStringNotContainsString('性格診断', $html);
     }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_期限の日の23時59分59秒までは開け翌日0時からは期限切れの画面で送っても保存しない(): void
+    {
+        $this->issueToken();
+        DB::table('trainee_personality_diagnosis_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+
+        $this->travelTo(Carbon::parse('2026-10-26 23:59:59.900000'));
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬性格診断</h1>', $this->showPage());
+
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $html = $this->showPage();
+        $this->assertStringContainsString('このリンクは有効期限が切れています。お手数ですがトレーナーにお問い合わせください。', $html);
+        $this->assertStringNotContainsString('<fieldset', $html);
+
+        $this->submit($this->fixtureCase('all-zero')['answers'])->assertOk()->assertSee('このリンクは有効期限が切れています。お手数ですがトレーナーにお問い合わせください。');
+        $this->assertSame(0, DB::table('trainee_personality_diagnosis_results')->count());
+    }
+
+    public function test_期限が空の前からの案内は今までどおり開ける(): void
+    {
+        $this->issueToken();
+        $this->travelTo(Carbon::parse('2030-01-01 10:00:00'));
+
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬性格診断</h1>', $this->showPage());
+    }
 }

@@ -551,4 +551,30 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertSame('2026-10-16 14:32:00', TraineeIntakeSurveyToken::query()->where('token', self::TOKEN)->sole()->answered_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-10-10 09:00:00', TraineeIntakeSurveyToken::query()->whereKey($previousTokenId)->sole()->answered_at->format('Y-m-d H:i:s'));
     }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_期限が切れた案内に送ると保存せず期限切れの画面(): void
+    {
+        $trainee = $this->traineeWithToken();
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+
+        $html = $this->submit($this->fullAnswer())->assertOk()->getContent();
+
+        $this->assertStringContainsString('このリンクは有効期限が切れています。お手数ですがトレーナーにお問い合わせください。', $html);
+        $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
+        $this->assertNull(TraineeIntakeSurveyToken::query()->sole()->answered_at);
+        $this->assertNull($trainee->fresh()->breed);
+    }
+
+    public function test_期限の日のうちに送れば保存する(): void
+    {
+        $this->traineeWithToken();
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        $this->travelTo(Carbon::parse('2026-10-26 23:59:59'));
+
+        $this->submit($this->fullAnswer())->assertRedirect(route('client-portal.intake-survey.thanks'));
+        $this->assertSame(1, TraineeIntakeSurveyResponse::query()->count());
+    }
 }

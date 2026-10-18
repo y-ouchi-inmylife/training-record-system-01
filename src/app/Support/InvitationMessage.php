@@ -43,8 +43,11 @@ class InvitationMessage
         );
     }
 
-    /** 愛犬アンケートのご案内（有効期限なし。1回かぎり） */
-    public static function intakeSurvey(Trainee $trainee, string $url): string
+    /**
+     * 愛犬アンケートのご案内。最後から 2 段目は、有効期限があれば「リンクの有効期限：…まで」（マイページ登録のご案内と同じ。
+     * 2026-10-19 変更：案内に 1 週間の有効期限を付けた）。期限なし（期限を付ける前に発行した案内）なら今までどおり 1 回かぎりの文
+     */
+    public static function intakeSurvey(Trainee $trainee, string $url, ?CarbonInterface $expiresAt = null): string
     {
         return self::compose(
             $trainee->client,
@@ -54,12 +57,12 @@ class InvitationMessage
             ]),
             __('messages.invitation_message.intake.body'),
             $url,
-            __('messages.invitation_message.once'),
+            self::expiresOrOnceLine($expiresAt),
         );
     }
 
-    /** 愛犬性格診断のご案内（有効期限なし。1回かぎり。問題の数は今の設問の数から出す） */
-    public static function personalityDiagnosis(Trainee $trainee, string $url): string
+    /** 愛犬性格診断のご案内（問題の数は今の設問の数から出す。最後から 2 段目は愛犬アンケートと同じ） */
+    public static function personalityDiagnosis(Trainee $trainee, string $url, ?CarbonInterface $expiresAt = null): string
     {
         return self::compose(
             $trainee->client,
@@ -69,8 +72,16 @@ class InvitationMessage
             ]),
             __('messages.invitation_message.personality.body', ['count' => count(PersonalityDiagnosisQuestions::questions())]),
             $url,
-            __('messages.invitation_message.once'),
+            self::expiresOrOnceLine($expiresAt),
         );
+    }
+
+    /** 有効期限の行（期限があるとき）か、1 回かぎりの文（期限なしの案内。2026-10-19 より前に発行したもの） */
+    private static function expiresOrOnceLine(?CarbonInterface $expiresAt): string
+    {
+        return $expiresAt !== null
+            ? __('messages.invitation_message.expires', ['expires' => self::expiresLabel($expiresAt)])
+            : __('messages.invitation_message.once');
     }
 
     /**

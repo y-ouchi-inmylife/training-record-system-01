@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientContract;
 use App\Models\ClientUsage;
+use App\Models\Trainee;
 use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
@@ -1888,5 +1889,34 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringContainsString('class="btn btn-sm btn-primary text-nowrap">愛犬アンケートの案内を発行</button>', $html);
         $this->assertStringNotContainsString('btn-outline-primary text-nowrap">愛犬アンケートの案内を発行', $html);
+    }
+
+    // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
+
+    public function test_期限が切れた案内は回答待ちにせず案内を発行のボタンを出す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id);
+        $this->personalityToken($id);
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        DB::table('trainee_personality_diagnosis_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('class="btn btn-sm btn-primary text-nowrap">愛犬アンケートの案内を発行</button>', $html);
+        $this->assertStringNotContainsString('愛犬アンケートの案内を表示', $html);
+        $this->assertStringNotContainsString('data-intake-survey-trainee-id="'.$id.'">取消</button>', $html);
+        $this->assertStringContainsString('>案内を発行</button>', $html);
+        $this->assertStringNotContainsString('>案内を表示</a>', $html);
+        $this->assertSame(Trainee::INTAKE_NOT_ISSUED, Trainee::query()->with(['latestIntakeSurveyResponse', 'activeIntakeSurveyToken'])->find($id)->intake_survey_status);
+
+        // 期限の日のうちは回答待ち（［…の案内を表示］［取消］）
+        $this->travelTo(Carbon::parse('2026-10-26 23:59:59'));
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertStringContainsString('>愛犬アンケートの案内を表示</a>', $html);
+        $this->assertStringContainsString('>案内を表示</a>', $html);
     }
 }

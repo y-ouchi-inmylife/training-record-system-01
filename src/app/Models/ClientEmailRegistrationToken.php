@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
-use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\ExpiresAtEndOfDay;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -25,6 +23,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ClientEmailRegistrationToken extends Model
 {
+    use ExpiresAtEndOfDay;
+
     protected $fillable = [
         'token',
         'client_id',
@@ -48,36 +48,10 @@ class ClientEmailRegistrationToken extends Model
         return $this->belongsTo(Trainer::class, 'created_by');
     }
 
-    /**
-     * 今発行したときの有効期限（今日から N 日後の日の終わり 23:59:59。2026-10-18 追加）。
-     * DB の TIMESTAMP は秒までなので、秒より下は 0 にしておく（保存の前後で値が変わらないように）
-     */
-    public static function expiresAtForNewToken(): CarbonInterface
+    /** 有効日数のキー（期限の決め方・判定・「期限内だけ」の絞り込みは trait ExpiresAtEndOfDay。2026-10-19 に共通にした） */
+    protected static function expiresDaysConfigKey(): string
     {
-        return Carbon::now()
-            ->addDays((int) config('client_tokens.email_registration_expires_days'))
-            ->endOfDay()
-            ->startOfSecond();
-    }
-
-    /**
-     * 期限を過ぎたか（2026-10-18 追加）。期限は秒までなので、今の時刻も秒の単位で比べる
-     * （23:59:59 のうちは使え、翌日 0:00:00 から使えない）。ログイン用リンク（期限を引き継ぐ）も同じ判定を使う
-     */
-    public static function isPastExpiry(CarbonInterface $expiresAt): bool
-    {
-        return $expiresAt->lt(Carbon::now()->startOfSecond());
-    }
-
-    /** 期限内のものだけ（isPastExpiry と同じ境目。DB にも秒までの今の時刻を渡す。2026-10-18 追加） */
-    public function scopeUnexpired(Builder $query): Builder
-    {
-        return $query->where('expires_at', '>=', Carbon::now()->startOfSecond());
-    }
-
-    public function isExpired(): bool
-    {
-        return self::isPastExpiry($this->expires_at);
+        return 'client_tokens.email_registration_expires_days';
     }
 
     public function isValid(): bool

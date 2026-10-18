@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\InvitationExpiry;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -42,8 +43,9 @@ class ClientLoginLinkToken extends Model
 
     public function isExpired(): bool
     {
-        // 期限はメールアドレス登録用トークンから引き継ぐので、判定も同じものを使う（2026-10-18 変更）
-        return ClientEmailRegistrationToken::isPastExpiry($this->expires_at);
+        // 期限はメールアドレス登録用トークンから引き継ぐので、判定も同じものを使う（2026-10-18 変更。2026-10-19 に
+        // 3 つの案内で共通の App\Support\InvitationExpiry に移した）
+        return InvitationExpiry::isPast($this->expires_at);
     }
 
     public function isValid(): bool
