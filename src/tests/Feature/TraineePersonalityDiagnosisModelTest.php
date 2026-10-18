@@ -175,7 +175,7 @@ class TraineePersonalityDiagnosisModelTest extends TestCase
         $this->assertSame('bg-success', $result->fresh()->evaluation_status_badge_class);
         $this->assertSame('2026-10-18 10:00:00', $result->fresh()->evaluation_published_at->format('Y-m-d H:i:s'));
 
-        // 公開をやめると（公開した日時を空に戻すと）下書きに戻る
+        // 公開を取り消すと（公開した日時を空に戻すと）下書きに戻る
         $result->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
         $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
     }

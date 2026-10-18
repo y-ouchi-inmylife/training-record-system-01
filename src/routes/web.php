@@ -150,7 +150,7 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'update'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.update');
-            // 評価文の公開（S-0313 の［公開］と S-0313-M01）・公開をやめる（［公開をやめる］と S-0313-M03）。2026-10-18 追加。
+            // 評価文の公開（S-0313 の［公開］と S-0313-M01）・公開取消（［公開取消］と S-0313-M03）。2026-10-18 追加。
             // 評価文そのものに公開した日時を付ける（トレーニング記録は作らない。2026-10-18 変更）
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish', [TraineePersonalityDiagnosisResultController::class, 'publish'])
                 ->scopeBindings()

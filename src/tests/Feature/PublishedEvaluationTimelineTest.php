@@ -17,7 +17,7 @@ use Tests\TestCase;
  * 要件定義書 6-3-3・6-15-6・6-16-16）。会員の愛犬性格診断の評価（S-1418。要件定義書 6-15-21）。
  *
  * - 並びは記録と同じ新しい順（評価文の日付・時刻は公開した日時。時刻のない記録はその日のいちばん後ろ）
- * - 下書き・公開をやめたもの・ほかの会員のトレーニーの評価文は出さない
+ * - 下書き・公開を取り消したもの・ほかの会員のトレーニーの評価文は出さない
  * - 件数（「トレーニング記録（N件）」「全 N 回」）は記録だけ
  * - トレーナー側の記録の一覧（S-0402）・ダッシュボードの最近の記録（S-0201）・記録数の推移（S-1101）には混ぜない
  * - S-1418 は自分のトレーニーの公開済みの評価文だけ（それ以外は 404）。グラフはその結果の時点
@@ -234,11 +234,11 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertStringNotContainsString('担当：', substr($block, 0, strpos($block, '</a>')));
     }
 
-    public function test_会員詳細は下書きと公開をやめたものとほかの会員の評価文を出さない(): void
+    public function test_会員詳細は下書きと公開を取り消したものとほかの会員の評価文を出さない(): void
     {
         $this->record('2026-10-10');
         $this->addResult('2026-10-01 09:00:00', '下書きの評価文');
-        $unpublished = $this->addResult('2026-10-02 09:00:00', '公開をやめた評価文', '2026-10-05 10:00:00');
+        $unpublished = $this->addResult('2026-10-02 09:00:00', '公開を取り消した評価文', '2026-10-05 10:00:00');
         $unpublished->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
         $other = $this->makeClient('0002', '佐藤');
         $this->addResult('2026-10-03 09:00:00', 'ほかの会員の評価文', '2026-10-06 10:00:00', $this->trainee($other, 'ハナ'));
@@ -247,7 +247,7 @@ class PublishedEvaluationTimelineTest extends TestCase
 
         $this->assertStringNotContainsString('data-timeline-evaluation', $html);
         $this->assertStringNotContainsString('下書きの評価文', $html);
-        $this->assertStringNotContainsString('公開をやめた評価文', $html);
+        $this->assertStringNotContainsString('公開を取り消した評価文', $html);
         $this->assertStringNotContainsString('ほかの会員の評価文', $html);
     }
 
@@ -394,11 +394,11 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertStringContainsString('c-session-tag', $this->evaluationCard($html, $e->id));
     }
 
-    public function test_マイページは下書きと公開をやめたものとほかの会員の評価文を出さない(): void
+    public function test_マイページは下書きと公開を取り消したものとほかの会員の評価文を出さない(): void
     {
         $this->record('2026-10-10');
         $this->addResult('2026-10-01 09:00:00', '下書きの評価文');
-        $unpublished = $this->addResult('2026-10-02 09:00:00', '公開をやめた評価文', '2026-10-05 10:00:00');
+        $unpublished = $this->addResult('2026-10-02 09:00:00', '公開を取り消した評価文', '2026-10-05 10:00:00');
         $unpublished->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
         $other = $this->makeClient('0002', '佐藤');
         $this->addResult('2026-10-03 09:00:00', 'ほかの会員の評価文', '2026-10-06 10:00:00', $this->trainee($other, 'ハナ'));
@@ -407,7 +407,7 @@ class PublishedEvaluationTimelineTest extends TestCase
 
         $this->assertStringNotContainsString('data-session-evaluation', $html);
         $this->assertStringNotContainsString('下書きの評価文', $html);
-        $this->assertStringNotContainsString('公開をやめた評価文', $html);
+        $this->assertStringNotContainsString('公開を取り消した評価文', $html);
         $this->assertStringNotContainsString('ほかの会員の評価文', $html);
     }
 
@@ -506,11 +506,11 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertMatchesRegularExpression('/data-evaluation-meta>\s*<div><span class="num-tabular">2026\/10\/14<\/span> 公開<\/div>\s*<\/div>/u', $html);
     }
 
-    public function test_評価の画面は下書きとなしと公開をやめたものは404(): void
+    public function test_評価の画面は下書きとなしと公開を取り消したものは404(): void
     {
         $draft = $this->addResult('2026-10-01 09:00:00', '下書き');
         $none = $this->addResult('2026-10-02 09:00:00');
-        $unpublished = $this->addResult('2026-10-03 09:00:00', '公開をやめた', '2026-10-05 10:00:00');
+        $unpublished = $this->addResult('2026-10-03 09:00:00', '公開を取り消した', '2026-10-05 10:00:00');
         $unpublished->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
 
         $this->evaluationPage($draft)->assertNotFound();

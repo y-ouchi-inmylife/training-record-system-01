@@ -73,7 +73,7 @@ class DashboardController extends Controller
 
         // 最新の記録のカード・これまでの記録には、自分のトレーニーの公開済みの愛犬性格診断の評価文も混ぜる
         // （2026-10-18 追加。要件定義書 6-15-6・6-16-16、設計書 S-1402「愛犬性格診断の評価を混ぜる」）。
-        // 並びは会員詳細（S-0305）と同じ（RecordTimeline）。下書き・公開をやめたものは入らない。
+        // 並びは会員詳細（S-0305）と同じ（RecordTimeline）。下書き・公開を取り消したものは入らない。
         // 「全 N 回」は記録の回数なので、評価文を数えない $recordCount を使う
         $timeline = RecordTimeline::merge(
             $sessions,

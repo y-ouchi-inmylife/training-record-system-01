@@ -11,16 +11,16 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * 愛犬性格診断詳細（S-0313）と評価文の更新・公開・公開をやめる（2026-10-18 追加。要件定義書 6-16-15・6-16-16）、
+ * 愛犬性格診断詳細（S-0313）と評価文の更新・公開・公開取消（2026-10-18 追加。要件定義書 6-16-15・6-16-16）、
  * 愛犬性格診断の結果の削除（要件定義書 6-16-14、api-design.md 4-1-16。2026-10 追加。2026-10-18 変更：送信元を S-0309 から S-0313 に移した）。
  *
  * 詳細と評価文：
- * - トレーナー（一般・管理者）なら見られる・更新・公開・公開をやめるができる。{personalityDiagnosisResult} は {trainee} の結果に限る（scopeBindings）
+ * - トレーナー（一般・管理者）なら見られる・更新・公開・公開取消ができる。{personalityDiagnosisResult} は {trainee} の結果に限る（scopeBindings）
  * - 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と公開した日時（evaluation_published_at）から決める（evaluation_status）
  * - 公開は評価文そのものに「公開済み」の印（公開した日時・公開したトレーナー）を付ける。トレーニング記録は作らない
  *   （2026-10-18 変更：評価文と記録の本文の二重持ちをやめるため。その前は、公開で評価文を本文にしたトレーニング記録を作っていた）
  * - 公開済みの評価文も更新できる（すぐ会員様の画面に出る）。ただし公開済みのあいだは空にできない
- * - 公開・公開をやめるは、結果の行を排他ロックして状態を確かめ直す。すでに公開済み・すでに公開をやめているときは、
+ * - 公開・公開取消は、結果の行を排他ロックして状態を確かめ直す。すでに公開済み・すでに公開を取り消しているときは、
  *   エラーにせず S-0313 に戻す（2 回押されても困らないように）
  * - アクセスログ（edit_／publish_／unpublish_trainee_personality_diagnosis_evaluation）は LogAccess ミドルウェアで記録する
  *
@@ -38,7 +38,7 @@ use Illuminate\View\View;
 class TraineePersonalityDiagnosisResultController extends Controller
 {
     /** 公開済みのあいだに空で更新しようとしたときの文言（設計書 S-0313「バリデーションチェック」） */
-    private const EMPTY_WHILE_PUBLISHED_MESSAGE = '公開中の評価文は空にできません。公開をやめてから消してください。';
+    private const EMPTY_WHILE_PUBLISHED_MESSAGE = '公開中の評価文は空にできません。公開を取り消してから消してください。';
 
     /**
      * 愛犬性格診断詳細（GET /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}。S-0313）。
@@ -122,10 +122,11 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * 評価文の公開をやめる（POST …/{personalityDiagnosisResult}/unpublish。S-0313-M03。2026-10-18 追加）。
+     * 評価文の公開取消（POST …/{personalityDiagnosisResult}/unpublish。S-0313-M03。2026-10-18 追加）。
      *
      * 結果の行を排他ロックして取り直し、公開済みなら公開した日時・公開したトレーナーを NULL に戻す（評価文は残す。状態は下書き）。
-     * 公開していなければ何もせず S-0313 に戻す。欄に保存していない直しがあっても保存しない（リクエストの評価文は使わない）
+     * 公開していなければ何もせず S-0313 に戻す。欄に保存していない直しがあっても保存しない（リクエストの評価文は使わない）。
+     * 完了メッセージは「{名前}の公開を取り消しました。」（ほかの取消の「〜の案内を取り消しました。」にそろえる。2026-10-18 変更：その前は「評価文の公開をやめました。」）
      */
     public function unpublish(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
     {
@@ -140,7 +141,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
             return true;
         });
 
-        return $this->backToShow($trainee, $personalityDiagnosisResult, $unpublished ? '評価文の公開をやめました。' : 'この評価文は公開していません。');
+        return $this->backToShow($trainee, $personalityDiagnosisResult, $unpublished ? __('messages.personality_diagnosis_name').'の公開を取り消しました。' : 'この評価文は公開していません。');
     }
 
     /**
@@ -181,7 +182,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * S-0313 に戻り、完了メッセージを出す（公開・公開をやめるの成功と、すでにその状態だったとき）
+     * S-0313 に戻り、完了メッセージを出す（公開・公開取消の成功と、すでにその状態だったとき）
      */
     private function backToShow(Trainee $trainee, TraineePersonalityDiagnosisResult $result, string $message): RedirectResponse
     {

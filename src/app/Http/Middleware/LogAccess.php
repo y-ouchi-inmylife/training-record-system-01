@@ -44,7 +44,7 @@ class LogAccess
         // 愛犬性格診断の評価文の保存（S-0313。2026-10-18 追加）。対象はトレーニー（結果の削除と同じ。結果の id は記録しない）。
         // 愛犬性格診断詳細の表示は記録しない（トレーニー詳細を見たことと同じ）
         'trainee-personality-diagnosis-results.update' => 'edit_trainee_personality_diagnosis_evaluation',
-        // 評価文の公開・公開をやめる（2026-10-18 追加）。対象はトレーニー（2026-10-18 変更：その前は公開を
+        // 評価文の公開・公開取消（2026-10-18 追加）。対象はトレーニー（2026-10-18 変更：その前は公開を
         // トレーニング記録の登録〔create_training_record〕として記録していた。公開で記録を作らなくなったため）
         'trainee-personality-diagnosis-results.publish' => 'publish_trainee_personality_diagnosis_evaluation',
         'trainee-personality-diagnosis-results.unpublish' => 'unpublish_trainee_personality_diagnosis_evaluation',

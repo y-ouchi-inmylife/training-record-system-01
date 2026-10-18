@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *   updated_by の名前にしない）
  *
  * - evaluation_published_at・evaluation_published_by は評価文を公開した日時とトレーナー（2026-10-18 追加。要件定義書 6-16-16）。
- *   公開をやめると NULL に戻す
+ *   公開を取り消すと NULL に戻す
  *
  * 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と公開した日時から決める（evaluation_status）。
  * 2026-10-18 変更：その前は、公開でトレーニング記録を作り、結び付いた記録の有無から決めていた（評価文と記録の本文の二重持ちをやめた）

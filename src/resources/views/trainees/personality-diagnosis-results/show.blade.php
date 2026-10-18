@@ -22,7 +22,7 @@
        作り（最大 300px の正方形・HTML の凡例・訓練性能を真上・点数なしは点を描かない）は S-0309 と同じ部品
      - 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と公開した日時から決める（evaluation_status）。
        公開済みも直せる（直すとそのまま会員様の画面に出る）
-     - ［公開］と確認のモーダル（S-0313-M01）、［公開をやめる］と確認のモーダル（S-0313-M03）。要件定義書 6-16-16。
+     - ［公開］と確認のモーダル（S-0313-M01）、［公開取消］と確認のモーダル（S-0313-M03）。要件定義書 6-16-16。
        公開は評価文そのものに公開した日時を付ける（トレーニング記録は作らない。2026-10-18 変更）。評価文が空なら［公開］は押せない。
        モーダルの［公開する］で、欄の今の文（保存していない直しを含む）を公開の送り先に送る --}}
 <div class="container">
@@ -93,7 +93,7 @@
          （2026-10-18 変更：その前は、公開でトレーニング記録を作り、公開済みは表示だけで記録へのリンクを出していた） --}}
     <div class="card mb-3" data-personality-diagnosis-evaluation>
         {{-- 見出しの行：左に「評価文」とすぐ右に状態のバッジ（公開済みのときは、その右に公開した日）、右にボタン
-             （なし・下書き：［更新］［公開］、公開済み：［更新］［公開をやめる］）。ボタンの大きさは、ほかのカードの見出しのボタン
+             （なし・下書き：［更新］［公開］、公開済み：［更新］［公開取消］）。ボタンの大きさは、ほかのカードの見出しのボタン
              （計測値の［新規登録］など）と同じ通常の大きさ。狭い幅で 1 行に収まらないときは、ボタンのまとまりを次の行へ折り返して
              右に寄せる（flex-wrap と ms-auto）。2026-10-18 変更：ユーザーレビューで、ボタンをテキストエリアの上の行から見出しの行に移し、
              バッジを見出しのすぐ右にした --}}
@@ -111,12 +111,12 @@
             {{-- ［更新］はフォームの外にあるので、form 属性で下の評価文のフォーム（id="evaluation-form"）を送る。
                  ［公開］（青の塗り。業務の中で必ず使う操作）は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで
                  切り替える。サーバーでも必須を確かめる）。押すとモーダル（S-0313-M01）で、欄の今の文（保存していない直しを含む）を送る。
-                 ［公開をやめる］は白抜きの赤（4-4 の「取消など、消す操作で目立たせすぎたくないもの」）。押すとモーダル（S-0313-M03） --}}
+                 ［公開取消］は白抜きの赤（4-4 の「取消など、消す操作で目立たせすぎたくないもの」）。押すとモーダル（S-0313-M03） --}}
             <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>
                 <button type="submit" form="evaluation-form" class="btn btn-success">更新</button>
                 @if($isPublished)
                     <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"
-                            data-evaluation-unpublish>公開をやめる</button>
+                            data-evaluation-unpublish>公開取消</button>
                 @else
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
                             data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>公開</button>
@@ -196,26 +196,29 @@
         </div>
     @endif
 
-    {{-- 公開をやめる確認モーダル（S-0313-M03。2026-10-18 追加）。公開済みのときだけ置く。見せ方は S-0305-M06（受付アンケート案内の取消）と
+    {{-- 公開取消確認モーダル（S-0313-M03。2026-10-18 追加）。公開済みのときだけ置く。見せ方は S-0305-M06（受付アンケート案内の取消）と
          同じ形（説明文・実行ボタン btn-danger・キャンセル）。欄に保存していない直しがあっても送らない（評価文は最後に保存した文のまま）。
-         二重に押されないよう、送ったらボタンを押せなくする（下のスクリプト） --}}
+         二重に押されないよう、送ったらボタンを押せなくする（下のスクリプト）。
+         2026-10-18 変更：ユーザーレビューで、［公開をやめる］を［公開取消］にし、見出し「{名前}の公開を取り消す」・文「会員のマイページから{名前}の公開を
+         取り消しますか？」・実行ボタン［取り消す］（ほかの取消の確認 S-0305-M03・M06・M07 と同じ）にした。名前は $pdName（M01 と同じ）。
+         その前は見出し「評価文の公開をやめる」・文「会員様のマイページから評価文を外します。評価文は下書きとして残ります。」・実行ボタン［公開をやめる］ --}}
     @if($isPublished)
         <div class="modal fade" id="personality-diagnosis-unpublish" tabindex="-1"
              aria-labelledby="personality-diagnosis-unpublish-label" aria-hidden="true" data-personality-diagnosis-unpublish>
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="personality-diagnosis-unpublish-label">評価文の公開をやめる</h5>
+                        <h5 class="modal-title" id="personality-diagnosis-unpublish-label">{{ $pdName }}の公開を取り消す</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="mb-0">会員様のマイページから評価文を外します。評価文は下書きとして残ります。</p>
+                        <p class="mb-0">会員のマイページから{{ $pdName }}の公開を取り消しますか？</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                         <form method="POST" action="{{ route('trainee-personality-diagnosis-results.unpublish', [$trainee, $result]) }}" class="d-inline m-0" data-evaluation-unpublish-form>
                             @csrf
-                            <button type="submit" class="btn btn-danger">公開をやめる</button>
+                            <button type="submit" class="btn btn-danger">取り消す</button>
                         </form>
                     </div>
                 </div>
@@ -260,7 +263,7 @@
 @endsection
 
 @push('scripts')
-{{-- 評価文の公開（S-0313-M01）と公開をやめる（S-0313-M03）。2026-10-18 追加。
+{{-- 評価文の公開（S-0313-M01）と公開取消（S-0313-M03）。2026-10-18 追加。
      - 欄が空（空白だけ）なら［公開］を押せなくする
      - モーダルの［公開する］では、欄の今の文を隠しの欄に写して送る
      - どちらのモーダルも、送ったら実行のボタンを押せなくする（二重に押されないように） --}}
