@@ -224,6 +224,8 @@ flowchart TD
 | `client_tokens.email_registration_expires_days` | 7 | メールアドレス登録用 URL（マイページ登録のご案内）のトークン（DS-0700 `client_email_registration_tokens.expires_at`）の有効日数。期限は発行した日から 7 日後の日の終わり（23:59:59）。**ログイン用リンク（DS-0600）にも同じ期限が適用される**（下記「期限の考え方」参照）（**2026-10-18 変更**：2026-10-18 のユーザーレビューで、3 日では短いため 7 日にした。その前は 3 日。すでに発行した URL の期限は変えない） |
 | `client_tokens.email_change_confirm_expires_days` | 3 | ログイン後にメールアドレスを変更する際に新しいアドレスへ送るメールアドレス確認リンク（DS-0800 `client_email_change_tokens.expires_at`）の有効日数。メールアドレス登録用 URL とは無関係に発行されるため、独立した設定値を持つ |
 | `client_tokens.password_reset_expires_days` | 3 | パスワードを忘れたお客様に送るパスワード再設定リンク（DS-0900 `client_password_reset_tokens.expires_at`）の有効日数。他のトークン（DS-0600 / DS-0700 / DS-0800）とは無関係に発行されるため、独立した設定値を持つ |
+| `client_tokens.intake_survey_expires_days` | 7 | 愛犬アンケート用 URL（DS-1000 `trainee_intake_survey_tokens.expires_at`）の有効日数。期限は発行した日から 7 日後の日の終わり（23:59:59）（**2026-10-19 追加**：2026-10-19 のユーザーレビューで、期限がないとお客様が答えるのを忘れてしまうので、マイページ登録のご案内と同じく 1 週間の有効期限を付けた） |
+| `client_tokens.personality_diagnosis_expires_days` | 7 | 愛犬性格診断用 URL（DS-1100 `trainee_personality_diagnosis_tokens.expires_at`）の有効日数。期限の決め方は愛犬アンケートと同じ（**2026-10-19 追加**） |
 
 **期限の考え方**：
 
@@ -235,7 +237,13 @@ flowchart TD
 - 期限切れの判定は秒の単位で比べる（今の時刻の秒より前の期限なら期限切れ。23:59:59 のうちは使え、翌日 0:00:00 から使えない。`ClientEmailRegistrationToken` に 1 か所にまとめ、ログイン用リンクの判定も同じものを使う）
 - **設定値も 1 つ**（`client_tokens.email_registration_expires_days`）に集約。ログイン用リンク専用の設定値は持たない
 
-**愛犬アンケート用 URL（DS-1000 `trainee_intake_survey_tokens`）と愛犬性格診断用 URL（DS-1100 `trainee_personality_diagnosis_tokens`。**2026-10 追加**）は有効期限を持たない**（**2026-10 追加**）：
+**愛犬アンケート用 URL（DS-1000 `trainee_intake_survey_tokens`）と愛犬性格診断用 URL（DS-1100 `trainee_personality_diagnosis_tokens`）の有効期限**（**2026-10-19 変更**：2026-10-19 のユーザーレビューで、期限がないとお客様が答えるのを忘れてしまうので、マイページ登録のご案内と同じく 1 週間の有効期限を付けた）：
+
+- 有効期限は、発行した日から 7 日後の日の終わり（23:59:59。日本時間）。マイページ登録のご案内と同じ決め方・同じ判定（秒の単位で比べる）。作り方・判定・「期限内だけ」の絞り込みは 3 つの案内（マイページ登録・愛犬アンケート・愛犬性格診断）で 1 つの部品を共通に使う（`App\Support\InvitationExpiry` と、モデルに付ける `App\Models\Concerns\ExpiresAtEndOfDay`）。日数は上の表のそれぞれのキー
+- すでに発行した案内（期限を付ける前のもの）は期限なし（`expires_at` が NULL）のままで、今までどおり答えるまで使える（期限が空の案内は期限切れにならない）
+- 期限が切れた案内は「回答待ち」に数えない（会員詳細は［…の案内を発行］に戻り、マイページのお知らせも出さない）。行は消さずに残す
+
+以下は 2026-10-19 より前の扱い（経緯）。**愛犬アンケート用 URL と愛犬性格診断用 URL は有効期限を持たない**（**2026-10 追加**）：
 
 - 回答の送信で使い切り（`answered_at` を記録）、放置されたものはトレーナーの取消で削除する（物理削除）。そのため上の表に設定値を置かない
 - 期限を設けない理由：メールアドレス登録用 URL はアカウントを開設できるため、第三者に渡ると成りすましの危険がある。一方、愛犬アンケート用 URL は回答を受け付けるだけで、画面に個人情報を出さず、送信すれば使い切りになる。危険の大きさが違うため（requirements.md 6-15-17 備考）
