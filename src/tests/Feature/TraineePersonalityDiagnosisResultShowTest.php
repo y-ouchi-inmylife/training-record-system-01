@@ -133,6 +133,15 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         return substr($html, $start, strpos($html, 'data-personality-diagnosis-answers', $start) - $start);
     }
 
+    /** 評価文のカードの見出しの行（card-header の中） */
+    private function evaluationHeader(string $card): string
+    {
+        $start = strpos($card, '<div class="card-header');
+        $this->assertNotFalse($start);
+
+        return substr($card, $start, strpos($card, '<div class="card-body">') - $start);
+    }
+
     /** レーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
     private function radarData(string $html): array
     {
@@ -288,17 +297,25 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $card = $this->evaluationCard($this->page($result));
 
         $this->assertStringContainsString('<span class="badge bg-secondary" data-evaluation-status>なし</span>', $card);
-        $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]).'" novalidate data-evaluation-form>', $card);
+        $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]).'" novalidate id="evaluation-form" data-evaluation-form>', $card);
         $this->assertStringContainsString('name="_method" value="PUT"', $card);
         $this->assertMatchesRegularExpression('/<textarea class="form-control " id="evaluation_text" name="evaluation_text"\s*rows="12" maxlength="10000"><\/textarea>/u', $card);
         $this->assertStringContainsString('<label for="evaluation_text" class="visually-hidden">評価文</label>', $card);
-        $this->assertStringContainsString('<button type="submit" class="btn btn-success">更新</button>', $card);
-        // ボタンの名前は［更新］（2026-10-18 変更：その前は［保存］）。［更新］［トレーニング記録にして公開］はテキストエリアの上に右寄せ
+        // ボタンの名前は［更新］（2026-10-18 変更：その前は［保存］）。［更新］はフォームの外（カードの見出しの行）にあり、
+        // form 属性で評価文のフォームを送る
+        $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $card);
         $this->assertStringNotContainsString('>保存</button>', $card);
-        $this->assertStringContainsString('<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">', $card);
-        $this->assertLessThan(strpos($card, '<textarea'), strpos($card, '>更新</button>'));
-        $this->assertLessThan(strpos($card, '<textarea'), strpos($card, '>トレーニング記録にして公開</button>'));
-        $this->assertLessThan(strpos($card, '>トレーニング記録にして公開</button>'), strpos($card, '>更新</button>'));
+        // 見出しの行：「評価文」→ すぐ右にバッジ → 右に［更新］［トレーニング記録にして公開］（2026-10-18 変更：その前はテキストエリアの上の行）
+        $header = $this->evaluationHeader($card);
+        $this->assertStringContainsString('<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">', $header);
+        $this->assertLessThan(strpos($header, 'data-evaluation-status>'), strpos($header, '<h6 class="mb-0">評価文</h6>'));
+        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, 'data-evaluation-status>'));
+        $this->assertLessThan(strpos($header, '>トレーニング記録にして公開</button>'), strpos($header, '>更新</button>'));
+        $this->assertStringContainsString('<div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>', $header);
+        // 大きさは通常（ほかのカードの見出しのボタンと同じ。btn-sm にしない）
+        $this->assertStringNotContainsString('btn-sm', $header);
+        // テキストエリアの上のボタンの行はなくした（ボタンは見出しの行だけ）
+        $this->assertStringNotContainsString('<button', substr($card, strpos($card, '<div class="card-body">')));
         $this->assertStringNotContainsString('最終更新', $card);
     }
 
@@ -392,6 +409,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('<textarea', $card);
         $this->assertStringNotContainsString('<form', $card);
         $this->assertStringNotContainsString('>更新</button>', $card);
+        // 見出しの行は「評価文」とバッジだけ
+        $this->assertStringNotContainsString('data-evaluation-buttons', $card);
+        $this->assertStringNotContainsString('<button', $this->evaluationHeader($card));
         $this->assertStringContainsString('data-evaluation-published>公開済み（<a href="'.route('training-records.show', $recordId).'">2026/10/18のトレーニング記録</a>）</p>', $card);
         $this->assertStringContainsString('直すときは、トレーニング記録の編集で直します。', $card);
         $this->assertStringContainsString('最終更新: 2026/10/17 09:00 佐藤', $card);

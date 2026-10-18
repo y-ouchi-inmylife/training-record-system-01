@@ -88,14 +88,31 @@
         </div>
     </div>
 
-    {{-- 評価文（要件定義書 6-16-15）。状態は見出しの右に文字で出す（色だけに頼らない）。
+    {{-- 評価文（要件定義書 6-16-15）。
          なし・下書き：テキストエリア（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。空で保存すると「なし」に戻る。
          公開済み：表示だけ（改行を保持）と、公開したトレーニング記録へのリンク --}}
     <div class="card mb-3" data-personality-diagnosis-evaluation>
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">評価文</h6>
-            {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
-            <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
+        {{-- 見出しの行：左に「評価文」とすぐ右に状態のバッジ、右に［更新］［トレーニング記録にして公開］（公開済みは出さない）。
+             2026-10-18 変更：ユーザーレビューで、ボタンをテキストエリアの上の行から見出しの行に移し、バッジを見出しのすぐ右にした
+             （その前はバッジが見出しの行の右端）。ボタンの大きさは、ほかのカードの見出しのボタン（計測値の［新規登録］など）と同じ通常の大きさ。
+             狭い幅で 1 行に収まらないときは、ボタンのまとまりを次の行へ折り返して右に寄せる（flex-wrap と ms-auto） --}}
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <h6 class="mb-0">評価文</h6>
+                {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
+                <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
+            </div>
+            @unless($isPublished)
+                {{-- ［更新］（データ保存なので緑）と［トレーニング記録にして公開］（業務の中で必ず使う操作なので青の塗り）。［更新］が左。
+                     ボタンはフォームの外にあるので、［更新］は form 属性で下の評価文のフォーム（id="evaluation-form"）を送る。
+                     公開は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで切り替える。サーバーでも必須を確かめる）。
+                     押すとモーダル（S-0313-M01）で、欄の今の文（保存していない直しを含む）を公開の送り先に送る --}}
+                <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>
+                    <button type="submit" form="evaluation-form" class="btn btn-success">更新</button>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
+                            data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>トレーニング記録にして公開</button>
+                </div>
+            @endunless
         </div>
         <div class="card-body">
             @if($isPublished)
@@ -103,18 +120,9 @@
             @else
                 <x-form-error-summary />
                 {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
-                <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate data-evaluation-form>
+                <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate id="evaluation-form" data-evaluation-form>
                     @csrf
                     @method('PUT')
-                    {{-- ［更新］（データ保存なので緑）と［トレーニング記録にして公開］（業務の中で必ず使う操作なので青の塗り）。
-                         テキストエリアの上に右寄せで並べる（2026-10-18 変更：ユーザーレビューで、ほかの画面の［更新］の名前にそろえ、
-                         入力欄の上に置いた。その前は入力欄の下の［保存］）。スマホの幅で 1 行に収まらないときは折り返す（flex-wrap）。
-                         公開は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで切り替える。サーバーでも必須を確かめる） --}}
-                    <div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
-                        <button type="submit" class="btn btn-success">更新</button>
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
-                                data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>トレーニング記録にして公開</button>
-                    </div>
                     <label for="evaluation_text" class="visually-hidden">評価文</label>
                     <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
                               rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
