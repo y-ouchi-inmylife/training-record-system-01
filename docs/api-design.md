@@ -86,7 +86,10 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | （発行の URL を GET で開いたとき） | GET | `/trainees/{trainee}/personality-diagnosis-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（405 にしない。**2026-10-17 追加**。下の「発行の URL を GET で開いたとき」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-tokens` | 愛犬性格診断の案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-personality-diagnosis-tokens.destroy`。**2026-10 追加**）。成功後は S-0305 に戻す | auth | 管理者、一般 |
 | トレーニー管理 | S-0312 愛犬性格診断案内画面 | GET | `/trainees/{trainee}/personality-diagnosis-tokens/print` | 愛犬性格診断案内画面を表示する（ルート名 `trainee-personality-diagnosis-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果を 1 件削除する（物理削除。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**） | auth | 管理者 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | GET | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果 1 件の詳細（タイプ・レーダーチャート・点数・50問の回答・評価文）を表示する（ルート名 `trainee-personality-diagnosis-results.show`。**2026-10-18 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 評価文を保存する（ルート名 `trainee-personality-diagnosis-results.update`。公開済みなら 409。**2026-10-18 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish` | 評価文を保存し、評価文を本文にしたトレーニング記録を作って公開する（ルート名 `trainee-personality-diagnosis-results.publish`。公開済みなら作らない。**2026-10-18 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果を 1 件削除する（物理削除。結び付いたトレーニング記録は残し、結び付きだけを NULL にする。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**。**2026-10-18 変更**：送信元を S-0309 から S-0313 に移した） | auth | 管理者 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -677,6 +680,7 @@ POST /clients と同じ項目。ただし internal_id は登録時と異なり�
 **処理**:
 - 対象トレーニング記録を取得する
 - この記録に紐づくメディアを sort_order 順（昇順）で取得し、view に渡す（閲覧用。再生は `GET /api/media-records/{id}/play` を利用する）
+- 結び付いた愛犬性格診断の結果（`trainee_personality_diagnosis_result_id`）があれば、その結果とトレーニーと、レーダーチャートの値（その結果を今回、その結果より前の結果から前回・初回。requirements.md 6-16-16）を view に渡す（**2026-10-18 追加**）。NULL（結び付きなし・結果が削除済み）なら渡さない
 
 **レスポンス**:
 - view `training-records.show`
@@ -1605,6 +1609,7 @@ POST /training-records に以下を追加する。
 **処理**:
 - 対象トレーニング記録が、ログイン中のクライアント自身のもの（記録の client_id がログイン中クライアントと一致）であることを確認する。本人のものでない場合は403
 - 記録の詳細（基本情報・ノート）を view に渡す。所感などクライアント非開示の情報は渡さない
+- 結び付いた愛犬性格診断の結果があれば、トレーニーの呼び名・回答日・タイプと、レーダーチャートの値（S-0403 と同じ。その結果の時点の今回・前回・初回）を view に渡す（**2026-10-18 追加**）。点数の表・50問の回答・評価文の状態は渡さない。結果はこの記録に結び付いているので、記録の本人認可を通れば見せてよい（記録の client_id と、結果のトレーニーの会員は、公開のときに同じにしている）
 - この記録に紐づくメディアを sort_order 順（昇順）で取得し、各メディアのサムネイルの署名付きURLを発行して view に渡す（閲覧用。再生は `GET /client-portal/media/{id}/play` を利用する）。本人の記録に紐づくメディアであることは記録レベルの本人認可により保証されるため、サムネイル発行に個別の認可は要しない
 
 **レスポンス**:
@@ -2315,13 +2320,14 @@ POST /training-records に以下を追加する。
 - `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（スコープ付きのルートモデルバインディング。別のトレーニーの結果なら 404）。引数名は、スコープ付きのバインディングで結果をトレーニーの関連 `personalityDiagnosisResults()` から探すため、関連の名前に合わせる（**2026-10 変更**：当初は `{result}` と書いていた）
 - 管理者でなければ 403（トレーニーの削除 `DELETE /trainees/{trainee}` と同じ確かめ方・同じ文言「管理者のみ削除できます。」。システム管理者は、トレーニー管理のルートの `practitioners` ミドルウェアで 403）
 - その結果（`trainee_personality_diagnosis_results` の行）を物理削除する。結果に使った案内（回答済みのトークン）は消さない
+- 結び付いたトレーニング記録（`training_records.trainee_personality_diagnosis_result_id` がこの結果）は削除しない。外部キーの SET NULL で結び付きだけが NULL になる（**2026-10-18 追加**。requirements.md 6-16-16）
 - アクセスログに記録する（`delete_trainee_personality_diagnosis_result`。`target_type='Trainee'`、`target_id` はトレーニーの id）
 
 **レスポンス**:
 - 成功：`redirect()->route('trainees.show', $trainee)`（S-0309。フラグメントは付けない）。フラッシュ `success` に「愛犬性格診断の結果を削除しました。」
 - 管理者でない：403
 - 別のトレーニーの結果・存在しない結果：404
-- 押下時に確認モーダルを挟む（screen-design.md S-0309-M01）
+- 押下時に確認モーダルを挟む（screen-design.md S-0313-M02。**2026-10-18 変更**：当初は S-0309-M01。送信元は愛犬性格診断詳細 S-0313 の［削除］）
 
 ###### GET /trainees/{trainee}/personality-diagnosis-tokens/print
 
@@ -2335,6 +2341,75 @@ POST /training-records に以下を追加する。
 **レスポンス**:
 - 有効なトークンあり：view（`layouts.print` を使う。S-0311 と同じ構え）
 - 有効なトークンなし（未発行・取消済み・前の案内に回答済みのいずれでも）：同じ view で「有効な愛犬性格診断の案内がありません。」を出す。QR・URL・コピー文面は出さない
+
+---
+
+##### S-0313 愛犬性格診断詳細画面
+
+**2026-10-18 追加**（requirements.md 6-16-15・6-16-16）。愛犬性格診断の結果 1 件の詳細と、評価文の保存・公開。
+
+**共通**（下の 3 つのルートと、上の DELETE）:
+- `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果・存在しない結果は 404）。DELETE と同じ
+- トレーニー管理のルートと同じく `practitioners` ミドルウェアの中に置く（一般・管理者。システム管理者は 403）
+
+###### GET /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}
+
+**概要**: 愛犬性格診断詳細画面を表示する（ルート名 `trainee-personality-diagnosis-results.show`）。
+
+**処理**:
+- 結果と、結び付いたトレーニング記録（あれば）を取得する
+- レーダーチャートの値：この結果を今回、同じトレーニーの結果のうちこの結果より前のもの（並べる基準は今と同じ `answered_at` の降順・同じ日時なら `id` の降順）の 1 つ目を前回、いちばん古いものを初回にする（S-0309 の今回・前回・初回の決まりを、この結果の時点にあてはめる）
+- 評価文の状態（未作成・下書き・公開済み）を決めて view に渡す
+- 表示はアクセスログに記録しない
+
+**レスポンス**:
+- view `trainees.personality-diagnosis-results.show`
+
+###### PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}
+
+**概要**: 評価文を保存する（ルート名 `trainee-personality-diagnosis-results.update`）。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| evaluation_text | string |  | nullable, string, max:10000 | 評価文。空なら NULL で保存する（未作成に戻る）。改行は LF にそろえる（受付アンケートの自由記述と同じ） |
+
+**処理**:
+- 公開済み（結び付いたトレーニング記録がある）なら保存しない（409。画面ではテキストエリアを出さないので、通常は起きない）
+- `evaluation_text`・`evaluation_updated_by`（ログイン中のトレーナー）・`evaluation_updated_at`（今）を保存する
+- アクセスログに記録する（`edit_trainee_personality_diagnosis_evaluation`。`target_type='Trainee'`、`target_id` はトレーニーの id）
+
+**レスポンス**:
+- 成功：`redirect()->route('trainee-personality-diagnosis-results.show', [$trainee, $result])`。フラッシュ `success` に「評価文を保存しました。」
+- バリデーション失敗：`back()`（screen-design.md §2-7）
+- 公開済み：409
+
+###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish
+
+**概要**: 評価文を保存し、評価文を本文にしたトレーニング記録を作って公開する（ルート名 `trainee-personality-diagnosis-results.publish`）。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| evaluation_text | string | ● | required, string, max:10000 | 評価文（画面の欄に書いてある文。保存していない直しも含めて公開する） |
+
+**処理**（1 つのトランザクション）:
+1. 結果の行を排他ロックして取り直す（`lockForUpdate`。同時に 2 回押されたときに 2 件目を作らないため）
+2. 結び付いたトレーニング記録がすでにあれば、作らずにその記録の詳細へ移す（下のレスポンス）
+3. 評価文を保存する（PUT と同じ。`evaluation_updated_by`・`evaluation_updated_at` も）
+4. トレーニング記録を作る：`client_id`＝トレーニーの会員、`training_date`＝今日（`Asia/Tokyo`）、`training_time`＝NULL、`trainer1_id`＝ログイン中のトレーナー、`trainer2_id`＝NULL、`record_content`＝評価文、`impression`＝NULL、`updated_by`＝ログイン中のトレーナー、`trainee_personality_diagnosis_result_id`＝この結果。メディアは結び付けない
+- 一意制約（`training_records_pd_result_id_unique`）が最後の守り（ロックをすり抜けても 2 件目は作られない）
+- アクセスログに記録する（`create_training_record`。`target_type='TrainingRecord'`、`target_id` は記録の登録と同じく NULL）
+
+**レスポンス**:
+- 成功：`redirect()->route('training-records.show', $record)`（S-0403）。フラッシュ `success` に「トレーニング記録を作り、会員様に公開しました。」
+- すでに公開済み：`redirect()->route('training-records.show', 結び付いた記録)`。フラッシュ `success` に「この愛犬性格診断は、すでにトレーニング記録にして公開しています。」（エラーにしない。2 回押しでも結果は同じになるため。トレーナー側のレイアウトの受け皿は `success`・`error` の 2 つだけ）
+- バリデーション失敗（評価文が空など）：`back()`
+- 押下時に確認モーダルを挟む（screen-design.md S-0313-M01）
+
+**段階2（予定。requirements.md 6-16-16 備考）**: 回答の保存のあと、キューで AI に評価文の下書きとスタッフ向けのメモを作らせ、評価文を `evaluation_text` に入れる。公開のときは、スタッフ向けのメモを記録の `impression` に入れる。ジョブ・指示文の置き場所・失敗したときの扱いは、そのときに決める（音声の要約〔SummarizeJob〕と同じ作りにする想定）
 
 ---
 
