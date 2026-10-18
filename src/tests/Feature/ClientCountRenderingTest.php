@@ -567,7 +567,7 @@ class ClientCountRenderingTest extends TestCase
         return preg_replace('/\s+/u', ' ', substr($html, $start, strpos($html, '</script>', $start) - $start));
     }
 
-    public function test_削除の確認_空のトレーニーだけなら一緒に削除することを添える(): void
+    public function test_削除の確認_空のトレーニーだけならトレーニーがいないときと同じ文(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -575,7 +575,9 @@ class ClientCountRenderingTest extends TestCase
 
         $script = $this->confirmDeleteScript($client);
 
-        $this->assertStringContainsString("return confirm('この会員を削除しますか？\\n登録内容のないトレーニーも一緒に削除します。');", $script);
+        // 2026-10-18 変更：ユーザーレビューで、一度添えていた「登録内容のないトレーニーも一緒に削除します。」を外した
+        $this->assertStringContainsString("return confirm('この会員を削除しますか？');", $script);
+        $this->assertStringNotContainsString('登録内容のないトレーニー', $script);
         $this->assertStringNotContainsString('トレーニーが登録されているため削除できません', $script);
     }
 
