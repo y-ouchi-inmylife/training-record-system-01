@@ -221,7 +221,7 @@ flowchart TD
 
 | 設定キー | 値 | 用途 |
 |---|---|---|
-| `client_tokens.email_registration_expires_days` | 3 | メールアドレス登録用 URL のトークン（DS-0700 `client_email_registration_tokens.expires_at`）の有効日数。**ログイン用リンク（DS-0600）にも同じ期限が適用される**（下記「期限の考え方」参照） |
+| `client_tokens.email_registration_expires_days` | 7 | メールアドレス登録用 URL（マイページ登録のご案内）のトークン（DS-0700 `client_email_registration_tokens.expires_at`）の有効日数。**ログイン用リンク（DS-0600）にも同じ期限が適用される**（下記「期限の考え方」参照）（**2026-10-18 変更**：2026-10-18 のユーザーレビューで、3 日では短いため 7 日にした。その前は 3 日。すでに発行した URL の期限は変えない） |
 | `client_tokens.email_change_confirm_expires_days` | 3 | ログイン後にメールアドレスを変更する際に新しいアドレスへ送るメールアドレス確認リンク（DS-0800 `client_email_change_tokens.expires_at`）の有効日数。メールアドレス登録用 URL とは無関係に発行されるため、独立した設定値を持つ |
 | `client_tokens.password_reset_expires_days` | 3 | パスワードを忘れたお客様に送るパスワード再設定リンク（DS-0900 `client_password_reset_tokens.expires_at`）の有効日数。他のトークン（DS-0600 / DS-0700 / DS-0800）とは無関係に発行されるため、独立した設定値を持つ |
 
@@ -230,7 +230,8 @@ flowchart TD
 - **メールアドレス登録用 URL の期限が、初回設定が完了するまでの全体の期限になる**
 - ログイン用リンク（DS-0600）は、対応するメールアドレス登録用トークン（DS-0700）の `expires_at` を**そのまま引き継ぐ**（お客様がメールアドレスを登録した時点から数え直さない）
 - お客様の操作（メールアドレスの入力・入力し直し）で期限は延びない
-- **期限が新しく 3 日になるのはトレーナーが URL を発行し直したときだけ**
+- **期限が新しく 7 日になるのはトレーナーが URL を発行し直したときだけ**（**2026-10-18 変更**：その前は 3 日）
+- 期限は発行した時刻から 7 日後の同じ時刻（例：10/18 10:00 に発行 → 10/25 10:00 まで）。画面・文面には日付だけを「2026年10月25日（日）まで」と出す
 - **設定値も 1 つ**（`client_tokens.email_registration_expires_days`）に集約。ログイン用リンク専用の設定値は持たない
 
 **受付アンケート用 URL（DS-1000 `trainee_intake_survey_tokens`）と愛犬性格診断用 URL（DS-1100 `trainee_personality_diagnosis_tokens`。**2026-10 追加**）は有効期限を持たない**（**2026-10 追加**）：

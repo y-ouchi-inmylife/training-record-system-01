@@ -1129,7 +1129,7 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。カラム型 VARCHAR(64) は将来の長さ拡張に備えた余裕。重複不可 |
 | client_id | BIGINT UNSIGNED | NO | — | メールアドレス登録の対象クライアントのID（外部キー）。発行時から特定のクライアントに紐づく |
-| expires_at | TIMESTAMP | NO | — | 有効期限。**発行から 3 日後**に設定される（設定値は `architecture.md` §3-1 参照）。**この期限が初回設定完了までの全体の期限**となり、対応するログイン用リンク（DS-0600）にもそのまま引き継がれる |
+| expires_at | TIMESTAMP | NO | — | 有効期限。**発行から 7 日後**に設定される（設定値は `architecture.md` §3-1 参照）（**2026-10-18 変更**：2026-10-18 のユーザーレビューで、3 日では短いため 7 日にした。その前は 3 日。すでに発行した URL の期限は変えない）。**この期限が初回設定完了までの全体の期限**となり、対応するログイン用リンク（DS-0600）にもそのまま引き継がれる |
 | is_used | BOOLEAN | NO | false | 使用状態。false: 未使用 / true: 使用済み。**初回設定が完了した時点で true に更新**（メールアドレス登録単独では使用済みにしない — 何度でも入力し直せるため） |
 | created_at | TIMESTAMP | YES | NULL | 発行日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
