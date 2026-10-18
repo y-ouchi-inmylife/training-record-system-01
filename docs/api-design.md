@@ -1570,13 +1570,13 @@ POST /training-records に以下を追加する。
 | first_name | string | | nullable, string, max:50 | 名 |
 | last_name_kana | string | | nullable, string, max:50, regex:ひらがな | せい |
 | first_name_kana | string | | nullable, string, max:50, regex:ひらがな | めい |
-| phone1 | string | ● | required, string, max:20, regex:/^[0-9\-]+$/ | 電話番号 |
+| phone1 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 電話番号（**2026-10-18 変更**：任意にした。その前は required） |
 | phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 緊急連絡先（ご家族等）（**2026-10-17 変更**：その前は電話番号（予備）） |
 | emergency_contact_relationship | string | | nullable, string, max:20 | 続柄（**2026-10-17 追加**） |
 | postal_code | string |  | nullable, string, regex:/^\d{3}-?\d{4}$/ | 郵便番号（任意。入力された場合のみ形式チェック） |
-| address1 | string | ● | required, string, max:50 | 都道府県 |
-| address2 | string | ● | required, string, max:50 | 市区町村 |
-| address3 | string | ● | required, string, max:100 | 町名・番地 |
+| address1 | string | | nullable, required_with:address2,address3,address4, string, max:50 | 都道府県（**2026-10-18 変更**：任意。住所のほかの欄が入っていれば必須。その前は required） |
+| address2 | string | | nullable, required_with:address1,address3,address4, string, max:50 | 市区町村（同上） |
+| address3 | string | | nullable, required_with:address1,address2,address4, string, max:100 | 町名・番地（同上） |
 | address4 | string | | nullable, string, max:100 | 建物名・部屋番号 |
 
 **処理**:
@@ -1747,14 +1747,16 @@ POST /training-records に以下を追加する。
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
-| phone1 | string | ● | required, string, max:20, regex:/^[0-9\-]+$/ | 電話番号 |
+| phone1 | string | △ | 契約あり：required／契約なし：nullable。string, max:20, regex:/^[0-9\-]+$/ | 電話番号（**2026-10-18 変更**：契約がある会員だけ必須。△ は以下同じ） |
 | phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 緊急連絡先（ご家族等）（**2026-10-17 変更**：その前は電話番号（予備）） |
 | emergency_contact_relationship | string | | nullable, string, max:20 | 続柄（**2026-10-17 追加**） |
 | postal_code | string |  | nullable, string, regex:/^\d{3}-?\d{4}$/ | 郵便番号（任意。入力された場合のみ形式チェック） |
-| address1 | string | ● | required, string, max:50 | 都道府県 |
-| address2 | string | ● | required, string, max:50 | 市区町村 |
-| address3 | string | ● | required, string, max:100 | 町名・番地 |
+| address1 | string | △ | 契約あり：required／契約なし：nullable, required_with:address2,address3,address4。string, max:50 | 都道府県 |
+| address2 | string | △ | 契約あり：required／契約なし：nullable, required_with:address1,address3,address4。string, max:50 | 市区町村 |
+| address3 | string | △ | 契約あり：required／契約なし：nullable, required_with:address1,address2,address4。string, max:100 | 町名・番地 |
 | address4 | string | | nullable, string, max:100 | 建物名・部屋番号 |
+
+- **住所・電話番号の必須**（**2026-10-18 変更**）：ログイン中の会員に契約（`client_contracts`）が 1 件以上あれば必須、なければ初回設定（`POST /client-portal/setup/{token}`）と同じく任意（`ClientProfileRequest`・`App\Http\Requests\Concerns\ClientContactRules`）。2026-10-18 のユーザーレビューで、マイページの登録の時点ではまだ犬を預かるか決まっていない会員もいるため、住所・電話番号を任意にした。契約が登録された会員は預かりが決まっているので、入れてもらう（登録情報の変更で必須、マイページで入力を促す）。入力エラーの文は screen-design.md S-1411「バリデーションチェック」
 
 **処理**:
 - ログイン中クライアントの `clients` の該当カラムを更新する
