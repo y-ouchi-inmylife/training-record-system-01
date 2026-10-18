@@ -152,8 +152,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント閲覧 | S-1402 クライアントダッシュボード画面 | GET | `/client-portal/dashboard` | クライアントダッシュボード画面を表示する | auth:client | クライアント |
 | クライアント閲覧 | S-1402 クライアントダッシュボード画面 | POST | `/client-portal/trainees/{trainee}/photo` | トレーニー写真をアップロードする（サーバ経由の multipart POST。サーバ側で長辺 400px にリサイズ・JPEG 変換して保存） | auth:client | クライアント |
 | クライアント閲覧 | S-1402 クライアントダッシュボード画面 | DELETE | `/client-portal/trainees/{trainee}/photo` | トレーニー写真を削除する（DB の `photo_path` を NULL に戻し、実ファイルもストレージから削除） | auth:client | クライアント |
-| クライアント閲覧 | S-1403 クライアント初回設定画面 | GET | `/client-portal/setup/{token}` | 初回設定画面を表示する（トークン検証、自動ログイン） | public | - |
-| クライアント閲覧 | S-1403 クライアント初回設定画面 | POST | `/client-portal/setup/{token}` | 初回設定（パスワード＋基本情報）を保存する | public | - |
+| クライアント閲覧 | S-1403 クライアントマイページ登録画面 | GET | `/client-portal/setup/{token}` | マイページ登録画面を表示する（トークン検証、自動ログイン） | public | - |
+| クライアント閲覧 | S-1403 クライアントマイページ登録画面 | POST | `/client-portal/setup/{token}` | マイページ登録（パスワード＋基本情報）を保存する | public | - |
 | クライアント閲覧 | S-1404 クライアントトレーニング記録詳細画面 | GET | `/client-portal/training-records/{id}` | クライアントが自分のトレーニング記録の詳細を表示する | auth:client | クライアント |
 | クライアント閲覧 | S-1404 クライアントトレーニング記録詳細画面 | GET | `/client-portal/media/{id}/play` | クライアントが自分の記録に紐づくメディアを表示・再生する | auth:client | クライアント |
 | クライアント閲覧 | S-1405 クライアントメールアドレス登録画面 | GET | `/client-portal/email-registration/{token}` | メールアドレス登録画面を表示する（トークン検証） | public | - |
@@ -1544,13 +1544,15 @@ POST /training-records に以下を追加する。
 
 ---
 
-##### S-1403 クライアント初回設定画面
+##### S-1403 クライアントマイページ登録画面
+
+**2026-10-18 変更**：2026-10-18 のユーザーレビューで、目的がはっきり分かるよう、お客様に見せる名前を「初回設定」から「マイページ登録」にした（トレーナー側の「マイページ登録のご案内」〔S-0307〕から進む画面と言い方がそろう）。その前の画面名は「クライアント初回設定画面」。URL・ルート名・コントローラ名（`InitialSetupController`）は変えない。下の説明の「初回設定」は、この画面での登録を指す。
 
 クライアントがメールで受け取ったログイン用リンクからアクセスする、認証不要の公開画面。トークン検証と同時にクライアントを client guard で自動ログインさせる（`auth:client` ミドルウェアは適用しない）。
 
 ###### GET /client-portal/setup/{token}
 
-**概要**: ログイン用リンクのトークンを検証し、初回設定画面を表示する。
+**概要**: ログイン用リンクのトークンを検証し、マイページ登録画面を表示する。
 
 **処理**:
 - トークンの有効性を「存在する／期限内／未使用」の順にチェック
@@ -1609,7 +1611,7 @@ POST /training-records に以下を追加する。
 - 成功：クライアントダッシュボード画面（S-1402）へリダイレクト＋完了メッセージ表示
 - トークン無効：トークンエラー画面
 - バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ（screen-design.md §2-7 の規約で返す）
-- 登録完了メールの送信失敗（全ロールバック後）：`back()` ＋ 入力項目ではなく専用のキー `form` で `withErrors(['form' => '…'])` で返す（画面設計書 §2-7「入力エラー以外の失敗を入力の項目のキーで返さないルール」。段階 4-2 で `setup` キーから `form` キーに移した）：「初回設定を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。」
+- 登録完了メールの送信失敗（全ロールバック後）：`back()` ＋ 入力項目ではなく専用のキー `form` で `withErrors(['form' => '…'])` で返す（画面設計書 §2-7「入力エラー以外の失敗を入力の項目のキーで返さないルール」。段階 4-2 で `setup` キーから `form` キーに移した）：「マイページの登録を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。」（**2026-10-18 変更**：その前は「初回設定を完了できませんでした。…」）
 
 ---
 
@@ -1870,7 +1872,7 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | current_password | string | ● | required, current_password (client guard) | 現在のパスワード |
-| new_password | string | ● | required, string, confirmed, StrongPassword | 新しいパスワード。S-1403 初回設定と同じ強度要件 |
+| new_password | string | ● | required, string, confirmed, StrongPassword | 新しいパスワード。S-1403 マイページ登録と同じ強度要件 |
 | new_password_confirmation | string | ● | required | 新しいパスワード（確認） |
 
 **処理**:
@@ -1959,7 +1961,7 @@ POST /training-records に以下を追加する。
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
-| new_password | string | ● | required, string, confirmed, StrongPassword | 新しいパスワード。S-1403 初回設定と同じ強度要件 |
+| new_password | string | ● | required, string, confirmed, StrongPassword | 新しいパスワード。S-1403 マイページ登録と同じ強度要件 |
 | new_password_confirmation | string | ● | required | 新しいパスワード（確認） |
 
 **処理**:
