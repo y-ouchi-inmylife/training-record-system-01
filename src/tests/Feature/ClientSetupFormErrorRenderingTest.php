@@ -135,35 +135,46 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     }
 
     /**
-     * 2026-10 変更：ログイン情報（パスワード・パスワード確認）をまとまりの最後
-     *（登録ボタンの直前）に移した。入力エラーで戻ったとき、一番上まで戻って
-     * パスワードを入れ直す必要がなくなるようにするため。同じ 2026-10 に愛犬の情報を
-     * 外したため、ログイン情報はご連絡先（建物名・部屋番号）の後に来る。
+     * 2026-10-18 変更：ユーザーレビューで、マイページを登録する画面なので、ログイン情報（メールアドレスの表示・
+     * パスワード・パスワード（確認））を一番上に置いた（お名前・ご連絡先はそのあと）。
+     * その前（2026-10）は、入力エラーで戻ったときにパスワードの入れ直しで上へ戻らずに済むよう、末尾に置いていた。
      */
-    public function test_初回設定_ログイン情報はまとまりの最後に描画される(): void
+    public function test_初回設定_ログイン情報はいちばん上に描画される(): void
     {
         $html = $this->renderSetup([])->__toString();
 
-        // 「ご連絡先」の最後の欄（建物名・部屋番号）より後に、
-        // 「ログイン情報」小見出しとパスワード欄が来ること。
-        $posAddress4 = mb_strpos($html, 'name="address4"');
-        $posLoginHeading = mb_strpos($html, 'ログイン情報');
-        $posPassword = mb_strpos($html, 'id="password"');
-
-        $this->assertNotFalse($posAddress4);
-        $this->assertNotFalse($posLoginHeading);
-        $this->assertNotFalse($posPassword);
-
-        $this->assertGreaterThan($posAddress4, $posLoginHeading);
-        $this->assertGreaterThan($posAddress4, $posPassword);
-
-        // 「ログイン情報」まとまりの中にメールアドレスの表示行（text-muted small ラベル）
-        // が入っていること。owner@example.com は hidden の username input（フォーム冒頭）
-        // にも値として入るため、ここは表示行のラベル文字列で位置を見る。
+        $posLoginHeading = mb_strpos($html, '<h2 class="fs-6 fw-bold mb-2">ログイン情報</h2>');
         $posEmailLabel = mb_strpos($html, 'メールアドレス</div>');
-        $this->assertNotFalse($posEmailLabel);
-        $this->assertGreaterThan($posLoginHeading, $posEmailLabel);
-        $this->assertGreaterThan($posEmailLabel, $posPassword);
+        $posPassword = mb_strpos($html, 'id="password"');
+        $posConfirmation = mb_strpos($html, 'id="password_confirmation"');
+        $posNameHeading = mb_strpos($html, '<h2 class="fs-6 fw-bold mb-2">お名前</h2>');
+        $posLastName = mb_strpos($html, 'id="last_name"');
+        foreach ([$posLoginHeading, $posEmailLabel, $posPassword, $posConfirmation, $posNameHeading, $posLastName] as $pos) {
+            $this->assertNotFalse($pos);
+        }
+
+        // ログイン情報（小見出し → メールアドレスの表示 → パスワード → パスワード（確認））→ お名前（姓）の順
+        $this->assertLessThan($posEmailLabel, $posLoginHeading);
+        $this->assertLessThan($posPassword, $posEmailLabel);
+        $this->assertLessThan($posConfirmation, $posPassword);
+        $this->assertLessThan($posNameHeading, $posConfirmation);
+        $this->assertLessThan($posLastName, $posNameHeading);
+        // ログイン情報の小見出しの前に入力欄はない（パスワード管理のための見えない username の欄だけ）
+        $this->assertSame(0, preg_match_all('/<(?:input|select|textarea)\b(?![^>]*name="(?:_token|username)")/u', mb_substr($html, 0, $posLoginHeading)));
+    }
+
+    /**
+     * パスワード管理（ブラウザのパスワードの保存）がメールアドレスとパスワードを結び付けられるよう、
+     * メールアドレスを autocomplete="username" の見えない欄でパスワードの欄より前に持つ（今までどおり）。
+     * パスワードの 2 つの欄は autocomplete="new-password"。
+     */
+    public function test_初回設定_パスワード管理のためのメールアドレスとパスワードの指定(): void
+    {
+        $html = $this->renderSetup([])->__toString();
+
+        $this->assertSame(1, preg_match('/<input\s+type="email"\s+name="username"\s+value="owner@example\.com"\s+autocomplete="username"\s+readonly\s+tabindex="-1"\s+aria-hidden="true"\s+class="visually-hidden"\s*>/u', $html));
+        $this->assertLessThan(mb_strpos($html, 'id="password"'), mb_strpos($html, 'name="username"'));
+        $this->assertSame(2, preg_match_all('/id="password(?:_confirmation)?"\s+name="password(?:_confirmation)?"\s+required\s+autocomplete="new-password"/u', $html));
     }
 
     /**
@@ -180,8 +191,9 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $this->assertNotFalse($posName);
         $this->assertNotFalse($posContact);
         $this->assertNotFalse($posLogin);
+        // ログイン情報 → お名前 → ご連絡先（2026-10-18 変更：その前はお名前 → ご連絡先 → ログイン情報）
+        $this->assertGreaterThan($posLogin, $posName);
         $this->assertGreaterThan($posName, $posContact);
-        $this->assertGreaterThan($posContact, $posLogin);
     }
 
     /**
@@ -215,35 +227,35 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     }
 
     /**
-     * 2026-10 変更：まとまりの区切り線は 1 本（お客様のプロフィール／ログイン情報の境目）だけ。
-     * 愛犬の情報を外したため、線は愛犬の備考の下から、建物名・部屋番号の下に移った。
+     * まとまりの区切り線は 1 本（ログイン情報／お客様のプロフィールの境目）だけ。
+     * 2026-10-18 変更：ログイン情報を一番上に移したため、線はパスワード（確認）の下（お名前の前）に移した
+     * （その前は緊急連絡先〔ご家族等〕の下、さらに前は建物名・部屋番号の下）。
      */
-    public function test_初回設定_区切り線はご連絡先の最後の緊急連絡先の下の1本だけ(): void
+    public function test_初回設定_区切り線はログイン情報とお名前の間の1本だけ(): void
     {
         $html = $this->renderSetup([])->__toString();
         $this->assertSame(1, substr_count($html, 'border-bottom'));
 
-        // 線は緊急連絡先（ご家族等）の fieldset に付く（ご連絡先のまとまりの最後。ログイン情報より前）。
-        // 2026-10-18 変更：住所 → 電話番号の順にしたため、建物名・部屋番号の下から移した
-        $this->assertStringContainsString('<fieldset class="mb-3 pb-3 border-bottom">', $html);
+        $this->assertMatchesRegularExpression('/<div class="mb-3 pb-3 border-bottom">\s*<label for="password_confirmation"/u', $html);
         $posLine = mb_strpos($html, 'border-bottom');
-        $this->assertGreaterThan(mb_strpos($html, 'name="phone1"'), $posLine);
-        $this->assertGreaterThan(mb_strpos($html, 'name="address4"'), $posLine);
-        $this->assertLessThan(mb_strpos($html, 'name="phone2"'), $posLine);
-        $this->assertLessThan(mb_strpos($html, 'ログイン情報'), $posLine);
+        $this->assertGreaterThan(mb_strpos($html, 'id="password"'), $posLine);
+        $this->assertLessThan(mb_strpos($html, 'id="password_confirmation"'), $posLine);
+        $this->assertLessThan(mb_strpos($html, 'お名前</h2>'), $posLine);
+        // 最後のまとまり（ご連絡先の緊急連絡先）の下には線を引かない
+        $this->assertStringContainsString('<fieldset class="mb-3">', $html);
     }
 
     public function test_初回設定_緊急連絡先の見出しの下に電話番号と続柄を横に並べる(): void
     {
         $html = (string) $this->renderSetup([]);
 
-        $this->assertSame(1, preg_match('/<fieldset class="mb-3 pb-3 border-bottom">\s*<legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）<\/legend>(.*?)<\/fieldset>/us', $html, $m));
+        $this->assertSame(1, preg_match('/<fieldset class="mb-3">\s*<legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）<\/legend>(.*?)<\/fieldset>/us', $html, $m));
         $this->assertMatchesRegularExpression('/<div class="row g-2">\s*<div class="col-6 col-sm-7">\s*<label for="phone2" class="form-label small mb-1">電話番号<\/label>/u', $m[1]);
         $this->assertMatchesRegularExpression('/<div class="col-6 col-sm-5">\s*<label for="emergency_contact_relationship" class="form-label small mb-1">続柄<\/label>/u', $m[1]);
         $this->assertStringContainsString('id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"', $m[1]);
         $this->assertStringContainsString('placeholder="例: 母、夫、娘"', $m[1]);
         // 電話番号（必須）の欄は見出しの外で、見出しの前
-        $this->assertTrue(strpos($html, 'id="phone1"') < strpos($html, '<fieldset class="mb-3 pb-3 border-bottom">'));
+        $this->assertTrue(strpos($html, 'id="phone1"') < strpos($html, '<fieldset class="mb-3">'));
         $this->assertStringNotContainsString('電話番号（予備）', $html);
     }
 
@@ -277,8 +289,8 @@ class ClientSetupFormErrorRenderingTest extends TestCase
         $html = (string) $this->renderSetup([]);
 
         $this->assertContactOrder($html);
-        // ご連絡先の小見出しのあとに住所、ログイン情報は最後
+        // ご連絡先の小見出しのあとに住所。ログイン情報はいちばん上（2026-10-18 変更：その前は最後）
         $this->assertTrue(strpos($html, 'ご連絡先</h2>') < strpos($html, 'id="postal_code"'));
-        $this->assertTrue(strpos($html, 'id="emergency_contact_relationship"') < strpos($html, 'id="password"'));
+        $this->assertTrue(strpos($html, 'id="password_confirmation"') < strpos($html, 'id="last_name"'));
     }
 }

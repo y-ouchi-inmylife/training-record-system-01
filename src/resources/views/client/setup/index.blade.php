@@ -57,6 +57,73 @@
                     class="visually-hidden"
                 >
 
+                {{-- 「ログイン情報」小見出し（3 か所の 1 番目）。メール表示・パスワード・パスワード（確認）の 3 つを 1 つのまとまりとして扱う。
+                     <h2 fs-6> を使う理由・fs-6 を外さない旨は下の「お名前」小見出しのコメント参照。**fs-6 を外さないこと**。
+                     2026-10-18 変更：ユーザーレビューで、マイページを登録する画面なので、ログイン情報を一番上に置いた（お名前は
+                     初期表示が入っており、ご連絡先は任意のため、目的のパスワードを先に入れてもらう）。
+                     経緯：2026-10 に末尾へ移していた。パスワードは Laravel 標準で old() の対象外（セッションに残さない）ため、
+                     入力エラーで戻ったときはパスワード欄だけが空になり、一番上に置くと上まで戻って入れ直すことになるため。
+                     一番上に戻した今は、パスワード欄が上部のエラーの案内のすぐ下に来るので、案内を読んだ流れで入れ直せる
+                     （下の「確認のため、パスワードをもう一度入力してください。」の一言はそのまま出す）。
+                     設計書 S-1403 備考「ログイン情報を一番上に戻した」/ §4-7 参照。 --}}
+                <h2 class="fs-6 fw-bold mb-2">ログイン情報</h2>
+                {{-- メールアドレスは表示のみ（S-1411 の「お名前」表示行と同じマークアップに揃える）。
+                     説明文で埋め込むより行として立っている方が、ログイン ID の確認場面として目に入る。 --}}
+                <div class="mb-3">
+                    <div class="text-muted small">メールアドレス</div>
+                    <div>{{ $client->email }}</div>
+                </div>
+
+                {{-- エラーで戻ったとき、パスワード以外の欄のエラーがあれば、
+                     パスワードが空に戻っている理由をパスワード欄の上で控えめに伝える
+                     （.form-text で赤字〔invalid-feedback〕と区別。2026-10 追加）。
+                     パスワードだけのエラーのときは、欄の下の赤字で原因が伝わるため出さない。 --}}
+                @if ($errors->hasAny([
+                    'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
+                    'postal_code', 'address1', 'address2', 'address3', 'address4',
+                    'phone1', 'phone2', 'emergency_contact_relationship',
+                ]))
+                    <div class="form-text mb-2">確認のため、パスワードをもう一度入力してください。</div>
+                @endif
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
+                    {{-- autofocus は付けない（2026-10 変更）：ほかの欄と同じく入力の開始位置はブラウザの既定に任せる。
+                         2026-10 に末尾へ移したときは、autofocus でページが最下部まで自動スクロールし、「エラー時にページの
+                         先頭（上部の案内）が見えている」要件（§2-7）と矛盾するため外した。一番上に戻した今も付けない。 --}}
+                    <input
+                        type="password"
+                        class="form-control @error('password') is-invalid @enderror"
+                        id="password"
+                        name="password"
+                        required
+                        autocomplete="new-password"
+                        aria-describedby="password-help"
+                    >
+                    {{-- 強度要件のヘルプ文は <x-form-error> の下に置くと、エラー時に欄との間にヘルプ文が
+                         挟まる。Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで
+                         ヘルプ文を挟んでも表示される。block は付けない。 --}}
+                    <x-form-error field="password" />
+                    <div id="password-help" class="form-text">
+                        8 文字以上で、大文字・小文字・数字・記号をそれぞれ 1 つ以上入れてください。
+                    </div>
+                </div>
+                {{-- パスワード（確認）はログイン情報まとまりの最終要素。下に区切り線を引く（ログイン情報／お名前の境目
+                     ＝ログイン情報とお客様のプロフィールの境目で、入力の性格が変わるため）。カード内の区切り線はこの 1 本だけ。
+                     2026-10-18 変更：ログイン情報を一番上に移したため、線も緊急連絡先（ご家族等）の下から移した。
+                     線の濃さは client.scss の .c-login--wide .border-bottom（ink 20%）。設計書 S-1403 備考 / §4-7 参照。 --}}
+                <div class="mb-3 pb-3 border-bottom">
+                    <label for="password_confirmation" class="form-label">パスワード（確認） <span class="text-danger">*</span></label>
+                    <input
+                        type="password"
+                        class="form-control"
+                        id="password_confirmation"
+                        name="password_confirmation"
+                        required
+                        autocomplete="new-password"
+                    >
+                </div>
+
                 {{-- 「お名前」「ご連絡先」の小見出し（太字）は入力欄のまとまりの先頭に置く。
                      見出しタグ <h2> を使う理由：読み上げソフトに画面の構造を伝えるため。
                      見た目だけの太字（旧 <p class="fw-bold">）では構造が伝わらない。
@@ -67,7 +134,7 @@
                      （後から「不要」と見て消されると見た目が変わる）。
                      パスワードのまとまりにも小見出しを置く：当初は「同じ語の重複」を避けて
                      置かない方針だったが、他の小見出しとの非対称で構造把握が難しいため、
-                     「ログイン情報」の文言で置いた（2026-09 追加。詳しくは下の「ログイン情報」
+                     「ログイン情報」の文言で置いた（2026-09 追加。詳しくは上の「ログイン情報」
                      小見出し直前のコメントを参照）。
                      区切り線と小見出しの役割は違う：線＝「ここで切れる」、小見出し＝「次が何か」。
                      両方置いて相補的に働かせる。文言「お名前」は S-1406/S-1411 の表示行と揃える。
@@ -94,7 +161,8 @@
                 </div>
                 {{-- せい・めい行とご連絡先小見出しの間はまとまりの境目だが、区切り線は引かない
                      （2026-10 変更）。各まとまりの小見出しで内容の区切りが伝わるため、線は
-                     「入力の性格が変わる境目」（お客様プロフィール／ログイン情報。ご連絡先の最後の緊急連絡先〔ご家族等〕の下。2026-10-18 までは建物名・部屋番号の下）だけに絞った。
+                     「入力の性格が変わる境目」（ログイン情報／お客様プロフィール。2026-10-18 からはパスワード（確認）の下。
+                     その前はご連絡先の最後の緊急連絡先〔ご家族等〕の下、さらに前は建物名・部屋番号の下）だけに絞った。
                      余白は mb-3（セクション内の mb-2 より少し広い）で、小見出しの前で詰まりすぎない。
                      設計書 S-1403 備考 / §4-7 参照。 --}}
                 <div class="row g-2 mb-3">
@@ -190,16 +258,10 @@
                      legend は Bootstrap の既定で大きな文字・左に浮くので、form-label と fs-6 で欄のラベルと同じ大きさにする。
                      2026-10-18 変更：その前（2026-10-17）は「緊急連絡先（ご家族等）」「続柄」を縦一列の別々の項目にしていたが、
                      続柄が緊急連絡先の方の続柄だとわからなかった --}}
-                {{-- 緊急連絡先（ご家族等）は「ご連絡先」まとまりの最終要素（2026-10-18 変更：住所 → 電話番号の順にしたため。
-                     その前は建物名・部屋番号が最終要素で、線もその下に引いていた）。下に区切り線を引く
-                     （ご連絡先／ログイン情報の境目＝お客様のプロフィールとログイン情報の境目で、
-                     入力の性格が変わるため）。カード内の区切り線はこの 1 本だけ。
-                     経緯：2026-10 に線を「入力の性格が変わる境目」の 1 本に絞ったときは、
-                     愛犬の備考の下（愛犬の情報／ログイン情報の境目）に引いていた。同じ 2026-10 に
-                     愛犬の情報を受付アンケート（S-1413）に分離して外したため、線を建物名・部屋番号の下に移した。
-                     線の濃さは client.scss の .c-login--wide .border-bottom（ink 20%）。
-                     設計書 S-1403 備考 / §4-7 参照。 --}}
-                <fieldset class="mb-3 pb-3 border-bottom">
+                {{-- 緊急連絡先（ご家族等）は「ご連絡先」まとまりの最終要素で、画面の最後のまとまり。下に区切り線は引かない
+                     （カードの枠が外周を担当。2026-10-18 変更：ログイン情報を一番上に移したため、ここにあった線を
+                     ログイン情報とお名前の間に移した）。設計書 S-1403 備考 / §4-7 参照。 --}}
+                <fieldset class="mb-3">
                     <legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）</legend>
                     <div class="row g-2">
                         <div class="col-6 col-sm-7">
@@ -219,73 +281,6 @@
                     </div>
                 </fieldset>
 
-                {{-- 「ログイン情報」小見出し（3 か所の最後、2026-10 に末尾へ移した。同じ 2026-10 に
-                     「愛犬の情報」の小見出しを外したため、4 か所から 3 か所になった）。
-                     メール表示・パスワード・パスワード（確認）の 3 つを 1 つのまとまりとして扱う。
-                     <h2 fs-6> を使う理由・fs-6 を外さない旨は上の「お名前」小見出しの
-                     コメント参照。**fs-6 を外さないこと**。
-                     なぜ末尾に移したか：Laravel 標準でパスワードは old() の対象外（セッションに
-                     残さない）ため、入力エラーで戻ったときはパスワード欄だけが空になる。
-                     ログイン情報を一番上に置くと、電話番号を 1 文字直すだけでも、
-                     上まで戻ってパスワードを入れ直すことになり不便だった。末尾に置き、
-                     上から赤字の欄を直して、最後にパスワードを入れて登録する一方通行の
-                     流れにする（設計書 S-1403 備考 / §4-7 参照）。 --}}
-                <h2 class="fs-6 fw-bold mb-2">ログイン情報</h2>
-                {{-- メールアドレスは表示のみ（S-1411 の「お名前」表示行と同じマークアップに揃える）。
-                     説明文で埋め込むより行として立っている方が、ログイン ID の確認場面として目に入る。 --}}
-                <div class="mb-3">
-                    <div class="text-muted small">メールアドレス</div>
-                    <div>{{ $client->email }}</div>
-                </div>
-
-                {{-- エラーで戻ったとき、パスワード以外の欄のエラーがあれば、
-                     パスワードが空に戻っている理由をパスワード欄の上で控えめに伝える
-                     （.form-text で赤字〔invalid-feedback〕と区別。2026-10 追加）。
-                     パスワードだけのエラーのときは、欄の下の赤字で原因が伝わるため出さない。 --}}
-                @if ($errors->hasAny([
-                    'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
-                    'postal_code', 'address1', 'address2', 'address3', 'address4',
-                    'phone1', 'phone2', 'emergency_contact_relationship',
-                ]))
-                    <div class="form-text mb-2">確認のため、パスワードをもう一度入力してください。</div>
-                @endif
-
-                <div class="mb-3">
-                    <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
-                    {{-- autofocus は付けない：ログイン情報を末尾に移したため、autofocus を付けると
-                         ページが最下部まで自動スクロールし、「エラー時にページの先頭（上部の案内）が
-                         見えている」要件（§2-7）と矛盾するため（2026-10 変更）。 --}}
-                    <input
-                        type="password"
-                        class="form-control @error('password') is-invalid @enderror"
-                        id="password"
-                        name="password"
-                        required
-                        autocomplete="new-password"
-                        aria-describedby="password-help"
-                    >
-                    {{-- 強度要件のヘルプ文は <x-form-error> の下に置くと、エラー時に欄との間にヘルプ文が
-                         挟まる。Bootstrap の .is-invalid ~ .invalid-feedback の「以後の兄弟」セレクタで
-                         ヘルプ文を挟んでも表示される。block は付けない。 --}}
-                    <x-form-error field="password" />
-                    <div id="password-help" class="form-text">
-                        8 文字以上で、大文字・小文字・数字・記号をそれぞれ 1 つ以上入れてください。
-                    </div>
-                </div>
-                {{-- パスワード（確認）はログイン情報まとまりの最終要素で、ログイン情報自体も
-                     最終まとまりとなるため、下に区切り線は引かない（カード枠が外周を担当。
-                     2026-10 変更）。 --}}
-                <div class="mb-3">
-                    <label for="password_confirmation" class="form-label">パスワード（確認） <span class="text-danger">*</span></label>
-                    <input
-                        type="password"
-                        class="form-control"
-                        id="password_confirmation"
-                        name="password_confirmation"
-                        required
-                        autocomplete="new-password"
-                    >
-                </div>
 
                 @include('layouts.partials.privacy-consent')
 
