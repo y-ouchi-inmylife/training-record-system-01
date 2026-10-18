@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
+use App\Models\Trainee;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -13,9 +14,11 @@ use Tests\TestCase;
 /**
  * 会員のマイページ（S-1402）の愛犬のカードの犬種・性別・誕生日（2026-10-18 追加。要件定義書 6-15-3）。
  *
- * - 名前のすぐ下の 1 行に「犬種 ／ 性別 ／ 誕生日（年齢）」。値はトレーナー側の会員詳細（S-0305）と同じ出し方
- *   （Trainee::client_profile_parts。誕生日は birthday_with_age_label）。性別の「不明」と値がない項目は出さない
- * - 3 つともなければ行を出さない。去勢・避妊は出さない。自分のトレーニーだけ。トレーニーの数でクエリが増えない
+ * - 写真（または「写真を登録」の枠）のすぐ下に 1 項目ずつ縦に（犬種 → 性別 → 誕生日。区切りの記号なし）。
+ *   犬種・性別は会員詳細（S-0305）と同じ値。誕生日はマイページだけ「2020/01/23生（6歳8ヶ月）」の書き方
+ *   （Trainee::client_profile_parts・TraineeAge::clientBirthdayParts）。「…生」と「（年齢）」の間でだけ折り返す
+ * - 性別の「不明」と値がない項目は出さない。3 つともなければ何も出さない。去勢・避妊は出さない。自分のトレーニーだけ。
+ *   トレーニーの数でクエリが増えない。名前の行は足す前の形（2026-10-18 変更：最初は名前の下の 1 行だった）
  */
 class ClientDashboardTraineeProfileTest extends TestCase
 {
@@ -96,35 +99,68 @@ class ClientDashboardTraineeProfileTest extends TestCase
         return $this->actingAs($this->client, 'client')->get(route('client-portal.dashboard'))->assertOk()->getContent();
     }
 
-    /** 名前の見出しのすぐ後ろの 1 行（なければ null） */
-    private function profileLine(string $html, string $callName): ?string
+    /** その愛犬のカード（article）の HTML */
+    private function card(string $html, string $callName): string
     {
-        $pattern = '/>'.preg_quote($callName, '/').'<\/h2>\s*<p class="mb-0 small text-muted" data-client-trainee-profile>(.*?)<\/p>/u';
+        $heading = strpos($html, '>'.$callName.'</h2>');
+        $this->assertNotFalse($heading, $callName.' のカードがない');
+        $start = strrpos(substr($html, 0, $heading), '<article');
 
-        return preg_match($pattern, $html, $m) === 1 ? $m[1] : null;
+        return substr($html, $start, strpos($html, '</article>', $heading) - $start);
+    }
+
+    /** 写真の下の犬種・性別・誕生日の行（行ごとの HTML。なければ null） */
+    private function profileLines(string $html, string $callName): ?array
+    {
+        $card = $this->card($html, $callName);
+        $start = strpos($card, '<div class="small text-muted mt-2" data-client-trainee-profile>');
+        if ($start === false) {
+            return null;
+        }
+        // 行の div（word-break: keep-all）はこのまとまりの中にだけある
+        preg_match_all('/<div style="word-break: keep-all;">(.*?)<\/div>/u', substr($card, $start), $lines);
+
+        return $lines[1];
     }
 
     private const FULL = ['breed' => 'トイ・プードル', 'sex' => 'female', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1, 'neuter_status' => 'done'];
 
-    public function test_名前のすぐ下に犬種と性別と誕生日を区切りでつないで出す(): void
+    public function test_写真の下に犬種と性別と誕生日を1項目ずつ縦に出し区切りの記号は使わない(): void
     {
         $this->trainee('アイ', self::FULL);
 
-        $line = $this->profileLine($this->open(), 'アイちゃん');
+        $html = $this->open();
+        $card = $this->card($html, 'アイちゃん');
 
-        $this->assertSame('<span class="d-inline-block">トイ・プードル</span> ／ <span class="d-inline-block">女の子</span> ／ <span class="d-inline-block">2020/05/01（6歳5ヶ月）</span>', $line);
+        $this->assertSame(['トイ・プードル', '女の子', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, 'アイちゃん'));
+        $this->assertStringNotContainsString(' ／ ', $card);
+        // 写真（ここでは「写真を登録」の枠）のあと、体重のグラフ（計測値がないときの文）より前
+        $this->assertTrue(strpos($card, '写真を登録</span>') < strpos($card, 'data-client-trainee-profile'));
+        $this->assertTrue(strpos($card, 'data-client-trainee-profile') < strpos($card, 'まだ計測値がありません'));
+        // 写真の列（.c-trainee-photo-col）の中
+        $this->assertMatchesRegularExpression('/<div class="c-trainee-photo-col[^"]*">(?:(?!<\/article>).)*data-client-trainee-profile/su', $card);
     }
 
-    public function test_年齢は今日を基準に会員詳細と同じ出し方で計算する(): void
+    public function test_名前のすぐ下には行を出さず名前の見出しは足す前の形(): void
+    {
+        $this->trainee('アイ', self::FULL);
+
+        $card = $this->card($this->open(), 'アイちゃん');
+
+        $this->assertStringContainsString('<h2 class="mb-2" style="font-size: 1.1rem;">アイちゃん</h2>', $card);
+        $this->assertDoesNotMatchRegularExpression('/アイちゃん<\/h2>\s*<(p|div)[^>]*data-client-trainee-profile/u', $card);
+    }
+
+    public function test_誕生日はマイページだけ生を付け年齢は今日を基準に会員詳細と同じ計算(): void
     {
         $cases = [
-            '前日' => [[2020, 10, 19], '2020/10/19（5歳11ヶ月）'], // 誕生日の前日（今日 2026/10/18）
-            '当日' => [[2020, 10, 18], '2020/10/18（6歳0ヶ月）'],
-            '翌日' => [[2020, 10, 17], '2020/10/17（6歳0ヶ月）'],
-            '1歳未満' => [[2026, 1, 10], '2026/01/10（9ヶ月）'],
-            '先の日付' => [[2026, 12, 1], '2026/12/01'],
-            '年と月だけ' => [[2020, 3, null], '2020年3月生まれ（6歳7ヶ月）'],
-            '年だけ' => [[2020, null, null], '2020年生まれ（約6歳）'],
+            '前日' => [[2020, 10, 19], '2020/10/19生<wbr>（5歳11ヶ月）'], // 誕生日の前日（今日 2026/10/18）
+            '当日' => [[2020, 10, 18], '2020/10/18生<wbr>（6歳0ヶ月）'],
+            '翌日' => [[2020, 10, 17], '2020/10/17生<wbr>（6歳0ヶ月）'],
+            '1歳未満' => [[2026, 1, 10], '2026/01/10生<wbr>（9ヶ月）'],
+            '先の日付' => [[2026, 12, 1], '2026/12/01生'],
+            '年と月だけ' => [[2020, 3, null], '2020年3月生<wbr>（6歳7ヶ月）'],
+            '年だけ' => [[2020, null, null], '2020年生<wbr>（約6歳）'],
         ];
         foreach ($cases as $name => [[$year, $month, $day], $expected]) {
             $this->trainee($name, ['birth_year' => $year, 'birth_month' => $month, 'birth_day' => $day]);
@@ -133,11 +169,22 @@ class ClientDashboardTraineeProfileTest extends TestCase
         $html = $this->open();
 
         foreach ($cases as $name => [, $expected]) {
-            $this->assertSame('<span class="d-inline-block">'.$expected.'</span>', $this->profileLine($html, $name.'ちゃん'), $name);
+            $this->assertSame([$expected], $this->profileLines($html, $name.'ちゃん'), $name);
         }
     }
 
-    public function test_値がない項目と性別の不明は出さず区切りも詰める(): void
+    public function test_会員詳細の誕生日の書き方は変えない(): void
+    {
+        $id = $this->trainee('アイ', self::FULL);
+
+        $trainee = Trainee::query()->find($id);
+
+        $this->assertSame('2020/05/01（6歳5ヶ月）', $trainee->birthday_with_age_label);
+        $trainee->birth_day = null;
+        $this->assertSame('2020年5月生まれ（6歳5ヶ月）', $trainee->birthday_with_age_label);
+    }
+
+    public function test_値がない項目と性別の不明は出さない(): void
     {
         $this->trainee('性別なし', ['breed' => '柴犬', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1]);
         $this->trainee('性別不明', ['breed' => '柴犬', 'sex' => 'unknown']);
@@ -146,38 +193,40 @@ class ClientDashboardTraineeProfileTest extends TestCase
 
         $html = $this->open();
 
-        $this->assertSame('<span class="d-inline-block">柴犬</span> ／ <span class="d-inline-block">2020/05/01（6歳5ヶ月）</span>', $this->profileLine($html, '性別なしちゃん'));
-        $this->assertSame('<span class="d-inline-block">柴犬</span>', $this->profileLine($html, '性別不明ちゃん'));
-        $this->assertSame('<span class="d-inline-block">男の子</span> ／ <span class="d-inline-block">2020/05/01（6歳5ヶ月）</span>', $this->profileLine($html, '犬種なしちゃん'));
-        $this->assertSame('<span class="d-inline-block">男の子</span>', $this->profileLine($html, '性別だけちゃん'));
-        // 性別の「不明」は値がないのと同じ扱い（名前の行の中に出さない）
-        preg_match_all('/data-client-trainee-profile>(.*?)<\\/p>/u', $html, $m);
-        $this->assertCount(4, $m[1]);
-        foreach ($m[1] as $line) {
-            $this->assertStringNotContainsString('不明', $line);
-        }
+        $this->assertSame(['柴犬', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, '性別なしちゃん'));
+        $this->assertSame(['柴犬'], $this->profileLines($html, '性別不明ちゃん'));
+        $this->assertSame(['男の子', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, '犬種なしちゃん'));
+        $this->assertSame(['男の子'], $this->profileLines($html, '性別だけちゃん'));
     }
 
-    public function test_3つともないときは行を出さず名前の見出しは今までどおり(): void
+    public function test_3つともないときは何も出さない(): void
     {
         $this->trainee('モモ', ['sex' => 'unknown', 'neuter_status' => 'done']);
 
         $html = $this->open();
 
-        $this->assertNull($this->profileLine($html, 'モモちゃん'));
+        $this->assertNull($this->profileLines($html, 'モモちゃん'));
         $this->assertStringNotContainsString('data-client-trainee-profile', $html);
-        $this->assertStringContainsString('<h2 class="mb-2" style="font-size: 1.1rem;">モモちゃん</h2>', $html);
     }
 
     public function test_去勢避妊は出さない(): void
     {
         $this->trainee('アイ', self::FULL);
 
+        $card = $this->card($this->open(), 'アイちゃん');
+
+        $this->assertStringNotContainsString('去勢', $card);
+        $this->assertStringNotContainsString('避妊', $card);
+        $this->assertStringNotContainsString('済み', implode('', $this->profileLines($this->open(), 'アイちゃん')));
+    }
+
+    public function test_値はエスケープして出す(): void
+    {
+        $this->trainee('アイ', ['breed' => '<b>柴</b>']);
+
         $html = $this->open();
 
-        $this->assertStringNotContainsString('去勢', $html);
-        $this->assertStringNotContainsString('避妊', $html);
-        $this->assertStringNotContainsString('済み', $this->profileLine($html, 'アイちゃん'));
+        $this->assertSame(['&lt;b&gt;柴&lt;/b&gt;'], $this->profileLines($html, 'アイちゃん'));
     }
 
     public function test_ほかの会員のトレーニーの値は出さない(): void
@@ -190,28 +239,6 @@ class ClientDashboardTraineeProfileTest extends TestCase
 
         $this->assertStringNotContainsString('ダックスフンド', $html);
         $this->assertStringNotContainsString('ハナちゃん', $html);
-    }
-
-    public function test_愛犬性格診断の結果があるときは名前の行の左の列に置き右のタイプの位置は変えない(): void
-    {
-        $id = $this->trainee('アイ', self::FULL);
-        $json = json_decode(file_get_contents(__DIR__.'/../fixtures/personality-diagnosis-cases.json'), true, 512, JSON_THROW_ON_ERROR);
-        $case = collect($json['cases'])->firstWhere('name', 'past-1');
-        $row = ['trainee_id' => $id, 'answered_at' => '2026-10-01 09:00:00', 'question_version' => 'v1',
-            'answers' => json_encode($case['answers']), 'personality_type' => $case['expected']['type'], 'created_at' => now(), 'updated_at' => now()];
-        foreach ($case['expected']['scores'] as $category => $score) {
-            $row['score_'.$category] = $score;
-        }
-        DB::table('trainee_personality_diagnosis_results')->insert($row);
-
-        $html = $this->open();
-
-        $this->assertMatchesRegularExpression(
-            '/<div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>\s*<div class="col-12 col-lg-8 col-xxl-9">\s*'
-            .'<h2 class="mb-0" style="font-size: 1.1rem;">アイちゃん<\/h2>.*?data-client-trainee-profile>.*?<\/p>\s*<\/div>\s*'
-            .'<div class="col-lg-4 col-xxl-3 d-none d-lg-block" data-client-personality-type-wide>/su',
-            $html
-        );
     }
 
     public function test_トレーニーの数でクエリが増えない(): void

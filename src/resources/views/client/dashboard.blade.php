@@ -76,24 +76,13 @@
                                 <div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>
                                     <div class="col-12 col-lg-8 col-xxl-9">
                                         <h2 class="mb-0" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
-                                        {{-- 犬種 ／ 性別 ／ 誕生日（2026-10-18 追加。値がない項目は Trainee::client_profile_parts で除いてある。3 つともなければ出さない）。
-                                             区切りは「 ／ 」（会員側のトレーニング記録の担当者の並べ方と同じ）。各値を d-inline-block で囲み、区切りのところで折り返す --}}
-                                        @if(! empty($chart['profileParts']))
-                                            <p class="mb-0 small text-muted" data-client-trainee-profile>@foreach($chart['profileParts'] as $part)@if(! $loop->first) ／ @endif<span class="d-inline-block">{{ $part }}</span>@endforeach</p>
-                                        @endif
                                     </div>
                                     <div class="col-lg-4 col-xxl-3 d-none d-lg-block" data-client-personality-type-wide>
                                         <p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">{{ __('messages.personality_diagnosis_name') }}：</span><span class="fw-bold">{!! $personalityTypeHtml !!}</span></p>
                                     </div>
                                 </div>
-                            @elseif(empty($chart['profileParts']))
-                                <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
                             @else
-                                {{-- 結果がなく、犬種・性別・誕生日のどれかがあるとき：名前とその下の 1 行をまとめ、下の余白（mb-2）はまとまりに付ける --}}
-                                <div class="mb-2">
-                                    <h2 class="mb-0" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
-                                    <p class="mb-0 small text-muted" data-client-trainee-profile>@foreach($chart['profileParts'] as $part)@if(! $loop->first) ／ @endif<span class="d-inline-block">{{ $part }}</span>@endforeach</p>
-                                </div>
+                                <h2 class="mb-2" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
                             @endif
 
                             {{-- カード上部：入力エラー以外の失敗（変換・保存失敗）はフォームの上に出す（設計書 §2-7
@@ -208,6 +197,19 @@
                                                  対するエラーかを明確にする。 --}}
                                             @if($shouldShowPhotoError)
                                                 <x-form-error field="photo" block />
+                                            @endif
+
+                                            {{-- 犬種・性別・誕生日（2026-10-18 追加。写真〔または「写真を登録」の枠〕の下に 1 項目ずつ。Trainee::client_profile_parts）。
+                                                 値がない項目は入っていない。3 つともなければ何も出さない。写真の列の中に置くので、左端は写真の左端にそろい、
+                                                 幅は写真と同じ。誕生日は「…生」と「（年齢）」の間でだけ折り返す（keep-all と <wbr>。各部分はエスケープしてからつなぐ）。
+                                                 写真のエラーの文言は写真の直下のまま（どの入力のエラーかが分かるように）、その下に置く。
+                                                 2026-10-18 変更：最初は名前の下の 1 行に「 ／ 」でつないでいた --}}
+                                            @if(! empty($chart['profileParts']))
+                                                <div class="small text-muted mt-2" data-client-trainee-profile>
+                                                    @foreach($chart['profileParts'] as $segments)
+                                                        <div style="word-break: keep-all;">{!! collect($segments)->map(fn ($segment) => e($segment))->implode('<wbr>') !!}</div>
+                                                    @endforeach
+                                                </div>
                                             @endif
                                         </div>
 

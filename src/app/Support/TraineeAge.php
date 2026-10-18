@@ -109,6 +109,32 @@ class TraineeAge
     }
 
     /**
+     * 会員側のマイページ（S-1402）の誕生日の書き方を、「誕生日」と「（年齢）」の 2 つに分けて返す（2026-10-18 追加）。
+     *
+     * マイページは項目名を付けないので、誕生日だと分かるよう「生」を付ける：「2020/01/23生」「2020年3月生」「2020年生」。
+     * 年齢は ageLabel と同じ計算（会員詳細と同じ）で「（6歳8ヶ月）」の形。年齢を出せない（未来の誕生日）ときは誕生日だけ。
+     * 未登録なら空の配列。2 つに分けるのは、画面で「…生」と「（年齢）」の間でだけ折り返すため。
+     * 会員詳細（S-0305）の書き方（birthdayWithAgeLabel）は変えない
+     *
+     * @return list<string>
+     */
+    public static function clientBirthdayParts(?int $year, ?int $month, ?int $day, int $refYear, int $refMonth, int $refDay): array
+    {
+        if ($year === null) {
+            return [];
+        }
+
+        $birthday = match (true) {
+            $month === null => $year.'年生',
+            $day === null => $year.'年'.$month.'月生',
+            default => sprintf('%04d/%02d/%02d生', $year, $month, $day),
+        };
+        $age = self::ageLabel($year, $month, $day, $refYear, $refMonth, $refDay);
+
+        return $age === null ? [$birthday] : [$birthday, '（'.$age.'）'];
+    }
+
+    /**
      * その月の日数（うるう年の 2 月は 29）。
      *
      * PHP の calendar 拡張（cal_days_in_month）に頼らず、JS にもそのまま移せる計算で出す。

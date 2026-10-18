@@ -304,22 +304,36 @@ class Trainee extends Model
     }
 
     /**
-     * 会員側のマイページ（S-1402）の愛犬のカードで、名前のすぐ下に出す値の並び（犬種・性別・誕生日。2026-10-18 追加）。
+     * 会員側のマイページ（S-1402）の愛犬のカードで、写真の下に 1 項目ずつ出す値の並び（犬種・性別・誕生日。2026-10-18 追加）。
      *
-     * 値はトレーナー側の会員詳細（S-0305）と同じ出し方（性別は sex_label、誕生日は birthday_with_age_label）。
+     * 1 項目は、折り返してよい位置で分けた文字の並び（犬種・性別は 1 つ。誕生日は「2020/01/23生」と「（6歳8ヶ月）」の 2 つ。
+     * TraineeAge::clientBirthdayParts）。犬種・性別はトレーナー側の会員詳細（S-0305）と同じ値（性別は sex_label）。
      * 値がない項目は入れない。性別の「不明」は会員様には情報にならないので入れない。3 つともなければ空の配列
-     * （ビューは行を出さない）。区切り（「 ／ 」）でつなぐのはビュー。去勢・避妊などほかの属性は入れない
+     * （ビューは何も出さない）。去勢・避妊などほかの属性は入れない。
+     * 2026-10-18 変更：最初は名前の下の 1 行に「 ／ 」でつないで出していた（誕生日は会員詳細と同じ書き方）
      *
-     * @return list<string>
+     * @return list<list<string>>
      */
     public function getClientProfilePartsAttribute(): array
     {
         $sex = $this->sex === self::SEX_UNKNOWN ? null : $this->sex_label;
+        $today = today();
+        $birthday = TraineeAge::clientBirthdayParts(
+            $this->birth_year, $this->birth_month, $this->birth_day,
+            $today->year, $today->month, $today->day,
+        );
 
-        return array_values(array_filter(
-            [$this->breed, $sex, $this->birthday_with_age_label],
-            fn (?string $value) => ! blank($value),
-        ));
+        $items = [];
+        foreach ([$this->breed, $sex] as $value) {
+            if (! blank($value)) {
+                $items[] = [$value];
+            }
+        }
+        if ($birthday !== []) {
+            $items[] = $birthday;
+        }
+
+        return $items;
     }
 
     /**
