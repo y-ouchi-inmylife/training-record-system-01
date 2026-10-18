@@ -1,8 +1,8 @@
 {{-- 回答待ちの案内のお知らせ（S-1402 の愛犬のカードの中、名前の行のすぐ下。2026-10 追加。設計書 S-1402「回答待ちの案内のお知らせ」）。
-     $notices は Client\DashboardController::surveyNotices（並びは 受付アンケート → 性格診断。kind と url）。
+     $notices は Client\DashboardController::surveyNotices（並びは 愛犬アンケート → 性格診断。kind と url）。
      - 文は lang/ja/messages.php の client_survey_notice（名称はお客様と相談中のため 1 か所で変える）
      - ［回答する］は印刷した案内と同じ回答の URL を同じタブで開く（会員側の主な操作なので btn-primary）
-     - 見た目は印刷した案内の帯にそろえる（受付アンケートは緑・clipboard-check、性格診断は紫・heart-pulse）。
+     - 見た目は印刷した案内の帯にそろえる（愛犬アンケートは緑・clipboard-check、性格診断は紫・heart-pulse）。
        会員側は Bootstrap Icons のフォントを読み込んでいないので、アイコンは 2 つだけ SVG を直接書く（見た目の印なので読み上げない）
      - スマホの幅（sm 未満）は文の下にボタン。閉じる（×）は付けない（回答すれば消えるため） --}}
 @foreach($notices as $notice)

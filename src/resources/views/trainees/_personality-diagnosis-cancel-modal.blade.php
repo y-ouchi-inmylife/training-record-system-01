@@ -1,6 +1,6 @@
 {{-- 性格診断の案内の取消確認モーダル（S-0305-M07。2026-10 追加。要件定義書 6-16-12）。
      S-0305 会員詳細のトレーニーカードの「性格診断」の行だけで使う。取消のあとは会員詳細に戻る。
-     受付アンケート案内の取消（S-0305-M06。trainees/_intake-survey-cancel-modal.blade.php）と同じ作り
+     愛犬アンケート案内の取消（S-0305-M06。trainees/_intake-survey-cancel-modal.blade.php）と同じ作り
      （キャンセルの見た目も M06 と同じ白抜き。4-4 の塗りにそろえるときは M02・M03・M06 と一緒に直す）。
 
      開き方：「性格診断」の行の「取消」ボタンに data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"

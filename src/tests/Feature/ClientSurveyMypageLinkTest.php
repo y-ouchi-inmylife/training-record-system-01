@@ -12,7 +12,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 受付アンケート（S-1413・S-1414）と性格診断（S-1415・S-1416）の回答完了の画面と使えない案内の画面の
+ * 愛犬アンケート（S-1413・S-1414）と性格診断（S-1415・S-1416）の回答完了の画面と使えない案内の画面の
  * ［マイページへ戻る］（2026-10 追加。App\Support\ClientMypageLink）。
  *
  * - 会員の認証（guard 'client'）でログインしていて、自分の愛犬の案内に回答したときだけ出す
@@ -90,9 +90,9 @@ class ClientSurveyMypageLinkTest extends TestCase
         $this->assertStringNotContainsString('data-client-mypage-back', $html);
     }
 
-    // ---- 受付アンケート ----
+    // ---- 愛犬アンケート ----
 
-    public function test_受付アンケート_自分の愛犬の案内にログインして回答したら完了の画面にマイページへ戻るを出す(): void
+    public function test_愛犬アンケート_自分の愛犬の案内にログインして回答したら完了の画面にマイページへ戻るを出す(): void
     {
         $this->issue('trainee_intake_survey_tokens', self::INTAKE);
 
@@ -103,7 +103,7 @@ class ClientSurveyMypageLinkTest extends TestCase
         $this->assertHasLink($response->getContent());
     }
 
-    public function test_受付アンケート_ログインなしでも回答でき完了の画面にマイページへ戻るは出さない(): void
+    public function test_愛犬アンケート_ログインなしでも回答でき完了の画面にマイページへ戻るは出さない(): void
     {
         $this->issue('trainee_intake_survey_tokens', self::INTAKE);
 
@@ -114,7 +114,7 @@ class ClientSurveyMypageLinkTest extends TestCase
         $this->assertSame(1, TraineeIntakeSurveyResponse::query()->count());
     }
 
-    public function test_受付アンケート_ほかの会員としてログインして回答したら出さない(): void
+    public function test_愛犬アンケート_ほかの会員としてログインして回答したら出さない(): void
     {
         $this->issue('trainee_intake_survey_tokens', self::INTAKE);
 
@@ -125,12 +125,12 @@ class ClientSurveyMypageLinkTest extends TestCase
         $this->assertNoLink($response->getContent());
     }
 
-    public function test_受付アンケート_完了の画面を直接開いたら出さない(): void
+    public function test_愛犬アンケート_完了の画面を直接開いたら出さない(): void
     {
         $this->assertNoLink($this->actingAs($this->owner, 'client')->get(route('client-portal.intake-survey.thanks'))->assertOk()->getContent());
     }
 
-    public function test_受付アンケート_使えない案内の画面も同じ条件(): void
+    public function test_愛犬アンケート_使えない案内の画面も同じ条件(): void
     {
         $this->issue('trainee_intake_survey_tokens', self::INTAKE, '2026-10-01 09:00:00');
         $url = '/client-portal/intake-survey/'.self::INTAKE;

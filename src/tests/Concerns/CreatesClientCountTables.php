@@ -81,7 +81,7 @@ trait CreatesClientCountTables
     }
 
     /**
-     * 受付アンケート用 URL のトークン（DS-1000。2026-10 追加）。trainees の表は各テストで作る
+     * 愛犬アンケート用 URL のトークン（DS-1000。2026-10 追加）。trainees の表は各テストで作る
      */
     protected function createTraineeIntakeSurveyTokensTable(): void
     {
@@ -96,7 +96,7 @@ trait CreatesClientCountTables
     }
 
     /**
-     * 受付アンケートの回答（D-1100。2026-10 追加）。trainees の表は各テストで作る
+     * 愛犬アンケートの回答（D-1100。2026-10 追加）。trainees の表は各テストで作る
      */
     protected function createTraineeIntakeSurveyResponsesTable(): void
     {

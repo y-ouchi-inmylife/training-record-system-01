@@ -13,8 +13,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 受付アンケートの回答（S-1413・S-1414、要件定義書 6-15-17）。お客様が受付アンケート案内の URL
- * （受付アンケート用 URL）から、ログインせずに開く。
+ * 愛犬アンケートの回答（S-1413・S-1414、要件定義書 6-15-17）。お客様が愛犬アンケート案内の URL
+ * （愛犬アンケート用 URL）から、ログインせずに開く。
  *
  * - 案内には有効期限がない。送信して回答を保存した時点で使い切りになる（開いただけでは使い切りにしない）
  * - 使えない URL（存在しない・取消済み・トレーニー削除済み）と回答済みは、専用の画面（200）で伝える
@@ -27,7 +27,7 @@ class IntakeSurveyController extends Controller
     private const ANSWERED = 'answered';
 
     /**
-     * 受付アンケート回答画面（S-1413。GET /client-portal/intake-survey/{token}）
+     * 愛犬アンケート回答画面（S-1413。GET /client-portal/intake-survey/{token}）
      */
     public function show(string $token): View
     {
@@ -118,7 +118,7 @@ class IntakeSurveyController extends Controller
     }
 
     /**
-     * 受付アンケート回答完了画面（S-1414。GET /client-portal/intake-survey/thanks）。
+     * 愛犬アンケート回答完了画面（S-1414。GET /client-portal/intake-survey/thanks）。
      * トークンを使わない固定の画面で、直接開かれても同じ文面を出す（愛犬の名前も出さない）
      */
     public function thanks(): View

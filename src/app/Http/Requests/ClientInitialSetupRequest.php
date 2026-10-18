@@ -13,7 +13,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * 2026-10-18 変更：住所・電話番号を任意にした（住所は一部だけ入れたらそろえて入れてもらう。ClientContactRules）。
  * その前は電話番号・都道府県・市区町村・町名番地が必須だった。
  *
- * 愛犬（トレーニー）の項目は 2026-10 に外した（受付アンケートに分離。requirements.md 6-15-5）。
+ * 愛犬（トレーニー）の項目は 2026-10 に外した（愛犬アンケートに分離。requirements.md 6-15-5）。
  * それに伴い、trainee_* の属性名だけを定義していた attributes() も外した（他の項目の
  * 属性名は lang/ja/validation.php の attributes で足りる）。
  *

@@ -27,7 +27,7 @@ use Illuminate\View\View;
  * 結果の削除：
  *
  * 性格診断は前回・初回と比べるため、間違った回答（別の愛犬のつもりで答えた、試しの回答、誤送信など）が残ると比較がずれる。
- * そのため、管理者が結果を 1 件ずつ削除できるようにする。受付アンケートの回答は今までどおり削除できない。
+ * そのため、管理者が結果を 1 件ずつ削除できるようにする。愛犬アンケートの回答は今までどおり削除できない。
  *
  * - 権限はトレーニーの削除（TraineeController::destroy）と同じ：管理者だけ（同じ確かめ方・同じ文言の 403）。
  *   システム管理者は、トレーニー管理のルートの practitioners ミドルウェアで 403
@@ -62,7 +62,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
     /**
      * 評価文を更新する（PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}）。
      *
-     * - 10,000 文字以内。改行は LF にそろえてから数える（受付アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）
+     * - 10,000 文字以内。改行は LF にそろえてから数える（愛犬アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）
      * - 空（空白だけを含む）で保存すると NULL（「なし」に戻る）。ただし公開済みのあいだは空にできない（入力エラー）
      * - 公開済みでも保存できる（そのまま会員様の画面に出る。2026-10-18 変更：その前は公開済みなら 409）
      * - 最後に保存したトレーナーと日時を残す（evaluation_updated_by・evaluation_updated_at）
@@ -166,7 +166,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
     /**
      * 評価文の入力を確かめて、保存する値を返す（更新と公開で同じ決まり。2026-10-18 に保存から切り出した）。
      *
-     * - 改行は LF にそろえてから数える（受付アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）。10,000 文字以内
+     * - 改行は LF にそろえてから数える（愛犬アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）。10,000 文字以内
      * - 空（空白だけを含む）なら null（なし）。公開では必須（空なら入力エラー）
      */
     private function validateEvaluationText(Request $request, bool $required): ?string

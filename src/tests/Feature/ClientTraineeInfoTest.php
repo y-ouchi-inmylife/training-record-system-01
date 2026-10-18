@@ -15,8 +15,8 @@ use Tests\TestCase;
  * 会員の登録情報（S-1406）の「愛犬の情報」の欄と、愛犬の情報の変更（S-1417）（2026-10-18 追加。要件定義書 6-15-20）。
  *
  * - S-1406：自分の愛犬ごとのカード（マイページと同じ並び・呼び名）に、名前・犬種・性別・誕生日・去勢・避妊と
- *   暮らしの様子（受付アンケートの 4 問。見るだけ）。愛犬がいなければ欄を出さない。トレーニーの数でクエリが増えない
- * - S-1417：今の値を入れて開き、保存すると登録情報に戻って完了メッセージ。入力のきまりは受付アンケートと同じ。
+ *   暮らしの様子（愛犬アンケートの 4 問。見るだけ）。愛犬がいなければ欄を出さない。トレーニーの数でクエリが増えない
+ * - S-1417：今の値を入れて開き、保存すると登録情報に戻って完了メッセージ。入力のきまりは愛犬アンケートと同じ。
  *   暮らしの様子・写真・最終更新者は変えない。操作の記録は残さない。ほかの会員の愛犬は 403、ログインしていなければログインの画面へ
  */
 class ClientTraineeInfoTest extends TestCase
@@ -181,7 +181,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertSame('<dd class="mb-0" style="white-space: pre-wrap;">膝のこと</dd>', $answers[3]);
     }
 
-    public function test_受付アンケートに答えていない愛犬も基本情報を出し暮らしの様子は4問とも未回答(): void
+    public function test_愛犬アンケートに答えていない愛犬も基本情報を出し暮らしの様子は4問とも未回答(): void
     {
         $this->trainee('アイ', self::FULL);
 
@@ -259,7 +259,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertMatchesRegularExpression('/id="neuter_status-neutered" value="neutered"\s+checked>/u', $html);
         // 印が付くのは性別と去勢・避妊の 2 つ
         $this->assertSame(2, preg_match_all('/\schecked>/', $html));
-        // 受付アンケートと同じ説明文。暮らしの様子・写真の欄はない。最後の欄に区切り線は引かない
+        // 愛犬アンケートと同じ説明文。暮らしの様子・写真の欄はない。最後の欄に区切り線は引かない
         $this->assertStringContainsString('※ 年だけ、または年と月だけでも入力できます。', $html);
         $this->assertStringNotContainsString('<textarea', $html);
         $this->assertStringNotContainsString('type="file"', $html);
@@ -311,7 +311,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertSame([2020, 3, null], [$trainee->birth_year, $trainee->birth_month, $trainee->birth_day]);
     }
 
-    public function test_名前が空なら受付アンケートと同じ文言のエラーで値を変えない(): void
+    public function test_名前が空なら愛犬アンケートと同じ文言のエラーで値を変えない(): void
     {
         $id = $this->trainee('アイ', self::FULL);
 
@@ -323,7 +323,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertSame('アイ', Trainee::query()->find($id)->name);
     }
 
-    public function test_正しくない誕生日は受付アンケートと同じきまりでエラーにする(): void
+    public function test_正しくない誕生日は愛犬アンケートと同じきまりでエラーにする(): void
     {
         $id = $this->trainee('アイ', self::FULL);
 
@@ -377,7 +377,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertSame('2026-10-01 00:00:00', DB::table('trainees')->where('id', $id)->value('updated_at'));
     }
 
-    public function test_受付アンケートに答えていない愛犬も変更でき回答待ちの受付アンケートには変えたあとの値が入る(): void
+    public function test_愛犬アンケートに答えていない愛犬も変更でき回答待ちの愛犬アンケートには変えたあとの値が入る(): void
     {
         $id = $this->trainee('アイ', ['breed' => 'マルチーズ']);
         DB::table('trainee_intake_survey_tokens')->insert([

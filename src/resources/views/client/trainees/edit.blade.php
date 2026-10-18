@@ -4,7 +4,7 @@
     $callName = $trainee->client_call_name;
     $sexLabels = \App\Models\Trainee::sexLabels();
     $neuterStatusLabels = \App\Models\Trainee::neuterStatusLabels();
-    // 初期値：トレーニーの今の値。入力エラーで戻ったときは、入力した値だけを使う（受付アンケートの回答画面と同じ。
+    // 初期値：トレーニーの今の値。入力エラーで戻ったときは、入力した値だけを使う（愛犬アンケートの回答画面と同じ。
     // 消した欄・選ばなかったラジオボタンにトレーニーの値を戻さないため、old() の第 2 引数は使わない）
     $hasOldInput = session()->hasOldInput();
     $initial = fn (string $key) => $hasOldInput ? old($key) : $trainee->{$key};
@@ -15,7 +15,7 @@
 @section('content')
 {{-- 会員の愛犬の情報の変更画面（S-1417。2026-10-18 追加。要件定義書 6-15-20）。
      作り（戻る導線・カードの外の見出し・カード・フル幅の［変更する］）は S-1411 登録情報の変更（client/settings/edit）にそろえる。
-     入力欄は受付アンケート（S-1413）と同じ部品（client/_trainee-basic-fields）。暮らしの様子・写真は変えない。
+     入力欄は愛犬アンケート（S-1413）と同じ部品（client/_trainee-basic-fields）。暮らしの様子・写真は変えない。
      保存すると登録情報（S-1406）に戻り、layouts.client の共通の受け皿に完了メッセージを出す --}}
 <div class="container">
     <div class="c-settings">
@@ -51,6 +51,6 @@
     </div>
 </div>
 
-{{-- 誕生日の入力中の年齢表示（トレーナー側・受付アンケートと同じ部品） --}}
+{{-- 誕生日の入力中の年齢表示（トレーナー側・愛犬アンケートと同じ部品） --}}
 @vite(['resources/js/trainee-birthday-input.js'])
 @endsection

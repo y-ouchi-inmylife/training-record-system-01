@@ -75,7 +75,7 @@ class TraineeAge
 
     /**
      * 誕生日の部分だけの表示（「2020/03/15」「2020年3月生まれ」「2020年生まれ」）。
-     * 未登録なら null。受付アンケートの回答の表示（年齢を付けない）でも使う。
+     * 未登録なら null。愛犬アンケートの回答の表示（年齢を付けない）でも使う。
      */
     public static function birthdayLabel(?int $year, ?int $month, ?int $day): ?string
     {

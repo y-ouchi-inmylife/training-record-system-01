@@ -13,7 +13,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニー詳細（S-0309）の暮らしの様子の欄（受付アンケートの回答）と、削除の確認の文言（2026-10 追加）。
+ * トレーニー詳細（S-0309）の暮らしの様子の欄（愛犬アンケートの回答）と、削除の確認の文言（2026-10 追加）。
  *
  * - 欄の見出しは「暮らしの様子」。状態の文字・日付は出さない（2026-10 変更。案内の状態は会員詳細のボタンで
  *   分かるため）。未発行・回答待ちのときは、本文に「（未回答）」とだけ出す
@@ -91,7 +91,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
     }
 
     /**
-     * 受付アンケートの欄（カード）の HTML だけを取り出す。画面上部のトレーニーの情報（名前・犬種など）と
+     * 愛犬アンケートの欄（カード）の HTML だけを取り出す。画面上部のトレーニーの情報（名前・犬種など）と
      * 見分けるため、確かめる範囲を欄の中に絞る。欄のすぐ後ろは計測値のモーダル
      */
     private function intakeCard(string $html): string
@@ -141,7 +141,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
     /** 欄（と画面全体）に操作のボタン・取消モーダルがないこと */
     private function assertNoOperations(string $html): void
     {
-        $this->assertStringNotContainsString('>受付アンケートの案内を発行<', $html);
+        $this->assertStringNotContainsString('>愛犬アンケートの案内を発行<', $html);
         $this->assertStringNotContainsString('>案内を取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
         $this->assertStringNotContainsString('intakeSurveyCancelModal', $html);
@@ -163,10 +163,10 @@ class TraineeShowIntakeSurveyTest extends TestCase
         foreach (TraineeIntakeSurveyResponse::questions() as $question) {
             $this->assertStringNotContainsString($question['question'], $card);
         }
-        // 「受付アンケート」は削除の確認の文（「発行済みの受付アンケート案内も…」）には出るため、欄の中で確かめる
-        $this->assertStringNotContainsString('受付アンケート', $card);
+        // 「愛犬アンケート」は削除の確認の文（「発行済みの愛犬アンケートの案内も…」）には出るため、欄の中で確かめる
+        $this->assertStringNotContainsString('愛犬アンケート', $card);
         $this->assertStringNotContainsString('未発行', $html);
-        $this->assertStringNotContainsString('受付アンケートの案内はまだ発行していません。', $html);
+        $this->assertStringNotContainsString('愛犬アンケートの案内はまだ発行していません。', $html);
         $this->assertStringNotContainsString('回答待ち', $html);
         $this->assertStringNotContainsString('2026/10/15', $html);
         $this->assertStringNotContainsString('会員詳細から行えます', $html);
@@ -198,7 +198,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
         $card = $this->intakeCard($html);
 
-        $this->assertStringNotContainsString('受付アンケート', $card);
+        $this->assertStringNotContainsString('愛犬アンケート', $card);
         $this->assertStringNotContainsString('回答済み', $card);
         $this->assertStringNotContainsString('2026/10/16', $card);
         $this->assertStringNotContainsString('14:32', $card);
@@ -211,10 +211,10 @@ class TraineeShowIntakeSurveyTest extends TestCase
     public function test_欄の中に完了メッセージは出さない(): void
     {
         // 段階3a で使っていたキーが残っていても、欄の中には出さない（操作を会員詳細に寄せたため）
-        $html = $this->withSession(['intake_survey_success' => '受付アンケートの案内を発行しました。'])
+        $html = $this->withSession(['intake_survey_success' => '愛犬アンケートの案内を発行しました。'])
             ->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('受付アンケートの案内を発行しました。', $html);
+        $this->assertStringNotContainsString('愛犬アンケートの案内を発行しました。', $html);
     }
 
     // ---- 削除の確認の文言 ----
@@ -239,7 +239,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->issueToken();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('発行済みの愛犬アンケートの案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_案内あり計測値あり(): void
@@ -248,7 +248,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addMeasurements(3);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('このトレーニーには 3 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('このトレーニーには 3 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。発行済みの愛犬アンケートの案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_回答済みの案内しかなければ案内の文は足さない(): void
@@ -265,7 +265,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addResponse();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('受付アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('愛犬アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_回答あり計測値あり(): void
@@ -275,7 +275,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addMeasurements(2);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。愛犬アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_回答と未回答の案内の両方があれば回答の文から足す(): void
@@ -285,7 +285,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->issueToken();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('受付アンケートの回答も一緒に削除されます。発行済みの受付アンケート案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('愛犬アンケートの回答も一緒に削除されます。発行済みの愛犬アンケートの案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     // ---- 削除の確認：性格診断（2026-10 追加。要件定義書 6-16-4） ----
@@ -308,7 +308,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         ]);
     }
 
-    public function test_削除の確認_受付アンケートの回答と性格診断の結果の両方があればつないで出す(): void
+    public function test_削除の確認_愛犬アンケートの回答と性格診断の結果の両方があればつないで出す(): void
     {
         $this->issueToken('2026-10-16 14:32:00');
         $this->addResponse();
@@ -316,7 +316,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addMeasurements(2);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。愛犬アンケートの回答と愛犬性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_性格診断の結果だけ(): void
@@ -343,10 +343,10 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->issuePersonalityToken();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。発行済みの受付アンケート案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('愛犬アンケートの回答と愛犬性格診断の結果も一緒に削除されます。発行済みの愛犬アンケートの案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
-    // ---- 回答の内容（2026-10 追加。設計書 S-0309「受付アンケートの欄」） ----
+    // ---- 回答の内容（2026-10 追加。設計書 S-0309「愛犬アンケートの欄」） ----
 
     public function test_回答済みでも基本情報の回答は欄に出さない(): void
     {
@@ -394,7 +394,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString('例：', $html);
     }
 
-    public function test_回答の内容は受付アンケートの欄の中に出し編集や削除の操作は置かない(): void
+    public function test_回答の内容は愛犬アンケートの欄の中に出し編集や削除の操作は置かない(): void
     {
         $this->addResponse('2026-10-16 14:32:00', ['breed' => 'トイプードル']);
 
@@ -458,7 +458,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addMeasurements(1);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('このトレーニーには 1 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。公開済みの愛犬性格診断の評価文も、会員様のマイページから消えます。発行済みの受付アンケート案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('このトレーニーには 1 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。愛犬アンケートの回答と愛犬性格診断の結果も一緒に削除されます。公開済みの愛犬性格診断の評価文も、会員様のマイページから消えます。発行済みの愛犬アンケートの案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_評価文が下書きなら評価文の文は出さない(): void

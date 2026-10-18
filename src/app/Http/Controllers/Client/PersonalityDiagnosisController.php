@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * 性格診断の回答（S-1415・S-1416、要件定義書 6-15-18。2026-10 追加）。お客様が性格診断の案内の URL
- * （性格診断用 URL）から、ログインせずに開く。受付アンケートの回答（IntakeSurveyController）と同じ作り。
+ * （性格診断用 URL）から、ログインせずに開く。愛犬アンケートの回答（IntakeSurveyController）と同じ作り。
  *
  * - 案内には有効期限がない。送信して結果を保存した時点で使い切りになる（開いただけでは使い切りにしない）
  * - 使えない URL（存在しない・取消済み・トレーニー削除済み）と回答済みは、専用の画面（200）で伝える
- * - 受付アンケートと違い、トレーニーの値は書き換えない（結果として残すだけ）
+ * - 愛犬アンケートと違い、トレーニーの値は書き換えない（結果として残すだけ）
  * - お客様の回答はアクセスログに記録しない（回答日時が回答の記録を兼ねる）
  * - 時間切れ（419）のときの出し直しは bootstrap/app.php から showForm() を呼ぶ（段階3 のコミット 2）
  */
@@ -67,7 +67,7 @@ class PersonalityDiagnosisController extends Controller
      * 成功したら完了画面（S-1416）へリダイレクトする（PRG）。
      *
      * ロックについて：同じ案内から同時に 2 回送られても結果を 1 件だけにするため、トランザクションの中でトークンの行を
-     * SELECT ... FOR UPDATE でロックしてから確かめる（受付アンケートと同じ）。後から来た送信は、ロックが解けるのを
+     * SELECT ... FOR UPDATE でロックしてから確かめる（愛犬アンケートと同じ）。後から来た送信は、ロックが解けるのを
      * 待ってから「回答済み」と判定される。トレーニーは書き換えないので、トレーニーの行はロックしない。
      * 注意：テストの DB（SQLite）では lockForUpdate() は何もしないため、排他はテストでは確かめられない。
      */
@@ -101,7 +101,7 @@ class PersonalityDiagnosisController extends Controller
             return self::unavailableView($result, $token);
         }
 
-        // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加。受付アンケートと同じ）。
+        // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加。愛犬アンケートと同じ）。
         // 完了の画面はトークンを持たないので、ここで判定してフラッシュで渡す
         $traineeId = TraineePersonalityDiagnosisToken::query()->where('token', $token)->value('trainee_id');
 
@@ -122,7 +122,7 @@ class PersonalityDiagnosisController extends Controller
 
     /**
      * トークンが使えるか。使えれば true、使えなければ理由（UNAVAILABLE / ANSWERED）。
-     * 確かめる順は受付アンケートと同じ（存在しない → 回答済み → トレーニーが存在しない）
+     * 確かめる順は愛犬アンケートと同じ（存在しない → 回答済み → トレーニーが存在しない）
      */
     private static function checkToken(?TraineePersonalityDiagnosisToken $tokenRecord): true|string
     {

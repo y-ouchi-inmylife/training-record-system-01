@@ -8,7 +8,7 @@ use Illuminate\Validation\Validator;
 /**
  * トレーニーの誕生日（年・月・日の 3 つの欄。birth_year・birth_month・birth_day）の受け付け。
  *
- * トレーナー側のトレーニー登録・編集（TraineeRequest。S-0308／S-0310）と、お客様の受付アンケート
+ * トレーナー側のトレーニー登録・編集（TraineeRequest。S-0308／S-0310）と、お客様の愛犬アンケート
  * （ClientIntakeSurveyRequest。S-1413）で共用する（2026-10。TraineeRequest から切り出した）。
  * 入力のルールは要件定義書 6-16「年齢の表示規則」の「入力のルール」、判定の順と文言は
  * screen-design.md §2-8「誕生日（年・月・日の 3 つの欄）の文言」の表。

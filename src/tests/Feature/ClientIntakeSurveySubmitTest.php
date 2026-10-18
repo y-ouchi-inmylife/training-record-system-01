@@ -14,7 +14,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 受付アンケートの回答の送信（POST /client-portal/intake-survey/{token}。2026-10 追加。要件定義書 6-15-17）。
+ * 愛犬アンケートの回答の送信（POST /client-portal/intake-survey/{token}。2026-10 追加。要件定義書 6-15-17）。
  *
  * - 回答を送られてきたとおりに保存し、回答の基本情報でトレーニーを上書きし（空・未選択の項目は変えない。
  *   2026-10 変更。当初は空欄の項目だけに反映していた）、案内を使い切りにして完了画面へ（PRG）

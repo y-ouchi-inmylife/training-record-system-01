@@ -16,7 +16,7 @@ use Tests\TestCase;
  * 性格診断（S-1415）からの送信がセッション切れ（419）になったとき（2026-10 追加。性格診断 段階3。設計書 S-1415 備考
  * 「時間切れ（419）のとき」）。送られてきた回答を入れたまま回答の画面を 200 で出し直す。
  *
- * テストでは Laravel が CSRF トークンの確認を飛ばす（ValidateCsrfToken::runningUnitTests()）ため、受付アンケートの
+ * テストでは Laravel が CSRF トークンの確認を飛ばす（ValidateCsrfToken::runningUnitTests()）ため、愛犬アンケートの
  * 419 のテスト（ClientIntakeSurveySessionExpiredTest）と同じく、確認を飛ばさないように差し替えた ValidateCsrfToken を
  * コンテナに登録し、CSRF トークンを付けない POST で本物の 419（TokenMismatchException → 419 の HttpException）を起こす。
  */
@@ -147,7 +147,7 @@ class ClientPersonalityDiagnosisSessionExpiredTest extends TestCase
         $response->assertDontSee('時間がたったため送信できませんでした');
     }
 
-    public function test_受付アンケートの419は今までどおり専用の画面(): void
+    public function test_愛犬アンケートの419は今までどおり専用の画面(): void
     {
         $response = $this->post('/client-portal/intake-survey/abcdefghijklmnopqrstuvwxyz012345', ['breed' => '柴']);
 

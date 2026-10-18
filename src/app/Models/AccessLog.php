@@ -44,8 +44,8 @@ class AccessLog extends Model
             'create_trainee_measurement' => '計測値登録',
             'edit_trainee_measurement' => '計測値編集',
             'delete_trainee_measurement' => '計測値削除',
-            'create_trainee_intake_survey_token' => '受付アンケート案内発行',
-            'delete_trainee_intake_survey_token' => '受付アンケート案内取消',
+            'create_trainee_intake_survey_token' => __('messages.intake_survey_name').'案内発行',
+            'delete_trainee_intake_survey_token' => __('messages.intake_survey_name').'案内取消',
             // 愛犬性格診断の名前は lang/ja/messages.php の 1 か所から読む（2026-10-18 変更：その前は「性格診断…」）
             'create_trainee_personality_diagnosis_token' => __('messages.personality_diagnosis_name').'案内発行',
             'delete_trainee_personality_diagnosis_token' => __('messages.personality_diagnosis_name').'案内取消',

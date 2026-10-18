@@ -21,7 +21,7 @@ use Tests\TestCase;
  * - 会員を登録すると、同じトランザクションでその会員のトレーニーを 1 件作る（中身は空）。操作の記録は create_client と create_trainee
  * - 入力エラーのときは会員もトレーニーもできない
  * - 「空のトレーニー」＝トレーニーの項目（名前・犬種・性別・誕生日・去勢避妊・写真）がどれも空で、結び付く 5 つの表
- *   （計測値・受付アンケートの案内と回答・愛犬性格診断の案内と結果）のどれにも行がない（Trainee::scopeNotBlank）
+ *   （計測値・愛犬アンケートの案内と回答・愛犬性格診断の案内と結果）のどれにも行がない（Trainee::scopeNotBlank）
  * 会員の削除（空のトレーニーだけなら一緒に削除）は ClientDeleteConstraintTest で確かめる。
  */
 class ClientRegistrationTraineeTest extends TestCase
@@ -191,8 +191,8 @@ class ClientRegistrationTraineeTest extends TestCase
     {
         return [
             '計測値' => ['trainee_measurements', ['measured_date' => '2026-10-01', 'measured_time' => '10:00:00', 'weight_kg' => 5.0]],
-            '受付アンケートの案内' => ['trainee_intake_survey_tokens', ['token' => str_repeat('a', 32)]],
-            '受付アンケートの回答' => ['trainee_intake_survey_responses', ['answered_at' => '2026-10-01 10:00:00']],
+            '愛犬アンケートの案内' => ['trainee_intake_survey_tokens', ['token' => str_repeat('a', 32)]],
+            '愛犬アンケートの回答' => ['trainee_intake_survey_responses', ['answered_at' => '2026-10-01 10:00:00']],
             '愛犬性格診断の案内' => ['trainee_personality_diagnosis_tokens', ['token' => str_repeat('b', 32)]],
             '愛犬性格診断の結果' => ['trainee_personality_diagnosis_results', [
                 'answered_at' => '2026-10-01 10:00:00', 'question_version' => 'v1', 'answers' => '{}',

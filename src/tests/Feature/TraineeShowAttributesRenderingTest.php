@@ -42,7 +42,7 @@ class TraineeShowAttributesRenderingTest extends TestCase
         $trainee->exists = true;
         $trainee->setRelation('client', $client);
         $trainee->setRelation('measurements', new EloquentCollection([]));
-        // 受付アンケートの欄の状態（2026-10 追加）。呼び出し側が渡さなければ未発行
+        // 愛犬アンケートの欄の状態（2026-10 追加）。呼び出し側が渡さなければ未発行
         if (! $trainee->relationLoaded('activeIntakeSurveyToken')) {
             $trainee->setRelation('activeIntakeSurveyToken', null);
             $trainee->setRelation('latestIntakeSurveyResponse', null);

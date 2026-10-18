@@ -4,11 +4,11 @@
     $companyName = config('app.client_portal_company');
 @endphp
 
-@section('title', '受付アンケート')
+@section('title', __('messages.intake_survey_name'))
 
 @section('content')
-{{-- 受付アンケートの送信がセッション切れ（419）になったときの画面（2026-10 追加。設計書 S-1413 備考
-     「入力中にセッションが切れたとき」）。bootstrap/app.php の例外の処理から、受付アンケートの画面
+{{-- 愛犬アンケートの送信がセッション切れ（419）になったときの画面（2026-10 追加。設計書 S-1413 備考
+     「入力中にセッションが切れたとき」）。bootstrap/app.php の例外の処理から、愛犬アンケートの画面
      （client-portal/intake-survey/*）からの送信のときだけ出す。ほかの画面は errors/419.blade.php のまま。
      - 見た目は使えない URL の画面（unavailable.blade.php）にそろえる（見出しはカードの外、本文はカードの中、
        「次にできること」のブロックは置かない）

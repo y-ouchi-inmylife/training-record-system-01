@@ -120,7 +120,7 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::delete('trainee-measurements/{measurement}', [TraineeMeasurementController::class, 'destroy'])
                 ->name('trainee-measurements.destroy');
 
-            // 受付アンケート案内（受付アンケート用 URL のトークン。DS-1000。2026-10 追加）。
+            // 愛犬アンケート案内（愛犬アンケート用 URL のトークン。DS-1000。2026-10 追加）。
             // 発行と取消は同じリソース URL に対する POST / DELETE（マイページ登録案内と同じ考え方）。
             Route::post('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'store'])
                 ->name('trainee-intake-survey-tokens.store');
@@ -128,11 +128,11 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::get('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'redirectToClient']);
             Route::delete('trainees/{trainee}/intake-survey-tokens', [TraineeIntakeSurveyTokenController::class, 'destroy'])
                 ->name('trainee-intake-survey-tokens.destroy');
-            // 受付アンケート案内画面（S-0311）。会員詳細の「受付アンケートの案内を表示」から開く（2026-10-17 変更：当初は別タブ）
+            // 愛犬アンケート案内画面（S-0311）。会員詳細の「愛犬アンケートの案内を表示」から開く（2026-10-17 変更：当初は別タブ）
             Route::get('trainees/{trainee}/intake-survey-tokens/print', [TraineeIntakeSurveyTokenController::class, 'print'])
                 ->name('trainee-intake-survey-tokens.print');
 
-            // 性格診断の案内（性格診断用 URL のトークン。DS-1100。2026-10 追加）。受付アンケート案内と同じ形
+            // 性格診断の案内（性格診断用 URL のトークン。DS-1100。2026-10 追加）。愛犬アンケート案内と同じ形
             Route::post('trainees/{trainee}/personality-diagnosis-tokens', [TraineePersonalityDiagnosisTokenController::class, 'store'])
                 ->name('trainee-personality-diagnosis-tokens.store');
             // 発行の URL を GET で開かれたときは、発行せずに会員詳細へ（マイページ登録案内と同じ。2026-10-17 追加）
@@ -294,7 +294,7 @@ Route::domain(config('subdomain.client_host'))->group(function () {
     Route::post('client-portal/email-registration/{token}', [\App\Http\Controllers\Client\EmailRegistrationController::class, 'storeByToken'])
         ->name('client-portal.email-registration.store');
 
-    // 受付アンケート（S-1413 回答画面・S-1414 回答完了画面、公開URL、認証不要。2026-10 追加）。
+    // 愛犬アンケート（S-1413 回答画面・S-1414 回答完了画面、公開URL、認証不要。2026-10 追加）。
     // 回答完了画面 client-portal/intake-survey/thanks は、`thanks` が {token} として解釈されないよう、
     // {token} のルートより**先に**定義すること（api-design.md 4-1-15）
     Route::get('client-portal/intake-survey/thanks', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'thanks'])
@@ -304,7 +304,7 @@ Route::domain(config('subdomain.client_host'))->group(function () {
     Route::post('client-portal/intake-survey/{token}', [\App\Http\Controllers\Client\IntakeSurveyController::class, 'store'])
         ->name('client-portal.intake-survey.store');
 
-    // 性格診断（S-1415 回答画面・S-1416 回答完了画面、公開URL、認証不要。2026-10 追加）。受付アンケートと同じ形。
+    // 性格診断（S-1415 回答画面・S-1416 回答完了画面、公開URL、認証不要。2026-10 追加）。愛犬アンケートと同じ形。
     // 回答完了画面 client-portal/personality-diagnosis/thanks は、`thanks` が {token} として解釈されないよう、
     // {token} のルートより**先に**定義すること（api-design.md 4-1-15）
     Route::get('client-portal/personality-diagnosis/thanks', [\App\Http\Controllers\Client\PersonalityDiagnosisController::class, 'thanks'])

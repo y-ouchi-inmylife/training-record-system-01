@@ -1,10 +1,10 @@
-{{-- 愛犬の基本情報（名前・犬種・性別・誕生日・去勢・避妊）の入力欄（2026-10-18 に受付アンケートの回答画面から切り出した）。
-     受付アンケートの回答画面（S-1413。client/intake-survey/show）と、会員の愛犬の情報の変更画面（S-1417。
+{{-- 愛犬の基本情報（名前・犬種・性別・誕生日・去勢・避妊）の入力欄（2026-10-18 に愛犬アンケートの回答画面から切り出した）。
+     愛犬アンケートの回答画面（S-1413。client/intake-survey/show）と、会員の愛犬の情報の変更画面（S-1417。
      client/trainees/edit）で共用する。入力のきまりも同じ（ClientTraineeProfileRequest::basicInfoRules()）。
      <form> の中に置き、誕生日の入力中の年齢の表示のため、呼び出し側のページで trainee-birthday-input.js を読み込む。
      - $initial：項目の値を返す関数（fn (string $key)）。トレーニーの今の値、入力エラーで戻ったときは入力した値だけ
      - $sexLabels・$neuterStatusLabels：性別・去勢・避妊の選択肢（Trainee::sexLabels()・neuterStatusLabels()）
-     - $lastFieldClass：最後の欄（去勢・避妊）の class。受付アンケートは「暮らしの様子」との境目の区切り線を付ける
+     - $lastFieldClass：最後の欄（去勢・避妊）の class。愛犬アンケートは「暮らしの様子」との境目の区切り線を付ける
        （mb-3 pb-3 border-bottom）。省略すると mb-3 --}}
 <div class="mb-3">
     <label for="name" class="form-label">名前 <span class="text-danger">*</span></label>

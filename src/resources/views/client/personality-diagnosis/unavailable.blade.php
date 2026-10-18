@@ -8,7 +8,7 @@
 
 @section('content')
 {{-- 性格診断の使えない URL の画面（設計書 S-1415「使えない URL の画面」。2026-10 追加）。
-     受付アンケートの使えない URL の画面（client/intake-survey/unavailable.blade.php）と同じ作り：見出し「性格診断」は
+     愛犬アンケートの使えない URL の画面（client/intake-survey/unavailable.blade.php）と同じ作り：見出し「性格診断」は
      カードの外、本文（$message）はカードの中、「次にできること」のブロックは置かない。
      $message は「回答済み」「使えない（存在しない・取消済み・トレーニー削除済み）」の 2 通り
      （Client\PersonalityDiagnosisController::unavailableView） --}}

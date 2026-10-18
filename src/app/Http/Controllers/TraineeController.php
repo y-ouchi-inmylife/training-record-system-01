@@ -37,8 +37,8 @@ class TraineeController extends Controller
         $validated['client_id'] = $client->id;
         $validated['updated_by'] = auth()->id();
 
-        // 受付アンケート案内はここでは発行しない（2026-10 変更。要件定義書 6-16-1）。案内の発行は会員詳細
-        // （S-0305）の［受付アンケートの案内を発行］だけで行う。以前の「受付アンケートの案内を発行する」のチェックの値
+        // 愛犬アンケート案内はここでは発行しない（2026-10 変更。要件定義書 6-16-1）。案内の発行は会員詳細
+        // （S-0305）の［愛犬アンケートの案内を発行］だけで行う。以前の「愛犬アンケートの案内を発行する」のチェックの値
         // （issue_intake_survey）が送られてきても、validated() に含まれないため使われない
         Trainee::create($validated);
 
@@ -56,7 +56,7 @@ class TraineeController extends Controller
      */
     public function show(Trainee $trainee): View
     {
-        // latestIntakeSurveyResponse と activeIntakeSurveyToken は受付アンケートの欄の状態と、
+        // latestIntakeSurveyResponse と activeIntakeSurveyToken は愛犬アンケートの欄の状態と、
         // 削除確認の文言に使う（2026-10 追加）。personalityDiagnosisResults は性格診断の欄の結果の一覧
         // （新しい順。2026-10 追加。何件あってもクエリは 1 本）。personalityDiagnosisResults と activePersonalityDiagnosisToken は
         // 削除確認の文言にも使う（2026-10 追加）。結果の表の評価文の状態は結果の列だけで決まる（2026-10-18）
@@ -79,9 +79,9 @@ class TraineeController extends Controller
         // 同じシングルクォート形式で埋め込む。**文言にシングルクォート・改行を
         // 含めないこと**（含めると onsubmit 内の JS 文字列リテラルが壊れる）。
         //
-        // 受付アンケート・性格診断（2026-10 追加。要件定義書 6-16-4、設計書 S-0309「削除」）：計測値の文の後ろに、
-        // 消えるもの（受付アンケートの回答・性格診断の結果のうち、あるものだけを「と」でつなぎ「〜も一緒に削除されます。」）、
-        // 使えなくなる未回答の案内（受付アンケート案内・性格診断の案内のうち、あるものだけを「と」でつなぎ
+        // 愛犬アンケート・性格診断（2026-10 追加。要件定義書 6-16-4、設計書 S-0309「削除」）：計測値の文の後ろに、
+        // 消えるもの（愛犬アンケートの回答・性格診断の結果のうち、あるものだけを「と」でつなぎ「〜も一緒に削除されます。」）、
+        // 使えなくなる未回答の案内（愛犬アンケート案内・性格診断の案内のうち、あるものだけを「と」でつなぎ
         // 「発行済みの〜も使えなくなります。」）をこの順で足し、最後を「このトレーニーを削除しますか？」で締める。
         // 文と文は区切りなしで続ける（confirm() では改行が使えないため）。どれもないときは、これまでの文のまま
         // （0 件のときの出し方を含めて変えない）。2026-10 変更：性格診断の結果・案内を足した。
@@ -92,11 +92,11 @@ class TraineeController extends Controller
             ? "このトレーニーには {$measurementCount} 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。"
             : '';
         $deleted = array_keys(array_filter([
-            '受付アンケートの回答' => $trainee->latestIntakeSurveyResponse !== null,
+            __('messages.intake_survey_name').'の回答' => $trainee->latestIntakeSurveyResponse !== null,
             __('messages.personality_diagnosis_name').'の結果' => $trainee->personalityDiagnosisResults->isNotEmpty(),
         ]));
         $invalidated = array_keys(array_filter([
-            '受付アンケート案内' => $trainee->activeIntakeSurveyToken !== null,
+            __('messages.intake_survey_name').'の案内' => $trainee->activeIntakeSurveyToken !== null,
             __('messages.personality_diagnosis_name').'の案内' => $trainee->activePersonalityDiagnosisToken !== null,
         ]));
         $intakeSurveySentence = '';

@@ -6,6 +6,7 @@ use App\Models\Client;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsIntakeSurveyName;
 use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
@@ -15,14 +16,15 @@ use Tests\TestCase;
  * 設計書 S-1402「回答待ちの案内のお知らせ」）。
  *
  * - その愛犬に回答待ちの案内があるときだけ、名前の行のすぐ下に「〇〇にお答えください。」と［回答する］
- *   （印刷した案内と同じ回答の URL）。両方あれば 受付アンケート → 性格診断 の順
- * - 「回答待ち」は会員詳細（S-0305）と同じ判定（受付アンケートは回答がなく有効な案内がある、性格診断は有効な案内がある）
+ *   （印刷した案内と同じ回答の URL）。両方あれば 愛犬アンケート → 性格診断 の順
+ * - 「回答待ち」は会員詳細（S-0305）と同じ判定（愛犬アンケートは回答がなく有効な案内がある、性格診断は有効な案内がある）
  * - 回答済み・取消済み（行がない）の案内、ほかの愛犬・ほかの会員の案内は出さない。クエリはトレーニーの数で増えない
  *
  * 実際の HTTP で開く（ClientDashboardPersonalityDiagnosisTest と同じ表の準備）。
  */
 class ClientDashboardSurveyNoticeTest extends TestCase
 {
+    use AssertsIntakeSurveyName;
     use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
@@ -69,7 +71,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
             $table->time('measured_time');
             $table->decimal('weight_kg', 5, 2);
         });
-        // 受付アンケート（回答待ちの案内のお知らせの判定に使う。2026-10 追加）
+        // 愛犬アンケート（回答待ちの案内のお知らせの判定に使う。2026-10 追加）
         $this->createTraineeIntakeSurveyTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
         $this->createTraineePersonalityDiagnosisTokensTable();
@@ -155,7 +157,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $this->assertMatchesRegularExpression('/<svg class="c-survey-notice-icon"[^>]*aria-hidden="true"/u', $card);
     }
 
-    public function test_受付アンケートが回答待ちならお知らせと回答のURLへの回答するを出す(): void
+    public function test_愛犬アンケートが回答待ちならお知らせと回答のURLへの回答するを出す(): void
     {
         $id = $this->trainee('モモ');
         $this->intakeToken($id, 'intaketoken000000000000000000001');
@@ -163,14 +165,14 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $card = $this->card($this->open(), 'モモちゃん');
 
         $this->assertSame(['intake'], $this->noticeKinds($card));
-        $this->assertStringContainsString('<span>受付アンケートにお答えください。</span>', $card);
+        $this->assertStringContainsString('<span>愛犬アンケートにお答えください。</span>', $card);
         $this->assertStringContainsString(
             '<a href="'.route('client-portal.intake-survey.show', ['token' => 'intaketoken000000000000000000001']).'" class="btn btn-primary btn-sm text-nowrap">回答する</a>',
             $card
         );
     }
 
-    public function test_両方が回答待ちなら受付アンケートから性格診断の順でカードのいちばん上(): void
+    public function test_両方が回答待ちなら愛犬アンケートから性格診断の順でカードのいちばん上(): void
     {
         $id = $this->trainee('モモ');
         $this->measurement($id);
@@ -192,7 +194,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
 
     public function test_回答済みや取消済みの案内では出さない(): void
     {
-        // 受付アンケート：回答があれば（回答済み）出さない
+        // 愛犬アンケート：回答があれば（回答済み）出さない
         $answered = $this->trainee('ハナ');
         $tokenId = $this->intakeToken($answered, 'intaketoken000000000000000000002', '2026-10-01 09:00:00');
         DB::table('trainee_intake_survey_responses')->insert([
@@ -273,7 +275,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
 
     public function test_文は1か所の翻訳ファイルにある(): void
     {
-        $this->assertSame('受付アンケートにお答えください。', __('messages.client_survey_notice.intake'));
+        $this->assertSame('愛犬アンケートにお答えください。', __('messages.client_survey_notice.intake'));
         $this->assertSame('愛犬性格診断にお答えください。', __('messages.client_survey_notice.personality'));
         $this->assertSame('回答する', __('messages.client_survey_notice.answer'));
         $partial = file_get_contents(resource_path('views/client/_survey-notices.blade.php'));
@@ -306,5 +308,24 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $this->assertSame(['愛犬', '性格診断'], __('messages.personality_diagnosis_name_parts'));
         $this->assertStringContainsString("'personality' => \$personalityDiagnosisName.'にお答えください。',", $source);
         $this->assertSame('愛犬性格診断', __('messages.personality_diagnosis_name'));
+    }
+
+    // ---- 愛犬アンケートの名前（2026-10-19 変更：その前は「受付アンケート」） ----
+
+    public function test_お知らせの愛犬アンケートの名前も文のファイルの1か所の名前から組み立てる(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->intakeToken($id, 'intaketoken000000000000000000009');
+        $this->assertIntakeSurveyNameOnly($this->card($this->open(), 'モモちゃん'));
+
+        // client_survey_notice.intake は、同じファイルの名前（$intakeSurveyName）から組み立てる
+        $source = file_get_contents(lang_path('ja/messages.php'));
+        $this->assertSame(1, substr_count($source, "\$intakeSurveyNameParts = ['愛犬', 'アンケート'];"));
+        $this->assertSame(0, substr_count($source, "'愛犬アンケート'"));
+        $this->assertStringContainsString("'intake_survey_name' => \$intakeSurveyName,", $source);
+        $this->assertStringContainsString("'intake' => \$intakeSurveyName.'にお答えください。',", $source);
+        $this->assertSame('愛犬アンケート', __('messages.intake_survey_name'));
+        $this->assertSame(['愛犬', 'アンケート'], __('messages.intake_survey_name_parts'));
+        $this->assertStringNotContainsString('受付アンケート', $source);
     }
 }

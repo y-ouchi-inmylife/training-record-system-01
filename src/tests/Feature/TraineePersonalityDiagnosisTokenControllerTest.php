@@ -20,7 +20,7 @@ use Tests\TestCase;
  * 性格診断の案内の発行・取消・表示（POST／DELETE /trainees/{trainee}/personality-diagnosis-tokens、
  * GET …/print〔S-0312〕。2026-10 追加。性格診断 段階2）と、案内の URL で開くお客様の回答の画面（S-1415）。
  *
- * - 受付アンケート案内と同じ作り。違いは、前の結果（回答済みの案内）があっても発行できること
+ * - 愛犬アンケート案内と同じ作り。違いは、前の結果（回答済みの案内）があっても発行できること
  * - 発行のあとは S-0312 を開き、完了メッセージは載せない。取消のあとは会員詳細に戻り、上端の success
  * - アクセスログに create_／delete_trainee_personality_diagnosis_token（target_type='Trainee'）が残る
  *

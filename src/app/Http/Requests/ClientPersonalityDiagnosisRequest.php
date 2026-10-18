@@ -9,7 +9,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * 性格診断の回答（S-1415。D-1200。2026-10 追加）のバリデーション。
  *
  * お客様がログインせずに送る（性格診断用 URL のトークンで対象のトレーニーが決まる）ため、authorize() は常に true。
- * トークンが使えるかどうかはコントローラで確かめる（受付アンケートの ClientIntakeSurveyRequest と同じ）。
+ * トークンが使えるかどうかはコントローラで確かめる（愛犬アンケートの ClientIntakeSurveyRequest と同じ）。
  *
  * - answers.Q01〜answers.Q50：すべて必須。値は 0〜4 か na（未経験）。設問と選択肢は PersonalityDiagnosisQuestions から
  * - 文言は、未回答は「選んでください。」、値が正しくないときは「選択された値は有効ではありません。」（設計書 S-1415

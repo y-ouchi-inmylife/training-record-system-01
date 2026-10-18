@@ -49,7 +49,7 @@ class Trainee extends Model
     | 去勢・避妊（neuter_status）の定数と日本語ラベル（2026-10 追加。D-0700・5-21）
     |--------------------------------------------------------------------------
     | 性別と同じ作り。値・ラベルの単一情報源で、Blade からは neuterStatusLabels() を参照する。
-    | 受付アンケートの回答の「分からない」（dont_know）は、トレーニーには unknown として反映する
+    | 愛犬アンケートの回答の「分からない」（dont_know）は、トレーニーには unknown として反映する
     | （D-1100。回答の値は別のモデルで持つ）。
     */
 
@@ -71,7 +71,7 @@ class Trainee extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | 受付アンケートの状態（2026-10 追加。要件定義書 6-16-8）
+    | 愛犬アンケートの状態（2026-10 追加。要件定義書 6-16-8）
     |--------------------------------------------------------------------------
     | 判定の順は「回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行」。
     */
@@ -136,7 +136,7 @@ class Trainee extends Model
     }
 
     /**
-     * 受付アンケート用 URL のトークン（DS-1000。回答済みのものを含む）
+     * 愛犬アンケート用 URL のトークン（DS-1000。回答済みのものを含む）
      */
     public function intakeSurveyTokens(): HasMany
     {
@@ -144,7 +144,7 @@ class Trainee extends Model
     }
 
     /**
-     * 有効な（まだ回答されていない）受付アンケート用 URL のトークン。同じトレーニーに 1 つまで
+     * 有効な（まだ回答されていない）愛犬アンケート用 URL のトークン。同じトレーニーに 1 つまで
      * （発行のサービスで守る）。会員詳細（S-0305）でトレーニーをまとめて読むときは
      * `trainees.activeIntakeSurveyToken` を eager load しておく（N+1 にしないため）
      */
@@ -154,7 +154,7 @@ class Trainee extends Model
     }
 
     /**
-     * 受付アンケートの回答（D-1100。1 頭に複数件持てる）
+     * 愛犬アンケートの回答（D-1100。1 頭に複数件持てる）
      */
     public function intakeSurveyResponses(): HasMany
     {
@@ -162,7 +162,7 @@ class Trainee extends Model
     }
 
     /**
-     * 最新の受付アンケートの回答（回答日時が最も新しいもの）。回答がなければ null。
+     * 最新の愛犬アンケートの回答（回答日時が最も新しいもの）。回答がなければ null。
      * 会員詳細（S-0305）でトレーニーをまとめて読むときは `trainees.latestIntakeSurveyResponse` を
      * eager load しておく（N+1 にしないため）
      */
@@ -229,8 +229,8 @@ class Trainee extends Model
      */
     public const CONTENT_RELATIONS = [
         'measurements',                 // 計測値（D-0800）
-        'intakeSurveyTokens',           // 受付アンケートの案内（回答済み・未回答とも）
-        'intakeSurveyResponses',        // 受付アンケートの回答（暮らしの様子を含む）
+        'intakeSurveyTokens',           // 愛犬アンケートの案内（回答済み・未回答とも）
+        'intakeSurveyResponses',        // 愛犬アンケートの回答（暮らしの様子を含む）
         'personalityDiagnosisTokens',   // 愛犬性格診断の案内（回答済み・未回答とも）
         'personalityDiagnosisResults',  // 愛犬性格診断の結果（評価文を含む）
     ];
@@ -392,7 +392,7 @@ class Trainee extends Model
     }
 
     /**
-     * 受付アンケートの状態（INTAKE_* の定数）。要件定義書 6-16-8 の判定の順
+     * 愛犬アンケートの状態（INTAKE_* の定数）。要件定義書 6-16-8 の判定の順
      * （回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行）。
      *
      * 呼び出し側は latestIntakeSurveyResponse と activeIntakeSurveyToken を eager load しておくこと

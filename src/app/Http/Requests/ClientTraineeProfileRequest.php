@@ -9,11 +9,11 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * 会員の愛犬の情報の変更（S-1417。要件定義書 6-15-20。2026-10-18 追加）のバリデーション。
  *
- * - 名前・犬種・性別・誕生日・去勢・避妊の規則は、受付アンケート（ClientIntakeSurveyRequest。S-1413）の
- *   愛犬の基本情報と同じ。規則は basicInfoRules() の 1 か所にまとめ、受付アンケートでも使う
- * - 誕生日はトレーナー側・受付アンケートと同じ判定（trait NormalizesTraineeBirthday。エラーのキーは birth_date）
+ * - 名前・犬種・性別・誕生日・去勢・避妊の規則は、愛犬アンケート（ClientIntakeSurveyRequest。S-1413）の
+ *   愛犬の基本情報と同じ。規則は basicInfoRules() の 1 か所にまとめ、愛犬アンケートでも使う
+ * - 誕生日はトレーナー側・愛犬アンケートと同じ判定（trait NormalizesTraineeBirthday。エラーのキーは birth_date）
  * - 暮らしの様子（自由記述）・写真は受け取らない（rules() にないキーは validated() に入らない）
- * - 項目名と文言は lang/ja/validation.php（受付アンケートと同じ）
+ * - 項目名と文言は lang/ja/validation.php（愛犬アンケートと同じ）
  */
 class ClientTraineeProfileRequest extends FormRequest
 {
@@ -37,7 +37,7 @@ class ClientTraineeProfileRequest extends FormRequest
 
     /**
      * 愛犬の基本情報（名前・犬種・性別・誕生日の年・月・日・去勢・避妊）の規則。
-     * 受付アンケート（ClientIntakeSurveyRequest）と共用する
+     * 愛犬アンケート（ClientIntakeSurveyRequest）と共用する
      *
      * - 名前：必須
      * - 性別・去勢・避妊：トレーニーと同じ値（Trainee の対応表のキー）

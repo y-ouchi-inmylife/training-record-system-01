@@ -10,18 +10,18 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * 受付アンケート案内（受付アンケート用 URL のトークン。DS-1000）の発行・取消（2026-10 追加）。
+ * 愛犬アンケート案内（愛犬アンケート用 URL のトークン。DS-1000）の発行・取消（2026-10 追加）。
  *
  * 要件定義書 6-16-8・6-16-9、api-design.md 4-1-16。発行・取消は S-0305 会員詳細の
  * トレーニーカードから呼ばれる（発行は会員詳細だけ。トレーニー登録 S-0308 では発行しない。2026-10 変更）。
- * 案内画面（S-0311、GET …/print）は、会員詳細の「受付アンケートの案内を表示」から同じタブで開く
+ * 案内画面（S-0311、GET …/print）は、会員詳細の「愛犬アンケートの案内を表示」から同じタブで開く
  * （2026-10-17 変更：当初は別タブ）。
  *
  * ## 戻り先と完了メッセージ（2026-10 変更）
  *
  * 発行のあとも取消のあとも**常に S-0305 会員詳細**に戻し、完了メッセージはいつもの `success`（画面の上端）
  * （2026-10-17 変更：その前は、発行のあとは S-0311 を開き、完了メッセージは載せなかった。下の store()）。
- * 受付アンケート案内の発行・表示・取消は会員詳細だけで行う（案内を渡す相手は会員で、マイページ登録案内も
+ * 愛犬アンケート案内の発行・表示・取消は会員詳細だけで行う（案内を渡す相手は会員で、マイページ登録案内も
  * 会員詳細でしか操作しないため。要件定義書 6-16-8 備考）。
  *
  * 経緯：段階3a では S-0309 トレーニー詳細からも発行・取消を行えるようにし、`return_to`
@@ -32,11 +32,11 @@ use Illuminate\View\View;
 class TraineeIntakeSurveyTokenController extends Controller
 {
     /**
-     * 受付アンケート案内を発行する（POST /trainees/{trainee}/intake-survey-tokens）。
+     * 愛犬アンケート案内を発行する（POST /trainees/{trainee}/intake-survey-tokens）。
      *
-     * 発行のあとは会員詳細（S-0305）に戻り、完了メッセージ「{表示名}の受付アンケートの案内を発行しました。」を
+     * 発行のあとは会員詳細（S-0305）に戻り、完了メッセージ「{表示名}の愛犬アンケートの案内を発行しました。」を
      * 出す（2026-10-17 変更。表示名は会員詳細のトレーニーの名前と同じ display_name）。S-0311 は開かない
-     * （案内は必要なときに［受付アンケートの案内を表示］から開く。マイページ登録案内と同じ）。
+     * （案内は必要なときに［愛犬アンケートの案内を表示］から開く。マイページ登録案内と同じ）。
      * 戻る位置はページの上（完了メッセージがページの上に出るため、トレーニーの欄の位置には移さない）。
      *
      * 発行できなかったとき：
@@ -51,12 +51,12 @@ class TraineeIntakeSurveyTokenController extends Controller
         $token = $service->issue($trainee, $request->user());
         // 状態の判定順（回答がある → 回答済み）に合わせて、回答の有無を先に見る
         if ($token === null && $trainee->intakeSurveyResponses()->exists()) {
-            abort(409, '受付アンケートの案内はすでに発行されています。');
+            abort(409, __('messages.intake_survey_name').'の案内はすでに発行されています。');
         }
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
 
-        return $token ? $redirect->with('success', $trainee->display_name.'の受付アンケートの案内を発行しました。') : $redirect;
+        return $token ? $redirect->with('success', $trainee->display_name.'の'.__('messages.intake_survey_name').'の案内を発行しました。') : $redirect;
     }
 
     /**
@@ -70,7 +70,7 @@ class TraineeIntakeSurveyTokenController extends Controller
     }
 
     /**
-     * 受付アンケート案内を取り消す（DELETE /trainees/{trainee}/intake-survey-tokens）。
+     * 愛犬アンケート案内を取り消す（DELETE /trainees/{trainee}/intake-survey-tokens）。
      * 有効な（未回答の）トークンだけを物理削除する。回答済みのトークンには触らない。
      * 有効な案内がなければ 409
      */
@@ -78,18 +78,18 @@ class TraineeIntakeSurveyTokenController extends Controller
     {
         $deleted = $trainee->intakeSurveyTokens()->whereNull('answered_at')->delete();
         if ($deleted === 0) {
-            abort(409, '取り消す受付アンケートの案内がありません。');
+            abort(409, '取り消す'.__('messages.intake_survey_name').'の案内がありません。');
         }
 
         return redirect()->route('clients.show', $trainee->client_id)
-            ->with('success', '受付アンケートの案内を取り消しました。');
+            ->with('success', __('messages.intake_survey_name').'の案内を取り消しました。');
     }
 
     /**
-     * 受付アンケート案内画面（S-0311、GET /trainees/{trainee}/intake-survey-tokens/print）。
+     * 愛犬アンケート案内画面（S-0311、GET /trainees/{trainee}/intake-survey-tokens/print）。
      *
      * 有効な（未回答の）トークンがあれば、QR コード・URL・手順を載せた案内を出す。なければ同じビューで
-     * 「有効な受付アンケート案内がありません。」を出す（回答済み・取消済み・未発行のいずれでも同じ。
+     * 「有効な愛犬アンケート案内がありません。」を出す（回答済み・取消済み・未発行のいずれでも同じ。
      * 発行できる場所には触れない）。マイページ登録案内の印刷画面（S-0307）と同じ作り。
      * 表示はアクセスログに記録しない（S-0307 の表示も記録していないため）。
      *

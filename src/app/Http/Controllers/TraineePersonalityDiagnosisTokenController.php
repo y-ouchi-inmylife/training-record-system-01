@@ -12,12 +12,12 @@ use Illuminate\View\View;
 /**
  * 性格診断の案内（性格診断用 URL のトークン。DS-1100）の発行・取消・表示（2026-10 追加）。
  *
- * 要件定義書 6-16-11・6-16-12、api-design.md 4-1-16。受付アンケート案内（TraineeIntakeSurveyTokenController）と
+ * 要件定義書 6-16-11・6-16-12、api-design.md 4-1-16。愛犬アンケート案内（TraineeIntakeSurveyTokenController）と
  * 同じ作り。発行・取消は S-0305 会員詳細のトレーニーカードの「性格診断」の行から呼ばれる（会員詳細だけで行う）。
  * 違いは、前の結果（回答済みの案内）があっても発行できること（何回でも受けられるため）。
  *
  * - 発行のあとは S-0305 会員詳細に戻し、完了メッセージは上端の success（2026-10-17 変更：その前は
- *   S-0312 にリダイレクトし、完了メッセージは載せなかった。受付アンケート案内と同じ）
+ *   S-0312 にリダイレクトし、完了メッセージは載せなかった。愛犬アンケート案内と同じ）
  * - 取消のあとは S-0305 会員詳細に戻し、完了メッセージは上端の success
  */
 class TraineePersonalityDiagnosisTokenController extends Controller
@@ -38,7 +38,7 @@ class TraineePersonalityDiagnosisTokenController extends Controller
 
     /**
      * 発行の URL を GET で開かれたとき（GET /trainees/{trainee}/personality-diagnosis-tokens。2026-10-17 追加）。
-     * 発行せずに、そのトレーニーの会員の会員詳細（S-0305）に移す（405 にしない。受付アンケート案内と同じ）
+     * 発行せずに、そのトレーニーの会員の会員詳細（S-0305）に移す（405 にしない。愛犬アンケート案内と同じ）
      */
     public function redirectToClient(Trainee $trainee): RedirectResponse
     {
@@ -48,7 +48,7 @@ class TraineePersonalityDiagnosisTokenController extends Controller
     /**
      * 性格診断の案内を取り消す（DELETE /trainees/{trainee}/personality-diagnosis-tokens）。
      * 有効な（未回答の）トークンだけを物理削除する。回答済みのトークンと結果には触らない。
-     * 有効な案内がなければ 409（受付アンケートと同じ）
+     * 有効な案内がなければ 409（愛犬アンケートと同じ）
      */
     public function destroy(Trainee $trainee): RedirectResponse
     {
@@ -66,8 +66,8 @@ class TraineePersonalityDiagnosisTokenController extends Controller
      *
      * 有効な（未回答の）トークンがあれば、QR コード・URL・手順を載せた案内を出す。なければ同じビューで
      * 「有効な性格診断の案内がありません。」を出す（未発行・取消済み・前の案内に回答済みのいずれでも同じ）。
-     * 受付アンケート案内画面（S-0311）と同じ作り。表示はアクセスログに記録しない。
-     * お客様の氏名・愛犬の名前はビューに渡さない（受付アンケートと同じ）。
+     * 愛犬アンケート案内画面（S-0311）と同じ作り。表示はアクセスログに記録しない。
+     * お客様の氏名・愛犬の名前はビューに渡さない（愛犬アンケートと同じ）。
      */
     public function print(Trainee $trainee): View
     {

@@ -18,7 +18,7 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * 誕生日（2026-10 変更）：年・月・日の 3 項目（birth_year・birth_month・birth_day）で受け、
  * 分かるところだけ入る。入力のルールは要件定義書 6-16「年齢の表示規則」の「入力のルール」。
- * 全角の数字の直し方と判定（キー `birth_date` に 1 つだけ載せる）は、受付アンケート
+ * 全角の数字の直し方と判定（キー `birth_date` に 1 つだけ載せる）は、愛犬アンケート
  * （ClientIntakeSurveyRequest）と共用の trait NormalizesTraineeBirthday にある（2026-10 に切り出した）。
  */
 class TraineeRequest extends FormRequest
@@ -33,7 +33,7 @@ class TraineeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // 名前は任意（2026-10 変更。受付アンケートの案内だけを先に発行する運用のため）
+            // 名前は任意（2026-10 変更。愛犬アンケートの案内だけを先に発行する運用のため）
             'name' => 'nullable|string|max:50',
             'breed' => 'nullable|string|max:100',
             'sex' => 'nullable|in:male,female,unknown',

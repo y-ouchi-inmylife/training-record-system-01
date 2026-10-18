@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * トレーニーの受付アンケートの状態（要件定義書 6-16-8。2026-10 追加）。
+ * トレーニーの愛犬アンケートの状態（要件定義書 6-16-8。2026-10 追加）。
  *
  * 判定の順は「回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行」。
  * 状態は latestIntakeSurveyResponse・activeIntakeSurveyToken（eager load したもの）から決まる。

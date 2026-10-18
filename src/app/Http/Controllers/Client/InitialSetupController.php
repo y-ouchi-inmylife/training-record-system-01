@@ -61,7 +61,7 @@ class InitialSetupController extends Controller
         Auth::guard('client')->login($tokenRecord->client);
         request()->session()->regenerate();
 
-        // 愛犬（トレーニー）の情報は初回設定では扱わない（2026-10 変更。受付アンケートに
+        // 愛犬（トレーニー）の情報は初回設定では扱わない（2026-10 変更。愛犬アンケートに
         // 分離した。requirements.md 6-15-5）。トレーニーは読み込まない。
         return view('client.setup.index', [
             'token' => $token,
@@ -120,7 +120,7 @@ class InitialSetupController extends Controller
                 ]);
 
                 // 愛犬（トレーニー）の情報は扱わない（2026-10 変更。以前はここで 1 頭目を
-                // 登録・更新していたが、受付アンケートに分離した。requirements.md 6-15-5）。
+                // 登録・更新していたが、愛犬アンケートに分離した。requirements.md 6-15-5）。
                 // 送信に古い trainee_* の項目が含まれていても、validated() に入らないため使われない。
 
                 // ログイン用リンクを使い切りにする

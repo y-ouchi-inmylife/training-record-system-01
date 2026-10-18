@@ -148,7 +148,7 @@ class ClientController extends Controller
 
         // トランザクション内で内部IDを採番（競合回避）。
         // 会員と同じトランザクションで、その会員のトレーニーを 1 件作る（中身は空。2026-10-18 追加。要件定義書 6-3-1）。
-        // 会員を登録したらすぐ受付アンケート・愛犬性格診断の案内（トレーニーごと）を出せるようにするため。
+        // 会員を登録したらすぐ愛犬アンケート・愛犬性格診断の案内（トレーニーごと）を出せるようにするため。
         // 会員の保存に失敗したらトレーニーも作られない（入力エラーはここに来る前に止まる）
         [$client, $trainee] = DB::transaction(function () use ($validated) {
             // サービスはコンテナから取る（テストで MySQL だけの採番の SQL を差し替えられるように。2026-10-18 変更）
@@ -184,7 +184,7 @@ class ClientController extends Controller
         // trainees は id 昇順（Client::trainees() の既定）で並び、
         // 各 trainee の measurements を eager load することで、
         // トレーニーカードの「最終計測」表示で N+1 を起こさない。
-        // trainees.latestIntakeSurveyResponse と trainees.activeIntakeSurveyToken は受付アンケートの行の
+        // trainees.latestIntakeSurveyResponse と trainees.activeIntakeSurveyToken は愛犬アンケートの行の
         // 状態（Trainee::intake_survey_status）に使う。トレーニーが何頭いてもクエリはそれぞれ 1 本で済む
         // （2026-10 追加）。
         // trainees.activePersonalityDiagnosisToken は性格診断の行のボタン（案内を発行／案内を表示・取消）に使う

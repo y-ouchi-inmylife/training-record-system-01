@@ -6,8 +6,8 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Tests\TestCase;
 
 /**
- * 受付アンケートからの送信がセッション切れ（419）になったときの画面（2026-10 追加。設計書 S-1413 備考
- * 「入力中にセッションが切れたとき」）。受付アンケートの画面からの送信のときだけお客様向けの文言にし、
+ * 愛犬アンケートからの送信がセッション切れ（419）になったときの画面（2026-10 追加。設計書 S-1413 備考
+ * 「入力中にセッションが切れたとき」）。愛犬アンケートの画面からの送信のときだけお客様向けの文言にし、
  * ほかの画面の 419 は今のまま。
  *
  * テストでは Laravel が CSRF トークンの確認を飛ばす（ValidateCsrfToken::runningUnitTests()）ため、
@@ -29,7 +29,7 @@ class ClientIntakeSurveySessionExpiredTest extends TestCase
         });
     }
 
-    public function test_受付アンケートの送信が419ならお客様向けの文言を出す(): void
+    public function test_愛犬アンケートの送信が419ならお客様向けの文言を出す(): void
     {
         $response = $this->post('/client-portal/intake-survey/abcdefghijklmnopqrstuvwxyz012345', ['breed' => '柴']);
 

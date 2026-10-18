@@ -1,7 +1,7 @@
-{{-- 受付アンケート案内取消確認モーダル（S-0305-M06。2026-10 追加。要件定義書 6-16-9）。
+{{-- 愛犬アンケート案内取消確認モーダル（S-0305-M06。2026-10 追加。要件定義書 6-16-9）。
      S-0305 会員詳細のトレーニーカードだけで使う。取消のあとは会員詳細に戻る。
      見せ方はマイページ登録案内の取消（S-0305-M03）と同じ形。
-     経緯：段階3a では S-0309 トレーニー詳細の受付アンケートの欄でも共用し、戻り先を return_to
+     経緯：段階3a では S-0309 トレーニー詳細の愛犬アンケートの欄でも共用し、戻り先を return_to
      （client / trainee）で渡していた。2026-10 に操作を会員詳細に寄せたため、S-0309 では使わない
 
      開き方：会員詳細のトレーニーカードの「取消」ボタンに data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
@@ -14,13 +14,13 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="intakeSurveyCancelModalLabel">
-                    受付アンケート案内の取消
+                    {{ __('messages.intake_survey_name') }}の案内の取消
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p class="mb-0">
-                    発行済みの受付アンケート案内が使えなくなります。<br>
+                    発行済みの{{ __('messages.intake_survey_name') }}の案内が使えなくなります。<br>
                     すでにお渡しした案内からは回答できなくなります。
                 </p>
             </div>

@@ -33,7 +33,7 @@ class TraineeRequestNeuterStatusTest extends TestCase
 
     public function test_決められた値以外はエラーになる(): void
     {
-        // dont_know（当初の受付アンケートの回答の「分からない」。2026-10 にやめた）は、トレーニーの値には使わない
+        // dont_know（当初の愛犬アンケートの回答の「分からない」。2026-10 にやめた）は、トレーニーの値には使わない
         foreach (['dont_know', 'yes', 'male'] as $value) {
             $this->assertSame(['選択された去勢・避妊は有効ではありません。'], $this->errors($value), $value);
         }

@@ -8,17 +8,19 @@ use App\Models\TraineeIntakeSurveyResponse;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsIntakeSurveyName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 受付アンケート回答画面（S-1413）・回答完了画面（S-1414）・使えない URL の画面（2026-10 追加。
+ * 愛犬アンケート回答画面（S-1413）・回答完了画面（S-1414）・使えない URL の画面（2026-10 追加。
  * 要件定義書 6-15-17）の表示。
  *
  * ログインしない画面。テストでは会員側のホスト（CLIENT_HOST）が空なので、ホストではなくパスで確かめる。
  */
 class ClientIntakeSurveyShowTest extends TestCase
 {
+    use AssertsIntakeSurveyName;
     use CreatesClientCountTables;
 
     private const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345';
@@ -92,7 +94,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertGuest('web');
         $this->assertGuest('client');
 
-        $this->get($this->showPath())->assertOk()->assertSee('受付アンケート');
+        $this->get($this->showPath())->assertOk()->assertSee('愛犬アンケート');
     }
 
     public function test_名前が登録済みでも説明文に名前を使わず名前は初期値の入った必須の入力欄(): void
@@ -101,7 +103,7 @@ class ClientIntakeSurveyShowTest extends TestCase
 
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
-        $this->assertStringContainsString('<h1 class="mb-2">受付アンケート</h1>', $html);
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬アンケート</h1>', $html);
         // 説明文に愛犬の名前は使わない（2026-10 変更。設計書 S-1413）
         $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>', $html);
         $this->assertStringNotContainsString('モモちゃん', $html);
@@ -350,7 +352,7 @@ class ClientIntakeSurveyShowTest extends TestCase
 
     private function assertUnavailable(string $html, string $message): void
     {
-        $this->assertStringContainsString('<h1 class="mb-4">受付アンケート</h1>', $html);
+        $this->assertStringContainsString('<h1 class="mb-4">愛犬アンケート</h1>', $html);
         $this->assertMatchesRegularExpression('/<div class="card-body p-4">\s*<p class="mb-0">'.preg_quote($message, '/').'<\/p>/u', $html);
         $this->assertStringNotContainsString('次にできること', $html);
         $this->assertStringNotContainsString('<form', $html);
@@ -408,5 +410,34 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringNotContainsString('モモ', $html);
         $this->assertStringNotContainsString('client-portal/login', $html);
         $this->assertStringNotContainsString('マイページ', $html);
+    }
+
+    // ---- 愛犬アンケートの名前（2026-10-19 変更：その前は「受付アンケート」） ----
+
+    public function test_回答の画面と使えない画面の見出しとタブの題は愛犬アンケート(): void
+    {
+        $this->traineeWithToken('モモ');
+
+        $html = $this->get($this->showPath())->assertOk()->getContent();
+        $this->assertIntakeSurveyNameOnly($html);
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬アンケート</h1>', $html);
+        $this->assertMatchesRegularExpression('/<title>愛犬アンケート - /u', $html);
+
+        $html = $this->get($this->showPath('nonexistent-token'))->assertOk()->getContent();
+        $this->assertIntakeSurveyNameOnly($html);
+        $this->assertMatchesRegularExpression('/<title>愛犬アンケート - /u', $html);
+    }
+
+    public function test_回答の画面と使えない画面の名前は文のファイルの1か所から読む(): void
+    {
+        $this->traineeWithToken('モモ');
+        $this->overrideIntakeSurveyName('テストアンケート');
+
+        $html = $this->get($this->showPath())->assertOk()->getContent();
+        $this->assertStringContainsString('<h1 class="mb-2">テストアンケート</h1>', $html);
+        $this->assertMatchesRegularExpression('/<title>テストアンケート - /u', $html);
+
+        $html = $this->get($this->showPath('nonexistent-token'))->assertOk()->getContent();
+        $this->assertStringContainsString('<h1 class="mb-4">テストアンケート</h1>', $html);
     }
 }

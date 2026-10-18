@@ -9,11 +9,12 @@ use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsIntakeSurveyName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 受付アンケート案内画面（S-0311、GET /trainees/{trainee}/intake-survey-tokens/print。2026-10 追加）。
+ * 愛犬アンケート案内画面（S-0311、GET /trainees/{trainee}/intake-survey-tokens/print。2026-10 追加）。
  *
  * マイページ登録案内の印刷画面（S-0307）と同じ作り。有効期限は載せず「1回かぎり」の文、
  * 愛犬の名前の行（未登録なら「愛犬」）、戻り先は会員詳細、お客様の氏名は載せない。
@@ -23,6 +24,7 @@ use Tests\TestCase;
  */
 class TraineeIntakeSurveyTokenPrintTest extends TestCase
 {
+    use AssertsIntakeSurveyName;
     use CreatesClientCountTables;
 
     private const TOKEN = 'intake-survey-token-for-print-00000';
@@ -113,7 +115,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $html = $this->printPage();
 
         $this->assertSame('/client-portal/intake-survey/'.self::TOKEN, parse_url($url, PHP_URL_PATH));
-        $this->assertMatchesRegularExpression('/>受付アンケートのご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
+        $this->assertMatchesRegularExpression('/>愛犬アンケートのご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
         $this->assertLessThan(strpos($html, 'QR コード</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
         // ［コピー］は「LINE・メールで送る」の見出しの行の右（青の塗り・小さいボタン。読み上げは「文面をコピー」）。文面の下にボタンはない
         // （2026-10-18 変更：その前は文面の下の右に［文面をコピー］）。ボタンの左に知らせの場所（aria-live。押すと「コピーしました」を出す）。
@@ -130,7 +132,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertStringNotContainsString('min-width', $html);
         $this->assertStringNotContainsString('>文面をコピー<', $html);
         $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex align-items-center">\\s*<h2 class="h6 mb-0" id="invitation-qr-heading">QR コード<\\/h2>/u', $html);
-        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="受付アンケート案内の QR コード"></canvas>', $html);
+        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="愛犬アンケートの案内の QR コード"></canvas>', $html);
         // QR コードの欄は見出し「QR コード」と QR コードだけ（2026-10-18 変更：その前は見出し「その場で読み取ってもらう」と、
         // 下にお客様向けの一文・有効期限〔または 1 回かぎりの文〕。QR コードはメール・LINE に添付することもあり、説明は過剰なため）
         $qr = $this->qrPanel($html);
@@ -168,7 +170,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
             '山田 太郎 様',
             '',
             'テスト訓練所です。',
-            'モモちゃんの受付アンケートのご案内をお送りします。',
+            'モモちゃんの愛犬アンケートのご案内をお送りします。',
             '',
             '下のリンクから、ご回答をお願いいたします。',
             '',
@@ -189,9 +191,9 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         $text = $this->copyText($this->printPage());
 
-        // 名前が空なら「{呼び名}の」を付けない（2026-10-18 変更：呼び名の「愛犬」が付いて「愛犬の受付アンケート」になっていた）
-        $this->assertStringStartsWith("山田 太郎 様\n\n受付アンケートのご案内をお送りします。\n", $text);
-        $this->assertStringNotContainsString('愛犬の受付アンケート', $text);
+        // 名前が空なら「{呼び名}の」を付けない（2026-10-18 変更：呼び名の「愛犬」が付いて「愛犬の愛犬アンケート」になっていた）
+        $this->assertStringStartsWith("山田 太郎 様\n\n愛犬アンケートのご案内をお送りします。\n", $text);
+        $this->assertStringNotContainsString('愛犬の愛犬アンケート', $text);
         $this->assertSame($text, $this->shownText($this->printPage()));
         $this->assertStringNotContainsString('愛犬ちゃん', $text);
     }
@@ -201,7 +203,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $html = $this->printPage();
 
         // 「ない」ことは本文（太字）で伝える。見出しは帯だけ（2026-10 変更）
-        $this->assertStringContainsString('<strong>有効な受付アンケート案内がありません。</strong>', $html);
+        $this->assertStringContainsString('<strong>有効な愛犬アンケートの案内がありません。</strong>', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('data-invitation-message', $html);
         $this->assertStringNotContainsString('data-copy-message', $html);
@@ -217,7 +219,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
     {
         $this->issueToken('2026-10-16 10:00:00');
 
-        $this->assertStringContainsString('有効な受付アンケート案内がありません。', $this->printPage());
+        $this->assertStringContainsString('有効な愛犬アンケートの案内がありません。', $this->printPage());
     }
 
     public function test_表示はアクセスログに記録しない(): void
@@ -228,29 +230,29 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertSame(0, AccessLog::query()->count());
     }
 
-    public function test_受付アンケートのご案内の緑の帯を見出しにしアイコンは読み上げない(): void
+    public function test_愛犬アンケートのご案内の緑の帯を見出しにしアイコンは読み上げない(): void
     {
         $this->issueToken();
 
         $html = $this->printPage();
 
-        // 帯＝見出し（h1。2026-10 変更）：文字は「受付アンケートのご案内」、色は緑（print-band--intake）、アイコンは aria-hidden
-        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケートのご案内<\/span><\/h1>/u', $html);
+        // 帯＝見出し（h1。2026-10 変更）：文字は「愛犬アンケートのご案内」、色は緑（print-band--intake）、アイコンは aria-hidden
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>愛犬アンケートのご案内<\/span><\/h1>/u', $html);
         // ［戻る］の下
         $this->assertMatchesRegularExpression('/>戻る<\/a>\s*<\/div>\s*<h1 class="print-band print-band--intake">/su', $html);
-        // 見出しは帯の 1 つだけ（文面の「受付アンケートのご案内をお送りします。」は見出しではない。2026-10-18 変更）
+        // 見出しは帯の 1 つだけ（文面の「愛犬アンケートのご案内をお送りします。」は見出しではない。2026-10-18 変更）
         $this->assertSame(1, substr_count($html, '<h1'));
-        $this->assertSame(1, substr_count($html, '受付アンケートのご案内</span>'));
+        $this->assertSame(1, substr_count($html, '愛犬アンケートのご案内</span>'));
         $this->assertStringNotContainsString('print-title', $html);
         // マイページ登録の帯は出さない
         $this->assertStringNotContainsString('print-band--mypage', $html);
     }
 
-    public function test_有効な案内がないときも受付アンケートの帯を見出しにする(): void
+    public function test_有効な案内がないときも愛犬アンケートの帯を見出しにする(): void
     {
         $html = $this->printPage();
 
-        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケートのご案内<\/span><\/h1>/u', $html);
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>愛犬アンケートのご案内<\/span><\/h1>/u', $html);
         $this->assertSame(1, substr_count($html, '<h1'));
     }
 
@@ -260,5 +262,33 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->issueToken();
 
         $this->get(route('trainee-intake-survey-tokens.print', $this->trainee))->assertForbidden();
+    }
+
+    // ---- 愛犬アンケートの名前（2026-10-19 変更：その前は「受付アンケート」） ----
+
+    public function test_S0311の帯と文面の名前は愛犬アンケートで文のファイルの1か所から読む(): void
+    {
+        $this->issueToken();
+
+        $html = $this->printPage();
+        $this->assertIntakeSurveyNameOnly($html);
+        $this->assertStringContainsString('<title>愛犬アンケートのご案内', $html);
+        $this->assertStringContainsString('モモちゃんの愛犬アンケートのご案内をお送りします。', $this->copyText($html));
+        $this->assertStringContainsString('aria-label="愛犬アンケートの案内の QR コード"', $html);
+
+        $this->overrideIntakeSurveyName('テストアンケート');
+        $html = $this->printPage();
+        $this->assertStringContainsString('<title>テストアンケートのご案内', $html);
+        $this->assertMatchesRegularExpression('/>テストアンケートのご案内<\/span><\/h1>/u', $html);
+        // 文面（画面に出す文・コピーする文）にも差し替えた名前が出る
+        $this->assertStringContainsString('モモちゃんのテストアンケートのご案内をお送りします。', $this->copyText($html));
+        $this->assertStringNotContainsString('愛犬アンケート', $html);
+    }
+
+    public function test_有効な案内がないときの文も文のファイルの名前から出す(): void
+    {
+        $this->overrideIntakeSurveyName('テストアンケート');
+
+        $this->assertStringContainsString('<strong>有効なテストアンケートの案内がありません。</strong>', $this->printPage());
     }
 }

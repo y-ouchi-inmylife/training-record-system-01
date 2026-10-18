@@ -162,11 +162,11 @@ class DashboardController extends Controller
 
     /**
      * 回答待ちの案内のお知らせ（2026-10 追加。設計書 S-1402「回答待ちの案内のお知らせ」）。
-     * 並びは 受付アンケート → 性格診断。kind は文（lang/ja/messages.php の client_survey_notice）と見た目を、
+     * 並びは 愛犬アンケート → 性格診断。kind は文（lang/ja/messages.php の client_survey_notice）と見た目を、
      * url は印刷した案内と同じ回答の URL（トークンの URL）。
      *
      * 「回答待ち」の判定は、会員詳細（S-0305）で［案内を表示］［取消］を出す条件と同じ：
-     * - 受付アンケート：Trainee::intake_survey_status が回答待ち（回答がなく、有効な案内〔未回答のトークン〕がある）
+     * - 愛犬アンケート：Trainee::intake_survey_status が回答待ち（回答がなく、有効な案内〔未回答のトークン〕がある）
      * - 性格診断：有効な案内（Trainee::activePersonalityDiagnosisToken。未回答のトークン）がある
      * 取消した案内はトークンの行ごと消えるので、ここには出ない
      *

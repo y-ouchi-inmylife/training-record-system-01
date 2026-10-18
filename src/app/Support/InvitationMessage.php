@@ -7,7 +7,7 @@ use App\Models\Trainee;
 use Carbon\CarbonInterface;
 
 /**
- * 3 つのご案内（マイページ登録 S-0307・受付アンケート S-0311・愛犬性格診断 S-0312）の、LINE・メールで送る文面（2026-10-18 追加。
+ * 3 つのご案内（マイページ登録 S-0307・愛犬アンケート S-0311・愛犬性格診断 S-0312）の、LINE・メールで送る文面（2026-10-18 追加。
  * 設計書 screen-design.md S-0307「LINE・メールで送る文面」）。
  *
  * 画面に出す文と［文面をコピー］でコピーする文は、ここで組み立てた 1 つの文字列を両方に使う（食い違わないように）。
@@ -43,12 +43,15 @@ class InvitationMessage
         );
     }
 
-    /** 受付アンケートのご案内（有効期限なし。1回かぎり） */
+    /** 愛犬アンケートのご案内（有効期限なし。1回かぎり） */
     public static function intakeSurvey(Trainee $trainee, string $url): string
     {
         return self::compose(
             $trainee->client,
-            __('messages.invitation_message.intake.'.self::introKey($trainee), ['callName' => $trainee->client_call_name]),
+            __('messages.invitation_message.intake.'.self::introKey($trainee), [
+                'callName' => $trainee->client_call_name,
+                'survey' => __('messages.intake_survey_name'),
+            ]),
             __('messages.invitation_message.intake.body'),
             $url,
             __('messages.invitation_message.once'),

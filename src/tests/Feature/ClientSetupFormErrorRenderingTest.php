@@ -93,7 +93,7 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     }
 
     /**
-     * 2026-10 変更：愛犬（トレーニー）の情報は初回設定では扱わない（受付アンケートに分離。
+     * 2026-10 変更：愛犬（トレーニー）の情報は初回設定では扱わない（愛犬アンケートに分離。
      * requirements.md 6-15-5）。小見出し・入力欄・多頭飼いの案内文が出ないこと。
      */
     public function test_初回設定_愛犬の情報の欄が出ない(): void

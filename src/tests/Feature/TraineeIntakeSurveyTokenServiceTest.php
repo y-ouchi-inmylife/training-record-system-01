@@ -13,7 +13,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 受付アンケート案内の発行（TraineeIntakeSurveyTokenService::issue。2026-10 追加）。
+ * 愛犬アンケート案内の発行（TraineeIntakeSurveyTokenService::issue。2026-10 追加）。
  *
  * 注意：テストの DB（SQLite）では lockForUpdate() は何もしない（SQL に FOR UPDATE が付かない）。
  * そのため、ここで確かめられるのは「有効な案内があれば発行しない」という論理だけで、2 人が

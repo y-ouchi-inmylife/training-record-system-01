@@ -9,6 +9,15 @@
 $personalityDiagnosisNameParts = ['愛犬', '性格診断'];
 $personalityDiagnosisName = implode('', $personalityDiagnosisNameParts);
 
+// 愛犬アンケートの名前（画面に出す名前。2026-10-19 変更：ユーザーレビューで「愛犬アンケート」から「愛犬アンケート」にした）。
+// 愛犬性格診断の名前と同じく、ここ 1 か所だけに置く。画面・コントローラーは __('messages.intake_survey_name') で読み、
+// このファイルの中の文（client_survey_notice）はこの変数から組み立てる。案内の文面（invitation_message.intake）は :survey で受け取る。
+// コード上の名前（URL・ルート名・クラス名・テーブル名の intake_survey など）は画面に出ないので変えない。
+// 折り返してよい位置で「愛犬」「アンケート」に分けて持つ（今はどの画面も分けて使っていない。愛犬性格診断と同じ形にそろえておく）。
+// 名前を変えるときは下の 1 行だけ直す
+$intakeSurveyNameParts = ['愛犬', 'アンケート'];
+$intakeSurveyName = implode('', $intakeSurveyNameParts);
+
 return [
 
     /*
@@ -32,9 +41,14 @@ return [
     // 名前を折り返してよい位置で分けたもの（上の $personalityDiagnosisNameParts。ラベル用の形を作るときに使う）
     'personality_diagnosis_name_parts' => $personalityDiagnosisNameParts,
 
+    // 愛犬アンケートの名前（上の $intakeSurveyName。画面に出すときはこのキーから読む。2026-10-19 追加）
+    'intake_survey_name' => $intakeSurveyName,
+    // 名前を折り返してよい位置で分けたもの（上の $intakeSurveyNameParts）
+    'intake_survey_name_parts' => $intakeSurveyNameParts,
+
     // 会員のマイページ（S-1402）の愛犬のカードに出す、回答待ちの案内のお知らせ（2026-10 追加）。
-    // 名称（「受付アンケート」「愛犬性格診断」）は文をここだけで変える（愛犬性格診断は上の $personalityDiagnosisName）。
-    // 印刷した案内の見出し（「受付アンケートのご案内」「愛犬性格診断のご案内」）と名称をそろえる
+    // 名称（「愛犬アンケート」「愛犬性格診断」）は文をここだけで変える（上の $intakeSurveyName・$personalityDiagnosisName）。
+    // ご案内の画面の見出し（「愛犬アンケートのご案内」「愛犬性格診断のご案内」）と名称をそろえる
     // マイページの「ご連絡先の登録のお願い」（2026-10-18 追加。設計書 S-1402）。契約がある会員で、住所か電話番号が空のときに出す。
     // 足りないものだけを書く（住所だけ・電話番号だけ・両方）
     'client_contact_notice' => [
@@ -45,16 +59,16 @@ return [
     ],
 
     'client_survey_notice' => [
-        'intake' => '受付アンケートにお答えください。',
+        'intake' => $intakeSurveyName.'にお答えください。',
         'personality' => $personalityDiagnosisName.'にお答えください。',
         'answer' => '回答する',
     ],
 
-    // 回答完了の画面・使えない案内の画面（受付アンケート S-1414・S-1413、性格診断 S-1416・S-1415）に、
+    // 回答完了の画面・使えない案内の画面（愛犬アンケート S-1414・S-1413、性格診断 S-1416・S-1415）に、
     // ログインしている会員が自分の愛犬の案内に回答したときだけ出すリンクの文字（2026-10 追加）
     'client_back_to_mypage' => 'マイページへ戻る',
 
-    // 3 つのご案内（マイページ登録 S-0307・受付アンケート S-0311・愛犬性格診断 S-0312）の、LINE・メールで送る文面（2026-10-18 追加。
+    // 3 つのご案内（マイページ登録 S-0307・愛犬アンケート S-0311・愛犬性格診断 S-0312）の、LINE・メールで送る文面（2026-10-18 追加。
     // 設計書 screen-design.md S-0307「LINE・メールで送る文面」）。文面は App\Support\InvitationMessage が行をつないで組み立てる
     // （画面に出す文と［文面をコピー］でコピーする文は同じもの）。トレーナーさんに確かめてもらって直すときは、ここだけを直す。
     // :name＝会員の氏名、:company＝訓練所の名前（config('app.client_portal_company')。空なら from の行ごと出さない）、
@@ -63,7 +77,7 @@ return [
         'greeting' => ':name 様',
         'from' => ':companyです。',
         'expires' => 'リンクの有効期限：:expiresまで',
-        // 受付アンケート・愛犬性格診断の案内は有効期限を持たない（要件定義書 6-15-17・6-15-18 備考）。有効期限の行の代わり
+        // 愛犬アンケート・愛犬性格診断の案内は有効期限を持たない（要件定義書 6-15-17・6-15-18 備考）。有効期限の行の代わり
         'once' => 'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
         'closing' => 'ご不明な点がございましたら、お気軽にお問い合わせください。',
         'mypage' => [
@@ -71,9 +85,10 @@ return [
             'body' => "下のリンクを開いて、メールアドレスをご入力ください。\n届いたメールのリンクから、パスワードなどを設定していただくと、ご登録が完了します。",
         ],
         // 愛犬の名前が空のときは「{呼び名}の」を付けない（intro_unnamed。呼び名が「愛犬」になり「愛犬の愛犬性格診断」と重なるため。2026-10-18 追加）
+        // :survey＝愛犬アンケートの名前（intake_survey_name。InvitationMessage が渡す。名前を差し替えたときも文面に出るように。2026-10-19 変更）
         'intake' => [
-            'intro' => ':callNameの受付アンケートのご案内をお送りします。',
-            'intro_unnamed' => '受付アンケートのご案内をお送りします。',
+            'intro' => ':callNameの:surveyのご案内をお送りします。',
+            'intro_unnamed' => ':surveyのご案内をお送りします。',
             'body' => '下のリンクから、ご回答をお願いいたします。',
         ],
         'personality' => [

@@ -30,12 +30,12 @@ class LogAccess
         'trainee-measurements.store' => 'create_trainee_measurement',
         'trainee-measurements.update' => 'edit_trainee_measurement',
         'trainee-measurements.destroy' => 'delete_trainee_measurement',
-        // 受付アンケート案内（DS-1000。2026-10 追加）。対象はトレーニー（target_type='Trainee'、
+        // 愛犬アンケート案内（DS-1000。2026-10 追加）。対象はトレーニー（target_type='Trainee'、
         // target_id はルートの {trainee}。トークンの行は取消で物理削除されるため）。
         // お客様の回答は記録しない（access_logs.trainer_id が NOT NULL のため。db-schema.md 5-16）
         'trainee-intake-survey-tokens.store' => 'create_trainee_intake_survey_token',
         'trainee-intake-survey-tokens.destroy' => 'delete_trainee_intake_survey_token',
-        // 性格診断の案内（DS-1100。2026-10 追加）。受付アンケート案内と同じく、対象はトレーニー
+        // 性格診断の案内（DS-1100。2026-10 追加）。愛犬アンケート案内と同じく、対象はトレーニー
         // （target_type='Trainee'、target_id はルートの {trainee}）。お客様の回答・結果を見たことは記録しない
         'trainee-personality-diagnosis-tokens.store' => 'create_trainee_personality_diagnosis_token',
         'trainee-personality-diagnosis-tokens.destroy' => 'delete_trainee_personality_diagnosis_token',

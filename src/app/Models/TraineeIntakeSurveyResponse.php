@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * 受付アンケートの回答（D-1100。2026-10 追加）。
+ * 愛犬アンケートの回答（D-1100。2026-10 追加）。
  *
- * お客様が受付アンケート（S-1413）で答えた内容を、トレーニーの属性とは別に「答えたとおり」に残す
+ * お客様が愛犬アンケート（S-1413）で答えた内容を、トレーニーの属性とは別に「答えたとおり」に残す
  * （回答の基本情報でトレーニーを上書きする。空・未選択の項目は変えない。要件定義書 6-15-17）。1 頭に複数件持てる（第1段階では 1 件）。
  * トレーナー側では閲覧のみ（S-0309。要件定義書 6-16-10）。お客様の操作で作られるため、
  * created_by / updated_by は持たない。
@@ -98,7 +98,7 @@ class TraineeIntakeSurveyResponse extends Model
     }
 
     /**
-     * 回答に使った受付アンケート用 URL のトークン（トークンが削除されていれば null）
+     * 回答に使った愛犬アンケート用 URL のトークン（トークンが削除されていれば null）
      */
     public function token(): BelongsTo
     {

@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('title', '受付アンケートのご案内')
+@section('title', __('messages.intake_survey_name').'のご案内')
 
 @section('content')
-{{-- 受付アンケートのご案内（S-0311。2026-10 追加。要件定義書 6-16-8）。会員詳細（S-0305）の［受付アンケートの案内を表示］から開く。
+{{-- 愛犬アンケートのご案内（S-0311。2026-10 追加。要件定義書 6-16-8）。会員詳細（S-0305）の［愛犬アンケートの案内を表示］から開く。
      作りはマイページ登録のご案内（S-0307）と同じ（invitations/_panels）。S-0307 との違い：有効期限を持たない
      （代わりに「1回かぎり」の文）、帯の色（緑）、文面。
      2026-10-18 変更：ユーザーレビューで、印刷して渡す作りをやめ、LINE・メールで送る・その場で読み取ってもらう 2 つの欄にした
@@ -17,17 +17,17 @@
     </div>
 
     {{-- 案内を見分ける帯＝ページの見出し（h1。緑）。有効な案内がないときも出す --}}
-    <x-print-band label="受付アンケートのご案内" variant="intake" icon="clipboard-check" />
+    <x-print-band :label="__('messages.intake_survey_name').'のご案内'" variant="intake" icon="clipboard-check" />
 
     @if($url)
         @include('invitations._panels', [
             'copyText' => $copyText,
             'url' => $url,
-            'qrLabel' => '受付アンケート案内の QR コード',
+            'qrLabel' => __('messages.intake_survey_name').'の案内の QR コード',
         ])
     @else
         {{-- 有効な案内なし（未発行・取消済み・回答済みのいずれでも同じ）。「ない」ことは本文（太字）で伝える --}}
-        <p class="invitation-empty"><strong>有効な受付アンケート案内がありません。</strong></p>
+        <p class="invitation-empty"><strong>有効な{{ __('messages.intake_survey_name') }}の案内がありません。</strong></p>
     @endif
 </div>
 @endsection

@@ -9,11 +9,12 @@ use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsIntakeSurveyName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 受付アンケート案内の発行・取消（POST／DELETE /trainees/{trainee}/intake-survey-tokens。2026-10 追加）。
+ * 愛犬アンケート案内の発行・取消（POST／DELETE /trainees/{trainee}/intake-survey-tokens。2026-10 追加）。
  *
  * - 発行のあとは同じタブで S-0311 を開き、完了メッセージは載せない（2026-10 変更）。有効な案内が
  *   すでにあれば新しく作らず今ある案内の S-0311 を開く。回答済みなら 409
@@ -25,6 +26,7 @@ use Tests\TestCase;
  */
 class TraineeIntakeSurveyTokenControllerTest extends TestCase
 {
+    use AssertsIntakeSurveyName;
     use CreatesClientCountTables;
 
     private Trainee $trainee;
@@ -85,7 +87,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
         // 発行のあとは会員詳細（ページの上）に戻る。S-0311 には移らない（2026-10-17 変更）
         $response->assertRedirect(route('clients.show', 7));
-        $response->assertSessionHas('success', 'モモの受付アンケートの案内を発行しました。');
+        $response->assertSessionHas('success', 'モモの愛犬アンケートの案内を発行しました。');
 
         $token = TraineeIntakeSurveyToken::query()->sole();
         $this->assertSame($this->trainee->id, (int) $token->trainee_id);
@@ -102,7 +104,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
             ->assertRedirect(route('clients.show', 7))
-            ->assertSessionHas('success', '名前未登録の受付アンケートの案内を発行しました。');
+            ->assertSessionHas('success', '名前未登録の愛犬アンケートの案内を発行しました。');
     }
 
     public function test_return_toにtraineeを送っても会員詳細に戻る(): void
@@ -168,7 +170,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertSame('create_trainee_intake_survey_token', $log->action);
         $this->assertSame('Trainee', $log->target_type);
         $this->assertSame($this->trainee->id, (int) $log->target_id);
-        $this->assertSame('受付アンケート案内発行', AccessLog::actionLabels()[$log->action]);
+        $this->assertSame('愛犬アンケート案内発行', AccessLog::actionLabels()[$log->action]);
     }
 
     // ---- 取消 ----
@@ -181,7 +183,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $response = $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee));
 
         $response->assertRedirect(route('clients.show', 7));
-        $response->assertSessionHas('success', '受付アンケートの案内を取り消しました。');
+        $response->assertSessionHas('success', '愛犬アンケートの案内を取り消しました。');
         $this->assertSame([$answered], TraineeIntakeSurveyToken::query()->pluck('id')->all());
         $this->assertFalse(TraineeIntakeSurveyToken::query()->whereKey($active)->exists());
     }
@@ -193,7 +195,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $response = $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee), ['return_to' => 'trainee']);
 
         $response->assertRedirect(route('clients.show', 7));
-        $response->assertSessionHas('success', '受付アンケートの案内を取り消しました。');
+        $response->assertSessionHas('success', '愛犬アンケートの案内を取り消しました。');
     }
 
     public function test_有効な案内がなければ取消は409(): void
@@ -213,7 +215,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertSame('delete_trainee_intake_survey_token', $log->action);
         $this->assertSame('Trainee', $log->target_type);
         $this->assertSame($this->trainee->id, (int) $log->target_id);
-        $this->assertSame('受付アンケート案内取消', AccessLog::actionLabels()[$log->action]);
+        $this->assertSame('愛犬アンケート案内取消', AccessLog::actionLabels()[$log->action]);
     }
 
     // ---- 権限 ----
@@ -256,5 +258,25 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         auth('web')->logout();
         $this->get('/trainees/'.$this->trainee->id.'/intake-survey-tokens')->assertRedirect(route('login'));
         $this->assertSame(0, TraineeIntakeSurveyToken::query()->count());
+    }
+
+    // ---- 愛犬アンケートの名前（2026-10-19 変更：その前は「受付アンケート」） ----
+
+    public function test_完了メッセージと操作の記録の表示名は文のファイルの1か所の名前から出す(): void
+    {
+        $this->overrideIntakeSurveyName('テストアンケート');
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
+            ->assertSessionHas('success', $this->trainee->display_name.'のテストアンケートの案内を発行しました。');
+        $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee))
+            ->assertSessionHas('success', 'テストアンケートの案内を取り消しました。');
+        $this->assertSame('テストアンケート案内発行', AccessLog::actionLabels()['create_trainee_intake_survey_token']);
+        $this->assertSame('テストアンケート案内取消', AccessLog::actionLabels()['delete_trainee_intake_survey_token']);
+    }
+
+    public function test_操作の記録の表示名は愛犬アンケート(): void
+    {
+        $this->assertSame('愛犬アンケート案内発行', AccessLog::actionLabels()['create_trainee_intake_survey_token']);
+        $this->assertSame('愛犬アンケート案内取消', AccessLog::actionLabels()['delete_trainee_intake_survey_token']);
     }
 }

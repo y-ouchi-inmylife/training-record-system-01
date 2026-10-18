@@ -196,7 +196,7 @@ class TraineeFormErrorRenderingTest extends TestCase
 
     /**
      * 誕生日の説明文（2026-10 変更）：年だけ・年月だけでも入力できることが分かる文。登録・編集の両方で出す
-     * （受付アンケートの回答画面 S-1413 も同じ文。ClientIntakeSurveyShowTest で確かめる）
+     * （愛犬アンケートの回答画面 S-1413 も同じ文。ClientIntakeSurveyShowTest で確かめる）
      */
     public function test_誕生日の説明文は登録と編集の両方で新しい文(): void
     {
@@ -284,16 +284,16 @@ class TraineeFormErrorRenderingTest extends TestCase
         $this->assertStringContainsString('trainee-birthday-input', $html);
     }
 
-    // ---- 受付アンケートの案内を発行するチェックは置かない（2026-10 変更。発行は会員詳細だけ） ----
+    // ---- 愛犬アンケートの案内を発行するチェックは置かない（2026-10 変更。発行は会員詳細だけ） ----
 
-    public function test_登録にも編集にも受付アンケートの案内を発行するチェックと説明文を出さない(): void
+    public function test_登録にも編集にも愛犬アンケートの案内を発行するチェックと説明文を出さない(): void
     {
         foreach ([$this->renderForm([]), $this->renderForm([], isEdit: true)] as $view) {
             $html = $view->__toString();
 
             $this->assertStringNotContainsString('issue_intake_survey', $html);
             $this->assertStringNotContainsString('type="checkbox"', $html);
-            $this->assertStringNotContainsString('受付アンケートの案内を発行する', $html);
+            $this->assertStringNotContainsString('愛犬アンケートの案内を発行する', $html);
             $this->assertStringNotContainsString('お客様にお渡しする案内（QR コード・URL）を発行します。', $html);
         }
     }

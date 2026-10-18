@@ -13,10 +13,10 @@
     $initial = fn (string $key) => $hasOldInput ? old($key) : $trainee->{$key};
 @endphp
 
-@section('title', '受付アンケート')
+@section('title', __('messages.intake_survey_name'))
 
 @section('content')
-{{-- 受付アンケート回答画面（S-1413。2026-10 追加。要件定義書 6-15-17）。
+{{-- 愛犬アンケート回答画面（S-1413。2026-10 追加。要件定義書 6-15-17）。
      画面の作りは S-1403 初回設定（client/setup/index.blade.php）にそろえる：.c-login--wide、見出しはカードの外、
      入力欄はカードの中に縦一列、<h2 class="fs-6 fw-bold mb-2"> の小見出しは「暮らしの様子」の 1 つだけ（fs-6 を外さないこと。
      理由は S-1403 の「お名前」小見出しのコメント参照）、区切り線は愛犬の基本情報／「暮らしの様子」の境目の 1 本だけ
@@ -28,7 +28,7 @@
      - 会員の氏名・連絡先・住所は出さない（ログインしない画面で、URL を知っていれば開けるため）
      - 所要時間の目安は書かない（設計書 S-1413） --}}
 <div class="c-login c-login--wide">
-    <h1 class="mb-2">受付アンケート</h1>
+    <h1 class="mb-2">{{ __('messages.intake_survey_name') }}</h1>
     <p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>
 
     <div class="card c-login-card">

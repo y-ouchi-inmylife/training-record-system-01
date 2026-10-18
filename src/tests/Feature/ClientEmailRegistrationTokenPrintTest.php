@@ -247,7 +247,7 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertSame(1, substr_count($html, '<h1'));
         $this->assertSame(1, substr_count(preg_replace('/<title>.*?<\/title>/su', '', $html), 'マイページ登録のご案内'));
         $this->assertStringNotContainsString('print-title', $html);
-        // 受付アンケートの帯は出さない
+        // 愛犬アンケートの帯は出さない
         $this->assertStringNotContainsString('print-band--intake', $html);
     }
 
