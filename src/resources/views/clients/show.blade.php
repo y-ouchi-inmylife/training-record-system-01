@@ -596,7 +596,11 @@
                                     <dd class="col-8 mb-1">{{ $trainee->birthday_with_age_label }}</dd>
                                     {{-- 去勢・避妊（2026-10 追加）。誕生日の下・最終計測の上。未登録は空欄（§2-4）。
                                          2026-10 にトレーニーの備考（この下の行）をなくした --}}
-                                    <dt class="col-4 fw-normal text-muted">去勢・避妊</dt>
+                                    {{-- ラベルは言葉の途中で折り返さない（2026-10-18 追加。狭い幅〔992px でラベルの列 約 86px、375px で約 76px〕で
+                                         「去勢・避／妊」「最終計／測」と折れていたため）。「愛犬性格診断」のリンクと同じく、keep-all と <wbr> で
+                                         「去勢・／避妊」「最終／計測」の位置でだけ折り返し、overflow-wrap: normal で受け継ぐ break-word を止める。
+                                         2〜3 文字のラベル（犬種・性別・誕生日）は狭い幅でも 1 行に収まるので付けない --}}
+                                    <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">去勢・<wbr>避妊</dt>
                                     <dd class="col-8 mb-1">{{ $trainee->neuter_status_label }}</dd>
                                     {{-- 最終計測（設計書 S-0305 セクション3「最終計測」参照）。
                                          最新 1 件は Trainee::latest_measurement アクセサ経由で取り出し、
@@ -605,7 +609,7 @@
                                     {{-- 計測値の登録のボタンは置かない（2026-10 変更。計測値の登録はトレーニー詳細 S-0309 の
                                          計測値の欄から行い、会員詳細のトレーニーの欄はトレーニーの情報を見る場所にするため）。
                                          値だけをほかの属性と同じ dd で出す（行の高さもほかの属性とそろう） --}}
-                                    <dt class="col-4 fw-normal text-muted">最終計測</dt>
+                                    <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測</dt>
                                     <dd class="col-8 mb-0">@if($trainee->latest_measurement){{ $trainee->latest_measurement->measured_date->format('Y/m/d') }}（{{ number_format((float) $trainee->latest_measurement->weight_kg, 2) }}kg）@endif</dd>
                                 </dl>
                                 {{-- 性格診断の行（2026-10 追加。要件定義書 6-16-11〜6-16-13、設計書 S-0305 セクション3「性格診断の行」）。

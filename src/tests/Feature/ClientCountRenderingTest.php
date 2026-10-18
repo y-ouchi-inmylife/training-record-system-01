@@ -526,7 +526,9 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         // ラベルの並び（2026-10 変更：トレーニーの備考をなくした）
-        preg_match_all('/<dt class="col-4 fw-normal text-muted">([^<]+)<\/dt>/u', $html, $m);
+        // ラベルの文字（折り返しの印 <wbr> を除いたもの。2026-10-18 から「去勢・避妊」「最終計測」に印が入る）
+        preg_match_all('/<dt class="col-4 fw-normal text-muted"[^>]*>(.+?)<\/dt>/u', $html, $m);
+        $m[1] = array_map(fn ($label) => str_replace('<wbr>', '', $label), $m[1]);
         $this->assertSame(['犬種', '性別', '誕生日', '去勢・避妊', '最終計測'], array_slice($m[1], 0, 5));
         $this->assertNotContains('備考', $m[1]);
     }
@@ -624,7 +626,7 @@ class ClientCountRenderingTest extends TestCase
         );
 
         // 最終計測の行は写真の有無にかかわらず同じ並べ方（ほかの属性と同じ dd）
-        $this->assertSame(2, preg_match_all('/<dt class="col-4 fw-normal text-muted">最終計測<\/dt>\s*<dd class="col-8 mb-0"><\/dd>/u', $html));
+        $this->assertSame(2, preg_match_all('/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測<\/dt>\s*<dd class="col-8 mb-0"><\/dd>/u', $html));
         // 項目の dl は写真の有無で変わらない（flex-grow-1 などを持たない）
         $this->assertSame(2, substr_count($html, '<dl class="row mb-0 small">'));
     }
@@ -648,7 +650,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('name="return_to"', $html);
         $this->assertStringNotContainsString(route('trainee-measurements.store', $id), $html);
         // 最終計測の値は今までどおり（ほかの属性と同じ dd の中に値だけ）
-        $this->assertMatchesRegularExpression('/<dt class="col-4 fw-normal text-muted">最終計測<\/dt>\s*<dd class="col-8 mb-0">2026\/10\/13（3\.20kg）<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測<\/dt>\s*<dd class="col-8 mb-0">2026\/10\/13（3\.20kg）<\/dd>/u', $html);
     }
 
     public function test_pc幅では左のトレーニング記録カードを右の列の高さに合わせる(): void
@@ -844,7 +846,7 @@ class ClientCountRenderingTest extends TestCase
         // 「暮らしの様子」のリンクは、性格診断の行のすぐ後ろ（トレーニーの欄のいちばん下）。S-0309 の #intake-survey へ
         // （2026-10 変更：当初は最終計測のすぐ後ろ・性格診断の行の前。トレーニー詳細の欄の順にそろえた）
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
-        $this->assertGreaterThan(strpos($html, '>最終計測</dt>'), strpos($html, '>愛犬<wbr>性格診断</a>'));
+        $this->assertGreaterThan(strpos($html, '>最終<wbr>計測</dt>'), strpos($html, '>愛犬<wbr>性格診断</a>'));
         $this->assertGreaterThan(strpos($html, '>愛犬<wbr>性格診断</a>'), strpos($html, '>暮らしの様子</a>'));
         // 回答日時は出さない
         $this->assertStringNotContainsString('2026/10/16', $html);
@@ -1669,5 +1671,28 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringContainsString('>&lt;b&gt;愛犬&lt;/b&gt;<wbr>性格診断</a>', $html);
         $this->assertStringNotContainsString('<b>愛犬</b>', $html);
+    }
+
+    public function test_トレーニーの欄の長いラベルは言葉の間でだけ折り返す(): void
+    {
+        // 「最終計測」「去勢・避妊」は狭い幅（992px・375px）でラベルの列に 1 行で収まらないので、「最終／計測」「去勢・／避妊」の
+        // 位置でだけ折り返す（2026-10-18 追加。「愛犬性格診断」のリンクと同じやり方）。2〜3 文字のラベルには付けない
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $keepAll = '<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">';
+        $this->assertStringContainsString($keepAll.'去勢・<wbr>避妊</dt>', $html);
+        $this->assertStringContainsString($keepAll.'最終<wbr>計測</dt>', $html);
+        foreach (['犬種', '性別', '誕生日'] as $label) {
+            $this->assertStringContainsString('<dt class="col-4 fw-normal text-muted">'.$label.'</dt>', $html);
+        }
+        // 長いラベルはこの 2 つだけ（印のないまま 4 文字以上のラベルが残っていない）
+        preg_match_all('/<dt class="col-4 fw-normal text-muted">([^<]+)<\/dt>/u', $html, $m);
+        foreach ($m[1] as $label) {
+            $this->assertLessThanOrEqual(3, mb_strlen($label), $label);
+        }
     }
 }
