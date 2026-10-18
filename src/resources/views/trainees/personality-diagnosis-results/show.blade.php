@@ -169,7 +169,8 @@
          隠しの欄に写してから送る（下のスクリプト。二重に押されないよう、送ったらボタンを押せなくする）。キャンセルは 4-4 のとおり塗り。
          2026-10-18 変更：公開でトレーニング記録を作らなくなったため、見出しと文を変えた（その前は「トレーニング記録にして公開」）。
          2026-10-18 変更：ユーザーレビューで、見出しを「{名前}の公開」、文を「会員のマイページに{名前}を公開します。」にした
-         （その前は「評価文の公開」と、直せること・すぐ見えることを添えた文）。名前は $pdName（lang/ja/messages.php の 1 か所） --}}
+         （その前は「評価文の公開」と、直せること・すぐ見えることを添えた文）。名前は $pdName（lang/ja/messages.php の 1 か所）。
+         2026-10-18 変更：ユーザーレビューで、文のあとに「よろしいですか？」を足した（同じ行に続け、全角の「？」。トレーナー側のほかの確認にそろえた） --}}
     @if(! $isPublished)
         <div class="modal fade" id="personality-diagnosis-publish" tabindex="-1"
              aria-labelledby="personality-diagnosis-publish-label" aria-hidden="true" data-personality-diagnosis-publish>
@@ -180,7 +181,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="mb-0">会員のマイページに{{ $pdName }}を公開します。</p>
+                        <p class="mb-0">会員のマイページに{{ $pdName }}を公開します。よろしいですか？</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
