@@ -173,7 +173,7 @@ erDiagram
     trainers ||--o{ client_email_registration_tokens : "発行"
     clients ||--o{ client_email_change_tokens : "メールアドレス変更"
     clients ||--o{ client_password_reset_tokens : "パスワード再設定"
-    trainees ||--o{ trainee_intake_survey_tokens : "受付アンケート案内"
+    trainees ||--o{ trainee_intake_survey_tokens : "愛犬アンケート案内"
     trainers ||--o{ trainee_intake_survey_tokens : "発行"
     trainees ||--o{ trainee_personality_diagnosis_tokens : "愛犬性格診断の案内"
     trainers ||--o{ trainee_personality_diagnosis_tokens : "発行"
@@ -221,7 +221,7 @@ erDiagram
 
     clients ||--o{ trainees : "トレーニングを受ける対象を持つ"
     trainees ||--o{ trainee_measurements : "計測される"
-    trainees ||--o{ trainee_intake_survey_responses : "受付アンケートに回答される"
+    trainees ||--o{ trainee_intake_survey_responses : "愛犬アンケートに回答される"
     trainee_intake_survey_tokens |o--o{ trainee_intake_survey_responses : "回答に使う（NULL はトークン削除済み）"
     trainees ||--o{ trainee_personality_diagnosis_results : "愛犬性格診断に回答される"
     trainee_personality_diagnosis_tokens |o--o{ trainee_personality_diagnosis_results : "回答に使う（NULL はトークン削除済み）"
@@ -614,7 +614,7 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
-| name | VARCHAR(50) | YES | NULL | 名前。**任意**（2026-10 に NOT NULL から NULL 許容に変更。受付アンケート案内だけを先に発行する運用のため）。未登録のときの表示は要件定義書 6-16「名前が未登録のときの表示」（トレーナー側は「名前未登録」、会員側は「愛犬」）。受付アンケートの回答で上書きされる（**2026-10 変更**：当初は未登録のときだけ埋まるとしていた）。犬の名前はひらがな・カタカナが多く、よみ（かな）は持たない |
+| name | VARCHAR(50) | YES | NULL | 名前。**任意**（2026-10 に NOT NULL から NULL 許容に変更。愛犬アンケート案内だけを先に発行する運用のため）。未登録のときの表示は要件定義書 6-16「名前が未登録のときの表示」（トレーナー側は「名前未登録」、会員側は「愛犬」）。愛犬アンケートの回答で上書きされる（**2026-10 変更**：当初は未登録のときだけ埋まるとしていた）。犬の名前はひらがな・カタカナが多く、よみ（かな）は持たない |
 | breed | VARCHAR(100) | YES | NULL | 犬種。自由入力（「ミックス」等の表記に対応するためマスタは持たない） |
 | sex | VARCHAR(20) | YES | NULL | 性別。値は 5-20. 参照 |
 | birth_year | SMALLINT UNSIGNED | YES | NULL | 誕生日の年（2026-10 新設。旧 `birth_date` を年・月・日に分けた。下の注記参照）。誕生日は分かるところだけ入れる |
@@ -624,7 +624,7 @@ erDiagram
 | photo_path | VARCHAR(500) | YES | NULL | トレーニーの写真のオブジェクトストレージ上の保存パス（キー）。写真未登録は NULL。**リサイズ済みの JPEG 1 枚のみ**（原寸・サムネイルは持たない）。詳細は下の注記「トレーニー写真の扱い」参照 |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
-| updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー）。**写真の登録・削除で会員が更新した場合は NULL のまま**（トレーナーによる更新の追跡カラムのため、会員操作では触らない。詳細は下の注記参照）。**受付アンケートの回答をトレーニーに反映する場合も触らない**（2026-10 追加。お客様の操作でトレーナーの更新者が書き換わらないように。下の注記「受付アンケートの回答の反映」参照） |
+| updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー）。**写真の登録・削除で会員が更新した場合は NULL のまま**（トレーナーによる更新の追跡カラムのため、会員操作では触らない。詳細は下の注記参照）。**愛犬アンケートの回答をトレーニーに反映する場合も触らない**（2026-10 追加。お客様の操作でトレーナーの更新者が書き換わらないように。下の注記「愛犬アンケートの回答の反映」参照） |
 
 ##### インデックス
 
@@ -655,8 +655,8 @@ erDiagram
   - `birth_year` に**固定の下限（例：1900）は付けない**。「今年から30年前まで」の制限はアプリ側で見ており、業務上の意味のない固定値を DB に足すと、ルールが 2 か所に分かれるため
 - **既存データの移行**（2026-10）：`name` の NULL 許容化、`birth_date` の3カラムへの分割、`neuter_status` の追加は、既存の `create_trainees_table` マイグレーションを書き換えず、**移行用のマイグレーションを新しく足して**行う。既存の `birth_date` の値は、年・月・日に分けて `birth_year` / `birth_month` / `birth_day` に移してから `birth_date` を削除する。`down()` では `birth_date` を作り直し、**誕生日の 3 項目がそろっている行は `birth_date` に戻す**。年だけ・年月だけの行は日付にできないため `birth_date` を空（NULL）にする。**名前が未登録の行は空文字で埋めてから NOT NULL に戻す**（戻すのは開発中の作業がほとんどで、失敗して止まるより戻せる方が扱いやすいため）
   - **理由**：本番の反映手順は `migrate --force` で、お客様の確認用のデータが本番に残っているため。追加のマイグレーションなら、既存のデータを移しながら適用できる。2026-10 の契約・利用の変更（`client_usages` への `client_contract_id` の追加、`count` の削除）も、既存のマイグレーションを書き換えず追加のマイグレーションで行っている
-- **受付アンケートの回答の反映**（2026-10 追加、要件定義書 6-15-17 参照）：お客様が受付アンケート（D-1100）に回答すると、回答の保存と同じトランザクションで、回答の基本情報（`name` / `breed` / `sex` / `birth_year`・`birth_month`・`birth_day` / `neuter_status`）で本テーブルの値を**上書きする**（回答が空・未選択の項目は変えない。誕生日は年・月・日をひとまとまりで扱い、どれかが入っていれば 3 つまとめて上書きする）。反映の条件は要件定義書 6-15-17 を正とする。**2026-10 変更**：当初は本テーブルの**空欄の項目だけ**に反映していた（`sex`・`neuter_status` が `unknown` なら入力済みとみなす、誕生日は年・月・日のすべてが NULL のときだけ反映する、回答の `dont_know` は `unknown` として反映する）。反映は**お客様の操作のため `updated_by` は触らない**（写真の登録・削除と同じ扱い）
-- **備考（`note`）は持たない**（**2026-10 変更**）：当初は TEXT 型の `note`（備考）を持っていたが、受付アンケートの「暮らしの様子」（要件定義書 6-16-10）で、飼い主さんの言葉で愛犬の様子を残せるようになったため、なくした。列は、既存の `create_trainees_table` を書き換えず、**列を消すマイグレーションを新しく足して**消す（`2026_10_15_000006_drop_note_from_trainees_table`。本番は追加のマイグレーションで反映するため）。`down()` は列を元の定義〔`text('note')->nullable()`〕で足し直すが、中身は戻らない
+- **愛犬アンケートの回答の反映**（2026-10 追加、要件定義書 6-15-17 参照）：お客様が愛犬アンケート（D-1100）に回答すると、回答の保存と同じトランザクションで、回答の基本情報（`name` / `breed` / `sex` / `birth_year`・`birth_month`・`birth_day` / `neuter_status`）で本テーブルの値を**上書きする**（回答が空・未選択の項目は変えない。誕生日は年・月・日をひとまとまりで扱い、どれかが入っていれば 3 つまとめて上書きする）。反映の条件は要件定義書 6-15-17 を正とする。**2026-10 変更**：当初は本テーブルの**空欄の項目だけ**に反映していた（`sex`・`neuter_status` が `unknown` なら入力済みとみなす、誕生日は年・月・日のすべてが NULL のときだけ反映する、回答の `dont_know` は `unknown` として反映する）。反映は**お客様の操作のため `updated_by` は触らない**（写真の登録・削除と同じ扱い）
+- **備考（`note`）は持たない**（**2026-10 変更**）：当初は TEXT 型の `note`（備考）を持っていたが、愛犬アンケートの「暮らしの様子」（要件定義書 6-16-10）で、飼い主さんの言葉で愛犬の様子を残せるようになったため、なくした。列は、既存の `create_trainees_table` を書き換えず、**列を消すマイグレーションを新しく足して**消す（`2026_10_15_000006_drop_note_from_trainees_table`。本番は追加のマイグレーションで反映するため）。`down()` は列を元の定義〔`text('note')->nullable()`〕で足し直すが、中身は戻らない
 - 将来的にトレーニングの対象を犬以外（人間等）に広げる可能性を見据え、テーブル名・カラム名は犬に限定しない命名としている。ただし `breed` は犬固有の項目であり、対象を広げる際は使用しないカラムとして残すか別テーブルへの切り出しを検討する
 - `created_by` は持たない（`training_records` 等の既存テーブルと同様、`updated_by` のみ）
 - **トレーニー写真の扱い**（2026-09 追加、要件定義書 6-15-15 参照）：
@@ -799,7 +799,9 @@ erDiagram
 
 ---
 
-#### D-1100 trainee_intake_survey_responses（受付アンケート回答）
+#### D-1100 trainee_intake_survey_responses（愛犬アンケート回答）
+
+**2026-10-19 変更**：機能の名前を「受付アンケート」から「愛犬アンケート」にした（用語集 No.30）。テーブル名・列名・操作の記録のキー（`create_trainee_intake_survey_token` など）は変えない。操作の記録の表示名は「愛犬アンケート案内発行」「愛犬アンケート案内取消」（その前は「受付アンケート…」）。
 
 ##### カラム定義
 
@@ -807,7 +809,7 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | trainee_id | BIGINT UNSIGNED | NO | — | 回答の対象のトレーニーのID（外部キー） |
-| trainee_intake_survey_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った受付アンケート用 URL のトークン（DS-1000）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も回答は残すため NULL 許容（下の制約参照） |
+| trainee_intake_survey_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った愛犬アンケート用 URL のトークン（DS-1000）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も回答は残すため NULL 許容（下の制約参照） |
 | answered_at | TIMESTAMP | NO | — | 回答日時。送信時に自動設定する。回答の記録を兼ねる（お客様の回答はアクセスログに記録しない。5-16. の注記参照） |
 | name | VARCHAR(50) | YES | NULL | 名前。回答では常に必須（アプリ側で検証）。型は `trainees.name` と同じ。**2026-10 変更**：当初はトレーニーの名前が未登録のときだけ入力欄を出して必須とし、登録済みのときは回答時点のトレーニーの名前を記録していた。NULL 許容は変えない（列の定義を変える追加のマイグレーションを避けるため。値は常に入る） |
 | breed | VARCHAR(100) | YES | NULL | 犬種。答えたとおりの内容。型は `trainees.breed` と同じ |
@@ -844,7 +846,7 @@ erDiagram
 
 ##### 注記
 
-- **答えたとおりの内容を残す**：トレーニー（D-0700）は回答で上書きする（空・未選択の項目は変えない。D-0700 の注記「受付アンケートの回答の反映」）が、本テーブルには反映の有無にかかわらず、送られてきた内容をそのまま保存する。トレーニーの現在の値と違うことがある（反映されなかった空・未選択の項目、回答のあとにトレーナーが直した項目）。回答はトレーナー側では閲覧のみで、更新・削除の操作は持たない（要件定義書 6-16-10）
+- **答えたとおりの内容を残す**：トレーニー（D-0700）は回答で上書きする（空・未選択の項目は変えない。D-0700 の注記「愛犬アンケートの回答の反映」）が、本テーブルには反映の有無にかかわらず、送られてきた内容をそのまま保存する。トレーニーの現在の値と違うことがある（反映されなかった空・未選択の項目、回答のあとにトレーナーが直した項目）。回答はトレーナー側では閲覧のみで、更新・削除の操作は持たない（要件定義書 6-16-10）
 - **1頭に複数件持てる**（ユニーク制約を付けない）。第1段階では1頭につき1件（回答済みのトレーニーには案内を発行できないため。DS-1000 の備考参照）。複数件ある場合は `answered_at` の新しい順に並べる。第2段階で、50問の診断の回答・採点結果・AI の下書きを本テーブルにひも付けて加える予定（要件定義書 D-1100）
   - `(trainee_id, answered_at)` の**複合インデックスは付けない**。第1段階では1頭1件のため。件数が増える第2段階で必要になれば足す
 - **性別・去勢・避妊の値をトレーニーと同じにする**（**2026-10 変更**）：お客様の回答でトレーニーを上書きするようになったため、選択肢と値をトレーニー（5-20.・5-21.）にそろえた（要件定義書 6-15-17 備考）
@@ -901,7 +903,7 @@ erDiagram
 
 | 制約名 | 種類 | 条件 | ON DELETE | 説明 |
 |--------|------|------|-----------|------|
-| trainee_personality_diagnosis_results_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時は結果も削除する（要件定義書 D-1200。受付アンケートの回答と同じ） |
+| trainee_personality_diagnosis_results_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時は結果も削除する（要件定義書 D-1200。愛犬アンケートの回答と同じ） |
 | trainee_personality_diagnosis_results_token_id_foreign | FOREIGN KEY | trainee_personality_diagnosis_token_id → trainee_personality_diagnosis_tokens(id) | SET NULL | トークンが削除されても結果は残す（D-1100 と同じ） |
 | trainee_personality_diagnosis_results_eval_by_foreign | FOREIGN KEY | evaluation_updated_by → trainers(id) | SET NULL | トレーナーを削除しても評価文は残し、最終保存者だけを NULL にする（**2026-10-18 追加**。ほかの表の `updated_by` と同じ） |
 | trainee_personality_diagnosis_results_pub_by_foreign | FOREIGN KEY | evaluation_published_by → trainers(id) | SET NULL | トレーナーを削除しても公開は続け、公開したトレーナーだけを NULL にする（**2026-10-18 追加**） |
@@ -1246,14 +1248,14 @@ erDiagram
 
 ---
 
-#### DS-1000 trainee_intake_survey_tokens（受付アンケート用 URL のトークン）
+#### DS-1000 trainee_intake_survey_tokens（愛犬アンケート用 URL のトークン）
 
-**概要**: トレーナーがトレーニーごとに発行する、受付アンケート案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに受付アンケートに回答し（回答は D-1100）、送信するとトークンは使用済みになる。
+**概要**: トレーナーがトレーニーごとに発行する、愛犬アンケート案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに愛犬アンケートに回答し（回答は D-1100）、送信するとトークンは使用済みになる。
 
 **対応する要件**:
-- 受付アンケート案内の発行（6-16-8）
-- 受付アンケート案内の取消（6-16-9）
-- 受付アンケートの回答（6-15-17）
+- 愛犬アンケート案内の発行（6-16-8）
+- 愛犬アンケート案内の取消（6-16-9）
+- 愛犬アンケートの回答（6-15-17）
 
 ##### カラム定義
 
@@ -1261,7 +1263,7 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。カラム型 VARCHAR(64) は将来の長さ拡張に備えた余裕。重複不可。既存のトークン（DS-0600〜DS-0900）と同じく平文で持つ |
-| trainee_id | BIGINT UNSIGNED | NO | — | 受付アンケートの対象のトレーニーのID（外部キー）。発行時から特定のトレーニーに紐づく |
+| trainee_id | BIGINT UNSIGNED | NO | — | 愛犬アンケートの対象のトレーニーのID（外部キー）。発行時から特定のトレーニーに紐づく |
 | answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。回答の送信を受け付けた時点で設定する。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない） |
 | created_at | TIMESTAMP | YES | NULL | 発行日時（状態「回答待ち」に添える発行日に使う） |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
@@ -1284,7 +1286,7 @@ erDiagram
 | trainee_intake_survey_tokens_created_by_foreign | FOREIGN KEY | created_by → trainers(id) | SET NULL | 発行者トレーナー削除時は NULL にする |
 
 **備考**:
-- **有効期限（`expires_at`）は持たない**（要件定義書 6-15-17 備考）。受付アンケートの URL は回答を受け付けるだけで、画面に個人情報を出さず、送信すれば使い切りになるため、マイページ登録案内（DS-0700）の URL と危険の大きさが違う。放置された案内はトレーナーが取り消す。したがって `architecture.md` §3-1 の有効期限の設定値も持たない
+- **有効期限（`expires_at`）は持たない**（要件定義書 6-15-17 備考）。愛犬アンケートの URL は回答を受け付けるだけで、画面に個人情報を出さず、送信すれば使い切りになるため、マイページ登録案内（DS-0700）の URL と危険の大きさが違う。放置された案内はトレーナーが取り消す。したがって `architecture.md` §3-1 の有効期限の設定値も持たない
 - **`is_used` は持たない**：使用済みかどうかは `answered_at` の有無で判定する（使用済みになった日時を状態の表示にも使うため、真偽値と日時を二重に持たない）
 - **`token` 以外の一意制約は付けない**。**同じトレーニーに有効な（`answered_at` が NULL の）案内は1つまで**という制約は、MySQL では条件付きのユニーク制約（部分インデックス）を書けないため、アプリ側で担保する：発行時に、トランザクション内で**対象のトレーニーの行を排他ロック**（`SELECT ... FOR UPDATE`）してから、有効な案内も回答（D-1100）もないことを確かめて発行する（同じトレーニーへの同時の発行で、有効な案内が2つできないようにするため。回答済みのトレーニーには発行できない〔第1段階〕）
 - **取消はトークン行の物理削除**（要件定義書 6-16-9）。対象は `answered_at` が NULL の行だけ。取消すると状態は「未発行」に戻る
@@ -1293,7 +1295,7 @@ erDiagram
   1. トークンの行を**排他ロック**する（`SELECT ... FOR UPDATE`。後から来た送信は、先の送信のトランザクションが終わるまで待つ）
   2. `answered_at` が NULL であることを確かめる（NULL でなければ、回答を保存せず「すでに回答済み」の画面を返す）
   3. 回答（D-1100）を保存する
-  4. 回答でトレーニー（D-0700）を上書きする（空・未選択の項目は変えない。D-0700 の注記「受付アンケートの回答の反映」。**2026-10 変更**：当初は空欄の項目だけに反映していた）。トレーニーの行も排他ロックしてから行う
+  4. 回答でトレーニー（D-0700）を上書きする（空・未選択の項目は変えない。D-0700 の注記「愛犬アンケートの回答の反映」。**2026-10 変更**：当初は空欄の項目だけに反映していた）。トレーニーの行も排他ロックしてから行う
   5. トークンの `answered_at` に回答日時を記録する（D-1100 の `answered_at` と同じ値）
 - お客様の回答はアクセスログ（DS-0500）に記録しない（5-16. の注記参照）。発行・取消はトレーナーの操作として記録する（`create_trainee_intake_survey_token` / `delete_trainee_intake_survey_token`）
 
@@ -1301,7 +1303,7 @@ erDiagram
 
 #### DS-1100 trainee_personality_diagnosis_tokens（愛犬性格診断用 URL のトークン）
 
-**概要**（**2026-10 追加**）: トレーナーがトレーニーごとに発行する、愛犬性格診断の案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに愛犬性格診断に回答し（結果は D-1200）、送信するとトークンは使用済みになる。**DS-1000（受付アンケート用 URL のトークン）と同じ作り**。
+**概要**（**2026-10 追加**）: トレーナーがトレーニーごとに発行する、愛犬性格診断の案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに愛犬性格診断に回答し（結果は D-1200）、送信するとトークンは使用済みになる。**DS-1000（愛犬アンケート用 URL のトークン）と同じ作り**。
 
 **対応する要件**:
 - 愛犬性格診断の案内の発行（6-16-11）
@@ -1340,7 +1342,7 @@ erDiagram
 - **有効期限（`expires_at`）は持たない**（要件定義書 6-15-18 備考。DS-1000 と同じ理由）。`architecture.md` §3-1 の有効期限の設定値も持たない
 - **同じトレーニーに有効な（`answered_at` が NULL の）案内は1つまで**：DS-1000 と同じく、アプリ側で担保する。発行時に、トランザクション内で**対象のトレーニーの行を排他ロック**（`SELECT ... FOR UPDATE`）してから、有効な案内がないことを確かめて発行する。**DS-1000 と違い、前の結果（D-1200）があっても発行できる**（何回でも受けられるため）
 - **取消はトークン行の物理削除**（要件定義書 6-16-12）。対象は `answered_at` が NULL の行だけ
-- **回答済みのトークン行は削除せず残す**：回答済みの URL を開いたときに「すでにご回答いただいています」の画面を出すため（DS-1000 と同じ）。トレーニーの状態は「有効な案内（本テーブルで `answered_at` が NULL の行）あり → 回答待ち、なし → 未発行」で判定する（受付アンケートのような「回答済み」の状態はない）
+- **回答済みのトークン行は削除せず残す**：回答済みの URL を開いたときに「すでにご回答いただいています」の画面を出すため（DS-1000 と同じ）。トレーニーの状態は「有効な案内（本テーブルで `answered_at` が NULL の行）あり → 回答待ち、なし → 未発行」で判定する（愛犬アンケートのような「回答済み」の状態はない）
 - **同時送信の防ぎ方**（要件定義書 6-15-18 動作）：回答の送信は次の順で 1 つのトランザクションの中で行う（DS-1000 と同じ作り）
   1. トークンの行を**排他ロック**する
   2. `answered_at` が NULL であることを確かめる（NULL でなければ、結果を保存せず「すでに回答済み」の画面を返す）
@@ -1402,8 +1404,8 @@ erDiagram
 | create_trainee_measurement | トレーニー計測値登録 |
 | edit_trainee_measurement | トレーニー計測値編集 |
 | delete_trainee_measurement | トレーニー計測値削除 |
-| create_trainee_intake_survey_token | 受付アンケート案内の発行 |
-| delete_trainee_intake_survey_token | 受付アンケート案内の取消 |
+| create_trainee_intake_survey_token | 愛犬アンケート案内の発行 |
+| delete_trainee_intake_survey_token | 愛犬アンケート案内の取消 |
 | create_trainee_personality_diagnosis_token | 愛犬性格診断の案内の発行（**2026-10 追加**） |
 | delete_trainee_personality_diagnosis_token | 愛犬性格診断の案内の取消（**2026-10 追加**） |
 | delete_trainee_personality_diagnosis_result | 愛犬性格診断の結果の削除（**2026-10 追加**） |
@@ -1419,10 +1421,10 @@ erDiagram
 
 `target_type` には短縮クラス名を格納する（例：会員は `'Client'`、トレーニング記録は `'TrainingRecord'`、トレーニーは `'Trainee'`、計測値は `'TraineeMeasurement'`）。トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため、参照の操作種別（`view_trainee`）は持たない（トレーニーの参照は `view_client` に含める。計測値も同様）。契約は `'ClientContract'`、利用は `'ClientUsage'` を格納する。契約・利用も会員詳細（S-0305）の中だけで表示するため、参照の操作種別は持たない（参照は `view_client` に含める）。
 
-- **`view_trainee` を持たない注記の前提について**（2026-10 追記）：上の「トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため」は、トレーニーを会員詳細の中だけで扱っていた段階①の前提で書いたもの。その後、トレーニー詳細は独立した画面（S-0309、`trainees.show`）になったが、トレーニー詳細の参照は記録していない（`view_trainee` は持たない）点は変わっていない。2026-10 に受付アンケートの回答（D-1100。愛犬の健康状態などを含む）を S-0309 で表示するようになったが、本書では参照の操作種別を追加していない。**第1段階では記録しない**。受付アンケートの回答を S-0309 で見せるようになっても、参照を記録しない既存の方針のまま。第2段階（回答を AI に送る段階）で、個人情報の扱いと一緒に見直す
-- **受付アンケート案内**（2026-10 追加）：`create_trainee_intake_survey_token`（発行）・`delete_trainee_intake_survey_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（トークンの行は取消で物理削除されるため、トークンではなくトレーニーを対象として記録する）。案内の発行は会員詳細（S-0305）の「受付アンケートの案内を発行」だけで行う（トレーニー登録 S-0308 では発行しない。**2026-10 変更**）ため、発行は必ず `create_trainee_intake_survey_token` として記録される
-- **愛犬性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）と、結果の削除 `delete_trainee_personality_diagnosis_result`、評価文の更新 `edit_trainee_personality_diagnosis_evaluation`・公開 `publish_trainee_personality_diagnosis_evaluation`・公開取消 `unpublish_trainee_personality_diagnosis_evaluation`（**2026-10-18 追加**）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（受付アンケート案内と同じ。結果の id は記録しない）。（**2026-10-18 変更**：その前〔段階1 の②〕は、評価文の公開を `create_training_record` として記録していた。公開で記録を作らなくなったため、専用の種別にした）愛犬性格診断詳細（S-0313）を見たことは記録しない。お客様の愛犬性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
-- **お客様の受付アンケートの回答は記録しない**：アクセスログはトレーナーの操作の記録で、`access_logs.trainer_id` が NOT NULL のため（お客様の操作を入れる先がない）。回答の記録は D-1100 の `answered_at` が兼ねる
+- **`view_trainee` を持たない注記の前提について**（2026-10 追記）：上の「トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため」は、トレーニーを会員詳細の中だけで扱っていた段階①の前提で書いたもの。その後、トレーニー詳細は独立した画面（S-0309、`trainees.show`）になったが、トレーニー詳細の参照は記録していない（`view_trainee` は持たない）点は変わっていない。2026-10 に愛犬アンケートの回答（D-1100。愛犬の健康状態などを含む）を S-0309 で表示するようになったが、本書では参照の操作種別を追加していない。**第1段階では記録しない**。愛犬アンケートの回答を S-0309 で見せるようになっても、参照を記録しない既存の方針のまま。第2段階（回答を AI に送る段階）で、個人情報の扱いと一緒に見直す
+- **愛犬アンケート案内**（2026-10 追加）：`create_trainee_intake_survey_token`（発行）・`delete_trainee_intake_survey_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（トークンの行は取消で物理削除されるため、トークンではなくトレーニーを対象として記録する）。案内の発行は会員詳細（S-0305）の「愛犬アンケートの案内を発行」だけで行う（トレーニー登録 S-0308 では発行しない。**2026-10 変更**）ため、発行は必ず `create_trainee_intake_survey_token` として記録される
+- **愛犬性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）と、結果の削除 `delete_trainee_personality_diagnosis_result`、評価文の更新 `edit_trainee_personality_diagnosis_evaluation`・公開 `publish_trainee_personality_diagnosis_evaluation`・公開取消 `unpublish_trainee_personality_diagnosis_evaluation`（**2026-10-18 追加**）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（愛犬アンケート案内と同じ。結果の id は記録しない）。（**2026-10-18 変更**：その前〔段階1 の②〕は、評価文の公開を `create_training_record` として記録していた。公開で記録を作らなくなったため、専用の種別にした）愛犬性格診断詳細（S-0313）を見たことは記録しない。お客様の愛犬性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
+- **お客様の愛犬アンケートの回答は記録しない**：アクセスログはトレーナーの操作の記録で、`access_logs.trainer_id` が NOT NULL のため（お客様の操作を入れる先がない）。回答の記録は D-1100 の `answered_at` が兼ねる
 
 ### 5-17. メディア種別
 
@@ -1462,7 +1464,7 @@ D-0700 `trainees.sex` の値。犬以外への対象拡張時にも共通で使�
 
 > **表示の文言の変更（2026-10）**：お客様（ドッグトレーナー）の要望により、画面に出す性別の文言を「オス／メス」から「男の子／女の子」に変更した。DB に保存する値（`male` / `female` / `unknown`）は変えておらず、Blade からは `Trainee::sexLabels()` の 1 か所で対応表を参照する。
 
-D-1100 `trainee_intake_survey_responses.sex`（受付アンケートの回答）も、同じ値を使う（**2026-10 変更**：当初は `male` / `female` だけを使い、回答には「不明」を置いていなかった。要件定義書 6-15-17 備考）。
+D-1100 `trainee_intake_survey_responses.sex`（愛犬アンケートの回答）も、同じ値を使う（**2026-10 変更**：当初は `male` / `female` だけを使い、回答には「不明」を置いていなかった。要件定義書 6-15-17 備考）。
 
 ### 5-21. 去勢・避妊
 
@@ -1474,11 +1476,11 @@ D-0700 `trainees.neuter_status` の値（2026-10 追加）。値の持ち方は 
 | not_neutered | していない |
 | unknown | 不明 |
 
-D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケートの回答）も、同じ値を使う（**2026-10 変更**。当初は 5-22. の値を使っていた）。
+D-1100 `trainee_intake_survey_responses.neuter_status`（愛犬アンケートの回答）も、同じ値を使う（**2026-10 変更**。当初は 5-22. の値を使っていた）。
 
-- 経緯：当初は、`unknown` を「受付アンケートの回答の反映では、NULL（未登録）と違い入力済みとみなす」としていた。2026-10 に、回答で上書きする形に変えたため、この扱いはなくなった（回答で「不明」が選ばれれば「不明」で上書きし、未選択なら変えない。要件定義書 6-15-17）
+- 経緯：当初は、`unknown` を「愛犬アンケートの回答の反映では、NULL（未登録）と違い入力済みとみなす」としていた。2026-10 に、回答で上書きする形に変えたため、この扱いはなくなった（回答で「不明」が選ばれれば「不明」で上書きし、未選択なら変えない。要件定義書 6-15-17）
 
-### 5-22. 受付アンケートの去勢・避妊（廃止）
+### 5-22. 愛犬アンケートの去勢・避妊（廃止）
 
 **2026-10 に廃止**。D-1100 `trainee_intake_survey_responses.neuter_status` は 5-21. と同じ値を使う（D-1100 の注記「性別・去勢・避妊の値をトレーニーと同じにする」）。以下は経緯として残す。
 
