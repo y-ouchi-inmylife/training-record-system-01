@@ -41,11 +41,17 @@ class SettingsController extends Controller
      * 登録情報の確認画面を表示（GET /client-portal/profile、S-1406）
      *
      * 登録内容の一覧と、3 つの変更画面（S-1411/S-1410/S-1409）への入口を配置する。
+     * その下の「愛犬の情報」の欄（2026-10-18 追加。要件定義書 6-15-20）には、ログイン中の会員のトレーニーを
+     * マイページの愛犬のカードと同じ並び（Client::trainees() の id 昇順）で渡す。暮らしの様子に出す最新の
+     * 受付アンケートの回答を一緒に読み込む（トレーニーが何頭いてもクエリの数は変わらない）。
      */
     public function show(): View
     {
+        $client = Auth::guard('client')->user();
+
         return view('client.settings.show', [
-            'client' => Auth::guard('client')->user(),
+            'client' => $client,
+            'trainees' => $client->trainees()->with('latestIntakeSurveyResponse')->get(),
         ]);
     }
 

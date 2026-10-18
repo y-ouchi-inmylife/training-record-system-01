@@ -47,91 +47,13 @@
                      名前は常にテキスト入力で必須。ラベルは「名前」（「お名前」は飼い主の氏名に使っているため）。
                      経緯：当初は、名前が登録済みなら表示のみ（S-1403 のメールアドレスの表示行と同じマークアップ）、
                      未登録ならテキスト入力で必須にしていた（入力済みの値は上書きしない反映のルールだったため） --}}
-                <div class="mb-3">
-                    <label for="name" class="form-label">名前 <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control @error('name') is-invalid @enderror"
-                           id="name" name="name" required maxlength="50" autocomplete="off"
-                           value="{{ $initial('name') }}">
-                    <x-form-error field="name" />
-                </div>
-
-                <div class="mb-3">
-                    <label for="breed" class="form-label">犬種</label>
-                    <input type="text" class="form-control @error('breed') is-invalid @enderror"
-                           id="breed" name="breed" maxlength="100" autocomplete="off"
-                           value="{{ $initial('breed') }}">
-                    <x-form-error field="breed" />
-                </div>
-
-                {{-- 性別・去勢・避妊はラジオボタン（会員側で初めて使う部品。押せる範囲を 44px 相当にする
-                     client.scss の .c-choice）。選択肢は 1 行に横並びにし、幅が足りなければ選択肢ごと次の行に折り返す
-                     （2026-10 変更。当初は縦に 1 つずつ並べていた）。選ばなくてもよく、選んだものを外す手段は設けない。
-                     エラーはまとまりの下に出す（欄の兄弟の位置ではないので block。§2-7 の但し書き） --}}
-                <div class="mb-3">
-                    <div id="sex-label" class="form-label">性別</div>
-                    <div class="c-choice" role="radiogroup" aria-labelledby="sex-label">
-                        @foreach($sexLabels as $value => $label)
-                            <div class="form-check">
-                                <input class="form-check-input @error('sex') is-invalid @enderror" type="radio"
-                                       name="sex" id="sex-{{ $value }}" value="{{ $value }}"
-                                       @checked($initial('sex') === $value)>
-                                <label class="form-check-label" for="sex-{{ $value }}">{{ $label }}</label>
-                            </div>
-                        @endforeach
-                    </div>
-                    <x-form-error field="sex" block />
-                </div>
-
-                {{-- 誕生日：トレーナー側（trainees/_form.blade.php）と同じ 3 つの欄・同じ説明文・入力中の年齢の表示
-                     （trainee-birthday-input.js。欄と表示先は data-birthday-* 属性で見つける）。
-                     エラーは 3 つの欄のまとまりの下に 1 つだけ（キー birth_date）。初期値（トレーニーの年・月・日）が
-                     入っているときも、ページを開いたときに JS が一度表示するので、年齢が出る --}}
-                <div class="mb-3">
-                    <label for="birth_year" id="birth_date-label" class="form-label">誕生日</label>
-                    <div class="d-flex flex-wrap align-items-center gap-2" role="group" aria-labelledby="birth_date-label" data-birthday-input>
-                        <div class="d-flex align-items-center gap-1">
-                            <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
-                                   id="birth_year" name="birth_year" inputmode="numeric" maxlength="4" data-birthday-part="year"
-                                   style="width: 5.5rem;" aria-label="誕生日の年" aria-describedby="birth_date-help"
-                                   value="{{ $initial('birth_year') }}" autocomplete="off">
-                            <span>年</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-1">
-                            <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
-                                   id="birth_month" name="birth_month" inputmode="numeric" maxlength="2" data-birthday-part="month"
-                                   style="width: 4rem;" aria-label="誕生日の月" aria-describedby="birth_date-help"
-                                   value="{{ $initial('birth_month') }}" autocomplete="off">
-                            <span>月</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-1">
-                            <input type="text" class="form-control @error('birth_date') is-invalid @enderror"
-                                   id="birth_day" name="birth_day" inputmode="numeric" maxlength="2" data-birthday-part="day"
-                                   style="width: 4rem;" aria-label="誕生日の日" aria-describedby="birth_date-help"
-                                   value="{{ $initial('birth_day') }}" autocomplete="off">
-                            <span>日</span>
-                        </div>
-                        {{-- 入力中の年齢（または入力中の案内）。JS が書き込む --}}
-                        <span class="ms-2" data-birthday-display aria-live="polite"></span>
-                    </div>
-                    <x-form-error field="birth_date" block />
-                    <div id="birth_date-help" class="form-text">※ 年だけ、または年と月だけでも入力できます。</div>
-                </div>
-
-                {{-- 去勢・避妊が愛犬の基本情報の最後。下に区切り線を引く（「暮らしの様子」との境目） --}}
-                <div class="mb-3 pb-3 border-bottom">
-                    <div id="neuter_status-label" class="form-label">去勢・避妊</div>
-                    <div class="c-choice" role="radiogroup" aria-labelledby="neuter_status-label">
-                        @foreach($neuterStatusLabels as $value => $label)
-                            <div class="form-check">
-                                <input class="form-check-input @error('neuter_status') is-invalid @enderror" type="radio"
-                                       name="neuter_status" id="neuter_status-{{ $value }}" value="{{ $value }}"
-                                       @checked($initial('neuter_status') === $value)>
-                                <label class="form-check-label" for="neuter_status-{{ $value }}">{{ $label }}</label>
-                            </div>
-                        @endforeach
-                    </div>
-                    <x-form-error field="neuter_status" block />
-                </div>
+                @include('client._trainee-basic-fields', [
+                    'initial' => $initial,
+                    'sexLabels' => $sexLabels,
+                    'neuterStatusLabels' => $neuterStatusLabels,
+                    // 去勢・避妊が愛犬の基本情報の最後。下に区切り線を引く（「暮らしの様子」との境目）
+                    'lastFieldClass' => 'mb-3 pb-3 border-bottom',
+                ])
 
                 {{-- 小見出し「暮らしの様子」の同じ行の後ろに、控えめなカッコ書き（太字にしない・少し小さく・色を落とす。
                      fw-normal small text-muted）。カッコ書きは見出しの一部として読まれる。2026-10 変更：当初は小見出しの

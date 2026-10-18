@@ -236,7 +236,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
             $client = $this->dummyClient();
             $client->phone2 = $phone;
             $client->emergency_contact_relationship = $relationship;
-            $html = (string) $this->view('client.settings.show', ['client' => $client]);
+            $html = (string) $this->view('client.settings.show', ['client' => $client, 'trainees' => collect()]);
 
             $this->assertMatchesRegularExpression(
                 '/<div class="text-muted small mb-1">緊急連絡先（ご家族等）<\/div>\s*<div style="min-height: 1.5rem;">'.preg_quote($expected, '/').'<\/div>/u',
@@ -250,7 +250,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
 
     public function test_登録情報の表示_緊急連絡先が空でもラベルを出す(): void
     {
-        $view = $this->view('client.settings.show', ['client' => $this->dummyClient()]);
+        $view = $this->view('client.settings.show', ['client' => $this->dummyClient(), 'trainees' => collect()]);
 
         $view->assertSee('<div class="text-muted small mb-1">緊急連絡先（ご家族等）</div>', false);
     }

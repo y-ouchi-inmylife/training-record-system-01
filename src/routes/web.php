@@ -360,6 +360,12 @@ Route::domain(config('subdomain.client_host'))->group(function () {
                 ->name('profile.edit');
             Route::put('/profile', [\App\Http\Controllers\Client\SettingsController::class, 'updateProfile'])
                 ->name('profile.update');
+            // 愛犬の情報の変更（S-1417、6-15-20。2026-10-18 追加）— 登録情報（S-1406）の愛犬のカードから開く。
+            // 自分の愛犬だけ（ほかの会員の愛犬は 403）。trainees.* ルート（トレーナー向け）は会員に開放しない
+            Route::get('/trainees/{trainee}/edit', [\App\Http\Controllers\Client\TraineeController::class, 'edit'])
+                ->name('trainees.edit');
+            Route::put('/trainees/{trainee}', [\App\Http\Controllers\Client\TraineeController::class, 'update'])
+                ->name('trainees.update');
             // メールアドレスの変更（S-1409）— 独立画面
             Route::get('/settings/email', [\App\Http\Controllers\Client\SettingsController::class, 'editEmail'])
                 ->name('settings.email.edit');

@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\NormalizesTraineeBirthday;
-use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyResponse;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -37,16 +36,9 @@ class ClientIntakeSurveyRequest extends FormRequest
 
     public function rules(): array
     {
-        $rules = [
-            'name' => 'required|string|max:50',
-            'breed' => 'nullable|string|max:100',
-            'sex' => 'nullable|in:'.implode(',', array_keys(Trainee::sexLabels())),
-            // 誕生日は年・月・日の 3 項目。形式・範囲・組み合わせは withValidator でまとめて判定する
-            'birth_year' => 'nullable',
-            'birth_month' => 'nullable',
-            'birth_day' => 'nullable',
-            'neuter_status' => 'nullable|in:'.implode(',', array_keys(Trainee::neuterStatusLabels())),
-        ];
+        // 愛犬の基本情報（名前〜去勢・避妊）は、会員の愛犬の情報の変更（S-1417）と同じ規則（2026-10-18 に
+        // ClientTraineeProfileRequest::basicInfoRules() へまとめた）。誕生日は withValidator でまとめて判定する
+        $rules = ClientTraineeProfileRequest::basicInfoRules();
         // 自由記述 4 欄（どれも任意・2,000 文字以内）
         foreach (array_keys(TraineeIntakeSurveyResponse::questions()) as $column) {
             $rules[$column] = 'nullable|string|max:2000';
