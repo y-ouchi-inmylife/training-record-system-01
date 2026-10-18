@@ -84,8 +84,8 @@ class ClientEmailRegistrationTokenStoreTest extends TestCase
 
         $token = ClientEmailRegistrationToken::query()->sole();
         $this->assertFalse($token->is_used);
-        // 有効期限は発行から 7 日後（2026-10-18 変更：その前は 3 日後の 2026-10-17 10:00:00）
-        $this->assertSame('2026-10-21 10:00:00', $token->expires_at->format('Y-m-d H:i:s'));
+        // 有効期限は発行した日から 7 日後の日の終わり（2026-10-18 変更：その前は 3 日後の同じ時刻の 2026-10-17 10:00:00）
+        $this->assertSame('2026-10-21 23:59:59', $token->expires_at->format('Y-m-d H:i:s'));
         $this->assertSame(200, (int) $token->created_by);
 
         // 案内は［マイページ登録の案内を表示］から S-0307 で見る

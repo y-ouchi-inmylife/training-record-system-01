@@ -365,7 +365,7 @@ class Client extends Authenticatable
             'has_active_email_reg_token' => ClientEmailRegistrationToken::selectRaw('1')
                 ->whereColumn('client_id', 'clients.id')
                 ->where('is_used', false)
-                ->where('expires_at', '>', now())
+                ->unexpired()
                 ->limit(1),
             'latest_email_reg_expires_at' => ClientEmailRegistrationToken::select('expires_at')
                 ->whereColumn('client_id', 'clients.id')
@@ -391,7 +391,7 @@ class Client extends Authenticatable
         $this->setAttribute('latest_email_reg_expires_at', $token?->expires_at);
         $this->setAttribute(
             'has_active_email_reg_token',
-            ($token && $token->expires_at > now()) ? 1 : null
+            ($token && ! $token->isExpired()) ? 1 : null
         );
 
         // これらは DB カラムではない導出値。dirty 扱いにすると

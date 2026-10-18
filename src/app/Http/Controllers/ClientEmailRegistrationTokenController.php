@@ -51,7 +51,7 @@ class ClientEmailRegistrationTokenController extends Controller
             // 有効な案内がすでにあれば、何も作らず・消さない
             $hasActive = $client->emailRegistrationTokens()
                 ->where('is_used', false)
-                ->where('expires_at', '>', now())
+                ->unexpired()
                 ->exists();
             if ($hasActive) {
                 return false;
@@ -68,13 +68,11 @@ class ClientEmailRegistrationTokenController extends Controller
                 ->where('is_used', false)
                 ->delete();
 
-            // 新しいトークンを 1 件作成。有効期限は設定値から算出（ハードコード禁止）
+            // 新しいトークンを 1 件作成。有効期限は設定値の日数後の日の終わり（ハードコード禁止。2026-10-18 変更：日の終わりにした）
             ClientEmailRegistrationToken::create([
                 'token' => Str::random(32),
                 'client_id' => $client->id,
-                'expires_at' => now()->addDays(
-                    (int) config('client_tokens.email_registration_expires_days')
-                ),
+                'expires_at' => ClientEmailRegistrationToken::expiresAtForNewToken(),
                 'is_used' => false,
                 'created_by' => Auth::id(),
             ]);
@@ -162,7 +160,7 @@ class ClientEmailRegistrationTokenController extends Controller
     {
         $token = $client->emailRegistrationTokens()
             ->where('is_used', false)
-            ->where('expires_at', '>', now())
+            ->unexpired()
             ->orderByDesc('id')
             ->first();
 

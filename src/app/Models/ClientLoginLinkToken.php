@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
 
 /**
  * クライアントログイン用リンクトークンモデル（DS-0600）
@@ -43,7 +42,8 @@ class ClientLoginLinkToken extends Model
 
     public function isExpired(): bool
     {
-        return $this->expires_at < Carbon::now();
+        // 期限はメールアドレス登録用トークンから引き継ぐので、判定も同じものを使う（2026-10-18 変更）
+        return ClientEmailRegistrationToken::isPastExpiry($this->expires_at);
     }
 
     public function isValid(): bool
