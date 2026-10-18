@@ -157,6 +157,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント閲覧 | S-1406 クライアント登録情報画面 | GET | `/client-portal/profile` | 登録情報の確認画面を表示する（登録内容の一覧＋各変更画面への入口ボタン） | auth:client | クライアント |
 | クライアント閲覧 | S-1411 クライアント登録情報の変更画面 | GET | `/client-portal/profile/edit` | 登録情報の変更フォームを表示する | auth:client | クライアント |
 | クライアント閲覧 | S-1411 クライアント登録情報の変更画面 | PUT | `/client-portal/profile` | 連絡先（電話番号・住所）を更新する | auth:client | クライアント |
+| クライアント閲覧 | S-1417 クライアントの愛犬の情報の変更画面 | GET | `/client-portal/trainees/{trainee}/edit` | 愛犬の情報の変更フォームを表示する（ルート名 `client-portal.trainees.edit`。自分の愛犬だけ。**2026-10-18 追加**） | auth:client | クライアント |
+| クライアント閲覧 | S-1417 クライアントの愛犬の情報の変更画面 | PUT | `/client-portal/trainees/{trainee}` | 愛犬の基本情報（名前・犬種・性別・誕生日・去勢・避妊）を更新する（ルート名 `client-portal.trainees.update`。自分の愛犬だけ。**2026-10-18 追加**） | auth:client | クライアント |
 | クライアント閲覧 | S-1409 クライアントメールアドレス変更画面 | GET | `/client-portal/settings/email` | メールアドレス変更画面を表示する | auth:client | クライアント |
 | クライアント閲覧 | S-1409 クライアントメールアドレス変更画面 | POST | `/client-portal/settings/email` | メールアドレス変更を申し込み、新しいアドレス宛にメールアドレス確認リンクを送信する | auth:client | クライアント |
 | クライアント閲覧 | S-1410 クライアントパスワード変更画面 | GET | `/client-portal/settings/password` | パスワード変更画面を表示する | auth:client | クライアント |
@@ -1699,13 +1701,15 @@ POST /training-records に以下を追加する。
 
 ###### GET /client-portal/profile
 
-**概要**: 登録情報の確認画面を表示する（登録内容の一覧＋各変更画面への入口ボタン）。
+**概要**: 登録情報の確認画面を表示する（登録内容の一覧＋各変更画面への入口ボタン。その下に愛犬の情報の欄。**2026-10-18 追加**）。
 
 **処理**:
 - ログイン中のクライアントに紐づく現在の値（氏名・氏名かな・住所・電話番号・メールアドレス）を view に渡す
+- 愛犬の情報の欄（**2026-10-18 追加**。requirements.md 6-15-20）：ログイン中のクライアントのトレーニー（`$client->trainees()`。`id` 昇順＝マイページの愛犬のカードと同じ並び）を、最新の受付アンケートの回答（`latestIntakeSurveyResponse`）と一緒に読み込んで渡す（eager load。トレーニーの数でクエリが増えない）。ほかのクライアントのトレーニーは出さない
 
 **レスポンス**:
-- view `client.settings.show`（登録内容の表示と、3 つの変更画面への入口ボタンを含む）
+- view `client.settings.show`（登録内容の表示と、3 つの変更画面への入口ボタン、愛犬の情報の欄を含む）
+- 直前に S-1417 で保存したときは、レイアウトの共通の受け皿（`session('success')`）に完了メッセージを出す
 
 ---
 
@@ -2128,6 +2132,55 @@ POST /training-records に以下を追加する。
 
 **レスポンス**:
 - view（回答完了画面）
+
+---
+
+##### S-1417 クライアントの愛犬の情報の変更画面
+
+ログイン中のクライアントが、自分の愛犬（トレーニー）1 頭の基本情報（名前・犬種・性別・誕生日・去勢・避妊）を変更する独立画面（**2026-10-18 追加**。requirements.md 6-15-20）。登録情報（S-1406）の愛犬のカードの下の［{呼び名}の情報を変更］から開く。
+
+**権限**（2 つのルートで共通）:
+- `auth:client`。ログインしていなければログイン画面（S-1401）へ（ほかの会員側のルートと同じ）
+- `{trainee}` はルートモデルバインディング。存在しなければ 404。**ログイン中のクライアントのトレーニーでなければ 403**（`trainees.client_id` を照合する。写真の登録・削除〔`/client-portal/trainees/{trainee}/photo`〕と同じ扱い）
+- トレーナー側のトレーニーのルート（`trainees.*`）は今のまま会員には開放しない
+
+###### GET /client-portal/trainees/{trainee}/edit
+
+**概要**: 愛犬の情報の変更フォームを表示する。
+
+**処理**:
+- トレーニーの今の値（名前・犬種・性別・誕生日の年・月・日・去勢・避妊）を初期値にする。入力エラーで戻ったときは、入力した値（old）だけを使う（受付アンケートの回答画面と同じ）
+
+**レスポンス**:
+- view `client.trainees.edit`
+
+###### PUT /client-portal/trainees/{trainee}
+
+**概要**: 愛犬の基本情報を更新する。
+
+**リクエスト**:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| name | string | ● | required, string, max:50 | 名前 |
+| breed | string | | nullable, string, max:100 | 犬種 |
+| sex | string | | nullable, in:male,female,unknown | 性別（男の子／女の子／不明） |
+| birth_year | string | | nullable（形式・範囲・組み合わせは 3 項目まとめて検証する） | 誕生日（年） |
+| birth_month | string | | nullable（同上） | 誕生日（月） |
+| birth_day | string | | nullable（同上） | 誕生日（日） |
+| neuter_status | string | | nullable, in:neutered,not_neutered,unknown | 去勢・避妊（している／していない／不明） |
+
+- **受付アンケート（`POST /client-portal/intake-survey/{token}`）の基本情報の 7 項目と同じ規則・同じ文言**（規則は 1 か所にまとめて両方で使う。誕生日の検証とエラーのキー `birth_date` も同じ）
+- 自由記述（暮らしの様子）・写真は受け取らない（送られてきても無視する）
+
+**処理**:
+- 7 項目でトレーニーを更新する（空にした項目は NULL にする。受付アンケートの「空なら変えない」とは違う）
+- `updated_by`（最終更新者のトレーナー）は変えない（会員の操作のため）
+- 操作の記録（`access_logs`）は残さない（会員側の操作は記録しない。requirements.md 6-15-20 備考）
+
+**レスポンス**:
+- 成功：`redirect('/client-portal/profile')`（S-1406）＋「{呼び名}の情報を変更しました。」（フラッシュメッセージ `success`。呼び名は変更したあとの名前から作る `Trainee::client_call_name`）
+- バリデーション失敗：`back()` ＋ バリデーションエラーメッセージ（screen-design.md §2-7 の規約。上部に 1 文の案内と該当する欄の下の文言、入力値は保持）
 
 ---
 
