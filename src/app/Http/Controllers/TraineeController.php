@@ -85,7 +85,9 @@ class TraineeController extends Controller
         // 使えなくなる未回答の案内（受付アンケート案内・性格診断の案内のうち、あるものだけを「と」でつなぎ
         // 「発行済みの〜も使えなくなります。」）をこの順で足し、最後を「このトレーニーを削除しますか？」で締める。
         // 文と文は区切りなしで続ける（confirm() では改行が使えないため）。どれもないときは、これまでの文のまま
-        // （0 件のときの出し方を含めて変えない）。2026-10 変更：性格診断の結果・案内を足した
+        // （0 件のときの出し方を含めて変えない）。2026-10 変更：性格診断の結果・案内を足した。
+        // 2026-10-18 追加：結果から作ったトレーニング記録（評価文を公開した記録）があるときは、消えるものの文のあとに
+        // 「愛犬性格診断の結果から作ったトレーニング記録は、グラフのない記録として残ります。」を足す（記録は会員の記録なので消えない）
         $measurementSentence = $measurementCount > 0
             ? "このトレーニーには {$measurementCount} 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。"
             : '';
@@ -100,6 +102,9 @@ class TraineeController extends Controller
         $intakeSurveySentence = '';
         if ($deleted !== []) {
             $intakeSurveySentence .= implode('と', $deleted).'も一緒に削除されます。';
+        }
+        if ($trainee->personalityDiagnosisResults->contains(fn ($result) => $result->trainingRecord !== null)) {
+            $intakeSurveySentence .= __('messages.personality_diagnosis_name').'の結果から作ったトレーニング記録は、グラフのない記録として残ります。';
         }
         if ($invalidated !== []) {
             $intakeSurveySentence .= '発行済みの'.implode('と', $invalidated).'も使えなくなります。';

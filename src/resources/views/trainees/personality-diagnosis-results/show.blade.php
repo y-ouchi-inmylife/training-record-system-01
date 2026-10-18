@@ -23,7 +23,8 @@
        作り（最大 300px の正方形・HTML の凡例・訓練性能を真上・点数なしは点を描かない）は S-0309 と同じ部品
      - 評価文の状態（未作成・下書き・公開済み）は列に持たず、評価文と結び付いたトレーニング記録から決める（evaluation_status）。
        公開済みは表示だけ（直すのはトレーニング記録の編集）
-     - ［トレーニング記録にして公開］と確認のモーダル（S-0313-M01）は次の段階で足す --}}
+     - ［トレーニング記録にして公開］と確認のモーダル（S-0313-M01。2026-10-18 追加。要件定義書 6-16-16）：評価文が空なら押せない。
+       モーダルの［公開する］で、欄の今の文（保存していない直しを含む）を公開の送り先に送る --}}
 <div class="container">
     <div class="mb-4">
         {{-- 1段目: 操作ボタン列（右寄せ。S-0309・S-0403 と同じ並び）。戻るはグレーの白抜き、削除は画面の対象そのものなので赤の塗り（4-4） --}}
@@ -61,20 +62,22 @@
                     {{-- タイプは「・」のあとでだけ折り返してよい（S-0309 の表と同じ） --}}
                     <p class="fs-5 mb-3" style="word-break: keep-all;" data-personality-diagnosis-type>{!! collect(explode('・', $result->personality_type_label))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
                     {{-- この結果の 7 項目の点数（1 行の表。S-0309 の表と同じ書き方。点数なしは「—」、読み上げは「点数なし」）。
-                         狭い幅では枠の中で横にスクロールする。position-relative は S-0309 の表と同じ理由 --}}
+                         狭い幅では枠の中で横にスクロールする。position-relative は S-0309 の表と同じ理由。
+                         幅は中身に合わせる（w-auto。2026-10-18 変更：右の列いっぱいに広がり、数字の間が空いて見えたため）。
+                         列の間は Bootstrap の table-sm の余白に px-2 を足して、数字が詰まりすぎないようにする --}}
                     <div class="table-responsive position-relative">
-                        <table class="table table-sm small align-middle mb-0" data-personality-diagnosis-scores>
+                        <table class="table table-sm small align-middle mb-0 w-auto" data-personality-diagnosis-scores>
                             <thead>
                                 <tr>
                                     @foreach($pdCategories as $categoryLabel)
-                                        <th scope="col" class="fw-normal text-muted text-end text-nowrap">{{ $categoryLabel }}</th>
+                                        <th scope="col" class="fw-normal text-muted text-end text-nowrap px-2">{{ $categoryLabel }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     @foreach(array_keys($pdCategories) as $category)
-                                        <td class="text-end text-nowrap">@if($display[$category] === null)<span aria-hidden="true">—</span><span class="visually-hidden">点数なし</span>@else{{ $display[$category] }}@endif</td>
+                                        <td class="text-end text-nowrap px-2">@if($display[$category] === null)<span aria-hidden="true">—</span><span class="visually-hidden">点数なし</span>@else{{ $display[$category] }}@endif</td>
                                     @endforeach
                                 </tr>
                             </tbody>
@@ -99,15 +102,19 @@
             @else
                 <x-form-error-summary />
                 {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
-                <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate>
+                <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate data-evaluation-form>
                     @csrf
                     @method('PUT')
                     <label for="evaluation_text" class="visually-hidden">評価文</label>
                     <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
                               rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
                     <x-form-error field="evaluation_text" />
-                    <div class="d-flex justify-content-end gap-2 mt-3">
+                    {{-- ［保存］（データ保存なので緑）と［トレーニング記録にして公開］（業務の中で必ず使う操作なので青の塗り）。
+                         公開は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで切り替える。サーバーでも必須を確かめる） --}}
+                    <div class="d-flex justify-content-end flex-wrap gap-2 mt-3">
                         <button type="submit" class="btn btn-success">保存</button>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
+                                data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>トレーニング記録にして公開</button>
                     </div>
                 </form>
             @endif
@@ -144,6 +151,33 @@
         </div>
     </div>
 
+    {{-- 公開の確認モーダル（S-0313-M01。2026-10-18 追加）。公開済みでないときだけ置く。［公開する］で、評価文の欄の今の文を
+         隠しの欄に写してから送る（下のスクリプト。二重に押されないよう、送ったらボタンを押せなくする）。キャンセルは 4-4 のとおり塗り --}}
+    @if(! $isPublished)
+        <div class="modal fade" id="personality-diagnosis-publish" tabindex="-1"
+             aria-labelledby="personality-diagnosis-publish-label" aria-hidden="true" data-personality-diagnosis-publish>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="personality-diagnosis-publish-label">トレーニング記録にして公開</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">トレーニング記録を作り、会員様に公開します。公開すると、評価文はトレーニング記録で直すことになります。</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <form method="POST" action="{{ route('trainee-personality-diagnosis-results.publish', [$trainee, $result]) }}" class="d-inline m-0" data-evaluation-publish-form>
+                            @csrf
+                            <input type="hidden" name="evaluation_text" value="">
+                            <button type="submit" class="btn btn-primary">公開する</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- 結果の削除確認モーダル（S-0313-M02。管理者だけ。2026-10-18 に S-0309-M01 から移した）。
          結び付いたトレーニング記録があるときは、記録は残るがグラフは消えることを足す。キャンセルは 4-4 のとおり塗り --}}
     @if(auth()->user()->isAdmin())
@@ -178,3 +212,27 @@
 {{-- レーダーチャート（S-0309 と同じ部品） --}}
 @vite('resources/js/personality-radar.js')
 @endsection
+
+@push('scripts')
+{{-- 評価文の公開（S-0313-M01。2026-10-18 追加）：欄が空（空白だけ）なら［トレーニング記録にして公開］を押せなくする。
+     モーダルの［公開する］では、欄の今の文を隠しの欄に写して送り、二重に押されないようにボタンを押せなくする --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var textarea = document.querySelector('[data-evaluation-form] textarea[name="evaluation_text"]');
+    var openButton = document.querySelector('[data-evaluation-publish]');
+    var publishForm = document.querySelector('[data-evaluation-publish-form]');
+    if (!textarea || !openButton || !publishForm) {
+        return;
+    }
+    var update = function () {
+        openButton.disabled = textarea.value.trim() === '';
+    };
+    textarea.addEventListener('input', update);
+    update();
+    publishForm.addEventListener('submit', function () {
+        publishForm.querySelector('input[name="evaluation_text"]').value = textarea.value;
+        publishForm.querySelector('button[type="submit"]').disabled = true;
+    });
+});
+</script>
+@endpush

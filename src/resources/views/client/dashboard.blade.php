@@ -376,6 +376,11 @@
                     {{-- 日付をスクリーンリーダー向けに追加(視覚では日付ブロックが表示) --}}
                     <p class="visually-hidden">{{ $rec->training_date->format('Y年n月j日') }}（{{ $weekdaysJp[$rec->training_date->dayOfWeek] }}）の記録</p>
 
+                    @if($rec->trainee_personality_diagnosis_result_id)
+                        {{-- 愛犬性格診断の印（評価文を公開して作った記録だけ。2026-10-18 追加。設計書 S-1402）。カードの中のいちばん上に小さく --}}
+                        <p class="c-session-tag mb-2" data-record-personality-badge>{{ __('messages.personality_diagnosis_name') }}</p>
+                    @endif
+
                     @if(count($media) > 0)
                         @php
                             $shown = array_slice($media, 0, 4);
@@ -452,6 +457,11 @@
                         <div class="c-session-body">
                             <div class="c-session-content">
                             <p class="visually-hidden">{{ $rec->training_date->format('Y年n月j日') }}（{{ $weekdaysJp[$rec->training_date->dayOfWeek] }}）の記録</p>
+
+                            @if($rec->trainee_personality_diagnosis_result_id)
+                                {{-- 愛犬性格診断の印（評価文を公開して作った記録だけ。2026-10-18 追加。設計書 S-1402）。カードの中のいちばん上に小さく --}}
+                                <p class="c-session-tag mb-2" data-record-personality-badge>{{ __('messages.personality_diagnosis_name') }}</p>
+                            @endif
 
                             @if(count($media) > 0)
                                 @php

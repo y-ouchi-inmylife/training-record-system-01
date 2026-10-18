@@ -696,6 +696,23 @@ input[type="tel"] {
     box-shadow: 0 0 0 3px $mat, 0 0 0 5px $ink;
 }
 
+// 愛犬性格診断の印（2026-10-18 追加。設計書 S-1402）
+// 評価文を公開して作った記録のカードのいちばん上に、小さな札で出す。色は愛犬性格診断の案内のお知らせ
+// （.c-survey-notice--personality）と同じ紫の薄い面。文字は本文と同じ $ink（色だけに頼らない）。
+// 記録のカード（.c-session-content）は縦の flex なので、札が横いっぱいに伸びないよう align-self で左に寄せる
+.c-session-tag {
+    align-self: flex-start;
+    display: inline-block;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background-color: mix($purple, $mat, 12%);
+    color: $ink;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 0.04em;
+}
+
 // ノート冒頭
 .c-session-note {
     margin: 0;

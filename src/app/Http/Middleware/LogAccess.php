@@ -44,6 +44,8 @@ class LogAccess
         // 愛犬性格診断の評価文の保存（S-0313。2026-10-18 追加）。対象はトレーニー（結果の削除と同じ。結果の id は記録しない）。
         // 愛犬性格診断詳細の表示は記録しない（トレーニー詳細を見たことと同じ）
         'trainee-personality-diagnosis-results.update' => 'edit_trainee_personality_diagnosis_evaluation',
+        // 評価文の公開（2026-10-18 追加）は、トレーニング記録の登録と同じ扱い（target_type は TrainingRecord、target_id は登録と同じく null）
+        'trainee-personality-diagnosis-results.publish' => 'create_training_record',
         // 契約（D-0900）・利用（D-1000）。参照は view_client に含めるため view_ 系は作らない。
         'client-contracts.store' => 'create_client_contract',
         'client-contracts.update' => 'edit_client_contract',
