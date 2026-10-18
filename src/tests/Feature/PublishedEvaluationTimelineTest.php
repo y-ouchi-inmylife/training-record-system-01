@@ -18,7 +18,7 @@ use Tests\TestCase;
  *
  * - 並びは記録と同じ新しい順（評価文の日付・時刻は公開した日時。時刻のない記録はその日のいちばん後ろ）
  * - 下書き・公開を取り消したもの・ほかの会員のトレーニーの評価文は出さない
- * - 件数（「トレーニング記録（N件）」「全 N 回」）は記録だけ
+ * - 件数（「これまでの記録（N件）」「全 N 回」）は記録だけ
  * - トレーナー側の記録の一覧（S-0402）・ダッシュボードの最近の記録（S-0201）・記録数の推移（S-1101）には混ぜない
  * - S-1418 は自分のトレーニーの公開済みの評価文だけ（それ以外は 404）。グラフはその結果の時点
  */
@@ -259,8 +259,27 @@ class PublishedEvaluationTimelineTest extends TestCase
 
         $html = $this->clientShow();
 
-        $this->assertStringContainsString('トレーニング記録（2件）', $html);
+        $this->assertStringContainsString('<h6 class="mb-0" data-client-records-heading>これまでの記録（2件）</h6>', $html);
         $this->assertSame(3, count($this->clientShowOrder($html)));
+    }
+
+    public function test_会員詳細の記録の欄の見出しはこれまでの記録でボタンはトレーニング記録を登録(): void
+    {
+        $this->record('2026-10-10');
+        $this->addResult('2026-10-01 09:00:00', '評価文', '2026-10-12 10:00:00');
+
+        $html = $this->clientShow();
+
+        // 2026-10-18 変更：ユーザーレビューで、見出しを「これまでの記録」、ボタンを［トレーニング記録を登録］にした（評価文も並ぶため）
+        $this->assertMatchesRegularExpression(
+            '/<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">\s*'
+            .'<h6 class="mb-0" data-client-records-heading>これまでの記録（1件）<\/h6>\s*'
+            .'<a href="'.preg_quote(route('training-records.create', ['client_id' => $this->client->id]), '/').'"\s*'
+            .'class="btn btn-primary ms-auto">トレーニング記録を登録<\/a>/u',
+            $html
+        );
+        $this->assertStringNotContainsString('>トレーニング記録（', $html);
+        $this->assertStringNotContainsString('>新規登録</a>', $html);
     }
 
     public function test_会員詳細は評価文だけでも一覧に出し件数は0件(): void
@@ -269,7 +288,7 @@ class PublishedEvaluationTimelineTest extends TestCase
 
         $html = $this->clientShow();
 
-        $this->assertStringContainsString('トレーニング記録（0件）', $html);
+        $this->assertStringContainsString('<h6 class="mb-0" data-client-records-heading>これまでの記録（0件）</h6>', $html);
         $this->assertSame(['e'.$e->id], $this->clientShowOrder($html));
         $this->assertStringNotContainsString('トレーニング記録はありません', $html);
     }

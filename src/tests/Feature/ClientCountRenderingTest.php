@@ -1151,7 +1151,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/class="btn btn-sm btn-primary">トレーニーを追加<\/a>/u', $body);
         $this->assertStringContainsString('<button type="submit" class="btn btn-sm btn-primary text-nowrap">マイページ登録の案内を発行</button>', $body);
         $this->assertStringContainsString('class="btn btn-primary">編集</a>', $body);
-        $this->assertMatchesRegularExpression('/class="btn btn-primary">新規登録<\/a>/u', $body);
+        $this->assertMatchesRegularExpression('/class="btn btn-primary ms-auto">トレーニング記録を登録<\/a>/u', $body);
         // 赤・グレーは今のまま
         $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除</button>', $body);
         $this->assertStringContainsString('class="btn btn-outline-secondary">&laquo; 会員一覧に戻る</a>', $body);

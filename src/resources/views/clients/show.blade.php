@@ -331,10 +331,14 @@
         <div class="col-lg-7 client-records-col">
             <div class="client-records-fill">
             <div class="card mb-3 client-records-card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">トレーニング記録（{{ $client->trainingRecords->count() }}件）</h6>
+                {{-- 見出し「これまでの記録（N件）」と［トレーニング記録を登録］（2026-10-18 変更：ユーザーレビューで、記録の欄に公開済みの
+                     評価文も並ぶようになったため、見出しをマイページの「これまでの記録」と同じ言い方にし、ボタンは何を登録するかを書いた。
+                     その前は「トレーニング記録（N件）」と［新規登録］）。件数は今までどおり記録だけ（評価文は数えない）。
+                     狭い幅で 1 行に収まらないときは、ボタンを次の行へ折り返して右に寄せる（flex-wrap と ms-auto。S-0313 の評価文の見出しの行と同じ） --}}
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h6 class="mb-0" data-client-records-heading>これまでの記録（{{ $client->trainingRecords->count() }}件）</h6>
                     <a href="{{ route('training-records.create', ['client_id' => $client->id]) }}"
-                       class="btn btn-primary">新規登録</a>
+                       class="btn btn-primary ms-auto">トレーニング記録を登録</a>
                 </div>
                 {{-- 記録と、公開済みの愛犬性格診断の評価文を混ぜた一覧（2026-10-18 変更。コントローラで新しい順に並べた $timeline）。
                      見出しの件数は記録だけ（評価文は数えない）。評価文だけがあるときも一覧を出す --}}
