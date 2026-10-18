@@ -110,7 +110,7 @@ class DashboardController extends Controller
                 'radar' => $trainee->personality_radar_data,
             ],
             'surveyNotices' => $this->surveyNotices($trainee),
-            // 写真の下に 1 項目ずつ出す犬種・性別・誕生日（値がない項目は入らない。2026-10-18 追加。Trainee::client_profile_parts）
+            // 写真の下に出す 2 行（犬種（性別）と誕生日。値がない行は入らない。2026-10-18 追加。Trainee::client_profile_parts）
             'profileParts' => $trainee->client_profile_parts,
         ])->all();
     }

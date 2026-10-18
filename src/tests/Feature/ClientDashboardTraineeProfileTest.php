@@ -14,11 +14,11 @@ use Tests\TestCase;
 /**
  * 会員のマイページ（S-1402）の愛犬のカードの犬種・性別・誕生日（2026-10-18 追加。要件定義書 6-15-3）。
  *
- * - 写真（または「写真を登録」の枠）のすぐ下に 1 項目ずつ縦に（犬種 → 性別 → 誕生日。区切りの記号なし）。
+ * - 写真（または「写真を登録」の枠）のすぐ下に 2 行（1 行目「犬種（性別）」、2 行目は誕生日）。写真の幅の中で中央揃え。
  *   犬種・性別は会員詳細（S-0305）と同じ値。誕生日はマイページだけ「2020/01/23生（6歳8ヶ月）」の書き方
- *   （Trainee::client_profile_parts・TraineeAge::clientBirthdayParts）。「…生」と「（年齢）」の間でだけ折り返す
+ *   （Trainee::client_profile_parts・TraineeAge::clientBirthdayParts）。「犬種」と「（性別）」、「…生」と「（年齢）」の間でだけ折り返す
  * - 性別の「不明」と値がない項目は出さない。3 つともなければ何も出さない。去勢・避妊は出さない。自分のトレーニーだけ。
- *   トレーニーの数でクエリが増えない。名前の行は足す前の形（2026-10-18 変更：最初は名前の下の 1 行だった）
+ *   トレーニーの数でクエリが増えない。名前の行は足す前の形（2026-10-18 変更：最初は名前の下の 1 行、次に写真の下に 3 行だった）
  */
 class ClientDashboardTraineeProfileTest extends TestCase
 {
@@ -109,11 +109,11 @@ class ClientDashboardTraineeProfileTest extends TestCase
         return substr($html, $start, strpos($html, '</article>', $heading) - $start);
     }
 
-    /** 写真の下の犬種・性別・誕生日の行（行ごとの HTML。なければ null） */
+    /** 写真の下の 2 行（行ごとの HTML。なければ null） */
     private function profileLines(string $html, string $callName): ?array
     {
         $card = $this->card($html, $callName);
-        $start = strpos($card, '<div class="small text-muted mt-2" data-client-trainee-profile>');
+        $start = strpos($card, '<div class="small text-muted text-center mt-2" data-client-trainee-profile>');
         if ($start === false) {
             return null;
         }
@@ -125,14 +125,17 @@ class ClientDashboardTraineeProfileTest extends TestCase
 
     private const FULL = ['breed' => 'トイ・プードル', 'sex' => 'female', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1, 'neuter_status' => 'done'];
 
-    public function test_写真の下に犬種と性別と誕生日を1項目ずつ縦に出し区切りの記号は使わない(): void
+    public function test_写真の下に犬種と性別の1行と誕生日の1行を中央揃えで出す(): void
     {
         $this->trainee('アイ', self::FULL);
 
         $html = $this->open();
         $card = $this->card($html, 'アイちゃん');
 
-        $this->assertSame(['トイ・プードル', '女の子', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, 'アイちゃん'));
+        // 2 行だけ。1 行目は「犬種」と「（性別）」の間、2 行目は「…生」と「（年齢）」の間に折り返しの印
+        $this->assertSame(['トイ・プードル<wbr>（女の子）', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, 'アイちゃん'));
+        // 写真の幅の中で中央揃え
+        $this->assertStringContainsString('<div class="small text-muted text-center mt-2" data-client-trainee-profile>', $card);
         $this->assertStringNotContainsString(' ／ ', $card);
         // 写真（ここでは「写真を登録」の枠）のあと、体重のグラフ（計測値がないときの文）より前
         $this->assertTrue(strpos($card, '写真を登録</span>') < strpos($card, 'data-client-trainee-profile'));
@@ -169,6 +172,7 @@ class ClientDashboardTraineeProfileTest extends TestCase
         $html = $this->open();
 
         foreach ($cases as $name => [, $expected]) {
+            // 犬種・性別がないので 2 行目（誕生日）だけ
             $this->assertSame([$expected], $this->profileLines($html, $name.'ちゃん'), $name);
         }
     }
@@ -184,19 +188,22 @@ class ClientDashboardTraineeProfileTest extends TestCase
         $this->assertSame('2020年5月生まれ（6歳5ヶ月）', $trainee->birthday_with_age_label);
     }
 
-    public function test_値がない項目と性別の不明は出さない(): void
+    public function test_1行目は値がないとき犬種だけ性別だけになりどちらもなければ出さない(): void
     {
+        $this->trainee('両方', ['breed' => '柴犬', 'sex' => 'male']);
         $this->trainee('性別なし', ['breed' => '柴犬', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1]);
         $this->trainee('性別不明', ['breed' => '柴犬', 'sex' => 'unknown']);
         $this->trainee('犬種なし', ['sex' => 'male', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1]);
-        $this->trainee('性別だけ', ['sex' => 'male']);
+        $this->trainee('どちらもなし', ['birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1]);
 
         $html = $this->open();
 
+        $this->assertSame(['柴犬<wbr>（男の子）'], $this->profileLines($html, '両方ちゃん'));
         $this->assertSame(['柴犬', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, '性別なしちゃん'));
+        // 「不明」は値がないのと同じ扱い（括弧も付けない）
         $this->assertSame(['柴犬'], $this->profileLines($html, '性別不明ちゃん'));
         $this->assertSame(['男の子', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, '犬種なしちゃん'));
-        $this->assertSame(['男の子'], $this->profileLines($html, '性別だけちゃん'));
+        $this->assertSame(['2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, 'どちらもなしちゃん'));
     }
 
     public function test_3つともないときは何も出さない(): void
@@ -220,13 +227,14 @@ class ClientDashboardTraineeProfileTest extends TestCase
         $this->assertStringNotContainsString('済み', implode('', $this->profileLines($this->open(), 'アイちゃん')));
     }
 
-    public function test_値はエスケープして出す(): void
+    public function test_値はエスケープしてから折り返しの印でつなぐ(): void
     {
-        $this->trainee('アイ', ['breed' => '<b>柴</b>']);
+        $this->trainee('アイ', ['breed' => '<b>柴</b>', 'sex' => 'female']);
 
         $html = $this->open();
 
-        $this->assertSame(['&lt;b&gt;柴&lt;/b&gt;'], $this->profileLines($html, 'アイちゃん'));
+        $this->assertSame(['&lt;b&gt;柴&lt;/b&gt;<wbr>（女の子）'], $this->profileLines($html, 'アイちゃん'));
+        $this->assertStringNotContainsString('<b>柴</b>', $html);
     }
 
     public function test_ほかの会員のトレーニーの値は出さない(): void

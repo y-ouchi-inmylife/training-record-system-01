@@ -304,36 +304,40 @@ class Trainee extends Model
     }
 
     /**
-     * 会員側のマイページ（S-1402）の愛犬のカードで、写真の下に 1 項目ずつ出す値の並び（犬種・性別・誕生日。2026-10-18 追加）。
+     * 会員側のマイページ（S-1402）の愛犬のカードで、写真の下に出す 2 行（2026-10-18 追加）。
      *
-     * 1 項目は、折り返してよい位置で分けた文字の並び（犬種・性別は 1 つ。誕生日は「2020/01/23生」と「（6歳8ヶ月）」の 2 つ。
-     * TraineeAge::clientBirthdayParts）。犬種・性別はトレーナー側の会員詳細（S-0305）と同じ値（性別は sex_label）。
-     * 値がない項目は入れない。性別の「不明」は会員様には情報にならないので入れない。3 つともなければ空の配列
-     * （ビューは何も出さない）。去勢・避妊などほかの属性は入れない。
-     * 2026-10-18 変更：最初は名前の下の 1 行に「 ／ 」でつないで出していた（誕生日は会員詳細と同じ書き方）
+     * 1 行目は「犬種（性別）」（例「マルチーズ（女の子）」）、2 行目は誕生日（例「2020/01/23生（6歳8ヶ月）」。
+     * TraineeAge::clientBirthdayParts）。各行は、折り返してよい位置で分けた文字の並び（1 行目は「マルチーズ」と「（女の子）」、
+     * 2 行目は「2020/01/23生」と「（6歳8ヶ月）」）。犬種・性別はトレーナー側の会員詳細（S-0305）と同じ値（性別は sex_label）。
+     * 性別の「不明」は会員様には情報にならないので、値がないのと同じ扱い。値がないとき：
+     * - 1 行目：犬種だけ →「マルチーズ」、性別だけ →「女の子」（括弧を付けない）、どちらもない → 1 行目を入れない
+     * - 2 行目：誕生日がない → 入れない
+     * すべてなければ空の配列（ビューは何も出さない）。去勢・避妊などほかの属性は入れない。
+     * 2026-10-18 変更：最初は名前の下の 1 行に「 ／ 」でつないで出し、次に写真の下に 1 項目ずつ 3 行で出していた
      *
      * @return list<list<string>>
      */
     public function getClientProfilePartsAttribute(): array
     {
-        $sex = $this->sex === self::SEX_UNKNOWN ? null : $this->sex_label;
+        $breed = blank($this->breed) ? null : $this->breed;
+        $sex = $this->sex === self::SEX_UNKNOWN || blank($this->sex_label) ? null : $this->sex_label;
         $today = today();
         $birthday = TraineeAge::clientBirthdayParts(
             $this->birth_year, $this->birth_month, $this->birth_day,
             $today->year, $today->month, $today->day,
         );
 
-        $items = [];
-        foreach ([$this->breed, $sex] as $value) {
-            if (! blank($value)) {
-                $items[] = [$value];
-            }
+        $lines = [];
+        if ($breed !== null && $sex !== null) {
+            $lines[] = [$breed, '（'.$sex.'）'];
+        } elseif ($breed !== null || $sex !== null) {
+            $lines[] = [$breed ?? $sex];
         }
         if ($birthday !== []) {
-            $items[] = $birthday;
+            $lines[] = $birthday;
         }
 
-        return $items;
+        return $lines;
     }
 
     /**

@@ -199,13 +199,15 @@
                                                 <x-form-error field="photo" block />
                                             @endif
 
-                                            {{-- 犬種・性別・誕生日（2026-10-18 追加。写真〔または「写真を登録」の枠〕の下に 1 項目ずつ。Trainee::client_profile_parts）。
-                                                 値がない項目は入っていない。3 つともなければ何も出さない。写真の列の中に置くので、左端は写真の左端にそろい、
-                                                 幅は写真と同じ。誕生日は「…生」と「（年齢）」の間でだけ折り返す（keep-all と <wbr>。各部分はエスケープしてからつなぐ）。
+                                            {{-- 犬種・性別・誕生日（2026-10-18 追加。写真〔または「写真を登録」の枠〕の下に 2 行。Trainee::client_profile_parts）。
+                                                 1 行目「犬種（性別）」、2 行目は誕生日。値がない行は入っていない。すべてなければ何も出さない。
+                                                 写真の列の中に置くので、幅は写真と同じで、その中で中央揃え（text-center）。
+                                                 1 行目は「犬種」と「（性別）」の間、2 行目は「…生」と「（年齢）」の間でだけ折り返す
+                                                 （keep-all と <wbr>。各部分はエスケープしてからつなぐ）。
                                                  写真のエラーの文言は写真の直下のまま（どの入力のエラーかが分かるように）、その下に置く。
-                                                 2026-10-18 変更：最初は名前の下の 1 行に「 ／ 」でつないでいた --}}
+                                                 2026-10-18 変更：最初は名前の下の 1 行に「 ／ 」でつなぎ、次に写真の下に 1 項目ずつ 3 行（左寄せ）で出していた --}}
                                             @if(! empty($chart['profileParts']))
-                                                <div class="small text-muted mt-2" data-client-trainee-profile>
+                                                <div class="small text-muted text-center mt-2" data-client-trainee-profile>
                                                     @foreach($chart['profileParts'] as $segments)
                                                         <div style="word-break: keep-all;">{!! collect($segments)->map(fn ($segment) => e($segment))->implode('<wbr>') !!}</div>
                                                     @endforeach
