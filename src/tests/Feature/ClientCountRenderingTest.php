@@ -1208,6 +1208,45 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<td><span class="badge bg-secondary">未登録</span></td>', $this->listRow($html, '山田'));
     }
 
+    public function test_マイページの状態のバッジは一覧と詳細で同じ文言_初回設定待ちは登録待ち初回設定(): void
+    {
+        // 2026-10-18 変更：初回設定待ち（awaiting_setup）のバッジは「登録待ち（初回設定）」。期限切れは「登録待ち（期限切れ）」
+        // （その前は「初回設定待ち」「初回設定待ち（期限切れ）」）。ほかのバッジ・色は変えない
+        $this->fakeMediaDisk();
+        $none = $this->makeClient('0001', '山田');
+        $awaitingEmail = $this->makeClient('0002', '佐藤');
+        $this->emailRegToken($awaitingEmail, now()->addDays(2)->format('Y-m-d H:i:s'));
+        $awaitingEmailExpired = $this->makeClient('0003', '鈴木');
+        $this->emailRegToken($awaitingEmailExpired, now()->subDay()->format('Y-m-d H:i:s'));
+        $awaitingSetup = $this->makeClient('0004', '田中');
+        $awaitingSetup->forceFill(['email' => 'tanaka@example.com'])->save();
+        $this->emailRegToken($awaitingSetup, now()->addDays(2)->format('Y-m-d H:i:s'));
+        $awaitingSetupExpired = $this->makeClient('0005', '高橋');
+        $awaitingSetupExpired->forceFill(['email' => 'takahashi@example.com'])->save();
+        $this->emailRegToken($awaitingSetupExpired, now()->subDay()->format('Y-m-d H:i:s'));
+        $inUse = $this->makeClient('0006', '伊藤');
+        $inUse->forceFill(['email' => 'ito@example.com', 'password' => 'hashed'])->save();
+
+        $expected = [
+            '山田' => [$none, '<span class="badge bg-secondary">未登録</span>'],
+            '佐藤' => [$awaitingEmail, '<span class="badge bg-warning text-dark">登録待ち</span>'],
+            '鈴木' => [$awaitingEmailExpired, '<span class="badge bg-danger">登録待ち（期限切れ）</span>'],
+            '田中' => [$awaitingSetup, '<span class="badge bg-warning text-dark">登録待ち（初回設定）</span>'],
+            '高橋' => [$awaitingSetupExpired, '<span class="badge bg-danger">登録待ち（期限切れ）</span>'],
+            '伊藤' => [$inUse, '<span class="badge bg-success">利用中</span>'],
+        ];
+
+        $list = $this->get(route('clients.index'))->assertOk()->getContent();
+        $this->assertStringNotContainsString('初回設定待ち', $list);
+        foreach ($expected as $lastName => [$client, $badge]) {
+            $this->assertStringContainsString("<td>{$badge}</td>", $this->listRow($list, $lastName), $lastName);
+
+            $show = $this->get(route('clients.show', $client))->assertOk()->getContent();
+            $this->assertStringContainsString($badge, $show, $lastName);
+            $this->assertStringNotContainsString('初回設定待ち', $show, $lastName);
+        }
+    }
+
     // ---- ボタンの色（2026-10 変更：青いボタンはすべて塗り） ----
 
     /** モーダルより前（画面の本文）の HTML */

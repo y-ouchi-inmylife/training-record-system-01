@@ -441,18 +441,24 @@ class Client extends Authenticatable
      *
      * 配色は screen-design.md §2-5 の「クライアント状態バッジの 4 状態対応」に従う。
      * 一覧・詳細で同じ表示にするため、モデル側にひとつだけ置いてビューから参照する。
+     *
+     * 2026-10-18 変更：ユーザーレビューで、初回設定待ちのバッジを「初回設定待ち」から「登録待ち（初回設定）」にした
+     * （お客様の画面の名前〔マイページ登録〕に合わせた）。期限切れのときは、メールアドレス登録待ちの期限切れと同じ
+     * 「登録待ち（期限切れ）」にする（「登録待ち（初回設定）（期限切れ）」とかっこが続かないように）。
      */
     public function statusBadge(): array
     {
-        $baseLabel = match ($this->status) {
+        $isExpired = $this->show_expired_note;
+
+        $label = match ($this->status) {
             self::STATUS_IN_USE => '利用中',
-            self::STATUS_AWAITING_SETUP => '初回設定待ち',
-            self::STATUS_AWAITING_EMAIL => '登録待ち',
+            self::STATUS_AWAITING_SETUP, self::STATUS_AWAITING_EMAIL => match (true) {
+                $isExpired => '登録待ち（期限切れ）',
+                $this->status === self::STATUS_AWAITING_SETUP => '登録待ち（初回設定）',
+                default => '登録待ち',
+            },
             self::STATUS_NO_EMAIL => '未登録',
         };
-
-        $isExpired = $this->show_expired_note;
-        $label = $isExpired ? "{$baseLabel}（期限切れ）" : $baseLabel;
 
         $class = match (true) {
             $this->status === self::STATUS_IN_USE => 'bg-success',
