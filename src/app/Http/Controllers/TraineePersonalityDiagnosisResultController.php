@@ -81,7 +81,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
 
         return redirect()
             ->route('trainee-personality-diagnosis-results.show', [$trainee, $personalityDiagnosisResult])
-            ->with('success', '評価文を保存しました。');
+            ->with('success', '評価文を更新しました。');
     }
 
     /**

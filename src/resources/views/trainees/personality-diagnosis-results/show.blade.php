@@ -89,7 +89,7 @@
     </div>
 
     {{-- 評価文（要件定義書 6-16-15）。状態は見出しの右に文字で出す（色だけに頼らない）。
-         なし・下書き：テキストエリア（10,000 文字以内）と［保存］（データ保存なので緑。4-4）。空で保存すると「なし」に戻る。
+         なし・下書き：テキストエリア（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。空で保存すると「なし」に戻る。
          公開済み：表示だけ（改行を保持）と、公開したトレーニング記録へのリンク --}}
     <div class="card mb-3" data-personality-diagnosis-evaluation>
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -106,23 +106,26 @@
                 <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate data-evaluation-form>
                     @csrf
                     @method('PUT')
+                    {{-- ［更新］（データ保存なので緑）と［トレーニング記録にして公開］（業務の中で必ず使う操作なので青の塗り）。
+                         テキストエリアの上に右寄せで並べる（2026-10-18 変更：ユーザーレビューで、ほかの画面の［更新］の名前にそろえ、
+                         入力欄の上に置いた。その前は入力欄の下の［保存］）。スマホの幅で 1 行に収まらないときは折り返す（flex-wrap）。
+                         公開は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで切り替える。サーバーでも必須を確かめる） --}}
+                    <div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
+                        <button type="submit" class="btn btn-success">更新</button>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
+                                data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>トレーニング記録にして公開</button>
+                    </div>
                     <label for="evaluation_text" class="visually-hidden">評価文</label>
                     <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
                               rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
                     <x-form-error field="evaluation_text" />
-                    {{-- ［保存］（データ保存なので緑）と［トレーニング記録にして公開］（業務の中で必ず使う操作なので青の塗り）。
-                         公開は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで切り替える。サーバーでも必須を確かめる） --}}
-                    <div class="d-flex justify-content-end flex-wrap gap-2 mt-3">
-                        <button type="submit" class="btn btn-success">保存</button>
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
-                                data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>トレーニング記録にして公開</button>
-                    </div>
                 </form>
             @endif
 
-            {{-- 最終保存（一度も保存していなければ出さない。トレーナーが削除されていれば日時だけ） --}}
+            {{-- 最終更新（一度も保存していなければ出さない。トレーナーが削除されていれば日時だけ）。トレーニング記録詳細（S-0403）の
+                 「最終更新: {日時} {トレーナー}」と同じ書き方（2026-10-18 変更：その前は「最終保存：」） --}}
             @if($result->evaluation_updated_at)
-                <p class="text-muted small mb-0 @if(! $isPublished) mt-2 @endif" data-evaluation-updated>最終保存：{{ $result->evaluation_updated_at->format('Y/m/d H:i') }}@if($result->evaluationUpdatedBy) {{ $result->evaluationUpdatedBy->name }}@endif</p>
+                <p class="text-muted small mb-0 @if(! $isPublished) mt-2 @endif" data-evaluation-updated>最終更新: {{ $result->evaluation_updated_at->format('Y/m/d H:i') }}@if($result->evaluationUpdatedBy) {{ $result->evaluationUpdatedBy->name }}@endif</p>
             @endif
 
             @if($isPublished)

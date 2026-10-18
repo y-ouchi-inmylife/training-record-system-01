@@ -249,7 +249,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"\s*data-evaluation-publish\s*>トレーニング記録にして公開<\/button>/u', $html);
         // ［保存］の右
-        $this->assertLessThan(strpos($html, 'data-evaluation-publish'), strpos($html, '>保存</button>'));
+        $this->assertLessThan(strpos($html, 'data-evaluation-publish'), strpos($html, '>更新</button>'));
         $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">トレーニング記録にして公開</h5>', $html);
         $this->assertStringContainsString('<p class="mb-0">トレーニング記録を作り、会員様に公開します。公開すると、評価文はトレーニング記録で直すことになります。</p>', $html);
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.publish', [$this->trainee, $result]).'" class="d-inline m-0" data-evaluation-publish-form>', $html);
@@ -281,7 +281,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
     // ---- 評価文 ----
 
-    public function test_なしは灰のバッジと空のテキストエリアと緑の保存で最終保存は出さない(): void
+    public function test_なしは灰のバッジと緑の更新と空のテキストエリアで最終更新は出さない(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
 
@@ -292,8 +292,14 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('name="_method" value="PUT"', $card);
         $this->assertMatchesRegularExpression('/<textarea class="form-control " id="evaluation_text" name="evaluation_text"\s*rows="12" maxlength="10000"><\/textarea>/u', $card);
         $this->assertStringContainsString('<label for="evaluation_text" class="visually-hidden">評価文</label>', $card);
-        $this->assertStringContainsString('<button type="submit" class="btn btn-success">保存</button>', $card);
-        $this->assertStringNotContainsString('最終保存', $card);
+        $this->assertStringContainsString('<button type="submit" class="btn btn-success">更新</button>', $card);
+        // ボタンの名前は［更新］（2026-10-18 変更：その前は［保存］）。［更新］［トレーニング記録にして公開］はテキストエリアの上に右寄せ
+        $this->assertStringNotContainsString('>保存</button>', $card);
+        $this->assertStringContainsString('<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">', $card);
+        $this->assertLessThan(strpos($card, '<textarea'), strpos($card, '>更新</button>'));
+        $this->assertLessThan(strpos($card, '<textarea'), strpos($card, '>トレーニング記録にして公開</button>'));
+        $this->assertLessThan(strpos($card, '>トレーニング記録にして公開</button>'), strpos($card, '>更新</button>'));
+        $this->assertStringNotContainsString('最終更新', $card);
     }
 
     public function test_保存すると下書きになり保存した人と日時と操作の記録が残る(): void
@@ -304,7 +310,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $response = $this->update($result, "落ち着いた性格です。\r\nお散歩が好きです。");
 
         $response->assertRedirect($this->url($result));
-        $response->assertSessionHas('success', '評価文を保存しました。');
+        $response->assertSessionHas('success', '評価文を更新しました。');
         $saved = $result->fresh();
         // 改行は LF にそろえる
         $this->assertSame("落ち着いた性格です。\nお散歩が好きです。", $saved->evaluation_text);
@@ -317,12 +323,12 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame('edit_trainee_personality_diagnosis_evaluation', $logs[0]->action);
         $this->assertSame('Trainee', $logs[0]->target_type);
         $this->assertSame($this->trainee->id, (int) $logs[0]->target_id);
-        $this->assertSame('愛犬性格診断評価文保存', AccessLog::actionLabels()[$logs[0]->action]);
+        $this->assertSame('愛犬性格診断評価文編集', AccessLog::actionLabels()[$logs[0]->action]);
 
         $card = $this->evaluationCard($this->page($saved));
         $this->assertStringContainsString('<span class="badge bg-warning text-dark" data-evaluation-status>下書き</span>', $card);
         $this->assertStringContainsString(">落ち着いた性格です。\nお散歩が好きです。</textarea>", $card);
-        $this->assertStringContainsString('data-evaluation-updated>最終保存：2026/10/18 14:30 佐藤</p>', $card);
+        $this->assertStringContainsString('data-evaluation-updated>最終更新: 2026/10/18 14:30 佐藤</p>', $card);
     }
 
     public function test_表示しただけでは操作の記録を残さない(): void
@@ -385,21 +391,21 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString("<div class=\"mb-2\" style=\"white-space: pre-wrap;\" data-evaluation-text>公開した文\n2 行目</div>", $card);
         $this->assertStringNotContainsString('<textarea', $card);
         $this->assertStringNotContainsString('<form', $card);
-        $this->assertStringNotContainsString('>保存</button>', $card);
+        $this->assertStringNotContainsString('>更新</button>', $card);
         $this->assertStringContainsString('data-evaluation-published>公開済み（<a href="'.route('training-records.show', $recordId).'">2026/10/18のトレーニング記録</a>）</p>', $card);
         $this->assertStringContainsString('直すときは、トレーニング記録の編集で直します。', $card);
-        $this->assertStringContainsString('最終保存：2026/10/17 09:00 佐藤', $card);
+        $this->assertStringContainsString('最終更新: 2026/10/17 09:00 佐藤', $card);
 
         $this->update($result, '書き換え')->assertStatus(409);
         $this->assertSame("公開した文\n2 行目", $result->fresh()->evaluation_text);
     }
 
-    public function test_保存したトレーナーが削除されていれば最終保存は日時だけ(): void
+    public function test_保存したトレーナーが削除されていれば最終更新は日時だけ(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         $result->update(['evaluation_text' => '下書き', 'evaluation_updated_by' => 999, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
 
-        $this->assertStringContainsString('data-evaluation-updated>最終保存：2026/10/17 09:00</p>', $this->page($result));
+        $this->assertStringContainsString('data-evaluation-updated>最終更新: 2026/10/17 09:00</p>', $this->page($result));
     }
 
     public function test_評価文はエスケープして出す(): void
