@@ -181,11 +181,13 @@ class ClientFormErrorRenderingTest extends TestCase
             $this->assertStringContainsString('id="emergency_contact_relationship"', $emergencyRow[0]);
             $this->assertTrue(strpos($emergencyRow[0], 'id="phone2"') < strpos($emergencyRow[0], 'id="emergency_contact_relationship"'));
 
-            // 緊急連絡先の行はラベルと入力欄を上にそろえる（ラベルが 2 行でも、入力欄の上が続柄の欄とそろう）
-            $this->assertSame(2, substr_count($emergencyRow[0], '<div class="row g-2 align-items-start">'));
-            $this->assertStringNotContainsString('align-items-center', $emergencyRow[0]);
-            // 緊急連絡先のラベルは「（ご家族等）」の前で折り返す（固定幅に収まらないため）
-            $this->assertStringContainsString('<label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>', $emergencyRow[0]);
+            // 緊急連絡先の見た目のラベルは「緊急連絡先」だけ（2026-10-18 変更：「（ご家族等）」を付けると 2 行に折り返したため）。
+            // 1 行に収まるので、そろえ方はほかの行（電話番号の行など）と同じ。上にそろえる指定はない
+            $this->assertStringContainsString('<label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed">緊急連絡先</label>', $emergencyRow[0]);
+            $this->assertStringNotContainsString('緊急連絡先（ご家族等）', $html);
+            $this->assertSame(2, substr_count($emergencyRow[0], '<div class="row g-2 align-items-center">'));
+            $this->assertSame(1, substr_count($phoneRow[0], '<div class="row g-2 align-items-center">'));
+            $this->assertStringNotContainsString('align-items-start', $html);
             // 続柄：見た目のラベルは「続柄」、読み上げは「緊急連絡先の続柄」
             $this->assertStringContainsString('<label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>', $emergencyRow[0]);
             $this->assertStringContainsString('name="emergency_contact_relationship" aria-label="緊急連絡先の続柄"', $emergencyRow[0]);

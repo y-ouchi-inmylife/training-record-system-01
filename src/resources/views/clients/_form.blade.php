@@ -244,13 +244,13 @@
                 <div class="row g-3 mb-2">
                     {{-- 行4: 緊急連絡先（ご家族等）+ 続柄（2026-10-18 変更：電話番号の行から次の行に分け、ひとまとまりに見せる。
                          続柄が緊急連絡先の方の続柄だとわからなかったため）。
-                         緊急連絡先のラベルは固定幅（140px）に収まらないので「（ご家族等）」の前で 2 行に折り返す。
-                         この行だけラベルと入力欄を上にそろえる（align-items-start）：上下の中央にそろえると、ラベルが 2 行の
-                         緊急連絡先の欄だけ入力欄が下にずれ、続柄の欄と上の位置がそろわないため。
+                         見た目のラベルは「緊急連絡先」だけにする（2026-10-18 変更：「緊急連絡先（ご家族等）」は固定幅〔140px〕で
+                         2 行に折り返して収まりが悪かったため。項目名・会員詳細・会員側の画面・エラーの文は「緊急連絡先（ご家族等）」のまま）。
+                         ラベルが 1 行に収まるので、そろえ方はほかの行と同じ（align-items-center）。
                          続柄の欄は、見た目のラベルは「続柄」のまま、読み上げでは「緊急連絡先の続柄」と読む（aria-label） --}}
                     <div class="col-md-4">
-                        <div class="row g-2 align-items-start">
-                            <label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed"><span class="d-inline-block">緊急連絡先</span><span class="d-inline-block">（ご家族等）</span></label>
+                        <div class="row g-2 align-items-center">
+                            <label for="phone2" class="col-md-auto col-form-label text-md-end form-label-fixed">緊急連絡先</label>
                             <div class="col-12 col-md">
                                 <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
                                        id="phone2" name="phone2" value="{{ old('phone2', $client?->phone2) }}" placeholder="例: 090-1234-5678"
@@ -260,7 +260,7 @@
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="row g-2 align-items-start">
+                        <div class="row g-2 align-items-center">
                             <label for="emergency_contact_relationship" class="col-md-auto col-form-label text-md-end form-label-fixed">続柄</label>
                             <div class="col-12 col-md">
                                 <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
