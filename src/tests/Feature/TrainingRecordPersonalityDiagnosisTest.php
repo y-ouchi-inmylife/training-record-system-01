@@ -21,7 +21,7 @@ use Tests\TestCase;
  * - 記録の詳細（トレーナー側 S-0403・会員側 S-1404）に愛犬性格診断の欄もレーダーの JS も出さない（公開済みの評価文があっても）
  * - 一覧（トレーナー側 S-0402、マイページ）に印を出さない
  * - 記録の更新（S-0404）は会員（client_id）を受け取らない（この直しは残す）
- * 公開済みの評価文をマイページ・会員詳細に混ぜて出すのは次の段階
+ * 公開済みの評価文をマイページ・会員詳細に混ぜて出すことは PublishedEvaluationTimelineTest で確かめる
  */
 class TrainingRecordPersonalityDiagnosisTest extends TestCase
 {
@@ -201,7 +201,10 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         $html = $this->actingAs($this->client, 'client')->get(route('client-portal.dashboard'))->assertOk()->getContent();
 
         $this->assertStringNotContainsString('data-record-personality-badge', $html);
-        $this->assertStringNotContainsString('<p class="c-session-tag', $html);
+        // 札（.c-session-tag）は、混ぜて出す評価文のカードにだけ付く（2026-10-18 変更）。記録のカードには付かない
+        $this->assertSame(1, substr_count($html, '<p class="c-session-tag'));
+        $this->assertSame(1, preg_match('/data-session-evaluation="\d+">.*?<\/article>/s', $html, $m));
+        $this->assertStringContainsString('<p class="c-session-tag', $m[0]);
     }
 
     // ---- 記録の更新（S-0404） ----

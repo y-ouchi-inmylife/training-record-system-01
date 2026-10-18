@@ -6,10 +6,12 @@ use App\Http\Requests\ClientRequest;
 use App\Models\Client;
 use App\Models\ClientContract;
 use App\Models\ClientUsage;
+use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\Trainer;
 use App\Models\TrainingRecord;
 use App\Services\ClientInternalIdService;
 use App\Services\ContractTicketService;
+use App\Support\RecordTimeline;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -205,7 +207,15 @@ class ClientController extends Controller
 
         $trainers = Trainer::practitioners()->orderBy('display_order')->orderBy('name')->get();
 
-        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal'));
+        // セクション2（トレーニング記録）の一覧：記録に、この会員のトレーニーの公開済みの愛犬性格診断の評価文を混ぜて
+        // 新しい順に並べる（2026-10-18 追加。要件定義書 6-3-3・6-16-16。並びは RecordTimeline）。
+        // 見出しの件数「トレーニング記録（N件）」と削除の可否は、今までどおり記録（$client->trainingRecords）だけで数える
+        $timeline = RecordTimeline::merge(
+            $client->trainingRecords,
+            TraineePersonalityDiagnosisResult::publishedEvaluationsOfClient($client->id),
+        );
+
+        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline'));
     }
 
     /**

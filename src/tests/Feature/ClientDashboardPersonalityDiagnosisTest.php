@@ -435,8 +435,9 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
             return $queries->count();
         };
 
-        $this->assertSame(1, $count($this->client));
-        $this->assertSame(1, $count($three));
+        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みの評価文（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない
+        $this->assertSame(2, $count($this->client));
+        $this->assertSame(2, $count($three));
     }
 
     // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----

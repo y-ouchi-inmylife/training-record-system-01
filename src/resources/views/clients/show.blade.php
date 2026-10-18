@@ -108,6 +108,26 @@
     white-space: pre-wrap;
     word-break: break-word;
 }
+/* 公開済みの評価文のブロック（2026-10-18 追加。設計書 S-0305 セクション2）。
+   （この style は画面にそのまま出るので、診断の名前は書かない。名前は文のファイルの 1 か所から読むため）
+   - 札「{診断の名前}（{名前}）」は、会員側の札（client.scss の .c-session-tag）と同じ紫の薄い面に本文の色の文字。
+     Bootstrap の badge の形（小さな角丸・太字）のまま、色だけ変える（白の上でも記録のブロックの文字と見分けられる）
+   - 点マーカーも紫にして、縦線の上で記録と見分けられるようにする（色だけに頼らず、札の文字でも分かる）
+   - 評価文は長くなりやすいので、はじめの 4 行で切る（記録のノートは全文を出すが、評価文は S-0313 で読む） */
+.record-block--evaluation::before {
+    background: #6f42c1;
+}
+.record-block__tag {
+    background-color: #eee8f8;
+    color: #212529;
+}
+.record-block__clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    overflow: hidden;
+}
 
 /* 回数カード（設計書 S-0305 セクション5）のカード本文: ビューポート基準の最大高さで、
    収まらない場合のみ縦スクロール。見出し（ご利用回数・追加ボタン）はこの外なので常に見える。
@@ -316,11 +336,37 @@
                     <a href="{{ route('training-records.create', ['client_id' => $client->id]) }}"
                        class="btn btn-primary">新規登録</a>
                 </div>
-                @if($client->trainingRecords->count() > 0)
+                {{-- 記録と、公開済みの愛犬性格診断の評価文を混ぜた一覧（2026-10-18 変更。コントローラで新しい順に並べた $timeline）。
+                     見出しの件数は記録だけ（評価文は数えない）。評価文だけがあるときも一覧を出す --}}
+                @if($timeline->isNotEmpty())
                     <div class="card-body training-records-scroll">
                         <div class="training-records-timeline">
-                            @foreach($client->trainingRecords as $record)
+                            @foreach($timeline as $entry)
+                                @if($entry['type'] === \App\Support\RecordTimeline::EVALUATION)
+                                    @php
+                                        $result = $entry['item'];
+                                    @endphp
+                                    {{-- 評価文のブロック（設計書 S-0305 セクション2「公開済みの愛犬性格診断の評価文を混ぜる」）。
+                                         見出し行：公開した日・札「愛犬性格診断（{トレーニーの名前}）」・担当（公開したトレーナー。削除されていれば出さない）。
+                                         その下に小見出し「評価文」と、評価文のはじめの 4 行（改行を保持）。所感・メディアはない。
+                                         ブロック全体を押すと愛犬性格診断詳細（S-0313） --}}
+                                    <a href="{{ route('trainee-personality-diagnosis-results.show', [$result->trainee, $result]) }}" class="record-block-link" data-timeline-evaluation="{{ $result->id }}">
+                                        <div class="record-block record-block--evaluation">
+                                            <div class="record-block__line1">
+                                                <span class="fw-bold">{{ $result->evaluation_published_at->format('Y/m/d') }}</span>
+                                                <span class="badge record-block__tag">{{ __('messages.personality_diagnosis_name') }}（{{ $result->trainee->display_name }}）</span>
+                                                @if($result->evaluationPublishedBy)
+                                                    <span><span class="text-muted">担当：</span>{{ $result->evaluationPublishedBy->name }}</span>
+                                                @endif
+                                            </div>
+                                            <div class="small fw-bold mt-2 text-body">評価文</div>
+                                            <div class="record-block__line3 record-block__clamp">{{ $result->evaluation_text }}</div>
+                                        </div>
+                                    </a>
+                                    @continue
+                                @endif
                                 @php
+                                    $record = $entry['item'];
                                     $isFutureDate = $record->training_date > now()->startOfDay();
                                     // 担当1・担当2 を中黒で連結。両方空なら行ごと非表示
                                     $trainerNames = implode('・', array_filter([
@@ -328,7 +374,7 @@
                                         $record->trainer2?->name,
                                     ]));
                                 @endphp
-                                <a href="{{ route('training-records.show', $record) }}" class="record-block-link">
+                                <a href="{{ route('training-records.show', $record) }}" class="record-block-link" data-timeline-record="{{ $record->id }}">
                                     <div class="record-block">
                                         {{-- 見出し行: 日付・時刻・担当・メディア件数を横並び
                                              （record-block__line1 の flex-wrap で狭い幅では自然に折り返す）。

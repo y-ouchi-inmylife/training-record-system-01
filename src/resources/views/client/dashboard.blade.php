@@ -3,7 +3,9 @@
 @php
     // 曜日の日本語表記（Carbon の dayOfWeek は 0=日 〜 6=土）
     $weekdaysJp = ['日', '月', '火', '水', '木', '金', '土'];
-    $hero = $sessions->first();
+    // 最新の記録のカード（hero）は、記録と公開済みの愛犬性格診断の評価文を混ぜた一覧の先頭（2026-10-18 変更。
+    // 評価文がいちばん新しければ評価文のカード）。一覧はコントローラで新しい順に並べた $timeline
+    $hero = $timeline->first();
     // 体重推移グラフ 1 枚あたりの高さ（暫定値）。値をここで一元管理し、
     // 各 canvas の親要素のインラインスタイルで使い回す。
     $weightChartHeight = '180px';
@@ -331,7 +333,7 @@
         </section>
     @endif
 
-    @if($sessions->isEmpty())
+    @if($timeline->isEmpty())
         {{-- 空状態（記録0件）— 設計書 §4-2。記録の種別にトレーニング以外
              （事前相談等）があるためラベル・本文とも「記録」（設計書 §6）。
              eyebrow は記録の有無で出し分けず「最新の記録」で固定する
@@ -356,11 +358,15 @@
         </section>
     @else
         {{-- hero: 最新の記録（先頭1件）。記録の種別にトレーニング以外
-             (事前相談等)があるためラベルは「記録」(設計書 §6)。 --}}
-        @php $rec = $hero['record']; $media = $hero['media']; @endphp
+             (事前相談等)があるためラベルは「記録」(設計書 §6)。
+             先頭が愛犬性格診断の評価文なら、評価文のカード（2026-10-18 追加。client/_evaluation-session）。 --}}
         <section class="c-section" aria-labelledby="c-latest-heading">
             <p class="eyebrow" id="c-latest-heading">最新の記録</p>
 
+            @if($hero['type'] === \App\Support\RecordTimeline::EVALUATION)
+                @include('client._evaluation-session', ['result' => $hero['item'], 'isHero' => true])
+            @else
+            @php $rec = $hero['item']['record']; $media = $hero['item']['media']; @endphp
             <article class="c-session c-session--hero">
                 <div class="c-date-block" aria-hidden="true">
                     {{-- ≥576px 用: 縦組み3行(月・日・曜日)。モバイルでは display:none
@@ -426,19 +432,28 @@
                     </div>
                 </div>
             </article>
+            @endif
         </section>
 
         {{-- feed: これまでの記録（残り）。記録の種別にトレーニング以外
              (事前相談等)があるため、hero と揃えてラベルを「記録」に統一
              (設計書 §6)。件数のサブテキストは「記録」の反復と「これまで」の
-             二重をどちらも避けるため「全 N 回」とする。 --}}
-        @if($sessions->count() > 1)
+             二重をどちらも避けるため「全 N 回」とする。
+             公開済みの愛犬性格診断の評価文も混ぜて出すが（2026-10-18 追加）、「全 N 回」は記録の回数なので
+             評価文を数えない（$recordCount。記録が 1 件もない〔評価文だけ〕ときは出さない）。 --}}
+        @if($timeline->count() > 1)
             <section class="c-section" aria-labelledby="c-past-heading">
                 <p class="eyebrow" id="c-past-heading">これまでの記録</p>
-                <p class="meta c-section-sub">全 <span class="num-tabular">{{ $sessions->count() }}</span> 回</p>
+                @if($recordCount > 0)
+                    <p class="meta c-section-sub" data-record-count>全 <span class="num-tabular">{{ $recordCount }}</span> 回</p>
+                @endif
 
-                @foreach($sessions->skip(1) as $session)
-                    @php $rec = $session['record']; $media = $session['media']; @endphp
+                @foreach($timeline->skip(1) as $entry)
+                    @if($entry['type'] === \App\Support\RecordTimeline::EVALUATION)
+                        @include('client._evaluation-session', ['result' => $entry['item'], 'isHero' => false])
+                        @continue
+                    @endif
+                    @php $rec = $entry['item']['record']; $media = $entry['item']['media']; @endphp
                     <article class="c-session">
                         <div class="c-date-block" aria-hidden="true">
                             {{-- ≥576px 用: 縦組み3行(月・日・曜日)。モバイルでは display:none

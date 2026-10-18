@@ -358,6 +358,10 @@ Route::domain(config('subdomain.client_host'))->group(function () {
                 ->name('contracts');
             Route::get('/training-records/{trainingRecord}', [\App\Http\Controllers\Client\TrainingRecordController::class, 'show'])
                 ->name('training-records.show');
+            // 愛犬性格診断の評価（S-1418、6-15-21。2026-10-18 追加）— マイページの記録の一覧に混ぜた評価文から開く。
+            // 自分のトレーニーの公開済みの評価文だけ（それ以外は 404）。trainee-personality-diagnosis-results.*（トレーナー向け）は会員に開放しない
+            Route::get('/personality-diagnosis-results/{personalityDiagnosisResult}', [\App\Http\Controllers\Client\PersonalityDiagnosisResultController::class, 'show'])
+                ->name('personality-diagnosis-results.show');
             Route::get('/media/{mediaRecord}/play', [\App\Http\Controllers\Client\MediaRecordController::class, 'play'])
                 ->name('media.play');
             // トレーニー写真（S-1402、6-15-15）— 会員がダッシュボードから登録・削除する

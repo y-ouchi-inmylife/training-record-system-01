@@ -40,6 +40,7 @@ class ClientContractNavRenderingTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('client_id');
             $table->date('training_date');
+            $table->time('training_time')->nullable();
             $table->unsignedBigInteger('trainer1_id')->nullable();
             $table->unsignedBigInteger('trainer2_id')->nullable();
         });
@@ -64,6 +65,9 @@ class ClientContractNavRenderingTest extends TestCase
             $table->date('measured_date');
             $table->time('measured_time');
         });
+        // 記録の一覧に混ぜる公開済みの評価文を読む（2026-10-18 追加。中身は空）
+        $this->createTraineePersonalityDiagnosisTokensTable();
+        $this->createTraineePersonalityDiagnosisResultsTable();
     }
 
     /** 契約 4 回＋3 回、利用 2 件（うち 1 件は契約なし）の会員（残りは 5 回） */

@@ -696,10 +696,11 @@ input[type="tel"] {
     box-shadow: 0 0 0 3px $mat, 0 0 0 5px $ink;
 }
 
-// 愛犬性格診断の印（2026-10-18 追加。設計書 S-1402）
-// 評価文を公開して作った記録のカードのいちばん上に、小さな札で出す。色は愛犬性格診断の案内のお知らせ
+// 愛犬性格診断の札（2026-10-18 追加。設計書 S-1402「愛犬性格診断の評価を混ぜる」）
+// 公開済みの評価文のカード（client/_evaluation-session）のいちばん上に、小さな札で出す。色は愛犬性格診断の案内のお知らせ
 // （.c-survey-notice--personality）と同じ紫の薄い面。文字は本文と同じ $ink（色だけに頼らない）。
-// 記録のカード（.c-session-content）は縦の flex なので、札が横いっぱいに伸びないよう align-self で左に寄せる
+// カードの中身（.c-session-content）の縦の flex の中に直に置いても横いっぱいに伸びないよう、align-self で左に寄せる。
+// 2026-10-18 変更：最初の形（段階1 の②）では、評価文を公開して作った記録のカードの印に使っていた
 .c-session-tag {
     align-self: flex-start;
     display: inline-block;
@@ -711,6 +712,14 @@ input[type="tel"] {
     font-weight: 700;
     line-height: 1.5;
     letter-spacing: 0.04em;
+}
+
+// 評価文のカードの見出し「{呼び名}の愛犬性格診断」（2026-10-18 追加）。札のすぐ下に、本文と同じ大きさの太字で出す
+.c-session-heading {
+    margin: 0;
+    color: $ink;
+    font-weight: 700;
+    line-height: 1.5;
 }
 
 // ノート冒頭

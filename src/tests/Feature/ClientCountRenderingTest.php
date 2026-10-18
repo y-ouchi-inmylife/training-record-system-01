@@ -1544,8 +1544,9 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        $this->assertSame(1, $count($one));
-        $this->assertSame(1, $count($three));
+        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みの評価文（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない
+        $this->assertSame(2, $count($one));
+        $this->assertSame(2, $count($three));
     }
 
     // ---- 連絡先の緊急連絡先（ご家族等）（2026-10-17 変更：その前は「電話番号（予備）」。

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Support\PersonalityDiagnosisQuestions;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -198,6 +200,30 @@ class TraineePersonalityDiagnosisResult extends Model
     public function trainee(): BelongsTo
     {
         return $this->belongsTo(Trainee::class);
+    }
+
+    /**
+     * 評価文を公開している結果だけに絞る（2026-10-18 追加。要件定義書 6-16-16）
+     */
+    public function scopeEvaluationPublished(Builder $query): Builder
+    {
+        return $query->whereNotNull('evaluation_published_at');
+    }
+
+    /**
+     * 会員のトレーニーの公開済みの評価文（2026-10-18 追加。要件定義書 6-3-3・6-15-6）。
+     * 会員詳細（S-0305）とマイページ（S-1402）で、トレーニング記録の一覧に混ぜるのに使う。
+     * トレーニー（名前・呼び名）と公開したトレーナー（担当）も読み込む。並べ替えは混ぜるときに行う（RecordTimeline）
+     *
+     * @return Collection<int, self>
+     */
+    public static function publishedEvaluationsOfClient(int $clientId): Collection
+    {
+        return self::query()
+            ->evaluationPublished()
+            ->whereIn('trainee_id', Trainee::query()->where('client_id', $clientId)->select('id'))
+            ->with(['trainee', 'evaluationPublishedBy'])
+            ->get();
     }
 
     /**

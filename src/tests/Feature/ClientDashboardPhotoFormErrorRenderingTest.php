@@ -52,7 +52,8 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         }
         $this->app['request']->setLaravelSession($session);
         return $this->withViewErrors($errors)->view('client.dashboard', [
-            'sessions' => new Collection([]),
+            'timeline' => new Collection([]),
+            'recordCount' => 0,
             'weightCharts' => $weightCharts ?? $this->dummyWeightCharts([1]),
         ]);
     }

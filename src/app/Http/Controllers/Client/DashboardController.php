@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MediaRecordController as TrainerMediaRecordController;
 use App\Models\Trainee;
+use App\Models\TraineePersonalityDiagnosisResult;
+use App\Support\RecordTimeline;
 use Illuminate\Contracts\View\View;
 
 /**
@@ -31,11 +33,14 @@ class DashboardController extends Controller
         // 一覧表示に使うリレーション（担当1・担当2）に加え、
         // メディアもカード内に埋め込むため mediaRecords を eager load（N+1回避）。
         // updatedBy はクライアント非表示のため意図的にロードしない。
+        // 同じ日の記録は時刻の新しい順（時刻のない記録はその日のいちばん後ろ）。会員詳細（S-0305）と同じ並びにする
+        // （2026-10-18 追加。公開済みの評価文を混ぜるときに、同じ日の並びを会員詳細とそろえるため）
         $records = $client
             ->trainingRecords()
             ->with(['trainer1', 'trainer2', 'mediaRecords'])
             ->withCount('mediaRecords')
             ->orderByDesc('training_date')
+            ->orderByDesc('training_time')
             ->get();
 
         // 記録ごとに入れ子の $sessions 構造に組み替える（設計書 §8-1-1 変更1）。
@@ -66,11 +71,21 @@ class DashboardController extends Controller
             ];
         });
 
+        // 最新の記録のカード・これまでの記録には、自分のトレーニーの公開済みの愛犬性格診断の評価文も混ぜる
+        // （2026-10-18 追加。要件定義書 6-15-6・6-16-16、設計書 S-1402「愛犬性格診断の評価を混ぜる」）。
+        // 並びは会員詳細（S-0305）と同じ（RecordTimeline）。下書き・公開をやめたものは入らない。
+        // 「全 N 回」は記録の回数なので、評価文を数えない $recordCount を使う
+        $timeline = RecordTimeline::merge(
+            $sessions,
+            TraineePersonalityDiagnosisResult::publishedEvaluationsOfClient($client->id),
+        );
+        $recordCount = $sessions->count();
+
         // 段階③：トレーニーごとの体重推移グラフ用データを組み立てる。
         // Blade には完成した配列を渡す（Blade 内での再計算・並べ替えは行わない）。
         $weightCharts = $this->buildWeightCharts($client);
 
-        return view('client.dashboard', compact('sessions', 'weightCharts'));
+        return view('client.dashboard', compact('timeline', 'recordCount', 'weightCharts'));
     }
 
     /**
