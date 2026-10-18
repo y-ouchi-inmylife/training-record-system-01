@@ -4,7 +4,11 @@
      2026-10-18 変更：ユーザーレビューで、実際は印刷せず、LINE・メールで送るか、その場で QR コードを読み取ってもらうことが分かったため、
      印刷して渡す作り（印刷専用のレイアウト・A4・QR コードを読み取る手順の欄）をやめ、2 つの欄にした。
        - LINE・メールで送る（上・主な使い方）：コピーする文をそのまま出す（改行も同じ。何が送られるか見て分かるように）。
-         ［文面をコピー］はトレーナー側のいつも使う操作なので青の塗り（4-4）。押すと「コピーしました」（copy-message.js）
+         ［コピー］はトレーナー側のいつも使う操作なので青の塗り（4-4）。押すと「コピーしました」（copy-message.js）。
+         2026-10-18 変更：ユーザーレビューで、［文面をコピー］を［コピー］にし、文面の下から見出しの行の右に移した。大きさは
+         ほかのカードの見出しの行のボタン（会員詳細の［トレーニング記録を登録］、S-0313 の［更新］）と同じふつうの大きさ。
+         読み上げは「文面をコピー」（aria-label）。「コピーしました」に変わってもボタンの幅が変わらないよう、copy-message.js が
+         いちばん長い表示に合わせた最低の幅を付ける。左右の見出しの行の高さは invitation-panel-header でそろえる（app.scss）
        - QR コード：QR コードだけ（その場で画面を見せて読み取ってもらうほか、画像にしてメール・LINE に添えることもある。qr-code.js）。
          2026-10-18 変更：ユーザーレビューで、見出しを「その場で読み取ってもらう」から「QR コード」にし、下のお客様向けの一文と
          有効期限（または 1 回かぎりの文）を外した（添付することもあるので説明は過剰なため。有効期限・1 回かぎりの文は左の文面に入っている）
@@ -14,20 +18,18 @@
 <div class="row g-3 align-items-start">
     <div class="col-12 col-lg-7">
         <section class="card h-100" aria-labelledby="invitation-message-heading" data-invitation-send>
-            <div class="card-header">
+            <div class="card-header invitation-panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <h2 class="h6 mb-0" id="invitation-message-heading">LINE・メールで送る</h2>
+                <button type="button" class="btn btn-primary ms-auto" aria-label="文面をコピー" data-copy-message data-copy-text="{{ $copyText }}">コピー</button>
             </div>
             <div class="card-body">
                 <div class="invitation-message" data-invitation-message>{{ $copyText }}</div>
-                <div class="d-flex justify-content-end mt-3">
-                    <button type="button" class="btn btn-primary" data-copy-message data-copy-text="{{ $copyText }}">文面をコピー</button>
-                </div>
             </div>
         </section>
     </div>
     <div class="col-12 col-lg-5">
         <section class="card h-100" aria-labelledby="invitation-qr-heading" data-invitation-qr>
-            <div class="card-header">
+            <div class="card-header invitation-panel-header d-flex align-items-center">
                 <h2 class="h6 mb-0" id="invitation-qr-heading">QR コード</h2>
             </div>
             <div class="card-body text-center">

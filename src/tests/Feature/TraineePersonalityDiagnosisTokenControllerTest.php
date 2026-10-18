@@ -281,9 +281,17 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         foreach (['d-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'ご回答の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
             $this->assertStringNotContainsString($text, $html, $text);
         }
-        // ［戻る］（会員詳細へのふつうのリンク）と［文面をコピー］（青の塗り）
+        // ［戻る］（会員詳細へのふつうのリンク）と［コピー］（青の塗り）
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
-        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-copy-message data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
+        // ［コピー］は「LINE・メールで送る」の見出しの行の右（青の塗り・ふつうの大きさ。読み上げは「文面をコピー」）。文面の下にボタンはない
+        // （2026-10-18 変更：その前は文面の下の右に［文面をコピー］）
+        $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">\\s*'
+            .'<h2 class="h6 mb-0" id="invitation-message-heading">LINE・メールで送る<\\/h2>\\s*'
+            .'<button type="button" class="btn btn-primary ms-auto" aria-label="文面をコピー" data-copy-message data-copy-text="[^"]*">コピー<\\/button>\\s*<\\/div>\\s*'
+            .'<div class="card-body">\\s*<div class="invitation-message" data-invitation-message>[^<]*<\\/div>\\s*<\\/div>/u', $html);
+        $this->assertSame(1, substr_count($html, 'data-copy-message '));
+        $this->assertStringNotContainsString('>文面をコピー<', $html);
+        $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex align-items-center">\\s*<h2 class="h6 mb-0" id="invitation-qr-heading">QR コード<\\/h2>/u', $html);
         $this->assertStringContainsString('copy-message', $html);
         $this->assertStringContainsString('qr-code', $html);
         $this->assertStringNotContainsString('close-tab', $html);
@@ -336,7 +344,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertStringContainsString('<p class="invitation-empty"><strong>有効な愛犬性格診断の案内がありません。</strong></p>', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('data-invitation-message', $html);
-        $this->assertStringNotContainsString('文面をコピー', $html);
+        $this->assertStringNotContainsString('data-copy-message', $html);
         $this->assertStringContainsString('btn-sm">戻る</a>', $html);
     }
 

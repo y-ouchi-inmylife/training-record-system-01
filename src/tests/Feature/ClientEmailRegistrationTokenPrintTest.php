@@ -114,8 +114,15 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         // 見出しは帯。その下に「LINE・メールで送る」（左・上）と「その場で読み取ってもらう」（右・下）の欄
         $this->assertMatchesRegularExpression('/>マイページ登録のご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
         $this->assertLessThan(strpos($html, 'QR コード</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
-        // ［文面をコピー］はトレーナー側のいつも使う操作なので青の塗り（4-4。2026-10-18 変更：その前は白抜きの小さいボタン）
-        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-copy-message data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
+        // ［コピー］は「LINE・メールで送る」の見出しの行の右（青の塗り・ふつうの大きさ。読み上げは「文面をコピー」）。文面の下にボタンはない
+        // （2026-10-18 変更：その前は文面の下の右に［文面をコピー］）
+        $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">\\s*'
+            .'<h2 class="h6 mb-0" id="invitation-message-heading">LINE・メールで送る<\\/h2>\\s*'
+            .'<button type="button" class="btn btn-primary ms-auto" aria-label="文面をコピー" data-copy-message data-copy-text="[^"]*">コピー<\\/button>\\s*<\\/div>\\s*'
+            .'<div class="card-body">\\s*<div class="invitation-message" data-invitation-message>[^<]*<\\/div>\\s*<\\/div>/u', $html);
+        $this->assertSame(1, substr_count($html, 'data-copy-message '));
+        $this->assertStringNotContainsString('>文面をコピー<', $html);
+        $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex align-items-center">\\s*<h2 class="h6 mb-0" id="invitation-qr-heading">QR コード<\\/h2>/u', $html);
         // QR コード（中身は URL）・お客様向けの一文・有効期限（曜日つき）
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="マイページ登録案内の QR コード"></canvas>', $html);
         // QR コードの欄は見出し「QR コード」と QR コードだけ（2026-10-18 変更：その前は見出し「その場で読み取ってもらう」と、
@@ -202,7 +209,7 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringContainsString('会員詳細画面から発行してください。', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('data-invitation-message', $html);
-        $this->assertStringNotContainsString('文面をコピー', $html);
+        $this->assertStringNotContainsString('data-copy-message', $html);
         // ［戻る］は出す（会員詳細へのふつうのリンク。2026-10-17 変更：その前は［閉じる］）
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
         $this->assertStringNotContainsString('閉じる', $html);
