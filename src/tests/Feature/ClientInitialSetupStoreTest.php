@@ -140,7 +140,8 @@ class ClientInitialSetupStoreTest extends TestCase
         $response = $this->postSetup($this->validInput());
 
         $response->assertRedirect(route('client-portal.dashboard'));
-        $response->assertSessionHas('success', '初回設定が完了しました。');
+        // 完了のメッセージは「マイページの登録」の言い方（2026-10-18 変更：その前は「初回設定が完了しました。」）
+        $response->assertSessionHas('success', 'マイページの登録が完了しました。');
         $response->assertSessionHasNoErrors();
     }
 

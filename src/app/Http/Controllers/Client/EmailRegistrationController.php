@@ -48,7 +48,8 @@ class EmailRegistrationController extends Controller
         if ($tokenRecord->is_used) {
             return $this->invalidTokenView(
                 'このURLは既に使用されています',
-                'このURLでは既に初回設定が完了しています。ログイン画面からログインしてください。'
+                // お客様に見せる名前は「マイページ登録」（2026-10-18 変更：その前は「既に初回設定が完了しています」）
+                'このURLでは既にマイページの登録が完了しています。ログイン画面からログインしてください。'
             );
         }
 

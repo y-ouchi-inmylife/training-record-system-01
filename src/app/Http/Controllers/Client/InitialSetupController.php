@@ -14,7 +14,11 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * クライアント初回設定コントローラ（S-1403）
+ * クライアント初回設定コントローラ（S-1403 マイページ登録）
+ *
+ * 2026-10-18 変更：ユーザーレビューで、お客様に見せる画面の名前を「初回設定」から「マイページ登録」にした。
+ * お客様に見える文言（完了・失敗・使用済みのメッセージ）も「マイページの登録」にそろえた。
+ * URL・ルート名・クラス名（InitialSetup）は変えない（このファイルのコメントの「初回設定」も同じものを指す）。
  *
  * トークン付き公開 URL（ログイン用リンク）からアクセスする。
  * GET でトークン検証と同時に client guard で自動ログインさせ、
@@ -49,7 +53,7 @@ class InitialSetupController extends Controller
         if ($tokenRecord->is_used) {
             return $this->invalidTokenView(
                 'このURLは既に使用されています',
-                'このURLでは既に初回設定が完了しています。ログイン画面からログインしてください。'
+                'このURLでは既にマイページの登録が完了しています。ログイン画面からログインしてください。'
             );
         }
 
@@ -159,12 +163,12 @@ class InitialSetupController extends Controller
             // キーを `setup` から専用の `form` に移した）。
             return back()
                 ->withInput()
-                ->withErrors(['form' => '初回設定を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。']);
+                ->withErrors(['form' => 'マイページの登録を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。']);
         }
 
         // 自動ログインは GET で完了している。そのままダッシュボードへ。
         return redirect()->route('client-portal.dashboard')
-            ->with('success', '初回設定が完了しました。');
+            ->with('success', 'マイページの登録が完了しました。');
     }
 
     private function invalidTokenView(string $title, string $message): View

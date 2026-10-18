@@ -6,18 +6,20 @@
     $prefectures = config('prefectures');
 @endphp
 
-@section('title', '初回設定')
+@section('title', 'マイページ登録')
 
 @section('content')
-{{-- pre-auth シェル（ログイン画面と共用）+ 幅広モディファイア。
-     初回設定はパスワード＋氏名＋連絡先＋住所を 1 画面に載せるため
+{{-- マイページ登録（S-1403。2026-10-18 変更：ユーザーレビューで、目的がはっきり分かるよう、画面の名前を「初回設定」から
+     「マイページ登録」にした。見出し・タブの題・ボタン〔その前は［設定して進む］〕。URL・ルート名は client-portal/setup のまま）。
+     pre-auth シェル（ログイン画面と共用）+ 幅広モディファイア。
+     マイページ登録はパスワード＋氏名＋連絡先＋住所を 1 画面に載せるため
      .c-login--wide で md 以上のカード幅を拡張する（設計書 §4-7）。
      ワードマークは layouts.partials.client-nav（ヘッダー帯の左）に移動。
      画面構成は S-1406 / S-1411 と揃える：見出しはカード外、セクション
      見出し（.eyebrow の ── XXX ── 装飾）は置かず、代わりに先頭に
      メールアドレスの表示行を置く（S-1411「お名前」と同じマークアップ）。 --}}
 <div class="c-login c-login--wide">
-    <h1 class="mb-4">初回設定</h1>
+    <h1 class="mb-4">マイページ登録</h1>
 
     <div class="card c-login-card">
         <div class="card-body p-4">
@@ -58,7 +60,7 @@
                 {{-- 「お名前」「ご連絡先」の小見出し（太字）は入力欄のまとまりの先頭に置く。
                      見出しタグ <h2> を使う理由：読み上げソフトに画面の構造を伝えるため。
                      見た目だけの太字（旧 <p class="fw-bold">）では構造が伝わらない。
-                     <h2> にする理由：主見出し「初回設定」が <h1> なので、その直下の階層。
+                     <h2> にする理由：主見出し「マイページ登録」が <h1> なので、その直下の階層。
                      レベルを飛ばさない。fs-6 は本文サイズに落とすため。Bootstrap の
                      見出しタグは既定で大きなフォントサイズが付くが、本文と地続きの小見出しに
                      するために fs-6（= 1rem = 本文サイズ）で明示的に落とす。**fs-6 を外さないこと**
@@ -288,7 +290,7 @@
                 @include('layouts.partials.privacy-consent')
 
                 <div class="d-grid">
-                    <button type="submit" class="btn btn-primary">設定して進む</button>
+                    <button type="submit" class="btn btn-primary">登録する</button>
                 </div>
             </form>
         </div>

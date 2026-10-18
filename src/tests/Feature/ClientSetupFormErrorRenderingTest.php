@@ -113,10 +113,10 @@ class ClientSetupFormErrorRenderingTest extends TestCase
     public function test_初回設定_formキーはフォームの上に出て欄下にも上部案内にも出ない(): void
     {
         $view = $this->renderSetup([
-            'form' => '初回設定を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。',
+            'form' => 'マイページの登録を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。',
         ]);
 
-        $view->assertSee('初回設定を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。');
+        $view->assertSee('マイページの登録を完了できませんでした。時間を置いて再度お試しください。改善しない場合は担当のトレーナーにご連絡ください。');
         $view->assertDontSee('入力内容に誤りがあります');
         $view->assertDontSee('is-invalid', false);
         $view->assertDontSee('invalid-feedback', false);
