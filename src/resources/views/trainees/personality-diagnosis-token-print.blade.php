@@ -23,7 +23,6 @@
             'copyText' => $copyText,
             'url' => $url,
             'qrLabel' => __('messages.personality_diagnosis_name').'の案内の QR コード',
-            'qrNote' => __('messages.invitation_message.once'),
         ])
     @else
         {{-- 有効な案内なし（未発行・取消済み・前の案内に回答済みのいずれでも同じ）。「ない」ことは本文（太字）で伝える --}}

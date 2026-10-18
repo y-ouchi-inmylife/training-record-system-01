@@ -234,6 +234,15 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     // ---- 案内の画面（S-0312） ----
 
+    /** QR コードの欄（data-invitation-qr の section）の HTML */
+    private function qrPanel(string $html): string
+    {
+        $start = strpos($html, 'data-invitation-qr>');
+        $this->assertNotFalse($start);
+
+        return substr($html, $start, strpos($html, '</section>', $start) - $start);
+    }
+
     /** 画面に出している文面（data-invitation-message の中身を戻したもの） */
     private function shownText(string $html): string
     {
@@ -256,10 +265,17 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality"><span class="print-band-label"><i class="bi bi-heart-pulse" aria-hidden="true"><\/i>愛犬性格診断のご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
         $this->assertSame(1, substr_count($html, '<h1'));
         $this->assertStringContainsString('<title>愛犬性格診断のご案内', $html);
-        $this->assertLessThan(strpos($html, 'その場で読み取ってもらう</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
+        $this->assertLessThan(strpos($html, 'QR コード</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="愛犬性格診断の案内の QR コード"></canvas>', $html);
-        $this->assertStringContainsString('<p class="mt-3 mb-1 fw-bold">スマホのカメラで読み取ってください。</p>', $html);
-        $this->assertStringContainsString('<p class="mb-0 text-muted" data-invitation-qr-note>ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。</p>', $html);
+        // QR コードの欄は見出し「QR コード」と QR コードだけ（2026-10-18 変更：その前は見出し「その場で読み取ってもらう」と、
+        // 下にお客様向けの一文・有効期限〔または 1 回かぎりの文〕。QR コードはメール・LINE に添付することもあり、説明は過剰なため）
+        $qr = $this->qrPanel($html);
+        $this->assertStringContainsString('<h2 class="h6 mb-0" id="invitation-qr-heading">QR コード</h2>', $qr);
+        foreach (['その場で読み取ってもらう', 'スマホのカメラで読み取ってください。', '有効期限', 'ご回答は1回かぎり', 'data-invitation-qr-note'] as $text) {
+            $this->assertStringNotContainsString($text, $qr, $text);
+        }
+        $this->assertStringNotContainsString('その場で読み取ってもらう', $html);
+        $this->assertStringNotContainsString('スマホのカメラで読み取ってください。', $html);
         $this->assertStringNotContainsString('有効期限', $html);
         // 印刷のための作り・読み取りの手順は出さない
         foreach (['d-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'ご回答の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
@@ -302,7 +318,11 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         // 訓練所名が未設定なら、その行を出さない。名前が空なら呼び名は「愛犬」
         config(['app.client_portal_company' => null]);
         $this->trainee->update(['name' => null]);
-        $this->assertStringStartsWith("山田 太郎 様\n\n愛犬の愛犬性格診断のご案内をお送りします。\n", $this->copyText($this->printPage()));
+        // 名前が空なら「{呼び名}の」を付けない（2026-10-18 変更：「愛犬の愛犬性格診断」と「愛犬」が重なっていた）
+        $html = $this->printPage();
+        $this->assertStringStartsWith("山田 太郎 様\n\n愛犬性格診断のご案内をお送りします。\n", $this->copyText($html));
+        $this->assertStringNotContainsString('愛犬の愛犬性格診断', $this->copyText($html));
+        $this->assertSame($this->copyText($html), $this->shownText($html));
     }
 
     public function test_有効な案内がないときは帯の下にないことを出しQRとコピーは出さない(): void

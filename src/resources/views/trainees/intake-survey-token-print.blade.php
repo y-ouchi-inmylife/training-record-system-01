@@ -24,7 +24,6 @@
             'copyText' => $copyText,
             'url' => $url,
             'qrLabel' => '受付アンケート案内の QR コード',
-            'qrNote' => __('messages.invitation_message.once'),
         ])
     @else
         {{-- 有効な案内なし（未発行・取消済み・回答済みのいずれでも同じ）。「ない」ことは本文（太字）で伝える --}}

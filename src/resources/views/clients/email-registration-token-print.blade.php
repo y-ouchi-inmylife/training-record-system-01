@@ -23,7 +23,6 @@
             'copyText' => $copyText,
             'url' => $url,
             'qrLabel' => 'マイページ登録案内の QR コード',
-            'qrNote' => '有効期限：'.\App\Support\InvitationMessage::expiresLabel($expiresOn).'まで',
         ])
     @else
         {{-- 有効な URL なし。「ない」ことは本文の 1 行目（太字）で伝える（見出しにはしない） --}}

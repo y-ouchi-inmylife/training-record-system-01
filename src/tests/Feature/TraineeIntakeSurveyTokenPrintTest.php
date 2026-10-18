@@ -85,6 +85,15 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         return route('client-portal.intake-survey.show', ['token' => self::TOKEN]);
     }
 
+    /** QR コードの欄（data-invitation-qr の section）の HTML */
+    private function qrPanel(string $html): string
+    {
+        $start = strpos($html, 'data-invitation-qr>');
+        $this->assertNotFalse($start);
+
+        return substr($html, $start, strpos($html, '</section>', $start) - $start);
+    }
+
     /** 画面に出している文面（data-invitation-message の中身を戻したもの） */
     private function shownText(string $html): string
     {
@@ -105,12 +114,18 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         $this->assertSame('/client-portal/intake-survey/'.self::TOKEN, parse_url($url, PHP_URL_PATH));
         $this->assertMatchesRegularExpression('/>受付アンケートのご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
-        $this->assertLessThan(strpos($html, 'その場で読み取ってもらう</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
+        $this->assertLessThan(strpos($html, 'QR コード</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-copy-message data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="受付アンケート案内の QR コード"></canvas>', $html);
-        $this->assertStringContainsString('<p class="mt-3 mb-1 fw-bold">スマホのカメラで読み取ってください。</p>', $html);
-        // 有効期限は持たない（代わりに 1 回かぎりの文）
-        $this->assertStringContainsString('<p class="mb-0 text-muted" data-invitation-qr-note>ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。</p>', $html);
+        // QR コードの欄は見出し「QR コード」と QR コードだけ（2026-10-18 変更：その前は見出し「その場で読み取ってもらう」と、
+        // 下にお客様向けの一文・有効期限〔または 1 回かぎりの文〕。QR コードはメール・LINE に添付することもあり、説明は過剰なため）
+        $qr = $this->qrPanel($html);
+        $this->assertStringContainsString('<h2 class="h6 mb-0" id="invitation-qr-heading">QR コード</h2>', $qr);
+        foreach (['その場で読み取ってもらう', 'スマホのカメラで読み取ってください。', '有効期限', 'ご回答は1回かぎり', 'data-invitation-qr-note'] as $text) {
+            $this->assertStringNotContainsString($text, $qr, $text);
+        }
+        $this->assertStringNotContainsString('その場で読み取ってもらう', $html);
+        $this->assertStringNotContainsString('スマホのカメラで読み取ってください。', $html);
         $this->assertStringNotContainsString('有効期限', $html);
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
         $this->assertStringContainsString('copy-message', $html);
@@ -160,7 +175,10 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         $text = $this->copyText($this->printPage());
 
-        $this->assertStringStartsWith("山田 太郎 様\n\n愛犬の受付アンケートのご案内をお送りします。\n", $text);
+        // 名前が空なら「{呼び名}の」を付けない（2026-10-18 変更：呼び名の「愛犬」が付いて「愛犬の受付アンケート」になっていた）
+        $this->assertStringStartsWith("山田 太郎 様\n\n受付アンケートのご案内をお送りします。\n", $text);
+        $this->assertStringNotContainsString('愛犬の受付アンケート', $text);
+        $this->assertSame($text, $this->shownText($this->printPage()));
         $this->assertStringNotContainsString('愛犬ちゃん', $text);
     }
 

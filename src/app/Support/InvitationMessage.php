@@ -48,7 +48,7 @@ class InvitationMessage
     {
         return self::compose(
             $trainee->client,
-            __('messages.invitation_message.intake.intro', ['callName' => $trainee->client_call_name]),
+            __('messages.invitation_message.intake.'.self::introKey($trainee), ['callName' => $trainee->client_call_name]),
             __('messages.invitation_message.intake.body'),
             $url,
             __('messages.invitation_message.once'),
@@ -60,7 +60,7 @@ class InvitationMessage
     {
         return self::compose(
             $trainee->client,
-            __('messages.invitation_message.personality.intro', [
+            __('messages.invitation_message.personality.'.self::introKey($trainee), [
                 'callName' => $trainee->client_call_name,
                 'diagnosis' => __('messages.personality_diagnosis_name'),
             ]),
@@ -68,6 +68,15 @@ class InvitationMessage
             $url,
             __('messages.invitation_message.once'),
         );
+    }
+
+    /**
+     * 案内の 1 文のキー。愛犬の名前が空なら「{呼び名}の」を付けない文（intro_unnamed）にする（2026-10-18 追加。
+     * 名前が空のときの呼び名は「愛犬」なので、「愛犬の愛犬性格診断のご案内…」と「愛犬」が重なって読みにくいため）
+     */
+    private static function introKey(Trainee $trainee): string
+    {
+        return $trainee->has_name ? 'intro' : 'intro_unnamed';
     }
 
     /** 有効期限の表示（例：2026年10月21日（水）） */
