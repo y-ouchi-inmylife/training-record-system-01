@@ -12,31 +12,43 @@
  *   （Chart.js の凡例はグラフの枠の中に描かれ、3 つの項目が 2 行に折り返すため。2026-10 変更）。
  *   凡例の項目と線の見本も、グラフと同じ SERIES_STYLES から作る（legendItems・legendSwatchSvg）
  * - 値は、下の表と同じ表示の値（小数第 1 位の文字列）を数にして使う（表とグラフで数字が食い違わないように）
- * - 訓練性能の軸を真上（12 時）に置く（2026-10-18 追加。radarStartAngle）。訓練性能だけは点数が高いほど良く、ほかの 6 項目は
+ * - 訓練性能の軸を真上（12 時）に置く（2026-10-18 追加。rotateToTop）。訓練性能だけは点数が高いほど良く、ほかの 6 項目は
  *   高いほど気をつけたい傾向のため、ほかと分けて見やすくする。点数の向きは変えない（参考にしている本などの向きに合わせる）。
- *   項目の並び（時計回りの順）は変えず、全体を回すだけ。トレーナー側と会員側（compact）の両方に効く
+ *   時計回りの順は変えず、グラフに渡す並びの始まりを訓練性能にずらす。トレーナー側と会員側（compact）の両方に効く
  */
 
 /** 真上に置くカテゴリ（値。PersonalityDiagnosisQuestions::categories() のキー） */
 export const TOP_CATEGORY_KEY = 'trainability';
 
 /**
- * レーダーの軸の始まりの角度（Chart.js の scales.r.startAngle。度。0 が真上で、時計回り）。
- * Chart.js は 1 つ目の項目を startAngle の位置に置き、そこから 360 / 項目の数 ずつ時計回りに並べるので、
- * index 番目の項目（訓練性能）を真上に置くには、全体を -(index × 360 / 項目の数) 度回す。
- * 角度は数を直に書かず、並びの中の位置と項目の数から計算する（並びや項目の数が変わっても、訓練性能が上に来るように）。
- * 訓練性能が見つからないとき（keys がない古いデータなど）は回さない（0）
+ * グラフに渡す並びを、訓練性能が先頭になるようにずらす（2026-10-18 追加）。
  *
- * @param {string[]|undefined} keys カテゴリの値（labels と同じ並び）
- * @returns {number}
+ * Chart.js は 1 つ目の項目を真上に置き、時計回りに並べる。項目名（labels）・カテゴリの値（keys）・各回の値（series[].values）を
+ * 同じだけ回して（ずらして）並べ直すので、時計回りの順は変わらず、ラベルと値の対応もずれない。
+ * 目盛りの数字は 1 つ目の項目の軸に沿って描かれるので、真上の訓練性能の軸にまっすぐ上向きで並ぶ。
+ * （最初は scales.r.startAngle で全体を回していたが、目盛りの数字が 1 つ目の項目〔対人〕の軸に沿って横倒しになり、
+ * 見にくかったため、この形にした。2026-10-18 変更）
+ *
+ * 訓練性能の位置は表示名ではなくカテゴリの値（keys の trainability）で探す。見つからないとき（keys がない古いデータなど）は
+ * 並べ直さない。渡されたデータは書き換えず、新しいものを返す（保存の形・データの並びは変えない）
+ *
+ * @param {{labels: string[], keys?: string[], series: {values: string[]}[]}} data
+ * @returns {{labels: string[], keys?: string[], series: object[]}}
  */
-export function radarStartAngle(keys) {
-    const index = Array.isArray(keys) ? keys.indexOf(TOP_CATEGORY_KEY) : -1;
+export function rotateToTop(data) {
+    const index = Array.isArray(data.keys) ? data.keys.indexOf(TOP_CATEGORY_KEY) : -1;
     if (index <= 0) {
-        return 0;
+        return data;
     }
 
-    return -(index * 360) / keys.length;
+    const rotate = (list) => [...list.slice(index), ...list.slice(0, index)];
+
+    return {
+        ...data,
+        labels: rotate(data.labels),
+        keys: rotate(data.keys),
+        series: data.series.map((series) => ({ ...series, values: rotate(series.values) })),
+    };
 }
 
 /** 回の種類ごとの名前と見た目。並びは凡例の順（今回 → 前回 → 初回） */
@@ -75,7 +87,9 @@ export const SERIES_STYLES = {
  * @returns {object} Chart.js の設定（type・data・options）
  */
 export function buildRadarConfig(data, { compact = false } = {}) {
-    const datasets = data.series.map((series) => {
+    // 訓練性能が先頭（真上）になるように並べ直す（上の rotateToTop）
+    const rotated = rotateToTop(data);
+    const datasets = rotated.series.map((series) => {
         const style = SERIES_STYLES[series.key];
 
         return {
@@ -93,7 +107,7 @@ export function buildRadarConfig(data, { compact = false } = {}) {
     const config = {
         type: 'radar',
         data: {
-            labels: data.labels,
+            labels: rotated.labels,
             datasets,
         },
         options: {
@@ -105,8 +119,6 @@ export function buildRadarConfig(data, { compact = false } = {}) {
                     min: 0,
                     max: 4,
                     beginAtZero: true,
-                    // 訓練性能の軸を真上に置く（2026-10-18 追加。上の radarStartAngle）
-                    startAngle: radarStartAngle(data.keys),
                     ticks: { stepSize: 1 },
                 },
             },
