@@ -60,8 +60,12 @@ class SettingsController extends Controller
      */
     public function edit(): View
     {
+        $client = Auth::guard('client')->user();
+
         return view('client.settings.edit', [
-            'client' => Auth::guard('client')->user(),
+            'client' => $client,
+            // 住所・電話番号を必須にするか（契約がある会員だけ。2026-10-18 追加。ClientProfileRequest と同じ決まり）
+            'contactRequired' => $client->hasContracts(),
         ]);
     }
 

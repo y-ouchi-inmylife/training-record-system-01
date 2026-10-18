@@ -26,6 +26,20 @@
          将来 Client に dog リレーションが入ったら hidden を外して差し込む。 --}}
     <div class="c-dog-placeholder" hidden></div>
 
+    {{-- ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402「ご連絡先の登録のお願い」）。契約がある会員で住所か電話番号が空のとき、
+         あいさつのすぐ下（愛犬のカードより上）に出す。会員全体のことなので、愛犬ごとの回答待ちの案内（愛犬のカードの中）とは分けて上に置く。
+         見た目は回答待ちの案内の帯と同じ作り（.c-survey-notice。色は会員側の青〔--contact〕。アイコンは家）。
+         ［登録する］は登録情報の変更（S-1411）。閉じるボタンは付けない（入力すれば消えるため） --}}
+    @if($contactNotice)
+        <div class="c-survey-notice c-survey-notice--contact c-contact-notice" data-client-contact-notice="{{ implode(' ', $contactNotice['missing']) }}">
+            <p class="c-survey-notice-text mb-0">
+                <svg class="c-survey-notice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5z"/></svg>
+                <span>{{ $contactNotice['text'] }}</span>
+            </p>
+            <a href="{{ $contactNotice['url'] }}" class="btn btn-primary btn-sm text-nowrap">{{ __('messages.client_contact_notice.register') }}</a>
+        </div>
+    @endif
+
     {{-- 体重推移（設計書 S-1402 セクション「体重推移」・6-15-14、段階③）。
          トレーニーごとに折れ線グラフを 1 枚描く。データはコントローラで
          組み立て、`data-measurement-chart` 属性に JSON で載せる（既存の

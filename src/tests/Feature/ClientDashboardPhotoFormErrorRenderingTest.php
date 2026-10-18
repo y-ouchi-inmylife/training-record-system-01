@@ -54,6 +54,7 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         return $this->withViewErrors($errors)->view('client.dashboard', [
             'timeline' => new Collection([]),
             'recordCount' => 0,
+            'contactNotice' => null,
             'weightCharts' => $weightCharts ?? $this->dummyWeightCharts([1]),
         ]);
     }

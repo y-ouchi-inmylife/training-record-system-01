@@ -2,14 +2,16 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ClientContactRules;
 use App\Rules\StrongPassword;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * クライアント初回設定（S-1403）のバリデーションルール。
  *
- * トレーナー側の [[ClientRequest]] と必須項目が異なる（電話番号・住所が必須）ため、
- * 別に用意する。ルールは設計書 api-design.md `POST /client-portal/setup/{token}`。
+ * トレーナー側の [[ClientRequest]] と必須項目が異なるため、別に用意する。ルールは設計書 api-design.md `POST /client-portal/setup/{token}`。
+ * 2026-10-18 変更：住所・電話番号を任意にした（住所は一部だけ入れたらそろえて入れてもらう。ClientContactRules）。
+ * その前は電話番号・都道府県・市区町村・町名番地が必須だった。
  *
  * 愛犬（トレーニー）の項目は 2026-10 に外した（受付アンケートに分離。requirements.md 6-15-5）。
  * それに伴い、trainee_* の属性名だけを定義していた attributes() も外した（他の項目の
@@ -19,6 +21,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class ClientInitialSetupRequest extends FormRequest
 {
+    use ClientContactRules;
+
     public function authorize(): bool
     {
         return true;
@@ -36,19 +40,8 @@ class ClientInitialSetupRequest extends FormRequest
             'last_name_kana' => ['nullable', 'string', 'max:50', 'regex:/^[\p{Hiragana}\s　]+$/u'],
             'first_name_kana' => ['nullable', 'string', 'max:50', 'regex:/^[\p{Hiragana}\s　]+$/u'],
 
-            // 連絡先（電話番号 phone1・都道府県 address1・市区町村 address2・
-            // 町名番地 address3 は必須。郵便番号は任意で、入力された場合のみ
-            // 形式チェック。DB が NULL 許容で、郵便番号は住所検索の入口という
-            // 位置づけのため。設計書 S-1403 備考 / 6-15-5 参照）
-            'phone1' => ['required', 'string', 'max:20', 'regex:/^[0-9\-]+$/'],
-            'phone2' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\-]+$/'],
-            // 続柄（2026-10-17 追加）。任意・自由入力・20文字以内。緊急連絡先（phone2）との組み合わせのきまりは作らない
-            'emergency_contact_relationship' => ['nullable', 'string', 'max:20'],
-            'postal_code' => ['nullable', 'string', 'regex:/^\d{3}-?\d{4}$/'],
-            'address1' => 'required|string|max:50',
-            'address2' => 'required|string|max:50',
-            'address3' => 'required|string|max:100',
-            'address4' => 'nullable|string|max:100',
+            // 連絡先（住所・電話番号は任意。2026-10-18 変更。設計書 S-1403 / 6-15-5 参照）
+            ...$this->contactRules(required: false),
         ];
     }
 }

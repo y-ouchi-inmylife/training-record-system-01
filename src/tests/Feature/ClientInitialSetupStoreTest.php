@@ -280,4 +280,67 @@ class ClientInitialSetupStoreTest extends TestCase
         $this->postSetup($this->validInput(['phone2' => 'abc']))
             ->assertSessionHasErrors(['phone2' => '緊急連絡先（ご家族等）の形式が正しくありません。']);
     }
+
+    // ---- 住所・電話番号は任意（2026-10-18 変更：マイページの登録の時点では預かるか決まっていない会員もいるため） ----
+
+    public function test_住所と電話番号が空でも完了できる(): void
+    {
+        $this->postSetup($this->validInput([
+            'postal_code' => '', 'address1' => '', 'address2' => '', 'address3' => '', 'address4' => '', 'phone1' => '',
+        ]))
+            ->assertRedirect(route('client-portal.dashboard'))
+            ->assertSessionHasNoErrors();
+
+        $client = $this->client->fresh();
+        foreach (['postal_code', 'address1', 'address2', 'address3', 'address4', 'phone1'] as $field) {
+            $this->assertNull($client->{$field}, $field);
+        }
+        $this->assertNotNull($client->password);
+    }
+
+    public function test_住所を一部だけ入れるとそろえて入れるエラーになる(): void
+    {
+        // 都道府県だけ
+        $this->postSetup($this->validInput(['address1' => '東京都', 'address2' => '', 'address3' => '', 'address4' => '']))
+            ->assertSessionHasErrors([
+                'address2' => '住所を入れるときは、市区町村も入力してください。',
+                'address3' => '住所を入れるときは、町名・番地も入力してください。',
+            ])
+            ->assertSessionDoesntHaveErrors(['address1', 'address4', 'postal_code']);
+        $this->assertNull($this->client->fresh()->password);
+
+        // 建物名だけ
+        $this->postSetup($this->validInput(['address1' => '', 'address2' => '', 'address3' => '', 'address4' => 'ビル101']))
+            ->assertSessionHasErrors([
+                'address1' => '住所を入れるときは、都道府県も選択してください。',
+                'address2' => '住所を入れるときは、市区町村も入力してください。',
+                'address3' => '住所を入れるときは、町名・番地も入力してください。',
+            ]);
+    }
+
+    public function test_郵便番号だけでは住所のエラーにしない(): void
+    {
+        $this->postSetup($this->validInput(['address1' => '', 'address2' => '', 'address3' => '', 'address4' => '', 'phone1' => '']))
+            ->assertRedirect(route('client-portal.dashboard'))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('100-0014', $this->client->fresh()->postal_code);
+    }
+
+    public function test_電話番号は空でよいが形が正しくなければエラー(): void
+    {
+        $this->postSetup($this->validInput(['phone1' => 'abc']))
+            ->assertSessionHasErrors(['phone1' => '電話番号の形式が正しくありません。']);
+    }
+
+    public function test_初回設定の画面に住所と電話番号の必須の印と必須の属性がない(): void
+    {
+        $html = $this->get(route('client-portal.setup.show', ['token' => self::TOKEN]))->assertOk()->getContent();
+
+        foreach (['address1' => '都道府県', 'address2' => '市区町村', 'address3' => '町名・番地', 'phone1' => '電話番号'] as $field => $label) {
+            $this->assertStringContainsString('<label for="'.$field.'" class="form-label">'.$label.'</label>', $html, $field);
+            $this->assertDoesNotMatchRegularExpression('/name="'.$field.'"[^>]*\srequired[\s>]/u', $html, $field);
+        }
+        // 姓・パスワードは今までどおり必須
+        $this->assertStringContainsString('<label for="last_name" class="form-label">姓 <span class="text-danger">*</span></label>', $html);
+    }
 }

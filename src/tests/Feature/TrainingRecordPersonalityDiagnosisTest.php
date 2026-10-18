@@ -36,6 +36,8 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         parent::setUp();
 
         $this->createClientsTable();
+        // マイページのご連絡先の登録のお願いで、契約があるかを見る（2026-10-18 追加。中身は空）
+        $this->createClientCountTables();
         $this->createAccessLogsTable();
         Schema::create('trainers', function (Blueprint $table) {
             $table->id();

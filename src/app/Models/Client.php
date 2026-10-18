@@ -246,6 +246,35 @@ class Client extends Authenticatable
      *
      * 並び順は割り当てルールと同じ利用日の昇順（同じ日は `id` の昇順）。
      */
+    /**
+     * 契約が 1 件以上あるか（2026-10-18 追加）。有効期限切れ・回数を使い切った契約も数える。
+     * 契約がある会員は預かりが決まっているので、住所・電話番号を入れてもらう（登録情報の変更で必須・マイページで入力を促す）
+     */
+    public function hasContracts(): bool
+    {
+        return $this->relationLoaded('contracts') ? $this->contracts->isNotEmpty() : $this->contracts()->exists();
+    }
+
+    /**
+     * まだ入っていない連絡先（2026-10-18 追加。設計書 S-1402「ご連絡先の登録のお願い」）。
+     * 'address'：都道府県・市区町村・町名番地のどれかが空。'phone'：電話番号が空。並びは住所 → 電話番号（入力欄の並びと同じ）。
+     * 郵便番号・建物名・部屋番号・緊急連絡先は見ない（任意のため）
+     *
+     * @return list<'address'|'phone'>
+     */
+    public function missingContactDetails(): array
+    {
+        $missing = [];
+        if (blank($this->address1) || blank($this->address2) || blank($this->address3)) {
+            $missing[] = 'address';
+        }
+        if (blank($this->phone1)) {
+            $missing[] = 'phone';
+        }
+
+        return $missing;
+    }
+
     public function usages(): HasMany
     {
         return $this->hasMany(ClientUsage::class)

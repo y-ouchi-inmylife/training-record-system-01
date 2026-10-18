@@ -51,6 +51,8 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
     {
         return $this->withViewErrors($errors)->view('client.settings.edit', [
             'client' => $this->dummyClient(),
+            // 契約がある会員（住所・電話番号が必須。2026-10-18 追加）
+            'contactRequired' => true,
         ]);
     }
 
@@ -220,7 +222,7 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $client = $this->dummyClient();
         $client->phone2 = '090-1111-2222';
         $client->emergency_contact_relationship = '娘';
-        $html = (string) $this->withViewErrors([])->view('client.settings.edit', ['client' => $client]);
+        $html = (string) $this->withViewErrors([])->view('client.settings.edit', ['client' => $client, 'contactRequired' => true]);
 
         $this->assertEmergencyFieldset($html, '090-1111-2222', '娘');
     }

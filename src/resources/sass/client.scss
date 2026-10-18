@@ -1434,6 +1434,15 @@ input[type="tel"] {
     --c-survey-notice-color: #{$purple};
     background-color: mix($purple, $mat, 8%);
 }
+// ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402）。回答待ちの案内と同じ帯の作りで、色は会員側の青（$brand-bright）。
+// 愛犬のカードの外（あいさつのすぐ下）に置くので、下の愛犬のカードとの間をあける
+.c-survey-notice--contact {
+    --c-survey-notice-color: #{$brand-bright};
+    background-color: mix($brand-bright, $mat, 8%);
+}
+.c-contact-notice {
+    margin-bottom: 1rem;
+}
 .c-survey-notice-text {
     display: flex;
     align-items: center;

@@ -115,6 +115,9 @@
                 {{-- 「ご連絡先」小見出し。<h2 fs-6> を使う理由・パスワードに小見出しを置かない理由・
                      線との役割分担は「お名前」小見出し直前のコメント参照。**fs-6 を外さないこと**。 --}}
                 <h2 class="fs-6 fw-bold mb-2">ご連絡先</h2>
+                {{-- 住所・電話番号は任意（必須の印「*」・required を付けない。2026-10-18 変更：ユーザーレビューで、マイページの登録の時点では
+                     まだ預かるか決まっていない会員もいるため。契約が登録されたら、マイページで入力を促し、登録情報の変更で必須にする）。
+                     住所を一部だけ入れたときは、都道府県・市区町村・町名番地をそろえて入れてもらう（ClientContactRules） --}}
                 {{-- 並びは住所 → 電話番号 → 緊急連絡先（2026-10-18 変更：登録情報の表示〔S-1406〕の順にそろえた。
                      その前は電話番号・緊急連絡先が住所より前）。Tab キーで移る順も見た目の順と同じ（tabindex で順を変えない） --}}
                 <div class="mb-2">
@@ -140,9 +143,9 @@
                 </div>
 
                 <div class="mb-2">
-                    <label for="address1" class="form-label">都道府県 <span class="text-danger">*</span></label>
+                    <label for="address1" class="form-label">都道府県</label>
                     <select class="form-select @error('address1') is-invalid @enderror"
-                            id="address1" name="address1" required>
+                            id="address1" name="address1">
                         <option value="">選択してください</option>
                         @foreach($prefectures as $pref)
                             <option value="{{ $pref }}" @selected(old('address1', $client->address1) === $pref)>{{ $pref }}</option>
@@ -151,16 +154,16 @@
                     <x-form-error field="address1" />
                 </div>
                 <div class="mb-2">
-                    <label for="address2" class="form-label">市区町村 <span class="text-danger">*</span></label>
+                    <label for="address2" class="form-label">市区町村</label>
                     <input type="text" class="form-control @error('address2') is-invalid @enderror"
-                           id="address2" name="address2" required maxlength="50"
+                           id="address2" name="address2" maxlength="50"
                            value="{{ old('address2', $client->address2) }}">
                     <x-form-error field="address2" />
                 </div>
                 <div class="mb-2">
-                    <label for="address3" class="form-label">町名・番地 <span class="text-danger">*</span></label>
+                    <label for="address3" class="form-label">町名・番地</label>
                     <input type="text" class="form-control @error('address3') is-invalid @enderror"
-                           id="address3" name="address3" required maxlength="100"
+                           id="address3" name="address3" maxlength="100"
                            value="{{ old('address3', $client->address3) }}">
                     <x-form-error field="address3" />
                 </div>
@@ -173,9 +176,9 @@
                 </div>
 
                 <div class="mb-2">
-                    <label for="phone1" class="form-label">電話番号 <span class="text-danger">*</span></label>
+                    <label for="phone1" class="form-label">電話番号</label>
                     <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
-                           id="phone1" name="phone1" required maxlength="20"
+                           id="phone1" name="phone1" maxlength="20"
                            value="{{ old('phone1', $client->phone1) }}">
                     <x-form-error field="phone1" />
                 </div>

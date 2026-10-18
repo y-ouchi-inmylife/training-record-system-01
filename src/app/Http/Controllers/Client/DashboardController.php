@@ -85,7 +85,11 @@ class DashboardController extends Controller
         // Blade には完成した配列を渡す（Blade 内での再計算・並べ替えは行わない）。
         $weightCharts = $this->buildWeightCharts($client);
 
-        return view('client.dashboard', compact('timeline', 'recordCount', 'weightCharts'));
+        // ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402「ご連絡先の登録のお願い」）。契約がある会員で、住所か電話番号が空のときだけ。
+        // 足りないもの（'address'・'phone'）を渡し、文は足りないものに合わせる。入力が済めば出ない
+        $contactNotice = $this->contactNotice($client);
+
+        return view('client.dashboard', compact('timeline', 'recordCount', 'weightCharts', 'contactNotice'));
     }
 
     /**
@@ -128,6 +132,32 @@ class DashboardController extends Controller
             // 写真の下に出す 2 行（犬種（性別）と誕生日。値がない行は入らない。2026-10-18 追加。Trainee::client_profile_parts）
             'profileParts' => $trainee->client_profile_parts,
         ])->all();
+    }
+
+    /**
+     * ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402「ご連絡先の登録のお願い」）。
+     *
+     * 出すのは、契約が 1 件以上ある（有効期限切れ・回数を使い切ったものも含む）会員で、住所（都道府県・市区町村・町名番地のどれか）か
+     * 電話番号が空のとき。マイページを開くたびに出す（閉じるボタンはない。入力が済めば出ない）。
+     * text は足りないものだけを書いた文（lang/ja/messages.php の client_contact_notice）、url は登録情報の変更（S-1411）
+     *
+     * @return array{missing: list<string>, text: string, url: string}|null
+     */
+    private function contactNotice($client): ?array
+    {
+        if (! $client->hasContracts()) {
+            return null;
+        }
+        $missing = $client->missingContactDetails();
+        if ($missing === []) {
+            return null;
+        }
+
+        return [
+            'missing' => $missing,
+            'text' => __('messages.client_contact_notice.'.(count($missing) === 2 ? 'both' : $missing[0])),
+            'url' => route('client-portal.profile.edit'),
+        ];
     }
 
     /**
