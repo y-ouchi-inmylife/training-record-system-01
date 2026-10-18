@@ -304,6 +304,25 @@ class Trainee extends Model
     }
 
     /**
+     * 会員側のマイページ（S-1402）の愛犬のカードで、名前のすぐ下に出す値の並び（犬種・性別・誕生日。2026-10-18 追加）。
+     *
+     * 値はトレーナー側の会員詳細（S-0305）と同じ出し方（性別は sex_label、誕生日は birthday_with_age_label）。
+     * 値がない項目は入れない。性別の「不明」は会員様には情報にならないので入れない。3 つともなければ空の配列
+     * （ビューは行を出さない）。区切り（「 ／ 」）でつなぐのはビュー。去勢・避妊などほかの属性は入れない
+     *
+     * @return list<string>
+     */
+    public function getClientProfilePartsAttribute(): array
+    {
+        $sex = $this->sex === self::SEX_UNKNOWN ? null : $this->sex_label;
+
+        return array_values(array_filter(
+            [$this->breed, $sex, $this->birthday_with_age_label],
+            fn (?string $value) => ! blank($value),
+        ));
+    }
+
+    /**
      * 受付アンケートの状態（INTAKE_* の定数）。要件定義書 6-16-8 の判定の順
      * （回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行）。
      *
