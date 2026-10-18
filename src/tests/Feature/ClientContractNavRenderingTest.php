@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientContract;
 use App\Models\ClientUsage;
+use App\Support\ClientPortalLogo;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\CreatesClientCountTables;
@@ -155,5 +156,70 @@ class ClientContractNavRenderingTest extends TestCase
 
         // ナビから開くと、S-1412 の空の状態が出る
         $this->assertStringContainsString('回数のご契約はありません。', $this->open($client, '/client-portal/contracts'));
+    }
+
+    // ---- ヘッダー帯の左上のロゴ画像（2026-10-18 追加。設計書 S-1402「ヘッダー帯」・§9-3） ----
+
+    /** プロダクト名（alt に出す）は .env の CLIENT_PORTAL_NAME。テストでは決めた値にする。ロゴは config の既定（env が未設定のとき）のまま */
+    private function useMiraiName(): void
+    {
+        config(['app.client_portal_name' => 'Mirai Dog Wellness']);
+    }
+
+    public function test_ヘッダーの左上にロゴ画像を出しマイページへのリンクにする(): void
+    {
+        $this->useMiraiName();
+        $client = $this->clientWithContracts();
+
+        foreach (['/client-portal/dashboard', '/client-portal/contracts'] as $url) {
+            $nav = $this->nav($this->open($client, $url));
+
+            $this->assertStringContainsString(
+                '<a class="navbar-brand" href="'.route('client-portal.dashboard').'">'
+                .' <img src="/images/mirai-dog-wellness-logo.png" alt="Mirai Dog Wellness" class="c-nav-brand-img" width="623" height="95">'
+                .' </a>',
+                preg_replace('/\s+/u', ' ', $nav),
+                $url
+            );
+        }
+    }
+
+    public function test_ログイン画面のヘッダーにもロゴ画像を出しリンクにはしない(): void
+    {
+        $this->useMiraiName();
+        $nav = $this->nav($this->get('/client-portal/login')->assertOk()->getContent());
+
+        $this->assertStringContainsString(
+            '<span class="navbar-brand mb-0"> <img src="/images/mirai-dog-wellness-logo.png" alt="Mirai Dog Wellness" class="c-nav-brand-img" width="623" height="95"> </span>',
+            preg_replace('/\s+/u', ' ', $nav)
+        );
+    }
+
+    public function test_ロゴ画像のファイルが置き場所にある(): void
+    {
+        $path = public_path('images/mirai-dog-wellness-logo.png');
+
+        $this->assertFileExists($path);
+        $size = getimagesize($path);
+        $this->assertSame([623, 95], [$size[0], $size[1]]);
+        $this->assertSame('image/png', $size['mime']);
+    }
+
+    public function test_ロゴの設定を空にするとプロダクト名の文字を出す(): void
+    {
+        $this->useMiraiName();
+        config(['app.client_portal_logo' => '']);
+
+        $nav = $this->nav($this->open($this->clientWithContracts(), '/client-portal/dashboard'));
+
+        $this->assertStringNotContainsString('<img', $nav);
+        $this->assertStringContainsString('<a class="navbar-brand" href="'.route('client-portal.dashboard').'"> Mirai Dog Wellness </a>', preg_replace('/\s+/u', ' ', $nav));
+    }
+
+    public function test_外のurlのロゴには幅と高さを付けない(): void
+    {
+        config(['app.client_portal_logo' => 'https://example.com/logo.png']);
+
+        $this->assertSame(['src' => 'https://example.com/logo.png', 'width' => null, 'height' => null], ClientPortalLogo::forHeader());
     }
 }

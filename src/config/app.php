@@ -156,9 +156,12 @@ return [
     |   （開発会社ではない）。設計書 §9-2 に従い、null / 空の場合は
     |   Blade 側で <footer> ブロックごと出力しない。
     | - client_portal_logo: ヘッダー帯のブランド位置に表示するロゴ画像の
-    |   URL（`public/` からの相対または絶対 URL）。設計書 §9-3 の暫定はロゴ画像
-    |   なし。null / 空の場合はテキスト（client_portal_name）を表示する。
-    |   将来ロゴが確定した際にこの値を設定するだけで画像に切り替わる。
+    |   URL（`public/` からの相対または絶対 URL）。空文字を設定した場合はテキスト
+    |   （client_portal_name）を表示する。**2026-10-18 変更**：ロゴが確定したため、
+    |   env が未設定のときは Mirai Dog Wellness のロゴ（public/images/mirai-dog-wellness-logo.png）
+    |   を既定にした（本番の .env を変えずに git pull だけで切り替わるように）。その前の既定は
+    |   null（設計書 §9-3 の暫定でロゴ画像なし）。`public/` の中の画像なら、<img> の
+    |   width・height を画像のファイルから読む（App\Support\ClientPortalLogo）。
     | - client_portal_privacy_url: プライバシーポリシー文書の URL。お客様が
     |   最初に個人情報を預ける画面（S-1405 メールアドレス登録・S-1403 初回設定）で、
     |   送信ボタンの手前に「送信すると、[プライバシーポリシー]に同意したものと
@@ -181,7 +184,7 @@ return [
 
     'client_portal_company' => env('CLIENT_PORTAL_COMPANY'),
 
-    'client_portal_logo' => env('CLIENT_PORTAL_LOGO'),
+    'client_portal_logo' => env('CLIENT_PORTAL_LOGO', '/images/mirai-dog-wellness-logo.png'),
 
     'client_portal_privacy_url' => env('CLIENT_PORTAL_PRIVACY_URL'),
 

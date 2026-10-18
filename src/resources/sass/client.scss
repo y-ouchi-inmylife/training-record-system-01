@@ -394,11 +394,27 @@ h2, .h2 {
 }
 
 // ヘッダー帯左のロゴ画像（config('app.client_portal_logo') が設定されているとき）。
-// 設計書 §9-3：ワードマーク左に画像スロット。max-height を帯に収まる大きさに絞る
+// 設計書 §9-3：ワードマーク左に画像スロット。
+// 2026-10-18 変更：Mirai Dog Wellness のロゴ（623×95 の横長。背景は透明）を出すようにした。<img> に画像の width・height を
+// 付けるので、表示の高さをここで決め、横幅は縦横比のまま（width: auto）。高さはパソコン 32px（横 210px ほど）、
+// スマホ（576px 未満）は 28px（横 184px ほど。右のメニューのボタンと離す）。どちらもヘッダー帯の高さは文字のときと変わらない
 .c-nav-brand-img {
     display: block;
-    max-height: 32px;
+    height: 32px;
     width: auto;
+    max-width: 100%;
+}
+@media (max-width: 575.98px) {
+    .c-nav-brand-img {
+        height: 28px;
+    }
+}
+// ロゴのときも、ヘッダー帯の高さを文字のときと同じにする（2026-10-18 追加）。文字のときのブランドの高さは
+// 「1 行の高さ（1lh。20px × 行の高さ 1.75 ＝ 35px）＋上下の余白」なので、ロゴのときも同じ高さを最低の高さにして、ロゴを上下の中央に置く
+.c-nav .navbar-brand:has(> .c-nav-brand-img) {
+    display: flex;
+    align-items: center;
+    min-height: calc(1lh + 2 * var(--bs-navbar-brand-padding-y));
 }
 
 // -----------------------------------------------------------------------------
