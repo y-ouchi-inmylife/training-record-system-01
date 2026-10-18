@@ -523,7 +523,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     {
         // 会員詳細（S-0305）のテンプレートの「性格診断」のリンクの飛び先（描いたときの href は ClientCountRenderingTest で確かめている）
         $template = file_get_contents(resource_path('views/clients/show.blade.php'));
-        $this->assertSame(1, preg_match('/route\(\'trainees\.show\', \$trainee\) \}\}#([a-z-]+)"\s*aria-label="\{\{ \$trainee->display_name \}\}の\{\{ __\(\'messages\.personality_diagnosis_name\'\) \}\}"/u', $template, $m));
+        $this->assertSame(1, preg_match('/route\(\'trainees\.show\', \$trainee\) \}\}#([a-z-]+)"(?: style="word-break: keep-all; overflow-wrap: normal;")?\s*aria-label="\{\{ \$trainee->display_name \}\}の\{\{ __\(\'messages\.personality_diagnosis_name\'\) \}\}"/u', $template, $m));
 
         $this->assertSame('personality-diagnosis', $m[1]);
         $this->assertStringContainsString('id="'.$m[1].'"', $this->page());

@@ -12,6 +12,8 @@ trait AssertsPersonalityDiagnosisName
 {
     protected function assertOnlyFullPersonalityDiagnosisName(string $html, string $message = ''): void
     {
+        // 狭い場所のラベルは「愛犬<wbr>性格診断」（「愛犬」と「性格診断」の間でだけ折り返す。2026-10-18 追加）。印を除いて数える
+        $html = str_replace('<wbr>', '', $html);
         $this->assertStringContainsString('愛犬性格診断', $html, $message);
         $this->assertSame(
             substr_count($html, '愛犬性格診断'),

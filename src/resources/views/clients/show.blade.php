@@ -631,8 +631,13 @@
                                        値の列の中のボタンのまとまりだけで、日付はリンクと同じ行に残る --}}
                                 <div class="row small mt-1 align-items-center" data-personality-diagnosis-row>
                                     <div class="col-4">
-                                        <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis"
-                                           aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">{{ __('messages.personality_diagnosis_name') }}</a>
+                                        {{-- リンクの文字は「愛犬」と「性格診断」の間でだけ折り返す（2026-10-18 追加。ラベルの列が狭い幅〔992px で約 86px、
+                                             375px で約 76px〕で言葉の途中で折り返していたため）。keep-all で途中では折り返さず、<wbr> の位置でだけ折り返す。
+                                             overflow-wrap: normal：上から受け継ぐ break-word を止める（375px では「性格診断」〔約 56px〕が列の中の文字の幅〔約 52px〕に
+                                             収まらず、break-word だと「性格診／断」と折れていた。止めると列の右の余白〔12px〕の中に約 4px はみ出すだけで、日付には重ならない）。
+                                             labelHtml() は文のファイルの決まった文字を逃がしてから <wbr> でつないだもの（利用者の入力は入らない） --}}
+                                        <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis" style="word-break: keep-all; overflow-wrap: normal;"
+                                           aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">{{ \App\Support\PersonalityDiagnosisName::labelHtml() }}</a>
                                     </div>
                                     <div class="col-8 d-flex flex-wrap align-items-center gap-2">
                                         @if($trainee->latestPersonalityDiagnosisResult)

@@ -3,8 +3,11 @@
 // 愛犬性格診断の名前（画面に出す正式名称。2026-10-18 変更：正式名称に決まった。その前は「性格診断」）。
 // 名前はまた変わることがあるので、ここ 1 か所だけに置く。画面・コントローラーは __('messages.personality_diagnosis_name') で読み、
 // このファイルの中の文（client_survey_notice など）はこの変数から組み立てる。
-// コード上の名前（クラス名・テーブル名・ルート名の personality_diagnosis など）は画面に出ないので変えない
-$personalityDiagnosisName = '愛犬性格診断';
+// コード上の名前（クラス名・テーブル名・ルート名の personality_diagnosis など）は画面に出ないので変えない。
+// 名前は「愛犬」「性格診断」の 2 つに分けて持つ（2026-10-18 追加）：ふつうの名前はつなげたもの、狭い場所のラベル用は
+// 間に折り返しの印を入れたもの（App\Support\PersonalityDiagnosisName::labelHtml()）。名前を変えるときは下の 1 行だけ直す
+$personalityDiagnosisNameParts = ['愛犬', '性格診断'];
+$personalityDiagnosisName = implode('', $personalityDiagnosisNameParts);
 
 return [
 
@@ -26,6 +29,8 @@ return [
 
     // 愛犬性格診断の名前（上の $personalityDiagnosisName。画面に出すときはこのキーから読む）
     'personality_diagnosis_name' => $personalityDiagnosisName,
+    // 名前を折り返してよい位置で分けたもの（上の $personalityDiagnosisNameParts。ラベル用の形を作るときに使う）
+    'personality_diagnosis_name_parts' => $personalityDiagnosisNameParts,
 
     // 会員のマイページ（S-1402）の愛犬のカードに出す、回答待ちの案内のお知らせ（2026-10 追加）。
     // 名称（「受付アンケート」「愛犬性格診断」）は文をここだけで変える（愛犬性格診断は上の $personalityDiagnosisName）。

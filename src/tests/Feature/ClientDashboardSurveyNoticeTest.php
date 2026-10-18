@@ -295,8 +295,13 @@ class ClientDashboardSurveyNoticeTest extends TestCase
     {
         // client_survey_notice.personality は、同じファイルの名前（$personalityDiagnosisName）から組み立てる
         $source = file_get_contents(lang_path('ja/messages.php'));
-        $this->assertSame(1, substr_count($source, "'愛犬性格診断'"));
+        // 名前は「愛犬」「性格診断」に分けた 1 行だけに書き、ふつうの名前はそれをつなげて作る（2026-10-18 変更）
+        $this->assertSame(1, substr_count($source, "\$personalityDiagnosisNameParts = ['愛犬', '性格診断'];"));
+        $this->assertSame(0, substr_count($source, "'愛犬性格診断'"));
+        $this->assertStringContainsString("\$personalityDiagnosisName = implode('', \$personalityDiagnosisNameParts);", $source);
         $this->assertStringContainsString("'personality_diagnosis_name' => \$personalityDiagnosisName,", $source);
+        $this->assertStringContainsString("'personality_diagnosis_name_parts' => \$personalityDiagnosisNameParts,", $source);
+        $this->assertSame(['愛犬', '性格診断'], __('messages.personality_diagnosis_name_parts'));
         $this->assertStringContainsString("'personality' => \$personalityDiagnosisName.'にお答えください。',", $source);
         $this->assertSame('愛犬性格診断', __('messages.personality_diagnosis_name'));
     }
