@@ -283,13 +283,14 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         }
         // ［戻る］（会員詳細へのふつうのリンク）と［コピー］（青の塗り）
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
-        // ［コピー］は「LINE・メールで送る」の見出しの行の右（青の塗り・ふつうの大きさ。読み上げは「文面をコピー」）。文面の下にボタンはない
+        // ［コピー］は「LINE・メールで送る」の見出しの行の右（青の塗り・小さいボタン。読み上げは「文面をコピー」）。文面の下にボタンはない
         // （2026-10-18 変更：その前は文面の下の右に［文面をコピー］）。ボタンの左に知らせの場所（aria-live。押すと「コピーしました」を出す）。
-        // ボタンの文字は［コピー］のまま変えず、最低の幅も付けない（2026-10-18 変更：その前はボタンの文字を変え、「コピーしました」の幅を最低の幅にしていた）
+        // ボタンの文字は［コピー］のまま変えず、最低の幅も付けない（2026-10-18 変更：その前はボタンの文字を変え、「コピーしました」の幅を最低の幅にしていた）。
+        // ボタンは小さいボタン（btn-sm。2026-10-18 変更：その前はふつうの大きさ）
         $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header invitation-send-header" data-copy-area>\\s*'
             .'<h2 class="h6 mb-0" id="invitation-message-heading">LINE・メールで送る<\\/h2>\\s*'
             .'<span class="invitation-copy-status small" role="status" aria-live="polite" data-copy-status><\\/span>\\s*'
-            .'<button type="button" class="btn btn-primary" aria-label="文面をコピー" data-copy-message data-copy-text="[^"]*">コピー<\\/button>\\s*<\\/div>\\s*'
+            .'<button type="button" class="btn btn-primary btn-sm" aria-label="文面をコピー" data-copy-message data-copy-text="[^"]*">コピー<\\/button>\\s*<\\/div>\\s*'
             .'<div class="card-body">\\s*<div class="invitation-message" data-invitation-message>[^<]*<\\/div>\\s*<\\/div>/u', $html);
         $this->assertSame(1, substr_count($html, 'data-copy-message '));
         $this->assertSame(1, substr_count($html, 'aria-live="polite" data-copy-status'));

@@ -121,11 +121,12 @@ h2 {
 .invitation-page {
     max-width: 1000px;
 }
-// 2 つの欄の見出しの行（2026-10-18 追加）。左（LINE・メールで送る）は見出しの行の右に［コピー］（ふつうの大きさのボタン）を置くので、
+// 2 つの欄の見出しの行（2026-10-18 追加）。左（LINE・メールで送る）は見出しの行の右に［コピー］（小さいボタン btn-sm）を置くので、
 // 右（QR コード）の見出しの行も同じ高さにして、横に並べたときに見出しの行の下端をそろえる。
-// 高さ＝ボタンの高さ（文字 1 行＋上下の余白＋枠）＋見出しの行の上下の余白＋見出しの行の下の線
+// 高さ＝小さいボタンの高さ（文字 1 行＋上下の余白＋枠）＋見出しの行の上下の余白＋見出しの行の下の線
+// （2026-10-18 変更：ボタンを btn-sm にしたので、ふつうの大きさのボタンの高さから小さいボタンの高さに変えた）
 .invitation-panel-header {
-    min-height: calc(#{$btn-font-size} * #{$btn-line-height} + 2 * #{$btn-padding-y} + 2 * #{$btn-border-width} + 2 * var(--bs-card-cap-padding-y) + var(--bs-card-border-width));
+    min-height: calc(#{$btn-font-size-sm} * #{$btn-line-height} + 2 * #{$btn-padding-y-sm} + 2 * #{$btn-border-width} + 2 * var(--bs-card-cap-padding-y) + var(--bs-card-border-width));
 }
 // 「LINE・メールで送る」の見出しの行（2026-10-18 追加）。見出し・知らせ（data-copy-status）・［コピー］の順に並べる。
 // 知らせが出ても消えても見出しの行の高さ・ボタンの位置が変わらないようにする：

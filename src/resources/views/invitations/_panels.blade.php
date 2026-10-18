@@ -6,7 +6,8 @@
        - LINE・メールで送る（上・主な使い方）：コピーする文をそのまま出す（改行も同じ。何が送られるか見て分かるように）。
          ［コピー］はトレーナー側のいつも使う操作なので青の塗り（4-4）。押すと「コピーしました」（copy-message.js）。
          2026-10-18 変更：ユーザーレビューで、［文面をコピー］を［コピー］にし、文面の下から見出しの行の右に移した。大きさは
-         ほかのカードの見出しの行のボタン（会員詳細の［トレーニング記録を登録］、S-0313 の［更新］）と同じふつうの大きさ。
+         小さいボタン（btn-sm。2026-10-18 変更：ユーザーレビューで、文字も一回り小さくした。その前はほかのカードの見出しの行の
+         ボタン〔会員詳細の［トレーニング記録を登録］、S-0313 の［更新］〕と同じふつうの大きさ）。
          読み上げは「文面をコピー」（aria-label）。左右の見出しの行の高さは invitation-panel-header でそろえる（app.scss）。
          2026-10-18 変更：ユーザーレビューで、ボタンの幅を［コピー］の文字に合った幅にした（その前は「コピーしました」に変わっても
          ずれないよう、その幅を最低の幅にしていたが、大きすぎた）。押した結果はボタンの文字を変えず、ボタンの左の知らせの場所
@@ -25,7 +26,7 @@
             <div class="card-header invitation-panel-header invitation-send-header" data-copy-area>
                 <h2 class="h6 mb-0" id="invitation-message-heading">LINE・メールで送る</h2>
                 <span class="invitation-copy-status small" role="status" aria-live="polite" data-copy-status></span>
-                <button type="button" class="btn btn-primary" aria-label="文面をコピー" data-copy-message data-copy-text="{{ $copyText }}">コピー</button>
+                <button type="button" class="btn btn-primary btn-sm" aria-label="文面をコピー" data-copy-message data-copy-text="{{ $copyText }}">コピー</button>
             </div>
             <div class="card-body">
                 <div class="invitation-message" data-invitation-message>{{ $copyText }}</div>
