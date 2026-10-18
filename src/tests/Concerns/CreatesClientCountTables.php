@@ -190,4 +190,37 @@ trait CreatesClientCountTables
             $table->unsignedBigInteger('updated_by')->nullable();
         });
     }
+
+    /**
+     * トレーニーの表（本番と同じ登録内容の列）と、トレーニーに結び付く 5 つの表（2026-10-18 追加）。
+     * 空のトレーニーかの判定（Trainee::scopeNotBlank）を確かめるテストで使う
+     */
+    protected function createTraineesWithRelatedTables(): void
+    {
+        Schema::create('trainees', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('client_id');
+            $table->string('name', 50)->nullable();
+            $table->string('breed', 100)->nullable();
+            $table->string('sex', 20)->nullable();
+            $table->unsignedSmallInteger('birth_year')->nullable();
+            $table->unsignedTinyInteger('birth_month')->nullable();
+            $table->unsignedTinyInteger('birth_day')->nullable();
+            $table->string('neuter_status', 20)->nullable();
+            $table->string('photo_path', 500)->nullable();
+            $table->timestamps();
+            $table->unsignedBigInteger('updated_by')->nullable();
+        });
+        Schema::create('trainee_measurements', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('trainee_id');
+            $table->date('measured_date');
+            $table->time('measured_time');
+            $table->decimal('weight_kg', 5, 2);
+        });
+        $this->createTraineeIntakeSurveyTokensTable();
+        $this->createTraineeIntakeSurveyResponsesTable();
+        $this->createTraineePersonalityDiagnosisTokensTable();
+        $this->createTraineePersonalityDiagnosisResultsTable();
+    }
 }

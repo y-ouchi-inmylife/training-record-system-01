@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\PersonalityDiagnosisQuestions;
 use App\Support\TraineeAge;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -213,6 +214,55 @@ class Trainee extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(Trainer::class, 'updated_by');
+    }
+
+    /**
+     * トレーニーの項目のうち、どれかが入っていれば「空でない」とみなす列（2026-10-18 追加。要件定義書 6-3-5）。
+     * 名前・犬種・性別・誕生日（年・月・日）・去勢避妊・写真。client_id・updated_by・日時は登録内容ではないので見ない
+     */
+    public const CONTENT_COLUMNS = ['name', 'breed', 'sex', 'birth_year', 'birth_month', 'birth_day', 'neuter_status', 'photo_path'];
+
+    /**
+     * トレーニーに結び付く表（2026-10-18 追加。要件定義書 6-3-5）。どれかに 1 行でもあれば「空でない」とみなす。
+     * どの表も trainee_id の外部キーが ON DELETE CASCADE（トレーニーを消すと一緒に消える）なので、空でないトレーニーを
+     * 会員の削除で一緒に消さないように、ここで見る。トレーニーに結び付く表を足したら、ここにも足す
+     */
+    public const CONTENT_RELATIONS = [
+        'measurements',                 // 計測値（D-0800）
+        'intakeSurveyTokens',           // 受付アンケートの案内（回答済み・未回答とも）
+        'intakeSurveyResponses',        // 受付アンケートの回答（暮らしの様子を含む）
+        'personalityDiagnosisTokens',   // 愛犬性格診断の案内（回答済み・未回答とも）
+        'personalityDiagnosisResults',  // 愛犬性格診断の結果（評価文を含む）
+    ];
+
+    /**
+     * 空でないトレーニーに絞る（2026-10-18 追加。要件定義書 6-3-5）。
+     *
+     * 「空のトレーニー」＝ CONTENT_COLUMNS がどれも空（NULL か空文字）で、CONTENT_RELATIONS のどの表にも行がないトレーニー。
+     * 会員の登録で自動で作ったトレーニー（中身は空）だけの会員は、トレーニーごと削除できる（Client::hasNonBlankTrainees）。
+     * 判定はこの 1 か所にまとめ、会員詳細（S-0305）の削除の確認と ClientController::destroy の両方で使う
+     */
+    public function scopeNotBlank(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            foreach (self::CONTENT_COLUMNS as $column) {
+                // 誕生日（年・月・日）は数の列なので NULL かどうかだけを見る。文字の列は空文字も空とみなす
+                $q->orWhere(fn (Builder $c) => str_starts_with($column, 'birth_')
+                    ? $c->whereNotNull($column)
+                    : $c->whereNotNull($column)->where($column, '!=', ''));
+            }
+            foreach (self::CONTENT_RELATIONS as $relation) {
+                $q->orWhereHas($relation);
+            }
+        });
+    }
+
+    /**
+     * 空のトレーニーか（2026-10-18 追加）。判定は scopeNotBlank と同じ（DB に問い合わせる）
+     */
+    public function isBlank(): bool
+    {
+        return ! self::query()->whereKey($this->id)->notBlank()->exists();
     }
 
     /**

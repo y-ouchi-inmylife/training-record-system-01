@@ -210,6 +210,15 @@ class Client extends Authenticatable
     }
 
     /**
+     * 空でないトレーニーが 1 頭でもいるか（2026-10-18 追加。要件定義書 6-3-5）。いれば会員を削除できない。
+     * 空のトレーニー（会員の登録で自動で作ったものなど。Trainee::scopeNotBlank）だけなら、会員の削除で一緒に消す
+     */
+    public function hasNonBlankTrainees(): bool
+    {
+        return $this->trainees()->notBlank()->exists();
+    }
+
+    /**
      * 残り回数（契約回数の合計 − 利用の件数）。契約も利用も 0 件なら null。
      *
      * 会員一覧（S-0304）で `ClientController::index()` の addSelect が付ける

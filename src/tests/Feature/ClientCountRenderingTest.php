@@ -72,6 +72,13 @@ class ClientCountRenderingTest extends TestCase
             $table->unsignedBigInteger('client_id');
             $table->string('name')->nullable();
             $table->string('photo_path', 500)->nullable();
+            // 空のトレーニーかの判定（会員の削除の確認。2026-10-18 追加）に使う登録内容の列
+            $table->string('breed', 100)->nullable();
+            $table->string('sex', 20)->nullable();
+            $table->unsignedSmallInteger('birth_year')->nullable();
+            $table->unsignedTinyInteger('birth_month')->nullable();
+            $table->unsignedTinyInteger('birth_day')->nullable();
+            $table->string('neuter_status', 20)->nullable();
         });
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();
@@ -543,6 +550,57 @@ class ClientCountRenderingTest extends TestCase
         return DB::table('trainees')->insertGetId([
             'client_id' => $client->id, 'name' => $name, 'photo_path' => $photoPath,
         ]);
+    }
+
+    // ---- 会員の削除の確認（2026-10-18 変更：空のトレーニーだけなら一緒に削除できる） ----
+
+    /** 管理者で会員詳細を開き、削除の確認の JS（confirmDelete）を返す */
+    private function confirmDeleteScript(Client $client): string
+    {
+        $admin = new Trainer(['name' => '管理者太郎', 'role' => 'admin']);
+        $admin->id = 100;
+        $admin->exists = true;
+        $html = $this->actingAs($admin, 'web')->get(route('clients.show', $client))->assertOk()->getContent();
+        $start = strpos($html, 'function confirmDelete()');
+        $this->assertNotFalse($start);
+
+        return preg_replace('/\s+/u', ' ', substr($html, $start, strpos($html, '</script>', $start) - $start));
+    }
+
+    public function test_削除の確認_空のトレーニーだけなら一緒に削除することを添える(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, null);
+
+        $script = $this->confirmDeleteScript($client);
+
+        $this->assertStringContainsString("return confirm('この会員を削除しますか？\\n登録内容のないトレーニーも一緒に削除します。');", $script);
+        $this->assertStringNotContainsString('トレーニーが登録されているため削除できません', $script);
+    }
+
+    public function test_削除の確認_空でないトレーニーがいれば今までどおり止める(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, null);
+        $this->trainee($client, 'ポチ');
+
+        $script = $this->confirmDeleteScript($client);
+
+        $this->assertStringContainsString("alert('この会員にはトレーニーが登録されているため削除できません。'); return false;", $script);
+        $this->assertStringNotContainsString('confirm(', $script);
+    }
+
+    public function test_削除の確認_トレーニーがいなければ今までの文(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+
+        $script = $this->confirmDeleteScript($client);
+
+        $this->assertStringContainsString("return confirm('この会員を削除しますか？');", $script);
+        $this->assertStringNotContainsString('登録内容のないトレーニー', $script);
     }
 
     public function test_トレーニーの欄に備考の行はなく去勢避妊の次が最終計測(): void

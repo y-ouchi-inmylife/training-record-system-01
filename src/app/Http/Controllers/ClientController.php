@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ClientRequest;
+use App\Models\AccessLog;
 use App\Models\Client;
 use App\Models\ClientContract;
 use App\Models\ClientUsage;
+use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\Trainer;
 use App\Models\TrainingRecord;
@@ -144,12 +146,30 @@ class ClientController extends Controller
 
         $validated['updated_by'] = auth()->id();
 
-        // トランザクション内で内部IDを採番（競合回避）
-        $client = DB::transaction(function () use ($validated) {
-            $validated['internal_id'] = (string) (new ClientInternalIdService)->generateNext();
+        // トランザクション内で内部IDを採番（競合回避）。
+        // 会員と同じトランザクションで、その会員のトレーニーを 1 件作る（中身は空。2026-10-18 追加。要件定義書 6-3-1）。
+        // 会員を登録したらすぐ受付アンケート・愛犬性格診断の案内（トレーニーごと）を出せるようにするため。
+        // 会員の保存に失敗したらトレーニーも作られない（入力エラーはここに来る前に止まる）
+        [$client, $trainee] = DB::transaction(function () use ($validated) {
+            // サービスはコンテナから取る（テストで MySQL だけの採番の SQL を差し替えられるように。2026-10-18 変更）
+            $validated['internal_id'] = (string) app(ClientInternalIdService::class)->generateNext();
+            $client = Client::create($validated);
+            $trainee = Trainee::create(['client_id' => $client->id, 'updated_by' => auth()->id()]);
 
-            return Client::create($validated);
+            return [$client, $trainee];
         });
+
+        // 操作の記録：会員の登録（create_client）は LogAccess ミドルウェアが残す。一緒に作ったトレーニーの分は
+        // トレーニーの登録と同じ create_trainee（target_type='Trainee'、target_id はトレーニーの id）をここで残す
+        // （ミドルウェアはルートの 1 件しか残せず、作ったトレーニーの id も分からないため）
+        AccessLog::create([
+            'trainer_id' => auth()->id(),
+            'action' => 'create_trainee',
+            'target_type' => 'Trainee',
+            'target_id' => $trainee->id,
+            'ip_address' => $request->ip(),
+            'user_agent' => substr($request->userAgent() ?? '', 0, 500),
+        ]);
 
         return redirect()
             ->route('clients.show', $client)
@@ -270,8 +290,10 @@ class ClientController extends Controller
                 ->with('error', 'この会員にはトレーニング記録が登録されているため削除できません。');
         }
 
-        // トレーニーが登録されている場合も削除不可（設計書 6-3-5、段階① で追加）
-        if ($client->trainees()->exists()) {
+        // 空でないトレーニーが登録されている場合も削除不可（設計書 6-3-5、段階① で追加）。
+        // 2026-10-18 変更：空のトレーニー（会員の登録で自動で作ったものなど。Trainee::scopeNotBlank）だけなら削除でき、
+        // 一緒に消す（下）。その前はトレーニーが 1 頭でもいれば削除不可
+        if ($client->hasNonBlankTrainees()) {
             return redirect()
                 ->route('clients.show', $client)
                 ->with('error', 'この会員にはトレーニーが登録されているため削除できません。');
@@ -287,7 +309,13 @@ class ClientController extends Controller
         }
 
         try {
-            $client->delete();
+            // 空のトレーニーを明示して消してから会員を消す（2026-10-18 追加）。trainees.client_id の外部キーは CASCADE だが、
+            // 消すものを読み手に分かるようにするため明示する。空のトレーニーには結び付く表の行がないので、ほかに消えるものはない。
+            // 操作の記録は会員の削除（delete_client）だけ（契約・利用を一緒に消すときと同じく、一緒に消したものの分は残さない）
+            DB::transaction(function () use ($client) {
+                $client->trainees()->delete();
+                $client->delete();
+            });
         } catch (QueryException $e) {
             // 最後の守り。画面の確かめをすり抜けて DB の外部キー（RESTRICT）に断られたとき、
             // サーバーエラー（500）にせず会員詳細に戻す（2026-10 追加。本番で音声記録のある

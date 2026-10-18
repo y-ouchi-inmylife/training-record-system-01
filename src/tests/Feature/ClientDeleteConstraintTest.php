@@ -10,6 +10,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
@@ -22,9 +23,15 @@ use Tests\TestCase;
  *
  * テスト用 SQLite ではマイグレーション（MySQL 専用の CHECK 制約）が通らないため、
  * 既存の CreatesRecordingTables と同じく検証に必要な列だけでテーブルを作る。
+ *
+ * 2026-10-18 変更：空のトレーニー（登録内容がなく、結び付く表の行もない。会員の登録で自動で作ったものなど）だけなら、
+ * 会員を削除でき、トレーニーも一緒に消える。空でないトレーニーが 1 頭でもいれば今までどおり止める（Trainee::scopeNotBlank）。
+ * 「空」の判定と会員の登録で作るトレーニーは ClientRegistrationTraineeTest で確かめる。
  */
 class ClientDeleteConstraintTest extends TestCase
 {
+    use CreatesClientCountTables;
+
     private Trainer $admin;
 
     protected function setUp(): void
@@ -49,10 +56,8 @@ class ClientDeleteConstraintTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('client_id');
         });
-        Schema::create('trainees', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('client_id');
-        });
+        // トレーニーと、トレーニーに結び付く表（空のトレーニーかの判定に使う。2026-10-18 追加）
+        $this->createTraineesWithRelatedTables();
         Schema::create('audio_records', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('client_id');
@@ -93,10 +98,11 @@ class ClientDeleteConstraintTest extends TestCase
         $this->assertTrue(Client::where('id', $client->id)->exists(), '会員は消えていない');
     }
 
-    public function test_トレーニーがある会員は削除できず_トレーニーのメッセージが出る(): void
+    public function test_空でないトレーニーがある会員は削除できず_トレーニーのメッセージが出る(): void
     {
         $client = $this->makeClient();
         DB::table('trainees')->insert(['client_id' => $client->id]);
+        DB::table('trainees')->insert(['client_id' => $client->id, 'name' => 'ポチ']);
 
         $response = app(ClientController::class)->destroy($client);
 
@@ -121,6 +127,45 @@ class ClientDeleteConstraintTest extends TestCase
             $response->getSession()->get('error')
         );
         $this->assertTrue(Client::where('id', $client->id)->exists());
+    }
+
+    public function test_空のトレーニーだけの会員は削除できてトレーニーも消える(): void
+    {
+        $client = $this->makeClient();
+        // 会員の登録で自動で作ったトレーニー（中身は空）と、空文字だけのトレーニー
+        DB::table('trainees')->insert(['client_id' => $client->id]);
+        DB::table('trainees')->insert(['client_id' => $client->id, 'name' => '', 'breed' => '']);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame(route('clients.index'), $response->getTargetUrl());
+        $this->assertSame('会員を削除しました。', $response->getSession()->get('success'));
+        $this->assertFalse(Client::where('id', $client->id)->exists());
+        $this->assertSame(0, DB::table('trainees')->where('client_id', $client->id)->count());
+    }
+
+    public function test_ほかの会員のトレーニーは消さない(): void
+    {
+        $client = $this->makeClient();
+        $other = Client::query()->create(['internal_id' => '0002', 'last_name' => '佐藤']);
+        DB::table('trainees')->insert(['client_id' => $client->id]);
+        DB::table('trainees')->insert(['client_id' => $other->id]);
+
+        app(ClientController::class)->destroy($client);
+
+        $this->assertSame(1, DB::table('trainees')->where('client_id', $other->id)->count());
+    }
+
+    public function test_空のトレーニーがいてもトレーニング記録があれば今までどおり止める(): void
+    {
+        $client = $this->makeClient();
+        DB::table('trainees')->insert(['client_id' => $client->id]);
+        DB::table('training_records')->insert(['client_id' => $client->id]);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame('この会員にはトレーニング記録が登録されているため削除できません。', $response->getSession()->get('error'));
+        $this->assertSame(1, DB::table('trainees')->where('client_id', $client->id)->count());
     }
 
     public function test_どれも登録されていない会員は削除できて会員一覧に戻る(): void
@@ -197,9 +242,9 @@ class ClientDeleteConstraintTest extends TestCase
             '音声記録が登録されているため削除できません',
             $blade
         );
-        // 既存の 2 条件もそのまま残っていること
+        // 既存の条件もそのまま残っていること（トレーニーは、空でないトレーニーがいるときだけ止める。2026-10-18 変更）
         $this->assertStringContainsString('trainingRecords->count() > 0', $blade);
-        $this->assertStringContainsString('trainees->count() > 0', $blade);
+        $this->assertStringContainsString('$client->hasNonBlankTrainees()', $blade);
     }
 }
 
