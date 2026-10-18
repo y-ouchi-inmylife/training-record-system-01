@@ -35,6 +35,6 @@ class TraineePersonalityDiagnosisResultController extends Controller
 
         return redirect()
             ->route('trainees.show', $trainee)
-            ->with('success', '性格診断の結果を削除しました。');
+            ->with('success', __('messages.personality_diagnosis_name').'の結果を削除しました。');
     }
 }

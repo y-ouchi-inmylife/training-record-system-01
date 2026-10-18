@@ -146,8 +146,8 @@ class PersonalityDiagnosisController extends Controller
     {
         return view('client.personality-diagnosis.unavailable', [
             'message' => $reason === self::ANSWERED
-                ? 'この性格診断はすでにご回答いただいています。'
-                : 'この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
+                ? 'この'.__('messages.personality_diagnosis_name').'はすでにご回答いただいています。'
+                : 'この'.__('messages.personality_diagnosis_name').'はご利用いただけません。お手数ですがトレーナーにお問い合わせください。',
             // ［マイページへ戻る］：ログインしている会員の、自分の愛犬の案内のときだけ（2026-10 追加）
             'showMypageLink' => ClientMypageLink::shouldShow(
                 TraineePersonalityDiagnosisToken::query()->where('token', $token)->value('trainee_id')

@@ -215,7 +215,7 @@
     @endphp
     <div class="card mb-3" id="personality-diagnosis" style="scroll-margin-top: 4.5rem;">
         <div class="card-header">
-            <h6 class="mb-0">性格診断</h6>
+            <h6 class="mb-0">{{ __('messages.personality_diagnosis_name') }}</h6>
         </div>
         <div class="card-body">
             @if($pdResults->isEmpty())
@@ -284,7 +284,7 @@
                                                 @if(auth()->user()->isAdmin())
                                                     <button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"
                                                             data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-{{ $result->id }}"
-                                                            aria-label="{{ $result->answered_at->format('Y/m/d') }}の性格診断の結果を削除">削除</button>
+                                                            aria-label="{{ $result->answered_at->format('Y/m/d') }}の{{ __('messages.personality_diagnosis_name') }}の結果を削除">削除</button>
                                                 @endif
                                             </td>
                                         </tr>
@@ -358,11 +358,11 @@
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title" id="personality-diagnosis-delete-{{ $result->id }}-label">性格診断の結果の削除</h5>
+                            <h5 class="modal-title" id="personality-diagnosis-delete-{{ $result->id }}-label">{{ __('messages.personality_diagnosis_name') }}の結果の削除</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="mb-0">{{ $result->answered_at->format('Y/m/d') }} の性格診断の結果を削除します。元に戻せません。</p>
+                            <p class="mb-0">{{ $result->answered_at->format('Y/m/d') }} の{{ __('messages.personality_diagnosis_name') }}の結果を削除します。元に戻せません。</p>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>

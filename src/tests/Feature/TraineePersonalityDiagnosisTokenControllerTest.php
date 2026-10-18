@@ -11,6 +11,7 @@ use App\Models\Trainer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -26,6 +27,7 @@ use Tests\TestCase;
  */
 class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     private Client $client;
@@ -104,7 +106,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         // 発行のあとは会員詳細（ページの上）に戻る。S-0312 には移らない（2026-10-17 変更）
         $response->assertRedirect(route('clients.show', $this->client));
-        $response->assertSessionHas('success', 'モモの性格診断の案内を発行しました。');
+        $response->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。');
 
         $token = TraineePersonalityDiagnosisToken::query()->sole();
         $this->assertSame($this->trainee->id, (int) $token->trainee_id);
@@ -117,7 +119,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertSame('create_trainee_personality_diagnosis_token', $logs[0]->action);
         $this->assertSame('Trainee', $logs[0]->target_type);
         $this->assertSame($this->trainee->id, (int) $logs[0]->target_id);
-        $this->assertSame('性格診断案内発行', AccessLog::actionLabels()[$logs[0]->action]);
+        $this->assertSame('愛犬性格診断案内発行', AccessLog::actionLabels()[$logs[0]->action]);
     }
 
     public function test_名前がないトレーニーは完了メッセージで名前未登録と出す(): void
@@ -126,7 +128,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
             ->assertRedirect(route('clients.show', $this->client))
-            ->assertSessionHas('success', '名前未登録の性格診断の案内を発行しました。');
+            ->assertSessionHas('success', '名前未登録の愛犬性格診断の案内を発行しました。');
     }
 
     public function test_有効な案内があれば作らず完了メッセージも出さずに会員詳細に戻る(): void
@@ -159,7 +161,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
 
         $response->assertRedirect(route('clients.show', $this->client));
-        $response->assertSessionHas('success', 'モモの性格診断の案内を発行しました。');
+        $response->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。');
         $this->assertSame(2, TraineePersonalityDiagnosisToken::query()->count());
         $this->assertNotNull($this->trainee->fresh()->activePersonalityDiagnosisToken);
         $this->assertSame(1, TraineePersonalityDiagnosisResult::query()->count());
@@ -176,7 +178,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $response = $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee));
 
         $response->assertRedirect(route('clients.show', $this->client));
-        $response->assertSessionHas('success', '性格診断の案内を取り消しました。');
+        $response->assertSessionHas('success', '愛犬性格診断の案内を取り消しました。');
         $this->assertSame([$answered], TraineePersonalityDiagnosisToken::query()->pluck('id')->all());
         $this->assertFalse(TraineePersonalityDiagnosisToken::query()->whereKey($active)->exists());
         // 回答済みの案内と結果は消えない
@@ -187,7 +189,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertSame('delete_trainee_personality_diagnosis_token', $logs[0]->action);
         $this->assertSame('Trainee', $logs[0]->target_type);
         $this->assertSame($this->trainee->id, (int) $logs[0]->target_id);
-        $this->assertSame('性格診断案内取消', AccessLog::actionLabels()[$logs[0]->action]);
+        $this->assertSame('愛犬性格診断案内取消', AccessLog::actionLabels()[$logs[0]->action]);
     }
 
     public function test_有効な案内がなければ取消は409(): void
@@ -240,11 +242,11 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $this->assertSame('/client-portal/personality-diagnosis/personality-diagnosis-token-000001', parse_url($url, PHP_URL_PATH));
         // 帯＝見出し（h1。紫。アイコンは読み上げない）。見出しは 1 つだけで、すぐ下に QR コード
-        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality"><span class="print-band-label"><i class="bi bi-heart-pulse" aria-hidden="true"><\/i>性格診断のご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality"><span class="print-band-label"><i class="bi bi-heart-pulse" aria-hidden="true"><\/i>愛犬性格診断のご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
         $this->assertSame(1, substr_count($html, '<h1'));
-        $this->assertStringContainsString('<title>性格診断のご案内', $html);
+        $this->assertStringContainsString('<title>愛犬性格診断のご案内', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
-        $this->assertStringContainsString('aria-label="性格診断の案内の QR コード"', $html);
+        $this->assertStringContainsString('aria-label="愛犬性格診断の案内の QR コード"', $html);
         $this->assertStringContainsString('上の QR コードを読み取るか、下の URL をブラウザに入力してください。', $html);
         $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
         $this->assertStringContainsString('<p class="print-section-title">ご回答の手順</p>', $html);
@@ -273,7 +275,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         config(['app.client_portal_company' => 'テスト訓練所']);
         $this->assertSame(implode("\n", [
-            'トレーニングの参考にするため、性格診断へのご回答をお願いします。',
+            'トレーニングの参考にするため、愛犬性格診断へのご回答をお願いします。',
             '下のリンクから、50の質問にお答えください。',
             '',
             $url,
@@ -295,7 +297,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality">/u', $html);
         $this->assertSame(1, substr_count($html, '<h1'));
-        $this->assertStringContainsString('<p class="print-lead"><strong>有効な性格診断の案内がありません。</strong></p>', $html);
+        $this->assertStringContainsString('<p class="print-lead"><strong>有効な愛犬性格診断の案内がありません。</strong></p>', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('<div class="print-url">', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
@@ -321,7 +323,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $html = $this->get(route('client-portal.personality-diagnosis.show', ['token' => 'personality-diagnosis-token-000001']))
             ->assertOk()->getContent();
 
-        $this->assertStringContainsString('<h1 class="mb-2">性格診断</h1>', $html);
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬性格診断</h1>', $html);
         $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
     }
 
@@ -345,5 +347,47 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         auth('web')->logout();
         $this->get('/trainees/'.$this->trainee->id.'/personality-diagnosis-tokens')->assertRedirect(route('login'));
         $this->assertSame(0, TraineePersonalityDiagnosisToken::query()->count());
+    }
+
+    // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----
+
+    public function test_S0312は愛犬性格診断の名前で出し性格診断は単独で出さない(): void
+    {
+        $this->insertToken();
+
+        $html = $this->printPage();
+
+        $this->assertStringContainsString('<title>愛犬性格診断のご案内', $html);
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality">.*愛犬性格診断のご案内/su', $html);
+        $this->assertStringContainsString('aria-label="愛犬性格診断の案内の QR コード"', $html);
+        $this->assertStringContainsString('トレーニングの参考にするため、愛犬性格診断へのご回答をお願いします。', $this->copyText($html));
+        $this->assertOnlyFullPersonalityDiagnosisName($html);
+    }
+
+    public function test_完了メッセージと操作の記録の表示も愛犬性格診断(): void
+    {
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
+            ->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。');
+        $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
+            ->assertSessionHas('success', '愛犬性格診断の案内を取り消しました。');
+
+        $labels = AccessLog::actionLabels();
+        $this->assertSame('愛犬性格診断案内発行', $labels['create_trainee_personality_diagnosis_token']);
+        $this->assertSame('愛犬性格診断案内取消', $labels['delete_trainee_personality_diagnosis_token']);
+        $this->assertSame('愛犬性格診断結果削除', $labels['delete_trainee_personality_diagnosis_result']);
+    }
+
+    public function test_S0312と完了メッセージの名前は文のファイルの1か所から読む(): void
+    {
+        $this->overridePersonalityDiagnosisName('テスト診断');
+        $this->insertToken();
+
+        $html = $this->printPage();
+        $this->assertStringContainsString('<title>テスト診断のご案内', $html);
+        $this->assertStringNotContainsString('性格診断', $html);
+
+        $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
+            ->assertSessionHas('success', 'テスト診断の案内を取り消しました。');
+        $this->assertSame('テスト診断案内発行', AccessLog::actionLabels()['create_trainee_personality_diagnosis_token']);
     }
 }

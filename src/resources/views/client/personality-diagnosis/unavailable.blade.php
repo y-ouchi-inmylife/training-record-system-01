@@ -4,7 +4,7 @@
     $companyName = config('app.client_portal_company');
 @endphp
 
-@section('title', '性格診断')
+@section('title', __('messages.personality_diagnosis_name'))
 
 @section('content')
 {{-- 性格診断の使えない URL の画面（設計書 S-1415「使えない URL の画面」。2026-10 追加）。
@@ -13,7 +13,7 @@
      $message は「回答済み」「使えない（存在しない・取消済み・トレーニー削除済み）」の 2 通り
      （Client\PersonalityDiagnosisController::unavailableView） --}}
 <div class="c-login c-login--wide">
-    <h1 class="mb-4">性格診断</h1>
+    <h1 class="mb-4">{{ __('messages.personality_diagnosis_name') }}</h1>
 
     <div class="card c-login-card">
         <div class="card-body p-4">

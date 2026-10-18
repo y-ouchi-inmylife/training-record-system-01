@@ -78,7 +78,7 @@
                                         <h2 class="mb-0" style="font-size: 1.1rem;">{{ $chart['callName'] }}</h2>
                                     </div>
                                     <div class="col-lg-4 col-xxl-3 d-none d-lg-block" data-client-personality-type-wide>
-                                        <p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">性格診断：</span><span class="fw-bold">{!! $personalityTypeHtml !!}</span></p>
+                                        <p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">{{ __('messages.personality_diagnosis_name') }}：</span><span class="fw-bold">{!! $personalityTypeHtml !!}</span></p>
                                     </div>
                                 </div>
                             @else
@@ -241,12 +241,12 @@
                                         {{-- 2026-10 変更：カードを低くするため詰めた（小見出しとタイプの間・タイプとグラフの間の余白をなくし、
                                              グラフを小さく〔.c-personality-radar。compact の設定〕、凡例の文字を小さくした〔.c-personality-legend〕） --}}
                                         {{-- 小見出しとタイプは lg 未満だけ（lg 以上は名前の行の右に出す。2026-10 変更）。lg 以上はレーダーと凡例だけ --}}
-                                        <p class="eyebrow mb-0 text-center d-lg-none">性格診断</p>
+                                        <p class="eyebrow mb-0 text-center d-lg-none">{{ __('messages.personality_diagnosis_name') }}</p>
                                         <p class="mb-1 fw-bold text-center d-lg-none" style="word-break: keep-all;" data-client-personality-type>{!! $personalityTypeHtml !!}</p>
                                         {{-- グラフの枠は横長（.c-personality-radar。client.scss）。data-personality-radar-compact で、枠の高さいっぱいに
                                              描き、項目名と目盛りの文字を小さくする（personality-radar-config.js の compact。トレーナー側には付けない） --}}
                                         <div class="c-personality-radar mx-auto">
-                                            <canvas id="personality-radar-{{ $chart['id'] }}" role="img" aria-label="{{ $chart['callName'] }}の性格診断のグラフ"
+                                            <canvas id="personality-radar-{{ $chart['id'] }}" role="img" aria-label="{{ $chart['callName'] }}の{{ __('messages.personality_diagnosis_name') }}のグラフ"
                                                     data-personality-radar="{{ json_encode($chart['personality']['radar'], JSON_UNESCAPED_UNICODE) }}"
                                                     data-personality-radar-compact></canvas>
                                         </div>

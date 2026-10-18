@@ -13,13 +13,13 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="personalityDiagnosisCancelModalLabel">
-                    性格診断の案内の取消
+                    {{ __('messages.personality_diagnosis_name') }}の案内の取消
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p class="mb-0">
-                    発行済みの性格診断の案内が使えなくなります。<br>
+                    発行済みの{{ __('messages.personality_diagnosis_name') }}の案内が使えなくなります。<br>
                     すでにお渡しした案内からは回答できなくなります。
                 </p>
             </div>

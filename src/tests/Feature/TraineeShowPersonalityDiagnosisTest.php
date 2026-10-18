@@ -9,6 +9,7 @@ use App\Models\Trainer;
 use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -25,6 +26,7 @@ use Tests\TestCase;
  */
 class TraineeShowPersonalityDiagnosisTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     private Client $client;
@@ -173,7 +175,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertLessThan(strpos($html, 'id="intake-survey"'), strpos($html, 'id="personality-diagnosis"'));
         // 欄の間の余白は今までどおり（どちらも mb-3）
         $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
-        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">性格診断<\/h6>\s*<\/div>/u', $this->card($html));
+        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">愛犬性格診断<\/h6>\s*<\/div>/u', $this->card($html));
     }
 
     public function test_結果がなければ未回答だけで表もグラフもない(): void
@@ -521,7 +523,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     {
         // 会員詳細（S-0305）のテンプレートの「性格診断」のリンクの飛び先（描いたときの href は ClientCountRenderingTest で確かめている）
         $template = file_get_contents(resource_path('views/clients/show.blade.php'));
-        $this->assertSame(1, preg_match('/route\(\'trainees\.show\', \$trainee\) \}\}#([a-z-]+)"\s*aria-label="\{\{ \$trainee->display_name \}\}の性格診断"/u', $template, $m));
+        $this->assertSame(1, preg_match('/route\(\'trainees\.show\', \$trainee\) \}\}#([a-z-]+)"\s*aria-label="\{\{ \$trainee->display_name \}\}の\{\{ __\(\'messages\.personality_diagnosis_name\'\) \}\}"/u', $template, $m));
 
         $this->assertSame('personality-diagnosis', $m[1]);
         $this->assertStringContainsString('id="'.$m[1].'"', $this->page());
@@ -565,13 +567,13 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
                 '/aria-label="'.preg_quote($date, '/').'の50問の回答">回答<\/button>.*?'
                 .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"\s*'
                 .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-'.$result->id.'"\s*'
-                .'aria-label="'.preg_quote($date, '/').'の性格診断の結果を削除">削除<\/button>/us',
+                .'aria-label="'.preg_quote($date, '/').'の愛犬性格診断の結果を削除">削除<\/button>/us',
                 $card
             );
 
             $modal = $this->deleteModal($html, $result);
-            $this->assertStringContainsString('>性格診断の結果の削除</h5>', $modal);
-            $this->assertStringContainsString($date.' の性格診断の結果を削除します。元に戻せません。', $modal);
+            $this->assertStringContainsString('>愛犬性格診断の結果の削除</h5>', $modal);
+            $this->assertStringContainsString($date.' の愛犬性格診断の結果を削除します。元に戻せません。', $modal);
             $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"', $modal);
             $this->assertStringContainsString('name="_method" value="DELETE"', $modal);
             $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除する</button>', $modal);
@@ -586,7 +588,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $html = $this->page();
 
-        $this->assertStringNotContainsString('の性格診断の結果を削除', $html);
+        $this->assertStringNotContainsString('性格診断の結果を削除', $html);
         $this->assertStringNotContainsString('data-personality-diagnosis-delete', $html);
         $this->assertStringNotContainsString('/personality-diagnosis-results/', $html);
         $this->assertStringNotContainsString('btn-outline-danger', $this->card($html));
@@ -612,7 +614,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             '2026/03/10' => $this->expectedRow('past-2'),
             '2025/12/01' => $this->expectedRow('past-3'),
         ], $this->tableRows($this->card($html)));
-        $this->assertStringContainsString('性格診断の結果を削除しました。', $html);
+        $this->assertStringContainsString('愛犬性格診断の結果を削除しました。', $html);
     }
 
     // ---- 結果の表の並び（新しい順。2026-10 変更） ----
@@ -658,7 +660,24 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
                 'action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"',
                 $this->deleteModal($html, $result)
             );
-            $this->assertStringContainsString($date.' の性格診断の結果を削除します。', $this->deleteModal($html, $result));
+            $this->assertStringContainsString($date.' の愛犬性格診断の結果を削除します。', $this->deleteModal($html, $result));
         }
+    }
+
+    // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----
+
+    public function test_トレーニー詳細は愛犬性格診断の名前で出し性格診断は単独で出さない(): void
+    {
+        $this->actingAsRole('admin');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page();
+
+        $this->assertStringContainsString('<h6 class="mb-0">愛犬性格診断</h6>', $html);
+        $this->assertStringContainsString('-label">愛犬性格診断の結果の削除</h5>', $html);
+        $this->assertStringContainsString('2026/06/01 の愛犬性格診断の結果を削除します。', $html);
+        $this->assertStringContainsString('aria-label="2026/06/01の愛犬性格診断の結果を削除"', $html);
+        $this->assertOnlyFullPersonalityDiagnosisName($html);
+        $this->assertNotNull($result);
     }
 }

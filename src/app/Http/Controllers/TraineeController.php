@@ -90,11 +90,11 @@ class TraineeController extends Controller
             : '';
         $deleted = array_keys(array_filter([
             '受付アンケートの回答' => $trainee->latestIntakeSurveyResponse !== null,
-            '性格診断の結果' => $trainee->personalityDiagnosisResults->isNotEmpty(),
+            __('messages.personality_diagnosis_name').'の結果' => $trainee->personalityDiagnosisResults->isNotEmpty(),
         ]));
         $invalidated = array_keys(array_filter([
             '受付アンケート案内' => $trainee->activeIntakeSurveyToken !== null,
-            '性格診断の案内' => $trainee->activePersonalityDiagnosisToken !== null,
+            __('messages.personality_diagnosis_name').'の案内' => $trainee->activePersonalityDiagnosisToken !== null,
         ]));
         $intakeSurveySentence = '';
         if ($deleted !== []) {

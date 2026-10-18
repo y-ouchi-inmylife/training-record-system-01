@@ -315,7 +315,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addMeasurements(2);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('このトレーニーには 2 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_性格診断の結果だけ(): void
@@ -323,7 +323,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->addPersonalityResult();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('愛犬性格診断の結果も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_性格診断の未回答の案内だけ(): void
@@ -331,7 +331,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->issuePersonalityToken();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('発行済みの性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('発行済みの愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     public function test_削除の確認_すべてあれば消えるものから使えなくなる案内の順(): void
@@ -342,7 +342,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->issuePersonalityToken();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('受付アンケートの回答と性格診断の結果も一緒に削除されます。発行済みの受付アンケート案内と性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。発行済みの受付アンケート案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
     // ---- 回答の内容（2026-10 追加。設計書 S-0309「受付アンケートの欄」） ----

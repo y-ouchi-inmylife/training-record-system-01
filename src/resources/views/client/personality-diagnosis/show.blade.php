@@ -11,7 +11,7 @@
         ->values();
 @endphp
 
-@section('title', '性格診断')
+@section('title', __('messages.personality_diagnosis_name'))
 
 @section('content')
 {{-- 性格診断回答画面（S-1415。2026-10 追加。要件定義書 6-15-18）。
@@ -27,7 +27,7 @@
        「まだ答えていない質問が N 問あります。」と最初の未回答の問へのリンク
      - 所要時間の目安は書かない（設計書 S-1415） --}}
 <div class="c-login c-login--wide">
-    <h1 class="mb-2">性格診断</h1>
+    <h1 class="mb-2">{{ __('messages.personality_diagnosis_name') }}</h1>
     <p class="mb-4">愛犬についてお答えください。ふだんの様子に近いものを選んでください。その状況になったことがなければ「未経験」を選んでください。</p>
 
     <div class="card c-login-card">

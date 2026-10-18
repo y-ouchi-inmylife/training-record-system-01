@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -30,6 +31,7 @@ use Tests\TestCase;
  */
 class ClientCountRenderingTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     protected function setUp(): void
@@ -814,7 +816,7 @@ class ClientCountRenderingTest extends TestCase
         $url = preg_quote(route('trainees.show', $traineeId).'#intake-survey', '/');
 
         // 性格診断の行（ボタンのまとまり・値の列・行の div）のすぐ後ろ（2026-10 変更：当初は属性の並び〔dl〕のすぐ後ろ）
-        return '/role="group" aria-label="'.preg_quote($name, '/').'の性格診断">.*?<\/div>\s*<\/div>\s*<\/div>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
+        return '/role="group" aria-label="'.preg_quote($name, '/').'の愛犬性格診断">.*?<\/div>\s*<\/div>\s*<\/div>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
     }
 
     public function test_受付アンケートが回答済みなら名前の行のまとまりを出さず性格診断の行の下に暮らしの様子のリンクを出す(): void
@@ -842,8 +844,8 @@ class ClientCountRenderingTest extends TestCase
         // 「暮らしの様子」のリンクは、性格診断の行のすぐ後ろ（トレーニーの欄のいちばん下）。S-0309 の #intake-survey へ
         // （2026-10 変更：当初は最終計測のすぐ後ろ・性格診断の行の前。トレーニー詳細の欄の順にそろえた）
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
-        $this->assertGreaterThan(strpos($html, '>最終計測</dt>'), strpos($html, '>性格診断</a>'));
-        $this->assertGreaterThan(strpos($html, '>性格診断</a>'), strpos($html, '>暮らしの様子</a>'));
+        $this->assertGreaterThan(strpos($html, '>最終計測</dt>'), strpos($html, '>愛犬性格診断</a>'));
+        $this->assertGreaterThan(strpos($html, '>愛犬性格診断</a>'), strpos($html, '>暮らしの様子</a>'));
         // 回答日時は出さない
         $this->assertStringNotContainsString('2026/10/16', $html);
     }
@@ -1213,7 +1215,7 @@ class ClientCountRenderingTest extends TestCase
         // （このテストの表はトークンの列を持たないため）。出し方はトレーニーの案内と同じ session('success')
         $cases = [
             [route('trainee-intake-survey-tokens.store', $traineeId), 'ポチの受付アンケートの案内を発行しました。', '>受付アンケートの案内を表示</a>'],
-            [route('trainee-personality-diagnosis-tokens.store', $traineeId), 'ポチの性格診断の案内を発行しました。', '>案内を表示</a>'],
+            [route('trainee-personality-diagnosis-tokens.store', $traineeId), 'ポチの愛犬性格診断の案内を発行しました。', '>案内を表示</a>'],
         ];
         foreach ($cases as [$url, $message, $printLink]) {
             $response = $this->post($url);
@@ -1272,7 +1274,7 @@ class ClientCountRenderingTest extends TestCase
     {
         $link = route('trainees.show', $traineeId).'#personality-diagnosis';
         $start = strpos($html, '<a href="'.$link.'"');
-        $this->assertNotFalse($start, '性格診断のリンクがない');
+        $this->assertNotFalse($start, '愛犬性格診断のリンクがない');
         $end = strpos($html, '</div>', strpos($html, 'role="group"', $start));
 
         return substr($html, $start, $end - $start);
@@ -1294,7 +1296,7 @@ class ClientCountRenderingTest extends TestCase
         // 回答済みのトレーニー：属性の並び（dl）のすぐ後ろに性格診断の行、その後ろに暮らしの様子のリンク
         $this->assertMatchesRegularExpression(
             '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
-            .'<a href="'.preg_quote(route('trainees.show', $answered), '/').'#personality-diagnosis"\s*aria-label="ポチの性格診断">性格診断<\/a>/u',
+            .'<a href="'.preg_quote(route('trainees.show', $answered), '/').'#personality-diagnosis"\s*aria-label="ポチの愛犬性格診断">愛犬性格診断<\/a>/u',
             $html
         );
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
@@ -1302,19 +1304,19 @@ class ClientCountRenderingTest extends TestCase
         // （読み上げは「名前未登録の性格診断」）。暮らしの様子のリンクは出ず、性格診断の行で欄が終わる
         $this->assertMatchesRegularExpression(
             '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
-            .'<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis"\s*aria-label="名前未登録の性格診断">性格診断<\/a>/u',
+            .'<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis"\s*aria-label="名前未登録の愛犬性格診断">愛犬性格診断<\/a>/u',
             $html
         );
-        $afterNotIssued = substr($html, strpos($html, 'aria-label="名前未登録の性格診断">性格診断</a>'));
+        $afterNotIssued = substr($html, strpos($html, 'aria-label="名前未登録の愛犬性格診断">愛犬性格診断</a>'));
         $this->assertStringNotContainsString('暮らしの様子</a>', $afterNotIssued);
         $this->assertMatchesRegularExpression(
-            '/role="group" aria-label="名前未登録の性格診断">.*?<\/form>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/us',
+            '/role="group" aria-label="名前未登録の愛犬性格診断">.*?<\/form>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/us',
             $afterNotIssued,
-            '性格診断の行のあと、トレーニーの欄が閉じる'
+            '愛犬性格診断の行のあと、トレーニーの欄が閉じる'
         );
         $this->assertSame(1, substr_count($html, '>暮らしの様子</a>'));
-        $this->assertStringContainsString('role="group" aria-label="名前未登録の性格診断"', $html);
-        $this->assertSame(2, substr_count($html, '>性格診断</a>'));
+        $this->assertStringContainsString('role="group" aria-label="名前未登録の愛犬性格診断"', $html);
+        $this->assertSame(2, substr_count($html, '>愛犬性格診断</a>'));
     }
 
     public function test_有効な案内がなければ案内を発行のフォームを出す(): void
@@ -1325,7 +1327,7 @@ class ClientCountRenderingTest extends TestCase
 
         $row = $this->personalityRow($this->get(route('clients.show', $client))->assertOk()->getContent(), $id);
 
-        $this->assertStringContainsString('role="group" aria-label="ポチの性格診断"', $row);
+        $this->assertStringContainsString('role="group" aria-label="ポチの愛犬性格診断"', $row);
         $this->assertMatchesRegularExpression(
             '/<form method="POST" action="'.preg_quote(route('trainee-personality-diagnosis-tokens.store', $id), '/').'" class="d-inline m-0"\s*'
             .'>\s*<input type="hidden" name="_token"[^>]*>\s*'
@@ -1380,8 +1382,8 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertStringContainsString('<div class="modal fade" id="personalityDiagnosisCancelModal" tabindex="-1"', $html);
-        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="personalityDiagnosisCancelModalLabel">\s*性格診断の案内の取消\s*<\/h5>/u', $html);
-        $this->assertStringContainsString('発行済みの性格診断の案内が使えなくなります。<br>', $html);
+        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="personalityDiagnosisCancelModalLabel">\s*愛犬性格診断の案内の取消\s*<\/h5>/u', $html);
+        $this->assertStringContainsString('発行済みの愛犬性格診断の案内が使えなくなります。<br>', $html);
         $this->assertStringContainsString('すでにお渡しした案内からは回答できなくなります。', $html);
         $this->assertMatchesRegularExpression('/<form method="POST" action="" class="d-inline m-0" id="personalityDiagnosisCancelForm">[\s\S]*?<button type="submit" class="btn btn-danger">取り消す<\/button>/u', $html);
         // 送信先のひな形（開いたボタンのトレーニーの id で置き換える）
@@ -1508,10 +1510,10 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<dl class="row mb-0 small">[\s\S]*?<dt class="col-4 fw-normal text-muted">/u', $html);
         $this->assertMatchesRegularExpression(
             '/<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*'
-            .'<div class="col-4">\s*<a href="'.preg_quote(route('trainees.show', $id), '/').'#personality-diagnosis"\s*aria-label="ポチの性格診断">性格診断<\/a>\s*<\/div>\s*'
+            .'<div class="col-4">\s*<a href="'.preg_quote(route('trainees.show', $id), '/').'#personality-diagnosis"\s*aria-label="ポチの愛犬性格診断">愛犬性格診断<\/a>\s*<\/div>\s*'
             .'<div class="col-8 d-flex flex-wrap align-items-center gap-2">\s*'
             .'<span data-personality-diagnosis-latest>2026\/10\/15<\/span>\s*'
-            .'<div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"\s*role="group" aria-label="ポチの性格診断">/u',
+            .'<div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"\s*role="group" aria-label="ポチの愛犬性格診断">/u',
             $html
         );
         // 日付には読み上げ用の特別な指定を付けない（普通の文字として読まれる）
@@ -1585,5 +1587,36 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(5, substr_count($card, '<div class="col-6 col-md-4">'));
         $this->assertSame(4, substr_count($card, '<div class="text-muted small mb-1">'));
         $this->assertTrue(strpos($card, '>電話番号</div>') < strpos($card, '>緊急連絡先（ご家族等）</div>'));
+    }
+
+    // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----
+
+    public function test_会員詳細は愛犬性格診断の名前で出し性格診断は単独で出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->personalityToken($id);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('aria-label="ポチの愛犬性格診断">愛犬性格診断</a>', $html);
+        $this->assertStringContainsString('role="group" aria-label="ポチの愛犬性格診断"', $html);
+        // 取消の確認（M07）
+        $this->assertStringContainsString('愛犬性格診断の案内の取消', $html);
+        $this->assertOnlyFullPersonalityDiagnosisName($html);
+    }
+
+    public function test_会員詳細の愛犬性格診断の名前は文のファイルの1か所から読む(): void
+    {
+        $this->fakeMediaDisk();
+        $this->overridePersonalityDiagnosisName('テスト診断');
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('aria-label="ポチのテスト診断">テスト診断</a>', $html);
+        $this->assertStringNotContainsString('性格診断', $html);
     }
 }

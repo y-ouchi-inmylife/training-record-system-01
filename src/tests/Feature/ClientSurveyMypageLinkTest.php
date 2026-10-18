@@ -192,7 +192,7 @@ class ClientSurveyMypageLinkTest extends TestCase
         $url = '/client-portal/personality-diagnosis/'.self::PD;
 
         $owner = $this->actingAs($this->owner, 'client')->get($url)->assertOk()->getContent();
-        $this->assertStringContainsString('この性格診断はすでにご回答いただいています。', $owner);
+        $this->assertStringContainsString('この愛犬性格診断はすでにご回答いただいています。', $owner);
         $this->assertHasLink($owner);
 
         $this->assertNoLink($this->actingAs($this->other, 'client')->get($url)->assertOk()->getContent());

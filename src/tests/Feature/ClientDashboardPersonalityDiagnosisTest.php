@@ -8,6 +8,7 @@ use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -23,6 +24,7 @@ use Tests\TestCase;
  */
 class ClientDashboardPersonalityDiagnosisTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     private Client $client;
@@ -164,7 +166,7 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         // 小見出しと最新のタイプ（「・」のあとでだけ折り返す）
         // 2026-10 変更：カードを低くするため、小見出しとタイプの間・タイプとグラフの間を詰めた
         // 2026-10 変更：lg 未満だけ、性格診断の列の中に小見出しとタイプ（lg 以上は名前の行の右。下のテスト）
-        $this->assertStringContainsString('<p class="eyebrow mb-0 text-center d-lg-none">性格診断</p>', $card);
+        $this->assertStringContainsString('<p class="eyebrow mb-0 text-center d-lg-none">愛犬性格診断</p>', $card);
         $this->assertStringContainsString(
             '<p class="mb-1 fw-bold text-center d-lg-none" style="word-break: keep-all;" data-client-personality-type>愛情たっぷり・<wbr>甘えん坊タイプ</p>',
             $card
@@ -172,7 +174,7 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('慎重派', $card);
         // レーダーチャート（読み上げは点数を言わない）と凡例の枠。id はトレーニーごと
         $this->assertMatchesRegularExpression(
-            '/<canvas id="personality-radar-'.$id.'" role="img" aria-label="モモちゃんの性格診断のグラフ"\s*data-personality-radar="[^"]*"\s*data-personality-radar-compact><\/canvas>/u',
+            '/<canvas id="personality-radar-'.$id.'" role="img" aria-label="モモちゃんの愛犬性格診断のグラフ"\s*data-personality-radar="[^"]*"\s*data-personality-radar-compact><\/canvas>/u',
             $card
         );
         $this->assertStringContainsString('data-personality-radar-legend="personality-radar-'.$id.'"', $card);
@@ -203,7 +205,7 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
             '/<div class="row g-3 align-items-baseline mb-2" data-trainee-name-row>\s*'
             .'<div class="col-12 col-lg-8 col-xxl-9">\s*<h2 class="mb-0" style="font-size: 1\.1rem;">モモちゃん<\/h2>\s*<\/div>\s*'
             .'<div class="col-lg-4 col-xxl-3 d-none d-lg-block" data-client-personality-type-wide>\s*'
-            .'<p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">性格診断：<\/span>'
+            .'<p class="mb-0 small text-center" style="word-break: keep-all;"><span class="text-muted">愛犬性格診断：<\/span>'
             .'<span class="fw-bold">エネルギッシュ・<wbr>アスリートタイプ<\/span><\/p>\s*<\/div>\s*<\/div>/u',
             $card
         );
@@ -212,7 +214,7 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
         $this->assertSame(2, substr_count($card, 'エネルギッシュ・<wbr>アスリートタイプ'));
         $this->assertStringNotContainsString('慎重派', $card);
         // 名前の見出しが先、性格診断が後（読み上げの順）
-        $this->assertLessThan(strpos($card, '性格診断：'), strpos($card, 'モモちゃん</h2>'));
+        $this->assertLessThan(strpos($card, '愛犬性格診断：'), strpos($card, 'モモちゃん</h2>'));
     }
 
     public function test_lg以上の右の列はレーダーと凡例だけ(): void
@@ -435,5 +437,20 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
 
         $this->assertSame(1, $count($this->client));
         $this->assertSame(1, $count($three));
+    }
+
+    // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----
+
+    public function test_マイページは愛犬性格診断の名前で出し性格診断は単独で出さない(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->addResult($id, 'past-1', '2026-06-01 09:00:00');
+
+        $html = $this->open();
+
+        $this->assertStringContainsString('<span class="text-muted">愛犬性格診断：</span>', $html);
+        $this->assertStringContainsString('<p class="eyebrow mb-0 text-center d-lg-none">愛犬性格診断</p>', $html);
+        $this->assertStringContainsString('の愛犬性格診断のグラフ"', $html);
+        $this->assertOnlyFullPersonalityDiagnosisName($html);
     }
 }

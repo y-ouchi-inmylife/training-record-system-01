@@ -133,7 +133,7 @@ class ClientPersonalityDiagnosisSessionExpiredTest extends TestCase
         $response = $this->post($this->url(), ['answers' => $this->allZero()]);
 
         $response->assertOk();
-        $response->assertSee('この性格診断はすでにご回答いただいています。');
+        $response->assertSee('この愛犬性格診断はすでにご回答いただいています。');
         $response->assertDontSee('時間がたったため送信できませんでした');
         $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
     }
@@ -143,7 +143,7 @@ class ClientPersonalityDiagnosisSessionExpiredTest extends TestCase
         $response = $this->post($this->url(), ['answers' => $this->allZero()]);
 
         $response->assertOk();
-        $response->assertSee('この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。');
+        $response->assertSee('この愛犬性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。');
         $response->assertDontSee('時間がたったため送信できませんでした');
     }
 

@@ -6,6 +6,7 @@ use App\Models\Client;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -22,6 +23,7 @@ use Tests\TestCase;
  */
 class ClientDashboardSurveyNoticeTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     private Client $client;
@@ -139,7 +141,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
 
         $this->assertSame(['personality'], $this->noticeKinds($card));
         $this->assertStringContainsString('<div class="c-survey-notice c-survey-notice--personality" data-client-survey-notice="personality">', $card);
-        $this->assertStringContainsString('<span>性格診断にお答えください。</span>', $card);
+        $this->assertStringContainsString('<span>愛犬性格診断にお答えください。</span>', $card);
         // 印刷した案内と同じ回答の URL を、同じタブで開く（target は付けない）。会員側の主な操作の青の塗り
         $this->assertStringContainsString(
             '<a href="'.route('client-portal.personality-diagnosis.show', ['token' => 'pdtoken0000000000000000000000001']).'" class="btn btn-primary btn-sm text-nowrap">回答する</a>',
@@ -270,9 +272,32 @@ class ClientDashboardSurveyNoticeTest extends TestCase
     public function test_文は1か所の翻訳ファイルにある(): void
     {
         $this->assertSame('受付アンケートにお答えください。', __('messages.client_survey_notice.intake'));
-        $this->assertSame('性格診断にお答えください。', __('messages.client_survey_notice.personality'));
+        $this->assertSame('愛犬性格診断にお答えください。', __('messages.client_survey_notice.personality'));
         $this->assertSame('回答する', __('messages.client_survey_notice.answer'));
         $partial = file_get_contents(resource_path('views/client/_survey-notices.blade.php'));
         $this->assertStringNotContainsString('にお答えください。', $partial);
+    }
+
+    // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----
+
+    public function test_お知らせは愛犬性格診断の名前で出し性格診断は単独で出さない(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->personalityToken($id, 'pd-token');
+
+        $card = $this->card($this->open(), 'モモちゃん');
+
+        $this->assertStringContainsString('愛犬性格診断にお答えください。', $card);
+        $this->assertOnlyFullPersonalityDiagnosisName($card);
+    }
+
+    public function test_お知らせの名前も文のファイルの1か所の名前から組み立てる(): void
+    {
+        // client_survey_notice.personality は、同じファイルの名前（$personalityDiagnosisName）から組み立てる
+        $source = file_get_contents(lang_path('ja/messages.php'));
+        $this->assertSame(1, substr_count($source, "'愛犬性格診断'"));
+        $this->assertStringContainsString("'personality_diagnosis_name' => \$personalityDiagnosisName,", $source);
+        $this->assertStringContainsString("'personality' => \$personalityDiagnosisName.'にお答えください。',", $source);
+        $this->assertSame('愛犬性格診断', __('messages.personality_diagnosis_name'));
     }
 }

@@ -632,7 +632,7 @@
                                 <div class="row small mt-1 align-items-center" data-personality-diagnosis-row>
                                     <div class="col-4">
                                         <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis"
-                                           aria-label="{{ $trainee->display_name }}の性格診断">性格診断</a>
+                                           aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">{{ __('messages.personality_diagnosis_name') }}</a>
                                     </div>
                                     <div class="col-8 d-flex flex-wrap align-items-center gap-2">
                                         @if($trainee->latestPersonalityDiagnosisResult)
@@ -641,7 +641,7 @@
                                             <span class="text-muted" data-personality-diagnosis-latest>診断なし</span>
                                         @endif
                                         <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"
-                                             role="group" aria-label="{{ $trainee->display_name }}の性格診断">
+                                             role="group" aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">
                                             @if($trainee->activePersonalityDiagnosisToken === null)
                                                 <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf

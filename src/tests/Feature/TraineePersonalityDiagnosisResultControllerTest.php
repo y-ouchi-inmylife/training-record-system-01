@@ -103,7 +103,7 @@ class TraineePersonalityDiagnosisResultControllerTest extends TestCase
         // フラグメントなしでトレーニー詳細に戻る
         $response->assertRedirect(route('trainees.show', $this->trainee));
         $this->assertStringNotContainsString('#', $response->headers->get('Location'));
-        $response->assertSessionHas('success', '性格診断の結果を削除しました。');
+        $response->assertSessionHas('success', '愛犬性格診断の結果を削除しました。');
         $this->assertSame([$first], TraineePersonalityDiagnosisResult::query()->pluck('id')->all());
         // 結果に使った案内（回答済みのトークン）は消さない
         $this->assertSame($tokenIds, TraineePersonalityDiagnosisToken::query()->orderBy('id')->pluck('id')->all());
@@ -114,7 +114,7 @@ class TraineePersonalityDiagnosisResultControllerTest extends TestCase
         $this->assertSame('delete_trainee_personality_diagnosis_result', $logs[0]->action);
         $this->assertSame('Trainee', $logs[0]->target_type);
         $this->assertSame($this->trainee->id, (int) $logs[0]->target_id);
-        $this->assertSame('性格診断結果削除', AccessLog::actionLabels()[$logs[0]->action]);
+        $this->assertSame('愛犬性格診断結果削除', AccessLog::actionLabels()[$logs[0]->action]);
     }
 
     public function test_管理者でなければ403で削除されない(): void

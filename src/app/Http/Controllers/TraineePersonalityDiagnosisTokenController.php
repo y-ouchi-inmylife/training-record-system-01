@@ -32,7 +32,7 @@ class TraineePersonalityDiagnosisTokenController extends Controller
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
 
-        return $token ? $redirect->with('success', $trainee->display_name.'の性格診断の案内を発行しました。') : $redirect;
+        return $token ? $redirect->with('success', $trainee->display_name.'の'.__('messages.personality_diagnosis_name').'の案内を発行しました。') : $redirect;
     }
 
     /**
@@ -53,11 +53,11 @@ class TraineePersonalityDiagnosisTokenController extends Controller
     {
         $deleted = $trainee->personalityDiagnosisTokens()->whereNull('answered_at')->delete();
         if ($deleted === 0) {
-            abort(409, '取り消す性格診断の案内がありません。');
+            abort(409, '取り消す'.__('messages.personality_diagnosis_name').'の案内がありません。');
         }
 
         return redirect()->route('clients.show', $trainee->client_id)
-            ->with('success', '性格診断の案内を取り消しました。');
+            ->with('success', __('messages.personality_diagnosis_name').'の案内を取り消しました。');
     }
 
     /**
@@ -102,7 +102,7 @@ class TraineePersonalityDiagnosisTokenController extends Controller
         $company = config('app.client_portal_company');
 
         $lines = [
-            'トレーニングの参考にするため、性格診断へのご回答をお願いします。',
+            'トレーニングの参考にするため、'.__('messages.personality_diagnosis_name').'へのご回答をお願いします。',
             '下のリンクから、50の質問にお答えください。',
             '',
             $url,

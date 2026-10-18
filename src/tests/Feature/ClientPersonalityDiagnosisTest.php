@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -24,6 +25,7 @@ use Tests\TestCase;
  */
 class ClientPersonalityDiagnosisTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     private const TOKEN = 'personalitydiagnosistoken0000001';
@@ -93,7 +95,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
 
         $html = $this->showPage();
 
-        $this->assertStringContainsString('<h1 class="mb-2">性格診断</h1>', $html);
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬性格診断</h1>', $html);
         $this->assertStringContainsString('愛犬についてお答えください。ふだんの様子に近いものを選んでください。その状況になったことがなければ「未経験」を選んでください。', $html);
         // 愛犬の名前・お客様の氏名は出さない
         $this->assertStringNotContainsString('モモ', $html);
@@ -137,7 +139,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
 
         $html = $this->showPage();
 
-        $this->assertStringContainsString('この性格診断はすでにご回答いただいています。', $html);
+        $this->assertStringContainsString('この愛犬性格診断はすでにご回答いただいています。', $html);
         $this->assertStringNotContainsString('<fieldset', $html);
     }
 
@@ -145,8 +147,8 @@ class ClientPersonalityDiagnosisTest extends TestCase
     {
         $html = $this->showPage();
 
-        $this->assertStringContainsString('<h1 class="mb-4">性格診断</h1>', $html);
-        $this->assertStringContainsString('この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。', $html);
+        $this->assertStringContainsString('<h1 class="mb-4">愛犬性格診断</h1>', $html);
+        $this->assertStringContainsString('この愛犬性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。', $html);
         $this->assertStringNotContainsString('<fieldset', $html);
     }
 
@@ -234,7 +236,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $response = $this->submit($answers);
 
         $response->assertOk();
-        $response->assertSee('この性格診断はすでにご回答いただいています。');
+        $response->assertSee('この愛犬性格診断はすでにご回答いただいています。');
         $this->assertSame(1, TraineePersonalityDiagnosisResult::query()->count());
     }
 
@@ -246,7 +248,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $response = $this->submit($this->fixtureCase('all-zero')['answers']);
 
         $response->assertOk();
-        $response->assertSee('この性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。');
+        $response->assertSee('この愛犬性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。');
         $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
     }
 
@@ -269,5 +271,40 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $direct = $this->get(route('client-portal.personality-diagnosis.thanks'))->assertOk()->getContent();
         $this->assertStringContainsString('<h1 class="mb-4">ご回答ありがとうございました</h1>', $direct);
         $this->assertStringContainsString('このページは閉じていただいて構いません。', $direct);
+    }
+
+    // ---- 愛犬性格診断の名前（2026-10-18 変更：正式名称に決まった。その前は「性格診断」） ----
+
+    public function test_回答の画面と使えない案内の画面は愛犬性格診断の名前で出し性格診断は単独で出さない(): void
+    {
+        $this->issueToken();
+        $html = $this->showPage();
+        $this->assertStringContainsString('<h1 class="mb-2">愛犬性格診断</h1>', $html);
+        $this->assertMatchesRegularExpression('/<title>愛犬性格診断/u', $html);
+        $this->assertOnlyFullPersonalityDiagnosisName($html, 'S-1415');
+
+        DB::table('trainee_personality_diagnosis_tokens')->update(['answered_at' => '2026-10-15 09:00:00']);
+        $html = $this->showPage();
+        $this->assertStringContainsString('<h1 class="mb-4">愛犬性格診断</h1>', $html);
+        $this->assertStringContainsString('この愛犬性格診断はすでにご回答いただいています。', $html);
+        $this->assertOnlyFullPersonalityDiagnosisName($html, '使えない案内');
+    }
+
+    public function test_ありがとうの画面は名前を出さず性格診断の文字も出ない(): void
+    {
+        // S-1416 は見出し「ご回答ありがとうございました」だけで、診断の名前は出さない（今までどおり）
+        $html = $this->get(route('client-portal.personality-diagnosis.thanks'))->assertOk()->getContent();
+        $this->assertStringNotContainsString('性格診断', $html);
+    }
+
+    public function test_回答の画面の名前は文のファイルの1か所から読む(): void
+    {
+        $this->overridePersonalityDiagnosisName('テスト診断');
+        $this->issueToken();
+
+        $html = $this->showPage();
+
+        $this->assertStringContainsString('<h1 class="mb-2">テスト診断</h1>', $html);
+        $this->assertStringNotContainsString('性格診断', $html);
     }
 }

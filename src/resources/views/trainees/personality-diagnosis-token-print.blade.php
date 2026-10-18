@@ -1,6 +1,6 @@
 @extends('layouts.print')
 
-@section('title', '性格診断のご案内')
+@section('title', __('messages.personality_diagnosis_name').'のご案内')
 
 @section('content')
 {{-- 性格診断案内画面（S-0312。2026-10 追加。要件定義書 6-16-11）。
@@ -26,13 +26,13 @@
 
 {{-- 案内を見分ける帯＝ページの見出し（h1。紫。ほかの案内〔S-0307・S-0311〕と取り違えないため）。
      有効な案内がないときも出す（どの案内の画面かが分かるように） --}}
-<x-print-band label="性格診断のご案内" variant="personality" icon="heart-pulse" />
+<x-print-band :label="__('messages.personality_diagnosis_name').'のご案内'" variant="personality" icon="heart-pulse" />
 
 @if($url)
     {{-- 見出し（上の帯）のすぐ下に QR コードを置く（S-0311 と同じ）。愛犬の名前は載せない（設計書 S-0312・§2-4） --}}
     <div class="print-qr">
         <canvas data-qr-url="{{ $url }}" data-qr-size="240"
-                aria-label="性格診断の案内の QR コード"></canvas>
+                aria-label="{{ __('messages.personality_diagnosis_name') }}の案内の QR コード"></canvas>
     </div>
 
     <p class="print-lead">
@@ -63,7 +63,7 @@
     {{-- 有効な案内なし（未発行・取消済み・前の案内に回答済みのいずれでも同じ）。発行できる場所には触れない。
          ページ上部の「閉じる」だけを残す（S-0311 と同じ見せ方） --}}
     {{-- 見出しは上の帯。「ない」ことは本文（太字）で伝える（見出しにはしない） --}}
-    <p class="print-lead"><strong>有効な性格診断の案内がありません。</strong></p>
+    <p class="print-lead"><strong>有効な{{ __('messages.personality_diagnosis_name') }}の案内がありません。</strong></p>
 @endif
 @endsection
 
