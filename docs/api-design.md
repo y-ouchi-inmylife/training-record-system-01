@@ -725,6 +725,8 @@ POST /training-records に以下を追加する。
 | media_record_ids | array | | nullable, array | この記録に紐づけるメディアのID配列。**配列の順序が表示順**となる。空配列・未送信は紐づけなし |
 | media_record_ids.* | integer | | integer, distinct, exists:media_records,id | 各メディアID（重複不可、実在すること） |
 
+- **`client_id` は受け取らない**（**2026-10-18 変更**。requirements.md 6-4-5）：POST の項目のうち `client_id` だけはバリデーションの対象から外し、送られてきても使わない（会員は作ったときのまま）。結び付けた愛犬性格診断の結果（`trainee_personality_diagnosis_result_id`）も受け取らない（POST・PUT とも。ルールにもモデルの fillable にもない。入れるのは評価文の公開〔S-0313〕だけ）
+
 **処理**:
 - トレーニング記録本体を更新する
 - メディア紐づけを更新する（記録本体の更新と同一トランザクション）：
