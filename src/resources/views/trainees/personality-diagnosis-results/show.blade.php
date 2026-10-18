@@ -130,12 +130,6 @@
                 </form>
             @endif
 
-            {{-- 最終更新（一度も保存していなければ出さない。トレーナーが削除されていれば日時だけ）。トレーニング記録詳細（S-0403）の
-                 「最終更新: {日時} {トレーナー}」と同じ書き方（2026-10-18 変更：その前は「最終保存：」） --}}
-            @if($result->evaluation_updated_at)
-                <p class="text-muted small mb-0 @if(! $isPublished) mt-2 @endif" data-evaluation-updated>最終更新: {{ $result->evaluation_updated_at->format('Y/m/d H:i') }}@if($result->evaluationUpdatedBy) {{ $result->evaluationUpdatedBy->name }}@endif</p>
-            @endif
-
             @if($isPublished)
                 <p class="mt-3 mb-0" data-evaluation-published>公開済み（<a href="{{ route('training-records.show', $linkedRecord) }}">{{ $linkedRecord->training_date->format('Y/m/d') }}のトレーニング記録</a>）</p>
                 <p class="text-muted small mb-0">直すときは、トレーニング記録の編集で直します。</p>
@@ -163,6 +157,14 @@
         </div>
     </div>
 
+    {{-- 最終更新（評価文を最後に更新した日時とトレーナー。一度も保存していなければ出さない。公開済みでも出す。トレーナーが削除されて
+         いれば日時だけ）。トレーニング記録詳細（S-0403）・会員詳細（S-0305）と同じく、画面のいちばん下に右寄せで小さく置く
+         （2026-10-18 変更：ユーザーレビューで、ほかの画面と同じ置き方にした。その前は評価文のカードの中、テキストエリアのすぐ下に左寄せ） --}}
+    @if($result->evaluation_updated_at)
+        <div class="text-end text-muted small mb-3" data-evaluation-updated>
+            最終更新: {{ $result->evaluation_updated_at->format('Y/m/d H:i') }}@if($result->evaluationUpdatedBy?->name) {{ $result->evaluationUpdatedBy->name }}@endif
+        </div>
+    @endif
     {{-- 公開の確認モーダル（S-0313-M01。2026-10-18 追加）。公開済みでないときだけ置く。［公開する］で、評価文の欄の今の文を
          隠しの欄に写してから送る（下のスクリプト。二重に押されないよう、送ったらボタンを押せなくする）。キャンセルは 4-4 のとおり塗り --}}
     @if(! $isPublished)
