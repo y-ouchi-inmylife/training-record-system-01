@@ -327,6 +327,8 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // テキストエリアの上のボタンの行はなくした（ボタンは見出しの行だけ）
         $this->assertStringNotContainsString('<button', substr($card, strpos($card, '<div class="card-body">')));
         $this->assertStringNotContainsString('最終更新', $card);
+        // 記録へのリンクは公開済みのときだけ
+        $this->assertStringNotContainsString('data-evaluation-record-link', $card);
         // 一度も更新していなければ、画面の下にも出さない
         $this->assertNull($this->updatedLine($this->page($result)));
     }
@@ -357,6 +359,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $html = $this->page($saved);
         $card = $this->evaluationCard($html);
         $this->assertStringContainsString('<span class="badge bg-warning text-dark" data-evaluation-status>下書き</span>', $card);
+        $this->assertStringNotContainsString('data-evaluation-record-link', $card);
         $this->assertStringContainsString(">落ち着いた性格です。\nお散歩が好きです。</textarea>", $card);
         // 最終更新は評価文のカードの中ではなく、画面の下（50問の回答のあと）に右寄せ（S-0403 と同じ。2026-10-18 変更）
         $this->assertStringNotContainsString('最終更新', $card);
@@ -422,15 +425,22 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $card = $this->evaluationCard($this->page($result));
 
         $this->assertStringContainsString('<span class="badge bg-success" data-evaluation-status>公開済み</span>', $card);
-        $this->assertStringContainsString("<div class=\"mb-2\" style=\"white-space: pre-wrap;\" data-evaluation-text>公開した文\n2 行目</div>", $card);
+        $this->assertStringContainsString("<div style=\"white-space: pre-wrap;\" data-evaluation-text>公開した文\n2 行目</div>", $card);
         $this->assertStringNotContainsString('<textarea', $card);
         $this->assertStringNotContainsString('<form', $card);
         $this->assertStringNotContainsString('>更新</button>', $card);
-        // 見出しの行は「評価文」とバッジだけ
+        // 見出しの行は「評価文」→ バッジ「公開済み」→「（トレーニング記録）」のリンク。ボタンは出さない
+        $header = $this->evaluationHeader($card);
         $this->assertStringNotContainsString('data-evaluation-buttons', $card);
-        $this->assertStringNotContainsString('<button', $this->evaluationHeader($card));
-        $this->assertStringContainsString('data-evaluation-published>公開済み（<a href="'.route('training-records.show', $recordId).'">2026/10/18のトレーニング記録</a>）</p>', $card);
-        $this->assertStringContainsString('直すときは、トレーニング記録の編集で直します。', $card);
+        $this->assertStringNotContainsString('<button', $header);
+        $link = '<span class="small" data-evaluation-record-link>（<a href="'.route('training-records.show', $recordId).'">トレーニング記録</a>）</span>';
+        $this->assertStringContainsString($link, $header);
+        $this->assertLessThan(strpos($header, $link), strpos($header, 'data-evaluation-status>公開済み</span>'));
+        // カードの中の「公開済み（{日付}のトレーニング記録）」と案内の一文は出さない（2026-10-18 変更）。日付も出さない
+        $this->assertStringNotContainsString('data-evaluation-published', $card);
+        $this->assertStringNotContainsString('直すときは', $card);
+        $this->assertStringNotContainsString('公開済み（', $card);
+        $this->assertStringNotContainsString('2026/10/18', $card);
         // 公開済みでも最終更新は出す（画面の下）
         $this->assertStringNotContainsString('最終更新', $card);
         $this->assertSame('最終更新: 2026/10/17 09:00 佐藤', $this->updatedLine($this->page($result)));
@@ -525,7 +535,8 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('data-evaluation-status>公開済み</span>', $card);
         $this->assertStringContainsString('data-evaluation-text>公開した文</div>', $card);
         $this->assertStringNotContainsString('<textarea', $card);
-        $this->assertStringContainsString('2026/10/18のトレーニング記録</a>', $card);
+        $record = TrainingRecord::query()->sole();
+        $this->assertStringContainsString('（<a href="'.route('training-records.show', $record).'">トレーニング記録</a>）', $this->evaluationHeader($card));
     }
 
     public function test_評価文が空なら公開できない(): void

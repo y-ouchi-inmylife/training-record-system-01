@@ -97,10 +97,17 @@
              （その前はバッジが見出しの行の右端）。ボタンの大きさは、ほかのカードの見出しのボタン（計測値の［新規登録］など）と同じ通常の大きさ。
              狭い幅で 1 行に収まらないときは、ボタンのまとまりを次の行へ折り返して右に寄せる（flex-wrap と ms-auto） --}}
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
                 <h6 class="mb-0">評価文</h6>
                 {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
                 <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
+                {{-- 公開済みのときだけ、バッジの右に作った記録（S-0403）へのリンク「（トレーニング記録）」。かっこはリンクに含めない。
+                     見出しより少し小さい通常の太さ（small）で、色は Bootstrap の通常のリンクの色。日付は出さない
+                     （2026-10-18 変更：ユーザーレビューで、カードの中の「公開済み（{日付}のトレーニング記録）」の行と
+                     「直すときは、トレーニング記録の編集で直します。」の一文をやめ、ここに移した）。狭い幅では折り返す（flex-wrap） --}}
+                @if($isPublished)
+                    <span class="small" data-evaluation-record-link>（<a href="{{ route('training-records.show', $linkedRecord) }}">トレーニング記録</a>）</span>
+                @endif
             </div>
             @unless($isPublished)
                 {{-- ［更新］（データ保存なので緑）と［トレーニング記録にして公開］（業務の中で必ず使う操作なので青の塗り）。［更新］が左。
@@ -116,7 +123,7 @@
         </div>
         <div class="card-body">
             @if($isPublished)
-                <div class="mb-2" style="white-space: pre-wrap;" data-evaluation-text>{{ $result->evaluation_text }}</div>
+                <div style="white-space: pre-wrap;" data-evaluation-text>{{ $result->evaluation_text }}</div>
             @else
                 <x-form-error-summary />
                 {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7） --}}
@@ -128,11 +135,6 @@
                               rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
                     <x-form-error field="evaluation_text" />
                 </form>
-            @endif
-
-            @if($isPublished)
-                <p class="mt-3 mb-0" data-evaluation-published>公開済み（<a href="{{ route('training-records.show', $linkedRecord) }}">{{ $linkedRecord->training_date->format('Y/m/d') }}のトレーニング記録</a>）</p>
-                <p class="text-muted small mb-0">直すときは、トレーニング記録の編集で直します。</p>
             @endif
         </div>
     </div>
