@@ -25,6 +25,9 @@ trait AssertsPersonalityDiagnosisName
     /** 名前を別の文字に差し替える（名前を 1 か所から読んでいることを確かめるため） */
     protected function overridePersonalityDiagnosisName(string $name): void
     {
+        // 先に文のファイル（messages）を読み込んでおく。読み込む前に addLines すると、ファイルのほかの文が読まれなくなる
+        // （2026-10-18 追加。案内の文面〔invitation_message〕を、名前を差し替えたまま組み立てるため）
+        app('translator')->load('*', 'messages', 'ja');
         app('translator')->addLines(['messages.personality_diagnosis_name' => $name], 'ja');
     }
 }

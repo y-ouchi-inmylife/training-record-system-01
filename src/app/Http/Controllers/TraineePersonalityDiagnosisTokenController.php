@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Trainee;
 use App\Services\TraineePersonalityDiagnosisTokenService;
+use App\Support\InvitationMessage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -85,37 +86,8 @@ class TraineePersonalityDiagnosisTokenController extends Controller
         return view('trainees.personality-diagnosis-token-print', [
             'trainee' => $trainee,
             'url' => $url,
-            'copyText' => $this->buildCopyText($url),
+            // LINE・メールで送る文面（画面に出す文とコピーする文は同じ。2026-10-18 変更：InvitationMessage に移した）
+            'copyText' => InvitationMessage::personalityDiagnosis($trainee, $url),
         ]);
-    }
-
-    /**
-     * メール／LINE 送付用の案内文面を組み立てる（screen-design.md S-0312「案内文面のコピー」）。
-     *
-     * S-0311 の決め事にそろえる：件名を入れない・挨拶を入れない・愛犬の名前を使わない・QR コードに触れない・
-     * 事業者名は最後の行で、config('app.client_portal_company') が未設定なら行ごと出さない。
-     *
-     * 文面を直すときは、上の設計書と本メソッドを同時に更新すること。
-     */
-    private function buildCopyText(string $url): string
-    {
-        $company = config('app.client_portal_company');
-
-        $lines = [
-            'トレーニングの参考にするため、'.__('messages.personality_diagnosis_name').'へのご回答をお願いします。',
-            '下のリンクから、50の質問にお答えください。',
-            '',
-            $url,
-            '',
-            'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
-        ];
-
-        // 事業者名が空のときは、直前の空行を含めて丸ごと出さない
-        if (! empty($company)) {
-            $lines[] = '';
-            $lines[] = $company;
-        }
-
-        return implode("\n", $lines);
     }
 }

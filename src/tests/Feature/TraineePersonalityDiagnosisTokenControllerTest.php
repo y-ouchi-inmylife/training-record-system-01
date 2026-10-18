@@ -8,6 +8,7 @@ use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\TraineePersonalityDiagnosisToken;
 use App\Models\Trainer;
+use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -233,7 +234,17 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     // ---- 案内の画面（S-0312） ----
 
-    public function test_S0312は紫の帯の見出し_QR_URL_手順_1回かぎり_戻る_文面をコピーを出す(): void
+    /** 画面に出している文面（data-invitation-message の中身を戻したもの） */
+    private function shownText(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<div class="invitation-message" data-invitation-message>(.*?)<\/div>/su', $html, $m));
+
+        return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5);
+    }
+
+    // 2026-10-18 変更：印刷して渡す作りをやめ、「LINE・メールで送る」「その場で読み取ってもらう」の 2 つの欄にした（設計書 S-0312・S-0307）
+
+    public function test_S0312は紫の帯の見出し_2つの欄_QRコード_1回かぎり_戻る_文面をコピーを出す(): void
     {
         $this->insertToken(null, 'personality-diagnosis-token-000001');
         $url = route('client-portal.personality-diagnosis.show', ['token' => 'personality-diagnosis-token-000001']);
@@ -241,52 +252,57 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $html = $this->printPage();
 
         $this->assertSame('/client-portal/personality-diagnosis/personality-diagnosis-token-000001', parse_url($url, PHP_URL_PATH));
-        // 帯＝見出し（h1。紫。アイコンは読み上げない）。見出しは 1 つだけで、すぐ下に QR コード
-        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality"><span class="print-band-label"><i class="bi bi-heart-pulse" aria-hidden="true"><\/i>愛犬性格診断のご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
+        // 帯＝見出し（h1。紫。アイコンは読み上げない）。見出しは 1 つだけで、すぐ下に 2 つの欄
+        $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality"><span class="print-band-label"><i class="bi bi-heart-pulse" aria-hidden="true"><\/i>愛犬性格診断のご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
         $this->assertSame(1, substr_count($html, '<h1'));
         $this->assertStringContainsString('<title>愛犬性格診断のご案内', $html);
-        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
-        $this->assertStringContainsString('aria-label="愛犬性格診断の案内の QR コード"', $html);
-        $this->assertStringContainsString('上の QR コードを読み取るか、下の URL をブラウザに入力してください。', $html);
-        $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
-        $this->assertStringContainsString('<p class="print-section-title">ご回答の手順</p>', $html);
-        $this->assertStringContainsString('<li>上の QR コードを読み取ります</li>', $html);
-        $this->assertStringContainsString('<li>開いたページで、50の質問にお答えください</li>', $html);
-        $this->assertStringContainsString('<li>「送信する」を押すと完了です</li>', $html);
-        $this->assertStringContainsString('ご回答は1回かぎりです。送信すると、この案内は使えなくなります。', $html);
+        $this->assertLessThan(strpos($html, 'その場で読み取ってもらう</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
+        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="愛犬性格診断の案内の QR コード"></canvas>', $html);
+        $this->assertStringContainsString('<p class="mt-3 mb-1 fw-bold">スマホのカメラで読み取ってください。</p>', $html);
+        $this->assertStringContainsString('<p class="mb-0 text-muted" data-invitation-qr-note>ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。</p>', $html);
         $this->assertStringNotContainsString('有効期限', $html);
-        // 愛犬の名前・お客様の氏名は出さない
-        $this->assertStringNotContainsString('モモ', $html);
-        $this->assertStringNotContainsString('山田', $html);
-        // ［戻る］（会員詳細へのふつうのリンク。グレーの白抜き。2026-10-17 変更：その前は［閉じる］）と［文面をコピー］。操作エリアは印刷では出さない
-        $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
+        // 印刷のための作り・読み取りの手順は出さない
+        foreach (['d-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'ご回答の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
+            $this->assertStringNotContainsString($text, $html, $text);
+        }
+        // ［戻る］（会員詳細へのふつうのリンク）と［文面をコピー］（青の塗り）
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
-        $this->assertMatchesRegularExpression('/<button type="button"\s+class="btn btn-outline-primary btn-sm"\s+data-copy-message\s+data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-copy-message data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
         $this->assertStringContainsString('copy-message', $html);
         $this->assertStringContainsString('qr-code', $html);
         $this->assertStringNotContainsString('close-tab', $html);
         $this->assertStringNotContainsString('閉じる', $html);
     }
 
-    public function test_S0312のコピーの文面_事業者名があるときとないとき(): void
+    public function test_S0312の文面_画面に出す文とコピーする文は同じで氏名_訓練所名_呼び名_問題の数_URLが入る(): void
     {
         $this->insertToken(null, 'personality-diagnosis-token-000001');
         $url = route('client-portal.personality-diagnosis.show', ['token' => 'personality-diagnosis-token-000001']);
 
         config(['app.client_portal_company' => 'テスト訓練所']);
-        $this->assertSame(implode("\n", [
-            'トレーニングの参考にするため、愛犬性格診断へのご回答をお願いします。',
-            '下のリンクから、50の質問にお答えください。',
+        $html = $this->printPage();
+        $expected = implode("\n", [
+            '山田 太郎 様',
+            '',
+            'テスト訓練所です。',
+            'モモちゃんの愛犬性格診断のご案内をお送りします。',
+            '',
+            '下のリンクから、ご回答をお願いいたします。（全50問です）',
             '',
             $url,
             '',
             'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
-            '',
-            'テスト訓練所',
-        ]), $this->copyText($this->printPage()));
+            'ご不明な点がございましたら、お気軽にお問い合わせください。',
+        ]);
+        $this->assertSame($expected, $this->copyText($html));
+        $this->assertSame($expected, $this->shownText($html));
+        // 問題の数は今の設問の数から出す
+        $this->assertSame(50, count(PersonalityDiagnosisQuestions::questions()));
 
+        // 訓練所名が未設定なら、その行を出さない。名前が空なら呼び名は「愛犬」
         config(['app.client_portal_company' => null]);
-        $this->assertStringEndsWith("\n\nご回答は1回かぎりです。送信すると、このリンクは使えなくなります。", $this->copyText($this->printPage()));
+        $this->trainee->update(['name' => null]);
+        $this->assertStringStartsWith("山田 太郎 様\n\n愛犬の愛犬性格診断のご案内をお送りします。\n", $this->copyText($this->printPage()));
     }
 
     public function test_有効な案内がないときは帯の下にないことを出しQRとコピーは出さない(): void
@@ -297,9 +313,9 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality">/u', $html);
         $this->assertSame(1, substr_count($html, '<h1'));
-        $this->assertStringContainsString('<p class="print-lead"><strong>有効な愛犬性格診断の案内がありません。</strong></p>', $html);
+        $this->assertStringContainsString('<p class="invitation-empty"><strong>有効な愛犬性格診断の案内がありません。</strong></p>', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
-        $this->assertStringNotContainsString('<div class="print-url">', $html);
+        $this->assertStringNotContainsString('data-invitation-message', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
         $this->assertStringContainsString('btn-sm">戻る</a>', $html);
     }
@@ -360,7 +376,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertStringContainsString('<title>愛犬性格診断のご案内', $html);
         $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--personality">.*愛犬性格診断のご案内/su', $html);
         $this->assertStringContainsString('aria-label="愛犬性格診断の案内の QR コード"', $html);
-        $this->assertStringContainsString('トレーニングの参考にするため、愛犬性格診断へのご回答をお願いします。', $this->copyText($html));
+        $this->assertStringContainsString('モモちゃんの愛犬性格診断のご案内をお送りします。', $this->copyText($html));
         $this->assertOnlyFullPersonalityDiagnosisName($html);
     }
 
@@ -385,6 +401,8 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $html = $this->printPage();
         $this->assertStringContainsString('<title>テスト診断のご案内', $html);
         $this->assertStringNotContainsString('性格診断', $html);
+        // 文面（画面に出す文・コピーする文）にも差し替えた名前が出る（2026-10-18 追加）
+        $this->assertStringContainsString('モモちゃんのテスト診断のご案内をお送りします。', $this->copyText($html));
 
         $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
             ->assertSessionHas('success', 'テスト診断の案内を取り消しました。');

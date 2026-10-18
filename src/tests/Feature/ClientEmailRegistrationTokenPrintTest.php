@@ -12,7 +12,10 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * マイページ登録案内の印刷画面（S-0307、GET /clients/{client}/email-registration-tokens/print）。
+ * マイページ登録のご案内の画面（S-0307、GET /clients/{client}/email-registration-tokens/print）。
+ *
+ * 2026-10-18 変更：印刷して渡す作りをやめ、「LINE・メールで送る」（文面を画面に出し、［文面をコピー］で同じ文をコピー）と
+ * 「その場で読み取ってもらう」（QR コード・有効期限）の 2 つの欄にした（設計書 S-0307）。文面は App\Support\InvitationMessage。
  *
  * 2026-10 追加：「文面をコピー」の JS を共用にする前に、S-0307 が今の動きのままであることを
  * 確かめるために足した（それまで S-0307 の HTTP のテストはなかった）。
@@ -84,37 +87,49 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5);
     }
 
-    public function test_有効な案内があるとき_見出し_QR_URL_手順_有効期限_戻る_文面をコピーを出す(): void
+    /** 画面に出している文面（data-invitation-message の中身を戻したもの） */
+    private function shownText(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<div class="invitation-message" data-invitation-message>(.*?)<\/div>/su', $html, $m));
+
+        return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5);
+    }
+
+    public function test_有効な案内があるとき_2つの欄と戻る_文面をコピー_QRコード_有効期限を出す(): void
     {
         $this->issueToken();
         $url = route('client-portal.email-registration.show', ['token' => self::TOKEN]);
 
         $html = $this->printPage();
 
-        // 見出しは帯（2026-10 変更）。帯のすぐ後ろに QR コード
-        $this->assertMatchesRegularExpression('/>マイページ登録のご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
-        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
-        $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
-        $this->assertStringContainsString('<li>上の QR コードを読み取ります</li>', $html);
-        $this->assertStringContainsString('<li>開いたページでメールアドレスを入力します</li>', $html);
-        $this->assertStringContainsString('<li>届いたメールのリンクを開いて、パスワードとご住所・お電話番号などを設定します</li>', $html);
-        // 説明文は受付アンケートの案内（S-0311）と同じ文（2026-10 変更）。前の文言は出さない
-        $this->assertStringContainsString('上の QR コードを読み取るか、下の URL をブラウザに入力してください。', $html);
-        $this->assertStringNotContainsString('マイページへのご登録は、', $html);
-        $this->assertStringNotContainsString('<li>届いたメールのリンクを開いて、パスワードを設定します</li>', $html);
-        $this->assertStringNotContainsString('3. 届いたメールのリンクを開いて、パスワードを設定します', $this->copyText($html));
-        $this->assertStringContainsString('<p class="print-expiry-date">2026年10月17日まで</p>', $html);
+        // 見出しは帯。その下に「LINE・メールで送る」（左・上）と「その場で読み取ってもらう」（右・下）の欄
+        $this->assertMatchesRegularExpression('/>マイページ登録のご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
+        $this->assertLessThan(strpos($html, 'その場で読み取ってもらう</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
+        // ［文面をコピー］はトレーナー側のいつも使う操作なので青の塗り（4-4。2026-10-18 変更：その前は白抜きの小さいボタン）
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-copy-message data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
+        // QR コード（中身は URL）・お客様向けの一文・有効期限（曜日つき）
+        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="マイページ登録案内の QR コード"></canvas>', $html);
+        $this->assertStringContainsString('<p class="mt-3 mb-1 fw-bold">スマホのカメラで読み取ってください。</p>', $html);
+        $this->assertStringContainsString('<p class="mb-0 text-muted" data-invitation-qr-note>有効期限：2026年10月17日（土）まで</p>', $html);
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
-        // 操作エリアは印刷では出さない
-        $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
-        // 文面をコピーのボタン（2026-10 に属性名を data-copy-registration-message から data-copy-message に変えた）と QR の JS
-        $this->assertMatchesRegularExpression('/<button type="button"\\s+class="btn btn-outline-primary btn-sm"\\s+data-copy-message\\s+data-copy-text="[^"]*">文面をコピー<\\/button>/u', $html);
         $this->assertStringContainsString('qr-code', $html);
         $this->assertStringContainsString('copy-message', $html);
-        $this->assertStringNotContainsString('copy-registration-message', $html);
     }
 
-    public function test_文面_事業者名が設定されているとき(): void
+    public function test_印刷のための作りと読み取りの手順は出さない(): void
+    {
+        $this->issueToken();
+
+        $html = $this->printPage();
+
+        foreach (['@page', 'A4', 'd-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'print-lead', 'ご登録の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
+            $this->assertStringNotContainsString($text, $html, $text);
+        }
+        // トレーナー側のふつうの画面（ナビゲーションあり）
+        $this->assertStringContainsString('<nav', $html);
+    }
+
+    public function test_文面_画面に出す文とコピーする文は同じで氏名_訓練所名_URL_有効期限が入る(): void
     {
         config(['app.client_portal_company' => 'テスト訓練所']);
         $this->issueToken();
@@ -122,43 +137,42 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
 
         $html = $this->printPage();
 
-        $this->assertSame(implode("\n", [
-            'マイページのご登録は、下の URL からお願いします。',
+        $expected = implode("\n", [
+            '山田 太郎 様',
+            '',
+            'テスト訓練所です。',
+            'マイページのご登録のご案内をお送りします。',
+            '',
+            '下のリンクを開いて、メールアドレスをご入力ください。',
+            '届いたメールのリンクから、パスワードなどを設定していただくと、ご登録が完了します。',
             '',
             $url,
             '',
-            '【ご登録の手順】',
-            '1. 上の URL を開きます',
-            '2. 開いたページでメールアドレスを入力します',
-            '3. 届いたメールのリンクを開いて、パスワードとご住所・お電話番号などを設定します',
-            '',
-            '【有効期限】',
-            '2026年10月17日まで',
-            '',
-            'テスト訓練所',
-        ]), $this->copyText($html));
-        $this->assertStringContainsString('<p class="print-company">テスト訓練所</p>', $html);
+            'リンクの有効期限：2026年10月17日（土）まで',
+            'ご不明な点がございましたら、お気軽にお問い合わせください。',
+        ]);
+        $this->assertSame($expected, $this->copyText($html));
+        $this->assertSame($expected, $this->shownText($html));
     }
 
-    public function test_文面_事業者名が未設定なら行ごと出さない(): void
+    public function test_文面_訓練所名が未設定なら訓練所名の行を出さない(): void
     {
         config(['app.client_portal_company' => null]);
         $this->issueToken();
 
-        $html = $this->printPage();
+        $text = $this->copyText($this->printPage());
 
-        $this->assertStringEndsWith("【有効期限】\n2026年10月17日まで", $this->copyText($html));
-        $this->assertStringNotContainsString('<p class="print-company">', $html);
+        $this->assertStringStartsWith("山田 太郎 様\n\nマイページのご登録のご案内をお送りします。", $text);
+        // 3 行目が案内の 1 文（訓練所名の行がない）
+        $this->assertSame('マイページのご登録のご案内をお送りします。', explode("\n", $text)[2]);
     }
 
-    public function test_お客様の氏名は出さない(): void
+    public function test_文面_名がなければ姓だけ(): void
     {
+        $this->client->update(['first_name' => null]);
         $this->issueToken();
 
-        $html = $this->printPage();
-
-        $this->assertStringNotContainsString('山田', $html);
-        $this->assertStringNotContainsString('太郎', $html);
+        $this->assertStringStartsWith("山田 様\n", $this->copyText($this->printPage()));
     }
 
     public function test_有効な案内がないとき_案内を出し_QR_URL_コピーのボタンは出さない(): void
@@ -169,7 +183,7 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
         $this->assertStringContainsString('<strong>発行済みのマイページ登録案内がありません</strong>', $html);
         $this->assertStringContainsString('会員詳細画面から発行してください。', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
-        $this->assertStringNotContainsString('<div class="print-url">', $html);
+        $this->assertStringNotContainsString('data-invitation-message', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
         // ［戻る］は出す（会員詳細へのふつうのリンク。2026-10-17 変更：その前は［閉じる］）
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
@@ -195,9 +209,9 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
 
         // 帯＝見出し（h1。2026-10 変更）：文字は「マイページ登録のご案内」、色は青（print-band--mypage）、アイコンは aria-hidden
         $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--mypage"><span class="print-band-label"><i class="bi bi-person-circle" aria-hidden="true"><\/i>マイページ登録のご案内<\/span><\/h1>/u', $html);
-        // 操作エリアの下
-        $this->assertMatchesRegularExpression('/print-actions.*<h1 class="print-band print-band--mypage">/su', $html);
-        // 見出しは帯の 1 つだけ。「マイページ登録のご案内」は <title> を除くと帯の 1 か所だけ
+        // ［戻る］の下
+        $this->assertMatchesRegularExpression('/>戻る<\/a>\s*<\/div>\s*<h1 class="print-band print-band--mypage">/su', $html);
+        // ページの見出し（h1）は帯の 1 つだけ。「マイページ登録のご案内」は <title> を除くと帯の 1 か所だけ
         $this->assertSame(1, substr_count($html, '<h1'));
         $this->assertSame(1, substr_count(preg_replace('/<title>.*?<\/title>/su', '', $html), 'マイページ登録のご案内'));
         $this->assertStringNotContainsString('print-title', $html);

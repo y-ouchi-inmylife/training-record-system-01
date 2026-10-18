@@ -4,6 +4,7 @@
        - label：帯の文字＝見出し（例：「マイページ登録のご案内」。読み上げる）
        - variant：色（mypage＝青、intake＝緑、personality＝紫）。色の指定は resources/sass/app.scss の .print-band--{variant}
        - icon：Bootstrap Icons の名前（bi- を除いた部分）。見た目の印なので読み上げない（aria-hidden）
-     印刷でも帯の色が出るよう、色は背景ではなく枠線で塗る（app.scss のコメント参照）。 --}}
+     印刷でも帯の色が出るよう、色は背景ではなく枠線で塗る（app.scss のコメント参照）。
+     2026-10-18 変更：案内の画面は印刷しなくなったが、帯は見出しとして残す（名前の print- はそのまま） --}}
 @props(['label', 'variant', 'icon'])
 <h1 class="print-band print-band--{{ $variant }}"><span class="print-band-label"><i class="bi bi-{{ $icon }}" aria-hidden="true"></i>{{ $label }}</span></h1>

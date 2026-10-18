@@ -85,7 +85,18 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         return route('client-portal.intake-survey.show', ['token' => self::TOKEN]);
     }
 
-    public function test_有効な案内があるとき_見出し_名前_QR_URL_手順_1回かぎり_戻る_文面をコピー(): void
+    /** 画面に出している文面（data-invitation-message の中身を戻したもの） */
+    private function shownText(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<div class="invitation-message" data-invitation-message>(.*?)<\/div>/su', $html, $m));
+
+        return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5);
+    }
+
+    // 2026-10-18 変更：印刷して渡す作りをやめ、「LINE・メールで送る」「その場で読み取ってもらう」の 2 つの欄にした（設計書 S-0311・S-0307）。
+    // 文面には会員の氏名と愛犬の呼び名を入れる（その前は、紙をなくしたときに漏れないよう、どちらも載せていなかった）
+
+    public function test_有効な案内があるとき_2つの欄と戻る_文面をコピー_QRコード_1回かぎりを出す(): void
     {
         $this->issueToken();
         $url = $this->surveyUrl();
@@ -93,87 +104,64 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $html = $this->printPage();
 
         $this->assertSame('/client-portal/intake-survey/'.self::TOKEN, parse_url($url, PHP_URL_PATH));
-        // 見出し（帯）のすぐ下に QR コード。「愛犬のことを教えてください」の行は置かない（2026-10 変更。設計書 S-0311）
-        $this->assertMatchesRegularExpression('/>受付アンケートのご案内<\/span><\/h1>\s*<div class="print-qr">/u', $html);
-        $this->assertStringNotContainsString('愛犬のことを教えてください', $html);
-        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="240"', $html);
-        $this->assertStringContainsString('<div class="print-url">'.$url.'</div>', $html);
-        $this->assertStringContainsString('<p class="print-section-title">ご回答の手順</p>', $html);
-        $this->assertStringContainsString('<li>上の QR コードを読み取ります</li>', $html);
-        $this->assertStringContainsString('<li>開いたページで、愛犬のことと暮らしの様子をご記入ください</li>', $html);
-        $this->assertStringContainsString('<li>「送信する」を押すと完了です</li>', $html);
-        $this->assertStringContainsString('ご回答は1回かぎりです。送信すると、この案内は使えなくなります。', $html);
-        // 有効期限は載せない
+        $this->assertMatchesRegularExpression('/>受付アンケートのご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
+        $this->assertLessThan(strpos($html, 'その場で読み取ってもらう</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-copy-message data-copy-text="[^"]*">文面をコピー<\/button>/u', $html);
+        $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="受付アンケート案内の QR コード"></canvas>', $html);
+        $this->assertStringContainsString('<p class="mt-3 mb-1 fw-bold">スマホのカメラで読み取ってください。</p>', $html);
+        // 有効期限は持たない（代わりに 1 回かぎりの文）
+        $this->assertStringContainsString('<p class="mb-0 text-muted" data-invitation-qr-note>ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。</p>', $html);
         $this->assertStringNotContainsString('有効期限', $html);
-        $this->assertStringNotContainsString('<p class="print-expiry-date">', $html);
-        // 戻り先は会員詳細。操作エリアは印刷では出さない
-        $this->assertStringContainsString('<div class="print-actions d-print-none d-flex flex-wrap gap-2 mb-3">', $html);
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
-        // 文面をコピー（S-0307 と共用の copy-message.js）と QR の JS
-        $this->assertMatchesRegularExpression('/<button type="button"\\s+class="btn btn-outline-primary btn-sm"\\s+data-copy-message\\s+data-copy-text="[^"]*">文面をコピー<\\/button>/u', $html);
         $this->assertStringContainsString('copy-message', $html);
         $this->assertStringContainsString('qr-code', $html);
     }
 
-    public function test_文面_名前があっても名前を使わず事業者名が設定されているとき(): void
+    public function test_印刷のための作りと読み取りの手順は出さない(): void
+    {
+        $this->issueToken();
+
+        $html = $this->printPage();
+
+        foreach (['@page', 'A4', 'd-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'print-lead', 'ご回答の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
+            $this->assertStringNotContainsString($text, $html, $text);
+        }
+    }
+
+    public function test_文面_画面に出す文とコピーする文は同じで氏名_訓練所名_呼び名_URLが入る(): void
     {
         config(['app.client_portal_company' => 'テスト訓練所']);
         $this->issueToken();
 
         $html = $this->printPage();
 
-        $this->assertSame(implode("\n", [
-            'トレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
-            '下のリンクから、愛犬のことと暮らしの様子をお聞かせください。',
+        $expected = implode("\n", [
+            '山田 太郎 様',
+            '',
+            'テスト訓練所です。',
+            'モモちゃんの受付アンケートのご案内をお送りします。',
+            '',
+            '下のリンクから、ご回答をお願いいたします。',
             '',
             $this->surveyUrl(),
             '',
             'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
-            '',
-            'テスト訓練所',
-        ]), $this->copyText($html));
-        $this->assertStringContainsString('<p class="print-company">テスト訓練所</p>', $html);
-        $this->assertStringNotContainsString('モモ', $this->copyText($html));
+            'ご不明な点がございましたら、お気軽にお問い合わせください。',
+        ]);
+        $this->assertSame($expected, $this->copyText($html));
+        $this->assertSame($expected, $this->shownText($html));
     }
 
-    public function test_名前が未登録でも名前があるときと同じ文(): void
+    public function test_文面_名前が未登録なら呼び名は愛犬で訓練所名が未設定なら行を出さない(): void
     {
         config(['app.client_portal_company' => null]);
         $this->trainee->update(['name' => null]);
         $this->issueToken();
 
-        $html = $this->printPage();
+        $text = $this->copyText($this->printPage());
 
-        $this->assertStringNotContainsString('愛犬のことを教えてください', $html);
-        $this->assertStringNotContainsString('愛犬ちゃん', $html);
-        $this->assertSame(implode("\n", [
-            'トレーニングの参考にするため、受付アンケートへのご回答をお願いします。',
-            '下のリンクから、愛犬のことと暮らしの様子をお聞かせください。',
-            '',
-            $this->surveyUrl(),
-            '',
-            'ご回答は1回かぎりです。送信すると、このリンクは使えなくなります。',
-        ]), $this->copyText($html));
-        $this->assertStringNotContainsString('愛犬のことを教えてください', $this->copyText($html));
-        // 事業者名が未設定なら、訓練所名の行も文面の最後の行も出さない
-        $this->assertStringNotContainsString('<p class="print-company">', $html);
-    }
-
-    public function test_名前があってもページに愛犬の名前を出さない(): void
-    {
-        $this->issueToken();
-
-        $this->assertStringNotContainsString('モモ', $this->printPage());
-    }
-
-    public function test_お客様の氏名は出さない(): void
-    {
-        $this->issueToken();
-
-        $html = $this->printPage();
-
-        $this->assertStringNotContainsString('山田', $html);
-        $this->assertStringNotContainsString('太郎', $html);
+        $this->assertStringStartsWith("山田 太郎 様\n\n愛犬の受付アンケートのご案内をお送りします。\n", $text);
+        $this->assertStringNotContainsString('愛犬ちゃん', $text);
     }
 
     public function test_有効な案内がないとき_案内を出し_QR_URL_コピーのボタンは出さない(): void
@@ -183,7 +171,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         // 「ない」ことは本文（太字）で伝える。見出しは帯だけ（2026-10 変更）
         $this->assertStringContainsString('<strong>有効な受付アンケート案内がありません。</strong>', $html);
         $this->assertStringNotContainsString('data-qr-url', $html);
-        $this->assertStringNotContainsString('<div class="print-url">', $html);
+        $this->assertStringNotContainsString('data-invitation-message', $html);
         $this->assertStringNotContainsString('文面をコピー', $html);
         $this->assertStringNotContainsString('発行', $html);
         // ［戻る］は出す（会員詳細へのふつうのリンク。2026-10-17 変更：その前は［閉じる］）
@@ -215,11 +203,11 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
 
         // 帯＝見出し（h1。2026-10 変更）：文字は「受付アンケートのご案内」、色は緑（print-band--intake）、アイコンは aria-hidden
         $this->assertMatchesRegularExpression('/<h1 class="print-band print-band--intake"><span class="print-band-label"><i class="bi bi-clipboard-check" aria-hidden="true"><\/i>受付アンケートのご案内<\/span><\/h1>/u', $html);
-        // 操作エリアの下
-        $this->assertMatchesRegularExpression('/print-actions.*<h1 class="print-band print-band--intake">/su', $html);
-        // 見出しは帯の 1 つだけ。「受付アンケートのご案内」は <title> を除くと帯の 1 か所だけ
+        // ［戻る］の下
+        $this->assertMatchesRegularExpression('/>戻る<\/a>\s*<\/div>\s*<h1 class="print-band print-band--intake">/su', $html);
+        // 見出しは帯の 1 つだけ（文面の「受付アンケートのご案内をお送りします。」は見出しではない。2026-10-18 変更）
         $this->assertSame(1, substr_count($html, '<h1'));
-        $this->assertSame(1, substr_count(preg_replace('/<title>.*?<\/title>/su', '', $html), '受付アンケートのご案内'));
+        $this->assertSame(1, substr_count($html, '受付アンケートのご案内</span>'));
         $this->assertStringNotContainsString('print-title', $html);
         // マイページ登録の帯は出さない
         $this->assertStringNotContainsString('print-band--mypage', $html);

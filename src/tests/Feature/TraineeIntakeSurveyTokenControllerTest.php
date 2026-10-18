@@ -34,6 +34,9 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         parent::setUp();
 
         $this->createAccessLogsTable();
+        // 会員（案内の画面〔S-0311〕の文面に会員の氏名を入れる。2026-10-18 追加）
+        $this->createClientsTable();
+        DB::table('clients')->insert(['id' => 7, 'internal_id' => '0007', 'last_name' => '山田', 'first_name' => '太郎']);
         Schema::create('trainees', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('client_id');

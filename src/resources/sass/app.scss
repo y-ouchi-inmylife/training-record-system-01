@@ -60,6 +60,8 @@ h2 {
 
 // 案内を見分ける帯＝ページの見出し（S-0307 マイページ登録案内・S-0311 受付アンケート案内・S-0312 性格診断の案内。2026-10 追加）。
 // 部品は resources/views/components/print-band.blade.php（h1）。設計書 screen-design.md S-0307 備考「案内を見分ける帯」。
+// 2026-10-18 変更：案内の画面は印刷しなくなった（LINE・メールで送る・その場で読み取ってもらう）。帯は見出しとして残す
+// （3 つの案内を取り違えないため。お客様に画面を見せたときもどの案内か分かる）。下の「印刷でも色が出る」作りは、そのとき入れたもの。
 // - 色は Bootstrap の primary（#0d6efd）・success（#198754）より 1 段濃い $blue-600・$green-600。
 //   白の文字とのコントラスト比は 6.4:1 以上（primary・success は 4.5:1 ちょうど前後で余裕がないため）。性格診断は $purple（6.51:1）
 // - 印刷で「背景のグラフィック」を出さない設定でも帯の色が出るよう、帯の色は背景ではなく枠線で塗る：
@@ -110,6 +112,38 @@ h2 {
     .bi {
         margin-right: 0.5rem;
     }
+}
+
+// 3 つのご案内の画面（S-0307・S-0311・S-0312）の本文（2026-10-18 追加。resources/views/invitations/_panels.blade.php）。
+// - 画面の幅は 1000px まで（2 つの欄を横に並べたときに、文面の行が長くなりすぎないように）
+// - 文面（LINE・メールで送る）：コピーする文をそのまま出す。改行を保ち、長い URL は折り返す。薄い面と枠で、送る文のまとまりと分かるように
+// - QR コード：描く大きさは 280px。欄が狭いときは枠いっぱいまで縮める（正方形のまま）
+.invitation-page {
+    max-width: 1000px;
+}
+.invitation-message {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.8;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-tertiary-bg);
+}
+.invitation-qr {
+    max-width: 280px;
+
+    canvas {
+        display: block;
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1;
+    }
+}
+.invitation-empty {
+    text-align: center;
+    font-size: 1.05rem;
+    margin: 0.5rem 0 1.5rem;
 }
 
 // トレーニー詳細（S-0309）の写真の枠（2026-10 追加）。sm 以上（写真の右にグラフ）はグラフと同じ高さの 224px 四方（横に並べた計測値のカードで計測値が 4 件ほど見える高さ。

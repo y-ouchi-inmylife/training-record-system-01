@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientEmailRegistrationToken;
+use App\Support\InvitationMessage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -182,51 +182,8 @@ class ClientEmailRegistrationTokenController extends Controller
             'client' => $client,
             'url' => $url,
             'expiresOn' => $token->expires_at,
-            'copyText' => $this->buildCopyText($url, $token->expires_at),
+            // LINE・メールで送る文面（画面に出す文とコピーする文は同じ。2026-10-18 変更：InvitationMessage に移した）
+            'copyText' => InvitationMessage::mypage($client, $url, $token->expires_at),
         ]);
-    }
-
-    /**
-     * メール／LINE 送付用の案内文面を組み立てる。
-     *
-     * 文面と決め事は screen-design.md S-0307「案内文面のコピー」を参照。
-     * 主な決め事：
-     * - QR コードに一切触れない（URL を開く前提の手順にする）
-     * - 挨拶を入れない（トレーナーが前後に自由に添えるため）
-     * - 件名を入れない（メールと LINE で共用するため）
-     * - 【】で見出しを付ける（LINE では改行だけだと段落の区切りが分かりにくい）
-     * - 事業者名は config('app.client_portal_company') から取り、
-     *   未設定なら行ごと出さない（余計な空行を残さない）
-     * - 有効期限の表記は印刷ページの表示と同じ形式
-     *
-     * 文面を直すときは、上の設計書と本メソッドを同時に更新すること。
-     */
-    private function buildCopyText(string $url, Carbon $expiresOn): string
-    {
-        $company = config('app.client_portal_company');
-        // 有効期限は印刷ページの表示と揃える（例：「2026年9月17日まで」）
-        $expiryLine = $expiresOn->format('Y年n月j日').'まで';
-
-        $lines = [
-            'マイページのご登録は、下の URL からお願いします。',
-            '',
-            $url,
-            '',
-            '【ご登録の手順】',
-            '1. 上の URL を開きます',
-            '2. 開いたページでメールアドレスを入力します',
-            '3. 届いたメールのリンクを開いて、パスワードとご住所・お電話番号などを設定します',
-            '',
-            '【有効期限】',
-            $expiryLine,
-        ];
-
-        // 事業者名が空のときは、直前の空行を含めて丸ごと出さない
-        if (! empty($company)) {
-            $lines[] = '';
-            $lines[] = $company;
-        }
-
-        return implode("\n", $lines);
     }
 }
