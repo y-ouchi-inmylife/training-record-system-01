@@ -268,7 +268,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $html = $this->page($result);
 
         $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">テスト診断の公開</h5>', $html);
-        $this->assertStringContainsString('<p class="mb-0">会員のマイページにテスト診断を公開します。よろしいですか？</p>', $html);
+        $this->assertStringContainsString('<p class="mb-0">会員のマイページにテスト診断を公開しますか？</p>', $html);
     }
 
     public function test_下書きには青の公開のボタンと確認のモーダルを出す(): void
@@ -285,8 +285,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertLessThan(strpos($html, 'data-evaluation-publish'), strpos($html, '>更新</button>'));
         // 確認のモーダル（M01）の見出しと文（2026-10-18 変更：ユーザーレビューで変えた）
         $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">愛犬性格診断の公開</h5>', $html);
-        // 「よろしいですか？」は同じ行に続け、全角の「？」（2026-10-18 変更：ユーザーレビューで足した）
-        $this->assertStringContainsString('<p class="mb-0">会員のマイページに愛犬性格診断を公開します。よろしいですか？</p>', $html);
+        // 公開取消の確認（M03）と言い方をそろえた問いかけの 1 文（2026-10-18 変更：その前は「〜を公開します。よろしいですか？」）
+        $this->assertStringContainsString('<p class="mb-0">会員のマイページに愛犬性格診断を公開しますか？</p>', $html);
+        $this->assertStringNotContainsString('よろしいですか？', $html);
+        $this->assertStringNotContainsString('愛犬性格診断を公開します。', $html);
         // 前の文は出ない
         $this->assertStringNotContainsString('評価文の公開<', $html);
         $this->assertStringNotContainsString('会員様のマイページに公開します。', $html);
