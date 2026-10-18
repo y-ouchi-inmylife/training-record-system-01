@@ -13,6 +13,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -32,6 +33,7 @@ use Tests\TestCase;
  */
 class TraineePersonalityDiagnosisResultShowTest extends TestCase
 {
+    use AssertsPersonalityDiagnosisName;
     use CreatesClientCountTables;
 
     private Client $client;
@@ -257,6 +259,18 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('modal-dialog-scrollable', $html);
     }
 
+    public function test_公開の確認のモーダルの名前は文のファイルの1か所から読む(): void
+    {
+        $this->overridePersonalityDiagnosisName('テスト診断');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '下書き']);
+
+        $html = $this->page($result);
+
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">テスト診断の公開</h5>', $html);
+        $this->assertStringContainsString('<p class="mb-0">会員のマイページにテスト診断を公開します。</p>', $html);
+    }
+
     public function test_下書きには青の公開のボタンと確認のモーダルを出す(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
@@ -269,8 +283,13 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('トレーニング記録にして公開', $html);
         // ［更新］の右
         $this->assertLessThan(strpos($html, 'data-evaluation-publish'), strpos($html, '>更新</button>'));
-        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">評価文の公開</h5>', $html);
-        $this->assertStringContainsString('<p class="mb-0">会員様のマイページに公開します。公開したあとも、この画面で直せます。直すとすぐ会員様に見えます。</p>', $html);
+        // 確認のモーダル（M01）の見出しと文（2026-10-18 変更：ユーザーレビューで変えた）
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">愛犬性格診断の公開</h5>', $html);
+        $this->assertStringContainsString('<p class="mb-0">会員のマイページに愛犬性格診断を公開します。</p>', $html);
+        // 前の文は出ない
+        $this->assertStringNotContainsString('評価文の公開<', $html);
+        $this->assertStringNotContainsString('会員様のマイページに公開します。', $html);
+        $this->assertStringNotContainsString('公開したあとも、この画面で直せます。', $html);
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.publish', [$this->trainee, $result]).'" class="d-inline m-0" data-evaluation-publish-form>', $html);
         $this->assertStringContainsString('<input type="hidden" name="evaluation_text" value="">', $html);
         $this->assertStringContainsString('<button type="submit" class="btn btn-primary">公開する</button>', $html);
