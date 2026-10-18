@@ -150,7 +150,10 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertStringNotContainsString('閉じる', $html);
     }
 
-    public function test_回答済みなら409で作らない(): void
+    /**
+     * 2026-10-19 変更：回答済みでも発行できる（答え直してもらうため。その前は 409 で作らなかった）
+     */
+    public function test_回答済みでも発行でき会員詳細に戻り完了メッセージを出す(): void
     {
         $tokenId = $this->insertToken('2026-10-16 10:00:00');
         DB::table('trainee_intake_survey_responses')->insert([
@@ -158,8 +161,30 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
             'answered_at' => '2026-10-16 10:00:00', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertStatus(409);
-        $this->assertSame([$tokenId], TraineeIntakeSurveyToken::query()->pluck('id')->all());
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', 7))
+            ->assertSessionHas('success', $this->trainee->display_name.'の愛犬アンケートの案内を発行しました。');
+        $tokens = TraineeIntakeSurveyToken::query()->orderBy('id')->get();
+        $this->assertCount(2, $tokens);
+        $this->assertSame($tokenId, $tokens[0]->id);
+        $this->assertNull($tokens[1]->answered_at);
+        // 回答は残る
+        $this->assertSame(1, DB::table('trainee_intake_survey_responses')->count());
+    }
+
+    public function test_回答済みで答え直しの案内がすでにあれば今までどおり新しく作らない(): void
+    {
+        $tokenId = $this->insertToken('2026-10-16 10:00:00');
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $this->trainee->id, 'trainee_intake_survey_token_id' => $tokenId,
+            'answered_at' => '2026-10-16 10:00:00', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $active = $this->insertToken();
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', 7))
+            ->assertSessionMissing('success');
+        $this->assertSame([$tokenId, $active], TraineeIntakeSurveyToken::query()->orderBy('id')->pluck('id')->all());
     }
 
     public function test_発行はアクセスログにトレーニーへの操作として残る(): void

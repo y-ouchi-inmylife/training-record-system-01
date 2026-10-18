@@ -73,7 +73,8 @@ class Trainee extends Model
     |--------------------------------------------------------------------------
     | 愛犬アンケートの状態（2026-10 追加。要件定義書 6-16-8）
     |--------------------------------------------------------------------------
-    | 判定の順は「回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行」。
+    | 判定の順は「有効な案内あり → 回答待ち、なければ回答あり → 回答済み、どちらもない → 未発行」
+    | （2026-10-19 変更：回答したあとも案内を発行し直せるようにしたため。その前は回答ありを先に見ていた）。
     */
 
     public const INTAKE_NOT_ISSUED = 'not_issued';
@@ -393,18 +394,21 @@ class Trainee extends Model
 
     /**
      * 愛犬アンケートの状態（INTAKE_* の定数）。要件定義書 6-16-8 の判定の順
-     * （回答あり → 回答済み、なければ有効な案内あり → 回答待ち、どちらもない → 未発行）。
+     * （有効な案内あり → 回答待ち、なければ回答あり → 回答済み、どちらもない → 未発行）。
+     * 2026-10-19 変更：回答したあとも案内を発行し直して答え直してもらえるようにしたため、有効な案内（答え直しの案内）が
+     * あれば、回答があっても「回答待ち」にする（会員詳細の［表示］［取消］、マイページのお知らせのため）。
+     * その前は回答ありを先に見ていた。暮らしの様子を出すかどうかは、状態ではなく latestIntakeSurveyResponse の有無で見る
      *
      * 呼び出し側は latestIntakeSurveyResponse と activeIntakeSurveyToken を eager load しておくこと
      * （会員詳細でトレーニーごとに追加のクエリを出さないため）
      */
     public function getIntakeSurveyStatusAttribute(): string
     {
-        if ($this->latestIntakeSurveyResponse !== null) {
-            return self::INTAKE_ANSWERED;
+        if ($this->activeIntakeSurveyToken !== null) {
+            return self::INTAKE_AWAITING;
         }
 
-        return $this->activeIntakeSurveyToken !== null ? self::INTAKE_AWAITING : self::INTAKE_NOT_ISSUED;
+        return $this->latestIntakeSurveyResponse !== null ? self::INTAKE_ANSWERED : self::INTAKE_NOT_ISSUED;
     }
 
     /**

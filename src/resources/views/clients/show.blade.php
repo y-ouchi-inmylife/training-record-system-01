@@ -613,15 +613,17 @@
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                                     <h6 class="mb-0 text-break"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
-                                    @if($trainee->intake_survey_status !== \App\Models\Trainee::INTAKE_ANSWERED)
+                                    {{-- 2026-10-19 変更：回答済みでも［愛犬アンケートの案内を発行］を出す（答え直してもらうため。要件定義書 6-16-8）。
+                                         回答済みのときは任意の操作なので白抜き（4-4）、未発行のときは今までどおり塗り。
+                                         その前は、回答済みではまとまりごと出さなかった --}}
                                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto small"
                                          role="group" aria-label="{{ $trainee->display_name }}の{{ __('messages.intake_survey_name') }}">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
-                                            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_NOT_ISSUED)
+                                            @if($trainee->intake_survey_status !== \App\Models\Trainee::INTAKE_AWAITING)
                                                 {{-- マイページ登録の案内を発行と同じく、発行のあとは会員詳細に戻って完了メッセージを出す（2026-10-17 変更） --}}
                                                 <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">{{ __('messages.intake_survey_name') }}の案内を発行</button>
+                                                    <button type="submit" class="btn btn-sm {{ $trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED ? 'btn-outline-primary' : 'btn-primary' }} text-nowrap">{{ __('messages.intake_survey_name') }}の案内を発行</button>
                                                 </form>
                                             @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
                                                 <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
@@ -632,7 +634,6 @@
                                             @endif
                                         </div>
                                     </div>
-                                    @endif
                                 </div>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。
@@ -727,7 +728,8 @@
                                      左の位置は属性の見出しにそろう）。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
                                      読み上げでどのトレーニーのものかが分かるよう、aria-label を「{表示名}の暮らしの様子」にする
                                      （見える文字「暮らしの様子」を含む） --}}
-                                @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+                                {{-- 2026-10-19 変更：状態ではなく回答があるかどうかで出す（答え直しの案内を出している間も、前回の答えを見られるように） --}}
+                                @if($trainee->latestIntakeSurveyResponse !== null)
                                     <div class="small mt-1">
                                         <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
                                            aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>

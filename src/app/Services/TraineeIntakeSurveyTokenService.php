@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Trainee;
-use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\TraineeIntakeSurveyToken;
 use App\Models\Trainer;
 use Illuminate\Support\Facades\DB;
@@ -21,9 +20,10 @@ class TraineeIntakeSurveyTokenService
     /**
      * トレーニーに愛犬アンケート案内を発行する。
      *
-     * 状態が「未発行」（回答も有効な案内もない）のときだけ発行し、作ったトークンを返す。
-     * 回答がある（回答済み）とき、または有効な案内がすでにあるときは発行せず null を返す
-     * （呼び出し側で 409 にする）。
+     * 有効な案内（未回答のトークン）がないときに発行し、作ったトークンを返す。有効な案内がすでにあるときは
+     * 発行せず null を返す（呼び出し側は何もせずに会員詳細に戻す）。
+     * 回答の有無は見ない（2026-10-19 変更：ユーザーレビューで、暮らしの様子は変わっていくので、回答したあとも
+     * 案内を発行し直して答え直してもらえるようにした。その前は、回答済みなら発行せず null を返し、呼び出し側で 409 にしていた）。
      *
      * ロックについて：同じトレーニーに有効な（answered_at が NULL の）案内を 2 つ作らないため、
      * トランザクションの中でトレーニーの行を SELECT ... FOR UPDATE でロックしてから確かめる。
@@ -33,7 +33,7 @@ class TraineeIntakeSurveyTokenService
      * このプロジェクトでロック（lockForUpdate）を使うのはここが初めて。
      *
      * マイページ登録案内の発行のような「古いものを消してから作る」作りにはしない
-     * （愛犬アンケート案内は発行し直さない。要件定義書 6-16-8 備考）。
+     * （有効な案内があるうちは発行し直さない。要件定義書 6-16-8 備考）。
      *
      * 呼び出し側がすでにトランザクションの中にいる場合は、その中の入れ子のトランザクションとして動く。
      */
@@ -41,14 +41,6 @@ class TraineeIntakeSurveyTokenService
     {
         return DB::transaction(function () use ($trainee, $practitioner) {
             Trainee::query()->whereKey($trainee->id)->lockForUpdate()->first();
-
-            // 回答済みなら発行しない（回答は 1 件。要件定義書 6-16-8）
-            $hasResponse = TraineeIntakeSurveyResponse::query()
-                ->where('trainee_id', $trainee->id)
-                ->exists();
-            if ($hasResponse) {
-                return null;
-            }
 
             $hasActive = TraineeIntakeSurveyToken::query()
                 ->where('trainee_id', $trainee->id)

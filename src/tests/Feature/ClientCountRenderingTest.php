@@ -910,7 +910,11 @@ class ClientCountRenderingTest extends TestCase
         return '/role="group" aria-label="'.preg_quote($name, '/').'の愛犬性格診断">.*?<\/div>\s*<\/div>\s*<\/div>\s*<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
     }
 
-    public function test_愛犬アンケートが回答済みなら名前の行のまとまりを出さず性格診断の行の下に暮らしの様子のリンクを出す(): void
+    /**
+     * 2026-10-19 変更：回答済みでも［愛犬アンケートの案内を発行］を出す（答え直してもらうため。任意の操作なので白抜き）。
+     * その前は、回答済みでは名前の行のまとまりを出さなかった
+     */
+    public function test_愛犬アンケートが回答済みなら白抜きの発行のボタンを出し性格診断の行の下に暮らしの様子のリンクを出す(): void
     {
         // 「今日」を回答日（2026/10/16）と別の日にする（画面のほかの場所に今日の日付が出るため。今日が回答日と
         // 同じ日だと、下の「回答日時は出さない」の確かめが、今日の日付に引っかかって失敗していた）
@@ -923,15 +927,19 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 名前の行のまとまり（role="group" の愛犬アンケート）と［回答を見る］は出さない
-        $this->assertStringNotContainsString('aria-label="ポチの愛犬アンケート"', $html);
+        // 名前の行のまとまりに、白抜きの［愛犬アンケートの案内を発行］だけを出す（［回答を見る］［表示］［取消］は出さない）
+        $this->assertMatchesRegularExpression(
+            '/role="group" aria-label="ポチの愛犬アンケート">\s*<div class="d-flex flex-wrap justify-content-end gap-2">\s*'
+            .'<form method="POST" action="'.preg_quote(route('trainee-intake-survey-tokens.store', $id), '/').'" class="d-inline m-0">\s*'
+            .'<input type="hidden" name="_token" value="[^"]*" autocomplete="off">\s*'
+            .'<button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">愛犬アンケートの案内を発行<\/button>/u',
+            $html
+        );
+        $this->assertStringNotContainsString('class="btn btn-sm btn-primary text-nowrap">愛犬アンケートの案内を発行<', $html);
         $this->assertStringNotContainsString('<span>愛犬アンケート</span>', $html);
         $this->assertStringNotContainsString('回答を見る', $html);
-        $this->assertStringNotContainsString('>愛犬アンケートの案内を発行<', $html);
         $this->assertStringNotContainsString('>取消<', $html);
         $this->assertStringNotContainsString('案内を表示', $html);
-        // 名前の行は名前だけ
-        $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="[^"]+">ポチ<\/a><\/h6>\s*<\/div>/u', $html);
         // 「暮らしの様子」のリンクは、性格診断の行のすぐ後ろ（トレーニーの欄のいちばん下）。S-0309 の #intake-survey へ
         // （2026-10 変更：当初は最終計測のすぐ後ろ・性格診断の行の前。トレーニー詳細の欄の順にそろえた）
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
@@ -1849,5 +1857,36 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('aria-label="タマのテストアンケート"', $html);
         $this->assertStringContainsString('発行済みのテストアンケートの案内が使えなくなります。', $html);
         $this->assertStringNotContainsString('愛犬アンケート', $html);
+    }
+
+    // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    public function test_回答済みで答え直しの案内があれば表示と取消と暮らしの様子のリンクを出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeResponse($id, $this->intakeToken($id, '2026-10-16 14:32:00'));
+        $this->intakeToken($id);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('>愛犬アンケートの案内を表示</a>', $html);
+        $this->assertStringContainsString('data-intake-survey-trainee-id="'.$id.'">取消</button>', $html);
+        $this->assertStringNotContainsString('>愛犬アンケートの案内を発行<', $html);
+        // 答え直しの案内を出している間も、前回の答え（暮らしの様子）を見られる
+        $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
+    }
+
+    public function test_未発行の発行のボタンは今までどおり塗り(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('class="btn btn-sm btn-primary text-nowrap">愛犬アンケートの案内を発行</button>', $html);
+        $this->assertStringNotContainsString('btn-outline-primary text-nowrap">愛犬アンケートの案内を発行', $html);
     }
 }

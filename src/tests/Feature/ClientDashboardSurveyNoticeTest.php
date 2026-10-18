@@ -328,4 +328,24 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $this->assertSame(['愛犬', 'アンケート'], __('messages.intake_survey_name_parts'));
         $this->assertStringNotContainsString('受付アンケート', $source);
     }
+
+    // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    public function test_回答済みの愛犬に答え直しの案内を出したらお知らせを出す(): void
+    {
+        $id = $this->trainee('モモ');
+        $answeredTokenId = $this->intakeToken($id, 'intaketoken000000000000000000010', '2026-10-10 09:00:00');
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $id, 'trainee_intake_survey_token_id' => $answeredTokenId, 'answered_at' => '2026-10-10 09:00:00',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $card = $this->card($this->open(), 'モモちゃん');
+        $this->assertSame([], $this->noticeKinds($card));
+
+        $this->intakeToken($id, 'intaketoken000000000000000000011');
+        $card = $this->card($this->open(), 'モモちゃん');
+
+        $this->assertSame(['intake'], $this->noticeKinds($card));
+        $this->assertStringContainsString(route('client-portal.intake-survey.show', ['token' => 'intaketoken000000000000000000011']), $card);
+    }
 }

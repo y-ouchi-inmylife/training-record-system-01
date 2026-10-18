@@ -42,17 +42,13 @@ class TraineeIntakeSurveyTokenController extends Controller
      * 発行できなかったとき：
      * - 有効な案内がすでにある（回答待ち。二重送信・古い画面から押し直したなど）：新しく発行せず、
      *   完了メッセージも載せずに会員詳細に戻る
-     * - 回答済み：今までどおり 409（UI 側でボタンを出し分けているため通常は到達しない）
+     * 回答済みのトレーニーにも発行する（答え直してもらうため。2026-10-19 変更：その前は 409）
      *
      * 設計書: requirements.md 6-16-8、6-3-6 備考「発行のあとの戻り先」
      */
     public function store(Request $request, Trainee $trainee, TraineeIntakeSurveyTokenService $service): RedirectResponse
     {
         $token = $service->issue($trainee, $request->user());
-        // 状態の判定順（回答がある → 回答済み）に合わせて、回答の有無を先に見る
-        if ($token === null && $trainee->intakeSurveyResponses()->exists()) {
-            abort(409, __('messages.intake_survey_name').'の案内はすでに発行されています。');
-        }
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
 

@@ -238,4 +238,19 @@ class ClientRegistrationTraineeTest extends TestCase
         sort($related);
         $this->assertSame($tables, $related);
     }
+
+    // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    public function test_回答が2件以上でも空でない(): void
+    {
+        $trainee = $this->blankTrainee();
+        DB::table('trainee_intake_survey_responses')->insert([
+            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-01 10:00:00'],
+            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-10 10:00:00'],
+        ]);
+
+        $this->assertFalse($trainee->isBlank());
+        $this->assertTrue($trainee->client->hasNonBlankTrainees());
+        $this->assertSame([$trainee->id], Trainee::query()->notBlank()->pluck('id')->all());
+    }
 }

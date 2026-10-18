@@ -72,7 +72,10 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
         $this->assertSame([$first->id], TraineeIntakeSurveyToken::query()->pluck('id')->all());
     }
 
-    public function test_回答があれば発行せずnullを返す(): void
+    /**
+     * 2026-10-19 変更：回答があっても発行する（答え直してもらうため。その前は発行せず null を返していた）
+     */
+    public function test_回答があっても有効な案内がなければ発行する(): void
     {
         $tokenId = DB::table('trainee_intake_survey_tokens')->insertGetId([
             'token' => str_repeat('a', 32), 'trainee_id' => $this->trainee->id,
@@ -83,11 +86,13 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
             'answered_at' => '2026-10-16 10:00:00', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->assertNull($this->service()->issue($this->trainee, $this->trainer));
-        $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
+        $token = $this->service()->issue($this->trainee, $this->trainer);
+        $this->assertNotNull($token);
+        $this->assertNull($token->answered_at);
+        $this->assertSame(2, TraineeIntakeSurveyToken::query()->count());
     }
 
-    public function test_回答のトークンが消えていても回答があれば発行しない(): void
+    public function test_回答のトークンが消えていて回答だけがあっても発行する(): void
     {
         // トークンが削除されても回答は残る（trainee_intake_survey_token_id が NULL。db-schema.md D-1100）
         DB::table('trainee_intake_survey_responses')->insert([
@@ -95,8 +100,20 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
             'answered_at' => '2026-10-16 10:00:00', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
+        $this->assertNotNull($this->service()->issue($this->trainee, $this->trainer));
+        $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
+    }
+
+    public function test_回答があっても答え直しの案内がすでにあれば発行せずnullを返す(): void
+    {
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $this->trainee->id, 'answered_at' => '2026-10-16 10:00:00',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $first = $this->service()->issue($this->trainee, $this->trainer);
+
         $this->assertNull($this->service()->issue($this->trainee, $this->trainer));
-        $this->assertSame(0, TraineeIntakeSurveyToken::query()->count());
+        $this->assertSame([$first->id], TraineeIntakeSurveyToken::query()->pluck('id')->all());
     }
 
     public function test_別のトレーニーの回答は関係しない(): void
@@ -144,7 +161,7 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
         $this->assertCount(1, $trainee->intakeSurveyTokens);
     }
 
-    public function test_最新の回答のリレーションと回答済みの状態(): void
+    public function test_最新の回答のリレーションと答え直しの案内があるときの状態(): void
     {
         $this->service()->issue($this->trainee, $this->trainer);
         DB::table('trainee_intake_survey_responses')->insert([
@@ -157,11 +174,16 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
             ['trainee_id' => $this->trainee->id, 'answered_at' => '2026-10-17 11:00:00', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        // 回答と有効な案内の両方があるときも、回答済みを先に判定する
+        // 回答と有効な案内（答え直しの案内）の両方があるときは、回答待ちを先に判定する（2026-10-19 変更：その前は回答済み）
         $trainee = Trainee::query()->with(['latestIntakeSurveyResponse', 'activeIntakeSurveyToken'])->find($this->trainee->id);
         $this->assertNotNull($trainee->activeIntakeSurveyToken);
         $this->assertSame('2026-10-18 09:00:00', $trainee->latestIntakeSurveyResponse->answered_at->format('Y-m-d H:i:s'));
-        $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
+        $this->assertSame(Trainee::INTAKE_AWAITING, $trainee->intake_survey_status);
         $this->assertCount(3, $trainee->intakeSurveyResponses);
+
+        // 答え直しの案内を取り消すと、回答済みに戻る
+        DB::table('trainee_intake_survey_tokens')->whereNull('answered_at')->delete();
+        $trainee = Trainee::query()->with(['latestIntakeSurveyResponse', 'activeIntakeSurveyToken'])->find($this->trainee->id);
+        $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
     }
 }

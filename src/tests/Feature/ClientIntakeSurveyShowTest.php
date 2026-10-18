@@ -440,4 +440,36 @@ class ClientIntakeSurveyShowTest extends TestCase
         $html = $this->get($this->showPath('nonexistent-token'))->assertOk()->getContent();
         $this->assertStringContainsString('<h1 class="mb-4">テストアンケート</h1>', $html);
     }
+
+    // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    public function test_答え直しの画面は今のトレーニーの値と前回の答えを最初から入れる(): void
+    {
+        $trainee = $this->traineeWithToken('モモ', null, ['breed' => '柴犬']);
+        DB::table('trainee_intake_survey_responses')->insert([
+            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-01 09:00:00', 'wish' => '古い答え', 'recent_events' => '古い様子',
+                'created_at' => now(), 'updated_at' => now()],
+            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-10 09:00:00', 'wish' => "新しい答え\n2行目", 'recent_events' => null,
+                'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $html = $this->get($this->showPath())->assertOk()->getContent();
+
+        // 基本情報は今のトレーニーの値
+        $this->assertMatchesRegularExpression('/id="breed"[^>]*value="柴犬"/u', $html);
+        // 暮らしの様子は前回の回答（最新の回答）の答え。答えていなかった欄は空
+        $this->assertStringContainsString('id="wish" name="wish" rows="4" maxlength="2000">'."新しい答え\n2行目".'</textarea>', $html);
+        $this->assertStringContainsString('id="recent_events" name="recent_events" rows="4" maxlength="2000"></textarea>', $html);
+        $this->assertStringNotContainsString('古い答え', $html);
+        $this->assertStringNotContainsString('古い様子', $html);
+    }
+
+    public function test_前回の回答がなければ暮らしの様子の欄は空(): void
+    {
+        $this->traineeWithToken('モモ');
+
+        $html = $this->get($this->showPath())->assertOk()->getContent();
+
+        $this->assertSame(4, preg_match_all('/rows="4" maxlength="2000"><\/textarea>/u', $html));
+    }
 }

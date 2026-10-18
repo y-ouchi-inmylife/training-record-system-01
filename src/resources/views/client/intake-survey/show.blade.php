@@ -11,6 +11,9 @@
     // ラジオボタンにトレーニーの値を戻さないため、old() の第 2 引数にトレーニーの値を渡す形にはしない）
     $hasOldInput = session()->hasOldInput();
     $initial = fn (string $key) => $hasOldInput ? old($key) : $trainee->{$key};
+    // 暮らしの様子の 4 欄の初期値（2026-10-19 追加。設計書 S-1413「初期値」）：前回の回答（最新の回答。答え直しのとき）の答え。
+    // 前回の回答がなければ空。入力エラーで戻ったときは、上と同じくお客様が入力した値だけを使う
+    $initialAnswer = fn (string $column) => $hasOldInput ? old($column) : $previousResponse?->{$column};
 @endphp
 
 @section('title', __('messages.intake_survey_name'))
@@ -73,7 +76,7 @@
                     <div class="mb-3">
                         <label for="{{ $column }}" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></label>
                         <textarea class="form-control @error($column) is-invalid @enderror"
-                                  id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="2000">{{ old($column) }}</textarea>
+                                  id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="2000">{{ $initialAnswer($column) }}</textarea>
                         <x-form-error :field="$column" />
                     </div>
                 @endforeach

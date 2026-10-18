@@ -49,7 +49,11 @@ class TraineeIntakeSurveyStatusTest extends TestCase
         $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
     }
 
-    public function test_回答と有効な案内の両方があれば回答済みを先に判定する(): void
+    /**
+     * 2026-10-19 変更：回答したあとも案内を発行し直せるようにしたため、有効な案内（答え直しの案内）があれば、
+     * 回答があっても「回答待ち」にする（その前は回答済みを先に判定していた）
+     */
+    public function test_回答と有効な案内の両方があれば回答待ちを先に判定する(): void
     {
         $token = new TraineeIntakeSurveyToken;
         $token->created_at = Carbon::parse('2026-10-15 09:30:00');
@@ -60,7 +64,7 @@ class TraineeIntakeSurveyStatusTest extends TestCase
         $trainee->setRelation('activeIntakeSurveyToken', $token);
         $trainee->setRelation('latestIntakeSurveyResponse', $response);
 
-        $this->assertSame(Trainee::INTAKE_ANSWERED, $trainee->intake_survey_status);
+        $this->assertSame(Trainee::INTAKE_AWAITING, $trainee->intake_survey_status);
     }
 
     public function test_状態の定数(): void

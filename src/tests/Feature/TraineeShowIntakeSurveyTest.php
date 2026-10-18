@@ -470,4 +470,30 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString('会員様のマイページから消えます', $this->deleteConfirmMessage($html));
         $this->assertStringNotContainsString('グラフのない記録', $this->deleteConfirmMessage($html));
     }
+
+    // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    public function test_回答が2件あれば最新の回答を出し答え直しの案内があっても前回の答えを出す(): void
+    {
+        $this->addResponse('2026-10-01 09:00:00', ['wish' => '古い答え']);
+        $this->addResponse('2026-10-10 09:00:00', ['wish' => '新しい答え']);
+        $this->issueToken();
+
+        $card = $this->intakeCard($this->get(route('trainees.show', $this->trainee))->assertOk()->getContent());
+
+        $this->assertStringContainsString('新しい答え', $card);
+        $this->assertStringNotContainsString('古い答え', $card);
+        $this->assertStringContainsString('data-intake-survey-answers', $card);
+    }
+
+    public function test_削除の確認_回答が2件でも文は今までどおり(): void
+    {
+        $this->issueToken('2026-10-01 09:00:00');
+        $this->addResponse('2026-10-01 09:00:00');
+        $this->issueToken('2026-10-10 09:00:00');
+        $this->addResponse('2026-10-10 09:00:00');
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('愛犬アンケートの回答も一緒に削除されます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
 }

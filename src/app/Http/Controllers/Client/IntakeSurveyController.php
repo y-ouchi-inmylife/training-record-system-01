@@ -47,12 +47,17 @@ class IntakeSurveyController extends Controller
             'token' => $token,
             'trainee' => $trainee,
             'questions' => TraineeIntakeSurveyResponse::questions(),
+            // 前回の回答（最新の回答。なければ null）。暮らしの様子の 4 欄の初期値にする（2026-10-19 追加：回答したあとに
+            // 案内を発行し直したとき〔答え直し〕、前回の答えを見ながら直せるように。設計書 S-1413「初期値」）
+            'previousResponse' => $trainee->latestIntakeSurveyResponse,
         ]);
     }
 
     /**
      * 回答の送信（POST /client-portal/intake-survey/{token}）。回答を保存し、トレーニーの空欄の項目だけに
      * 基本情報を反映し、案内を使い切りにする（要件定義書 6-15-17「トレーニーへの反映」）。
+     * 回答はいつも新しい行として保存する（2026-10-19 から、答え直しのときも。前回までの回答は消さずに残し、
+     * いちばん新しい回答が今の答えになる。要件定義書 6-15-17「答え直し」）。
      * 成功したら完了画面（S-1414）へリダイレクトする（PRG）。
      *
      * ロックについて：同じ案内から同時に 2 回送られても回答を 1 件だけにするため、トランザクションの中で

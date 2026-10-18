@@ -308,16 +308,17 @@
          - 回答がないときも、欄の id と scroll-margin-top は回答済みのときと同じに付ける（欄の作りを 1 つにそろえる）
          - 発行・表示・取消のボタン、取消モーダル（S-0305-M06）は置かない。愛犬アンケート案内の操作は会員詳細
            （S-0305）だけで行う（要件定義書 6-16-8 備考）
-         - 回答があるかは Trainee::intake_survey_status（TraineeController::show で latestIntakeSurveyResponse・
-           activeIntakeSurveyToken を読み込み済み）が「回答済み」かどうかで見る
+         - 回答があるかは latestIntakeSurveyResponse（TraineeController::show で読み込み済み）があるかどうかで見る
+           （2026-10-19 変更：答え直しの案内を出している間〔状態は回答待ち〕も、前回の答えを出すため。その前は
+           Trainee::intake_survey_status が「回答済み」かどうかで見ていた）
          - 自由記述 4 欄を、設問文（TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で
            出し、改行を保持する。設問文の先頭の「●」は S-1413 と同じ作り（aria-hidden="true" で読み上げでは読まず、
            d-flex で折り返したときに 2 行目を「●」の右から始める）。回答の行には付けない。答えなかった設問は
            「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。編集・削除の操作は置かない
          - 回答した基本情報（名前・犬種・性別・誕生日・去勢・避妊）は出さない：基本情報の回答はトレーニーの基本情報に
            反映済みで、画面上部と重なるため。回答そのものは trainee_intake_survey_responses に残っている
-         - 回答が複数件あるときに新しい順に並べるのは第 2 段階（第 1 段階では 1 件）。今は最新の 1 件
-           （latestIntakeSurveyResponse）だけを出す
+         - 回答が複数件あるとき（2026-10-19 から、答え直すと増える）は、最新の 1 件（latestIntakeSurveyResponse）だけを出す
+           （前回までの回答は残すが、画面には出さない）
          - id="intake-survey" と scroll-margin-top は、会員詳細の「暮らしの様子」のリンクから飛ぶ先にするため（見出しを変えても
            id は変えない）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
            バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
@@ -327,7 +328,7 @@
             <h6 class="mb-0">暮らしの様子</h6>
         </div>
         <div class="card-body">
-            @if($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED)
+            @if($trainee->latestIntakeSurveyResponse !== null)
                 @php
                     $intakeResponse = $trainee->latestIntakeSurveyResponse;
                 @endphp

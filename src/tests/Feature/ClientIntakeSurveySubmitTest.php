@@ -513,4 +513,42 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertMatchesRegularExpression('/id="name" name="name" required maxlength="50" autocomplete="off"\s*value=""/u', $html);
         $this->assertStringContainsString(">留守番中に鳴き続けてしまう\nのを直したい</textarea>", $html);
     }
+
+    // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    public function test_答え直すとトレーニーの属性と暮らしの様子が新しい値になり前回の回答は残る(): void
+    {
+        $trainee = $this->traineeWithToken(['breed' => '柴犬', 'sex' => 'male']);
+        // 前回の回答（前の案内で答えたもの）
+        $previousTokenId = DB::table('trainee_intake_survey_tokens')->insertGetId([
+            'token' => 'previous-token-000000000000000001', 'trainee_id' => $trainee->id,
+            'answered_at' => '2026-10-10 09:00:00', 'created_at' => '2026-10-09 09:00:00', 'updated_at' => '2026-10-10 09:00:00',
+        ]);
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $trainee->id, 'trainee_intake_survey_token_id' => $previousTokenId,
+            'answered_at' => '2026-10-10 09:00:00', 'name' => 'モモ', 'breed' => '柴犬', 'sex' => 'male',
+            'wish' => '前回の答え', 'ideal_days' => '前回の理想', 'created_at' => '2026-10-10 09:00:00', 'updated_at' => '2026-10-10 09:00:00',
+        ]);
+
+        $this->submit($this->fullAnswer())->assertRedirect(route('client-portal.intake-survey.thanks'));
+
+        // 回答は新しい行として増え、前回の回答は消えずに残る
+        $responses = TraineeIntakeSurveyResponse::query()->orderBy('answered_at')->get();
+        $this->assertCount(2, $responses);
+        $this->assertSame('前回の答え', $responses[0]->wish);
+        $this->assertSame('前回の理想', $responses[0]->ideal_days);
+        $this->assertSame('2026-10-10 09:00:00', $responses[0]->answered_at->format('Y-m-d H:i:s'));
+        $this->assertSame("留守番中に鳴き続けてしまう\nのを直したい", $responses[1]->wish);
+        // 新しい答えが今の答え（最新の回答）
+        $latest = $trainee->fresh()->latestIntakeSurveyResponse;
+        $this->assertSame($responses[1]->id, $latest->id);
+        $this->assertSame('2026-10-16 14:32:00', $latest->answered_at->format('Y-m-d H:i:s'));
+        // トレーニーの属性は、今の回答と同じく送られた値で上書きする
+        $fresh = $trainee->fresh();
+        $this->assertSame('トイプードル', $fresh->breed);
+        $this->assertSame('female', $fresh->sex);
+        // 答え直しの案内は使い切り、前の案内はそのまま
+        $this->assertSame('2026-10-16 14:32:00', TraineeIntakeSurveyToken::query()->where('token', self::TOKEN)->sole()->answered_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-10-10 09:00:00', TraineeIntakeSurveyToken::query()->whereKey($previousTokenId)->sole()->answered_at->format('Y-m-d H:i:s'));
+    }
 }
