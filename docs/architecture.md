@@ -249,7 +249,7 @@ flowchart TD
 |---|---|---|---|
 | `app.client_portal_name` | `CLIENT_PORTAL_NAME` | 「トレーニング記録」 | ヘッダー帯のワードマーク・ブラウザタイトル。Blade にベタ書きしない |
 | `app.client_portal_company` | `CLIENT_PORTAL_COMPANY` | null | pre-auth フッターのトレーニング提供会社名（`&copy; YYYY {会社名}`）。null/空なら `<footer>` ブロックごと出力しない。**メールの件名の「【事業者名】」および差出人（From）の表示名にも使う**（null/空なら「【】」は付けず、表示名を付けない。詳細は client-portal-design-plan.md §6-1・§6-1-1） |
-| `app.client_portal_logo` | `CLIENT_PORTAL_LOGO` | null | ヘッダー帯左のロゴ画像 URL（`public/` からの相対または絶対）。null/空ならテキスト（プロダクト名）を出す |
+| `app.client_portal_logo` | `CLIENT_PORTAL_LOGO` | `/images/mirai-dog-wellness-logo.png`（**2026-10-18 変更**：その前は null） | ヘッダー帯左のロゴ画像 URL（`public/` からの相対または絶対）。`public/` の中の画像なら `<img>` の width・height を画像のファイルから読む（screen-design.md 2-1-3）。空ならテキスト（プロダクト名）を出す |
 | `app.client_portal_privacy_url` | `CLIENT_PORTAL_PRIVACY_URL` | null | プライバシーポリシー文書の URL。お客様が最初に個人情報を預ける画面（S-1405 メールアドレス登録・S-1403 初回設定・S-1413 受付アンケート回答・S-1415 愛犬性格診断回答）で、送信ボタンの手前に同意文を表示するときに使う。**null/空なら同意文のブロックごと出力しない**（詳細は requirements.md 6-15-13） |
 | `app.client_portal_reply_to` | `CLIENT_PORTAL_REPLY_TO` | null | お客様に送るメールの Reply-To（返信先）アドレス。お客様が受信メールに返信したときの届き先。**null/空なら Reply-To ヘッダを付けない**（返信は From アドレスに届く）。従前は開発会社アドレスがハードコードされていたが、お客様の返信は事業者に届くべきで、事業者側の問い合わせアドレスが確定するまでは空にしておく。詳細は client-portal-design-plan.md §6-1-1 |
 
