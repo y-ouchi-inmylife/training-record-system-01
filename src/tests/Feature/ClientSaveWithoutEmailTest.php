@@ -122,9 +122,23 @@ class ClientSaveWithoutEmailTest extends TestCase
             $this->assertTrue($v->fails());
             $this->assertSame('続柄は20文字以内で入力してください。', $v->errors()->first('emergency_contact_relationship'));
 
-            // 緊急連絡先の文言は「緊急連絡先（ご家族等）」
-            $v = Validator::make(['phone2' => 'abc'], $rules);
-            $this->assertSame('緊急連絡先（ご家族等）の形式が正しくありません。', $v->errors()->first('phone2'));
+            // 緊急連絡先のエラーの項目名：トレーナー側（ClientRequest）は画面のラベルにそろえて「緊急連絡先」（2026-10-18 変更）、
+            // 会員側（初回設定・登録情報の変更）は「緊急連絡先（ご家族等）」のまま
+            $expected = $request instanceof ClientRequest ? '緊急連絡先' : '緊急連絡先（ご家族等）';
+            $v = Validator::make(['phone2' => 'abc'], $rules, [], $request->attributes());
+            $this->assertSame($expected.'の形式が正しくありません。', $v->errors()->first('phone2'));
+            $v = Validator::make(['phone2' => str_repeat('1', 21)], $rules, [], $request->attributes());
+            $this->assertSame($expected.'は20文字以内で入力してください。', $v->errors()->first('phone2'));
         }
+    }
+
+    public function test_トレーナー側の編集で緊急連絡先の形が正しくないと項目名は緊急連絡先のエラーになる(): void
+    {
+        $client = Client::query()->create(['internal_id' => '1', 'last_name' => '山田', 'initial_consultation_date' => '2026-10-01']);
+
+        $this->put(route('clients.update', $client), [
+            'internal_id' => '1', 'last_name' => '山田', 'initial_consultation_date' => '2026-10-01', 'phone2' => 'abc',
+        ])->assertSessionHasErrors(['phone2' => '緊急連絡先の形式が正しくありません。']);
+        $this->assertNull($client->fresh()->phone2);
     }
 }

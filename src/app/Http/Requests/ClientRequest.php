@@ -30,7 +30,7 @@ class ClientRequest extends FormRequest
      *
      * 元 ClientController::validationRules() の内容をそのまま移した。
      * 電話番号／緊急連絡先（ご家族等）／続柄（phone1 / phone2 / emergency_contact_relationship）のラベル差替は
-     * `lang/ja/validation.php` の attributes セクションで解決している。
+     * `lang/ja/validation.php` の attributes セクションで解決している（phone2 だけは下の attributes() で差し替える）。
      */
     public function rules(): array
     {
@@ -57,6 +57,20 @@ class ClientRequest extends FormRequest
             'address4' => 'nullable|string|max:100',
 
             'primary_trainer_id' => 'nullable|exists:trainers,id',
+        ];
+    }
+
+    /**
+     * トレーナー側の項目名の差し替え。
+     *
+     * phone2 は、トレーナー側の登録・編集のラベルが「緊急連絡先」なので、エラーの文の項目名もそろえる
+     * （2026-10-18 変更。例：「緊急連絡先の形式が正しくありません。」）。会員側（初回設定・登録情報の変更）は
+     * lang/ja/validation.php の「緊急連絡先（ご家族等）」のまま。
+     */
+    public function attributes(): array
+    {
+        return [
+            'phone2' => '緊急連絡先',
         ];
     }
 }

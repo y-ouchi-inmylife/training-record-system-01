@@ -273,4 +273,11 @@ class ClientInitialSetupStoreTest extends TestCase
             ->assertSessionHasErrors(['emergency_contact_relationship' => '続柄は20文字以内で入力してください。']);
         $this->assertNull($this->client->fresh()->password);
     }
+
+    public function test_会員側の緊急連絡先のエラーの項目名は緊急連絡先ご家族等のまま(): void
+    {
+        // トレーナー側（ClientRequest）は「緊急連絡先」に差し替えたが、会員側は画面のラベルどおり「緊急連絡先（ご家族等）」（2026-10-18）
+        $this->postSetup($this->validInput(['phone2' => 'abc']))
+            ->assertSessionHasErrors(['phone2' => '緊急連絡先（ご家族等）の形式が正しくありません。']);
+    }
 }
