@@ -456,7 +456,7 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
 
     // ---- 点数なし・判定なし（2026-10-18 追加） ----
 
-    public function test_マイページは判定なしを出し今回に点数なしがあれば注記を出す(): void
+    public function test_マイページは判定なしを出し今回に点数なしがあっても注記は出さない(): void
     {
         $id = $this->trainee('モモ');
         $this->addResult($id, 'all-na', '2026-06-01 09:00:00');
@@ -465,15 +465,19 @@ class ClientDashboardPersonalityDiagnosisTest extends TestCase
 
         $this->assertStringContainsString('<span class="text-muted">愛犬性格診断：</span><span class="fw-bold">判定なし</span>', $html);
         $this->assertStringContainsString('data-client-personality-type>判定なし</p>', $html);
-        $this->assertStringContainsString('data-personality-radar-missing-note>※ 対人・対犬・所有欲・分離不安・恐怖心・訓練性能・興奮性は、答えがすべて「未経験」のため点数がありません。</p>', $html);
+        // マイページは点数の表がないが、注記は出さない（2026-10-18 変更）
+        $this->assertStringNotContainsString('点数がありません', $html);
+        $this->assertStringNotContainsString('data-personality-radar-missing-note', $html);
     }
 
-    public function test_マイページは前回だけ点数なしなら注記を出さない(): void
+    public function test_マイページは今回に一部の点数なしがあっても注記は出さない(): void
     {
         $id = $this->trainee('モモ');
-        $this->addResult($id, 'category-all-na', '2026-03-10 09:00:00');
-        $this->addResult($id, 'past-1', '2026-06-01 09:00:00');
+        $this->addResult($id, 'past-1', '2026-03-10 09:00:00');
+        $this->addResult($id, 'category-all-na', '2026-06-01 09:00:00');
 
-        $this->assertStringNotContainsString('data-personality-radar-missing-note', $this->open());
+        $html = $this->open();
+        $this->assertStringNotContainsString('点数がありません', $html);
+        $this->assertStringNotContainsString('data-personality-radar-missing-note', $html);
     }
 }

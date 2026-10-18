@@ -106,32 +106,6 @@ class TraineePersonalityDiagnosisResult extends Model
         return PersonalityDiagnosisQuestions::types()[$this->personality_type] ?? $this->personality_type;
     }
 
-    /**
-     * 点数なし（全問「未経験」）のカテゴリの表示名（並びは categories()。2026-10-18 追加）
-     *
-     * @return list<string>
-     */
-    public function missingScoreLabels(): array
-    {
-        $labels = PersonalityDiagnosisQuestions::categories();
-
-        return array_values(array_map(
-            fn (string $category) => $labels[$category],
-            array_keys(array_filter($this->scores(), fn (?string $score) => $score === null)),
-        ));
-    }
-
-    /**
-     * グラフの注記（今回の結果に点数なしのカテゴリがあるときだけ。設計書 S-0309「点数なしの項目」）。
-     * 例：「※ 対犬・訓練性能は、答えがすべて「未経験」のため点数がありません。」。点数なしがなければ null
-     */
-    public function missingScoresNote(): ?string
-    {
-        $labels = $this->missingScoreLabels();
-
-        return $labels === [] ? null : '※ '.implode('・', $labels).'は、答えがすべて「未経験」のため点数がありません。';
-    }
-
     public function trainee(): BelongsTo
     {
         return $this->belongsTo(Trainee::class);

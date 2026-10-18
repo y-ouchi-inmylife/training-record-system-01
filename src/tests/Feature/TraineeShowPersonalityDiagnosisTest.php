@@ -698,26 +698,29 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('0.0', $row);
     }
 
-    public function test_今回に点数なしがあれば注記を出しグラフには点数なしをnullのまま渡す(): void
+    public function test_今回に点数なしがあっても注記は出さずグラフには点数なしをnullのまま渡す(): void
     {
         $this->addResult('category-all-na', '2026-06-01 09:00:00');
 
         $html = $this->page();
 
-        $this->assertStringContainsString('<p class="small text-muted text-center mt-2 mb-0" data-personality-radar-missing-note>※ 分離不安は、答えがすべて「未経験」のため点数がありません。</p>', $html);
+        // 点数なしは表の「—」で分かるので、グラフの下に注記は出さない（2026-10-18 変更）
+        $this->assertStringNotContainsString('点数がありません', $html);
+        $this->assertStringNotContainsString('data-personality-radar-missing-note', $html);
+        $this->assertStringContainsString('<td class="text-end text-nowrap"><span aria-hidden="true">—</span><span class="visually-hidden">点数なし</span></td>', $html);
         $values = $this->radarData($html)['series'][0]['values'];
         $this->assertNull($values[3]);
         $this->assertSame('2.0', $values[1]);
     }
 
-    public function test_前回だけ点数なしなら注記は出さない(): void
+    public function test_前回だけ点数なしでも注記は出さない(): void
     {
         $this->addResult('category-all-na', '2026-03-10 09:00:00');
         $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $html = $this->page();
 
-        $this->assertStringNotContainsString('data-personality-radar-missing-note', $html);
+        $this->assertStringNotContainsString('点数がありません', $html);
         // 前回の値には点数なし（null）が入る（点を描かないだけ）
         $this->assertNull($this->radarData($html)['series'][1]['values'][3]);
     }
