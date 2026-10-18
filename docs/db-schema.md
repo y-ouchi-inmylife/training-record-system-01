@@ -1406,7 +1406,7 @@ erDiagram
 | create_trainee_personality_diagnosis_token | 愛犬性格診断の案内の発行（**2026-10 追加**） |
 | delete_trainee_personality_diagnosis_token | 愛犬性格診断の案内の取消（**2026-10 追加**） |
 | delete_trainee_personality_diagnosis_result | 愛犬性格診断の結果の削除（**2026-10 追加**） |
-| edit_trainee_personality_diagnosis_evaluation | 愛犬性格診断の評価文の保存（**2026-10-18 追加**。要件定義書 6-16-15） |
+| edit_trainee_personality_diagnosis_evaluation | 愛犬性格診断の評価文の更新（**2026-10-18 追加**。要件定義書 6-16-15）。操作履歴の表示名は「愛犬性格診断評価文編集」（ほかの `edit_*` の「〜編集」にそろえる。**2026-10-18 変更**：その前は「愛犬性格診断評価文保存」。キーは変えない） |
 | create_client_contract | 契約登録 |
 | edit_client_contract | 契約編集 |
 | delete_client_contract | 契約削除 |

@@ -2383,7 +2383,7 @@ POST /training-records に以下を追加する。
 - アクセスログに記録する（`edit_trainee_personality_diagnosis_evaluation`。`target_type='Trainee'`、`target_id` はトレーニーの id）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainee-personality-diagnosis-results.show', [$trainee, $result])`。フラッシュ `success` に「評価文を保存しました。」
+- 成功：`redirect()->route('trainee-personality-diagnosis-results.show', [$trainee, $result])`。フラッシュ `success` に「評価文を更新しました。」（**2026-10-18 変更**：その前は「評価文を保存しました。」。画面のボタンも［保存］から［更新］にした）
 - バリデーション失敗：`back()`（screen-design.md §2-7）
 - 公開済み：409
 
