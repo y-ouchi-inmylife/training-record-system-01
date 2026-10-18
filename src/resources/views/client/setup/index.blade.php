@@ -32,8 +32,8 @@
             @if ($errors->hasAny([
                 'password',
                 'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
-                'phone1', 'phone2', 'emergency_contact_relationship',
                 'postal_code', 'address1', 'address2', 'address3', 'address4',
+                'phone1', 'phone2', 'emergency_contact_relationship',
             ]))
                 <x-form-error-summary />
             @endif
@@ -92,7 +92,7 @@
                 </div>
                 {{-- せい・めい行とご連絡先小見出しの間はまとまりの境目だが、区切り線は引かない
                      （2026-10 変更）。各まとまりの小見出しで内容の区切りが伝わるため、線は
-                     「入力の性格が変わる境目」（お客様プロフィール／ログイン情報。建物名・部屋番号の下）だけに絞った。
+                     「入力の性格が変わる境目」（お客様プロフィール／ログイン情報。ご連絡先の最後の緊急連絡先〔ご家族等〕の下。2026-10-18 までは建物名・部屋番号の下）だけに絞った。
                      余白は mb-3（セクション内の mb-2 より少し広い）で、小見出しの前で詰まりすぎない。
                      設計書 S-1403 備考 / §4-7 参照。 --}}
                 <div class="row g-2 mb-3">
@@ -115,39 +115,8 @@
                 {{-- 「ご連絡先」小見出し。<h2 fs-6> を使う理由・パスワードに小見出しを置かない理由・
                      線との役割分担は「お名前」小見出し直前のコメント参照。**fs-6 を外さないこと**。 --}}
                 <h2 class="fs-6 fw-bold mb-2">ご連絡先</h2>
-                <div class="mb-2">
-                    <label for="phone1" class="form-label">電話番号 <span class="text-danger">*</span></label>
-                    <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
-                           id="phone1" name="phone1" required maxlength="20"
-                           value="{{ old('phone1', $client->phone1) }}">
-                    <x-form-error field="phone1" />
-                </div>
-                {{-- 緊急連絡先（ご家族等）：見出し（legend）の下に「電話番号」「続柄」を横に並べる（7：5。スマホの幅でも横に並べ、576px 未満は 6：6。
-                     375px の幅では 7：5 だと続柄の欄が狭く、例の文「例: 母、夫、娘」が欄に収まらなかったため）。
-                     fieldset と legend で、読み上げでは「緊急連絡先（ご家族等）」の中の「電話番号」「続柄」と読まれる。
-                     legend は Bootstrap の既定で大きな文字・左に浮くので、form-label と fs-6 で欄のラベルと同じ大きさにする。
-                     2026-10-18 変更：その前（2026-10-17）は「緊急連絡先（ご家族等）」「続柄」を縦一列の別々の項目にしていたが、
-                     続柄が緊急連絡先の方の続柄だとわからなかった --}}
-                <fieldset class="mb-3">
-                    <legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）</legend>
-                    <div class="row g-2">
-                        <div class="col-6 col-sm-7">
-                            <label for="phone2" class="form-label small mb-1">電話番号</label>
-                            <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
-                                   id="phone2" name="phone2" maxlength="20"
-                                   value="{{ old('phone2', $client->phone2) }}">
-                            <x-form-error field="phone2" />
-                        </div>
-                        <div class="col-6 col-sm-5">
-                            <label for="emergency_contact_relationship" class="form-label small mb-1">続柄</label>
-                            <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
-                                   id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"
-                                   value="{{ old('emergency_contact_relationship', $client->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘">
-                            <x-form-error field="emergency_contact_relationship" />
-                        </div>
-                    </div>
-                </fieldset>
-
+                {{-- 並びは住所 → 電話番号 → 緊急連絡先（2026-10-18 変更：登録情報の表示〔S-1406〕の順にそろえた。
+                     その前は電話番号・緊急連絡先が住所より前）。Tab キーで移る順も見た目の順と同じ（tabindex で順を変えない） --}}
                 <div class="mb-2">
                     {{-- 郵便番号は任意（住所検索の入口という位置づけで、DB も NULL 許容。
                          都道府県以下が入っていれば住所として成立する。設計書 S-1403 備考参照）。
@@ -195,21 +164,55 @@
                            value="{{ old('address3', $client->address3) }}">
                     <x-form-error field="address3" />
                 </div>
-                {{-- 建物名・部屋番号は「ご連絡先」まとまりの最終要素。下に区切り線を引く
-                     （ご連絡先／ログイン情報の境目＝お客様のプロフィールとログイン情報の境目で、
-                     入力の性格が変わるため）。カード内の区切り線はこの 1 本だけ。
-                     経緯：2026-10 に線を「入力の性格が変わる境目」の 1 本に絞ったときは、
-                     愛犬の備考の下（愛犬の情報／ログイン情報の境目）に引いていた。同じ 2026-10 に
-                     愛犬の情報を受付アンケート（S-1413）に分離して外したため、線をここに移した。
-                     線の濃さは client.scss の .c-login--wide .border-bottom（ink 20%）。
-                     設計書 S-1403 備考 / §4-7 参照。 --}}
-                <div class="mb-3 pb-3 border-bottom">
+                <div class="mb-3">
                     <label for="address4" class="form-label">建物名・部屋番号</label>
                     <input type="text" class="form-control @error('address4') is-invalid @enderror"
                            id="address4" name="address4" maxlength="100"
                            value="{{ old('address4', $client->address4) }}">
                     <x-form-error field="address4" />
                 </div>
+
+                <div class="mb-2">
+                    <label for="phone1" class="form-label">電話番号 <span class="text-danger">*</span></label>
+                    <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
+                           id="phone1" name="phone1" required maxlength="20"
+                           value="{{ old('phone1', $client->phone1) }}">
+                    <x-form-error field="phone1" />
+                </div>
+                {{-- 緊急連絡先（ご家族等）：見出し（legend）の下に「電話番号」「続柄」を横に並べる（7：5。スマホの幅でも横に並べ、576px 未満は 6：6。
+                     375px の幅では 7：5 だと続柄の欄が狭く、例の文「例: 母、夫、娘」が欄に収まらなかったため）。
+                     fieldset と legend で、読み上げでは「緊急連絡先（ご家族等）」の中の「電話番号」「続柄」と読まれる。
+                     legend は Bootstrap の既定で大きな文字・左に浮くので、form-label と fs-6 で欄のラベルと同じ大きさにする。
+                     2026-10-18 変更：その前（2026-10-17）は「緊急連絡先（ご家族等）」「続柄」を縦一列の別々の項目にしていたが、
+                     続柄が緊急連絡先の方の続柄だとわからなかった --}}
+                {{-- 緊急連絡先（ご家族等）は「ご連絡先」まとまりの最終要素（2026-10-18 変更：住所 → 電話番号の順にしたため。
+                     その前は建物名・部屋番号が最終要素で、線もその下に引いていた）。下に区切り線を引く
+                     （ご連絡先／ログイン情報の境目＝お客様のプロフィールとログイン情報の境目で、
+                     入力の性格が変わるため）。カード内の区切り線はこの 1 本だけ。
+                     経緯：2026-10 に線を「入力の性格が変わる境目」の 1 本に絞ったときは、
+                     愛犬の備考の下（愛犬の情報／ログイン情報の境目）に引いていた。同じ 2026-10 に
+                     愛犬の情報を受付アンケート（S-1413）に分離して外したため、線を建物名・部屋番号の下に移した。
+                     線の濃さは client.scss の .c-login--wide .border-bottom（ink 20%）。
+                     設計書 S-1403 備考 / §4-7 参照。 --}}
+                <fieldset class="mb-3 pb-3 border-bottom">
+                    <legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）</legend>
+                    <div class="row g-2">
+                        <div class="col-6 col-sm-7">
+                            <label for="phone2" class="form-label small mb-1">電話番号</label>
+                            <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
+                                   id="phone2" name="phone2" maxlength="20"
+                                   value="{{ old('phone2', $client->phone2) }}">
+                            <x-form-error field="phone2" />
+                        </div>
+                        <div class="col-6 col-sm-5">
+                            <label for="emergency_contact_relationship" class="form-label small mb-1">続柄</label>
+                            <input type="text" class="form-control @error('emergency_contact_relationship') is-invalid @enderror"
+                                   id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"
+                                   value="{{ old('emergency_contact_relationship', $client->emergency_contact_relationship) }}" placeholder="例: 母、夫、娘">
+                            <x-form-error field="emergency_contact_relationship" />
+                        </div>
+                    </div>
+                </fieldset>
 
                 {{-- 「ログイン情報」小見出し（3 か所の最後、2026-10 に末尾へ移した。同じ 2026-10 に
                      「愛犬の情報」の小見出しを外したため、4 か所から 3 か所になった）。
@@ -236,8 +239,8 @@
                      パスワードだけのエラーのときは、欄の下の赤字で原因が伝わるため出さない。 --}}
                 @if ($errors->hasAny([
                     'last_name', 'first_name', 'last_name_kana', 'first_name_kana',
-                    'phone1', 'phone2', 'emergency_contact_relationship',
                     'postal_code', 'address1', 'address2', 'address3', 'address4',
+                    'phone1', 'phone2', 'emergency_contact_relationship',
                 ]))
                     <div class="form-text mb-2">確認のため、パスワードをもう一度入力してください。</div>
                 @endif

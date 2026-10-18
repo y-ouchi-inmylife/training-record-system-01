@@ -218,34 +218,32 @@ class ClientSetupFormErrorRenderingTest extends TestCase
      * 2026-10 変更：まとまりの区切り線は 1 本（お客様のプロフィール／ログイン情報の境目）だけ。
      * 愛犬の情報を外したため、線は愛犬の備考の下から、建物名・部屋番号の下に移った。
      */
-    public function test_初回設定_区切り線は建物名部屋番号の下の1本だけ(): void
+    public function test_初回設定_区切り線はご連絡先の最後の緊急連絡先の下の1本だけ(): void
     {
         $html = $this->renderSetup([])->__toString();
         $this->assertSame(1, substr_count($html, 'border-bottom'));
 
+        // 線は緊急連絡先（ご家族等）の fieldset に付く（ご連絡先のまとまりの最後。ログイン情報より前）。
+        // 2026-10-18 変更：住所 → 電話番号の順にしたため、建物名・部屋番号の下から移した
+        $this->assertStringContainsString('<fieldset class="mb-3 pb-3 border-bottom">', $html);
         $posLine = mb_strpos($html, 'border-bottom');
-        $posAddress4 = mb_strpos($html, 'name="address4"');
-        $posAddress3 = mb_strpos($html, 'name="address3"');
-        $posLoginHeading = mb_strpos($html, 'ログイン情報');
-
-        // 線は建物名・部屋番号の欄を包む div に付く（町名・番地より後、建物名・部屋番号の直前、ログイン情報より前）
-        $this->assertGreaterThan($posAddress3, $posLine);
-        $this->assertLessThan($posAddress4, $posLine);
-        $this->assertLessThan($posLoginHeading, $posLine);
+        $this->assertGreaterThan(mb_strpos($html, 'name="phone1"'), $posLine);
+        $this->assertGreaterThan(mb_strpos($html, 'name="address4"'), $posLine);
+        $this->assertLessThan(mb_strpos($html, 'name="phone2"'), $posLine);
+        $this->assertLessThan(mb_strpos($html, 'ログイン情報'), $posLine);
     }
 
     public function test_初回設定_緊急連絡先の見出しの下に電話番号と続柄を横に並べる(): void
     {
         $html = (string) $this->renderSetup([]);
 
-        $this->assertSame(1, preg_match('/<fieldset class="mb-3">\s*<legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）<\/legend>(.*?)<\/fieldset>/us', $html, $m));
+        $this->assertSame(1, preg_match('/<fieldset class="mb-3 pb-3 border-bottom">\s*<legend class="form-label fs-6 mb-1">緊急連絡先（ご家族等）<\/legend>(.*?)<\/fieldset>/us', $html, $m));
         $this->assertMatchesRegularExpression('/<div class="row g-2">\s*<div class="col-6 col-sm-7">\s*<label for="phone2" class="form-label small mb-1">電話番号<\/label>/u', $m[1]);
         $this->assertMatchesRegularExpression('/<div class="col-6 col-sm-5">\s*<label for="emergency_contact_relationship" class="form-label small mb-1">続柄<\/label>/u', $m[1]);
         $this->assertStringContainsString('id="emergency_contact_relationship" name="emergency_contact_relationship" maxlength="20"', $m[1]);
         $this->assertStringContainsString('placeholder="例: 母、夫、娘"', $m[1]);
-        // 電話番号（必須）の欄は見出しの外、郵便番号は見出しのあと
-        $this->assertTrue(strpos($html, 'id="phone1"') < strpos($html, '<fieldset class="mb-3">'));
-        $this->assertTrue(strpos($html, '</fieldset>') < strpos($html, 'id="postal_code"'));
+        // 電話番号（必須）の欄は見出しの外で、見出しの前
+        $this->assertTrue(strpos($html, 'id="phone1"') < strpos($html, '<fieldset class="mb-3 pb-3 border-bottom">'));
         $this->assertStringNotContainsString('電話番号（予備）', $html);
     }
 
@@ -255,5 +253,32 @@ class ClientSetupFormErrorRenderingTest extends TestCase
 
         $view->assertSee('入力内容に誤りがあります。');
         $view->assertSee('確認のため、パスワードをもう一度入力してください。');
+    }
+
+    /**
+     * 入力欄の並び：住所（郵便番号〜建物名・部屋番号）→ 電話番号 → 緊急連絡先（電話番号・続柄）（2026-10-18 変更：
+     * 登録情報の表示〔S-1406〕の順にそろえた）。Tab キーの順を変える tabindex（0 以上）も付けない
+     */
+    private function assertContactOrder(string $html): void
+    {
+        $ids = ['postal_code', 'address1', 'address2', 'address3', 'address4', 'phone1', 'phone2', 'emergency_contact_relationship'];
+        $positions = array_map(fn ($id) => strpos($html, 'id="'.$id.'"'), $ids);
+        foreach ($positions as $i => $pos) {
+            $this->assertNotFalse($pos, $ids[$i]);
+        }
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions);
+        $this->assertDoesNotMatchRegularExpression('/tabindex="(?!-1")/u', $html);
+    }
+
+    public function test_初回設定_ご連絡先は住所から電話番号緊急連絡先の順に並べる(): void
+    {
+        $html = (string) $this->renderSetup([]);
+
+        $this->assertContactOrder($html);
+        // ご連絡先の小見出しのあとに住所、ログイン情報は最後
+        $this->assertTrue(strpos($html, 'ご連絡先</h2>') < strpos($html, 'id="postal_code"'));
+        $this->assertTrue(strpos($html, 'id="emergency_contact_relationship"') < strpos($html, 'id="password"'));
     }
 }

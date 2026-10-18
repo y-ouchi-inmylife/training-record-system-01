@@ -281,4 +281,30 @@ class ClientSettingsFormErrorRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/id="phone2".*?ERR_phone2.*?<div class="col-6 col-sm-5">/us', $html);
         $this->assertMatchesRegularExpression('/id="emergency_contact_relationship".*?ERR_rel.*?<\/fieldset>/us', $html);
     }
+
+    /**
+     * 入力欄の並び：住所（郵便番号〜建物名・部屋番号）→ 電話番号 → 緊急連絡先（電話番号・続柄）（2026-10-18 変更：
+     * 登録情報の表示〔S-1406〕の順にそろえた）。Tab キーの順を変える tabindex（0 以上）も付けない
+     */
+    private function assertContactOrder(string $html): void
+    {
+        $ids = ['postal_code', 'address1', 'address2', 'address3', 'address4', 'phone1', 'phone2', 'emergency_contact_relationship'];
+        $positions = array_map(fn ($id) => strpos($html, 'id="'.$id.'"'), $ids);
+        foreach ($positions as $i => $pos) {
+            $this->assertNotFalse($pos, $ids[$i]);
+        }
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions);
+        $this->assertDoesNotMatchRegularExpression('/tabindex="(?!-1")/u', $html);
+    }
+
+    public function test_登録情報変更_住所から電話番号緊急連絡先の順に並べる(): void
+    {
+        $html = (string) $this->renderEdit([]);
+
+        $this->assertContactOrder($html);
+        // 最後の欄（緊急連絡先）のあとに［変更する］
+        $this->assertTrue(strpos($html, 'id="emergency_contact_relationship"') < strpos($html, '>変更する</button>'));
+    }
 }
