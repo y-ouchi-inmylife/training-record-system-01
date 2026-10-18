@@ -104,6 +104,9 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
         $this->assertStringContainsString('<legend class="fs-6 mb-2">①知らない人が家に入ってきた時に吠える・唸る</legend>', $html);
         $this->assertStringContainsString('<legend class="fs-6 mb-2">⑧ 散歩から帰ってきても、体力が有り余っていてすぐに遊びたがる</legend>', $html);
+        // Q11 は文末を直した文（2026-10-18 変更：当初は「…喧嘩になり」）
+        $this->assertStringContainsString('<legend class="fs-6 mb-2">③ドッグランなどで他の犬に追いかけられると、本気で怒って喧嘩になる</legend>', $html);
+        $this->assertStringNotContainsString('喧嘩になり', $html);
         $this->assertSame(300, substr_count($html, 'type="radio" class="btn-check" name="answers['));
         $this->assertSame(6, substr_count($html, 'name="answers[Q01]"'));
         foreach (PersonalityDiagnosisQuestions::choices() as $value => $label) {

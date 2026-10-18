@@ -46,8 +46,9 @@ class PersonalityDiagnosisQuestionsTest extends TestCase
 
         $this->assertSame('①知らない人が家に入ってきた時に吠える・唸る', $questions['Q01']['text']);
         $this->assertSame('① 遠くに犬を見つけただけで、グイグイ引っ張ったり吠えたりする', $questions['Q09']['text']);
-        // Q11 は文末を確認中（要件定義書 D-1200）。今の文のまま
-        $this->assertSame('③ドッグランなどで他の犬に追いかけられると、本気で怒って喧嘩になり', $questions['Q11']['text']);
+        // Q11 の文末は 2026-10-18 にトレーナーさんに確認し「喧嘩になる」に直した（要件定義書 D-1200）。版は v1 のまま
+        $this->assertSame('③ドッグランなどで他の犬に追いかけられると、本気で怒って喧嘩になる', $questions['Q11']['text']);
+        $this->assertSame('v1', PersonalityDiagnosisQuestions::VERSION);
         $this->assertSame('⑧ 散歩から帰ってきても、体力が有り余っていてすぐに遊びたがる', $questions['Q50']['text']);
         foreach ($questions as $id => $question) {
             $this->assertMatchesRegularExpression('/^[①-⑧]/u', $question['text'], $id);

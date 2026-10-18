@@ -262,6 +262,9 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertSame(4, $answers['Q02']);
         $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">①知らない人が家に入ってきた時に吠える・唸る<\/dt>\s*<dd class="col-sm-4 mb-1">未経験<\/dd>/u', $modal);
         $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">②窓の外を誰かが通りかかっただけで、敏感に反応して吠える<\/dt>\s*<dd class="col-sm-4 mb-1">4：常にある<\/dd>/u', $modal);
+        // Q11 は文末を直した文で出す（保存済みの結果〔v1〕でも。2026-10-18 変更：当初は「…喧嘩になり」）
+        $this->assertStringContainsString('<dt class="col-sm-8 fw-normal">③ドッグランなどで他の犬に追いかけられると、本気で怒って喧嘩になる</dt>', $modal);
+        $this->assertStringNotContainsString('喧嘩になり', $modal);
     }
 
     public function test_別のトレーニーの結果は出さない(): void
