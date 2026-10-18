@@ -200,6 +200,8 @@
            ように作り直した）。結果がないときは本文に「（未回答）」とだけ出す（グラフも表も出さない）
          - 結果は Trainee::personalityDiagnosisResults()（新しい順。TraineeController::show で読み込み済み）。表は新しい順（2026-10 変更。当初は古い順で、上が初回）
          - 点数は表示の値（小数第 1 位）。保存の値（小数第 2 位）から四捨五入する（TraineePersonalityDiagnosisResult::displayScores()）
+         - 点数なし（そのカテゴリの答えがすべて「未経験」）は表で「—」（読み上げは「点数なし」）、タイプの判定なしは「判定なし」。
+           グラフでは点を描かず、今回に点数なしがあるときだけ凡例の下に注記を出す（2026-10-18 追加。要件定義書 6-16）
          - 表の各行の［回答］で、その回の 50 問の回答をモーダルで出す（1 回ごとにモーダルを置き、中身はサーバーで出す）。
            設問は結果の設問の版に合った文（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は設問の ID）
          - 操作（発行・表示・取消）は置かない（会員詳細 S-0305 だけで行う）
@@ -212,6 +214,8 @@
         // レーダーチャートに重ねる回（今回・前回・初回）と値。会員側のマイページ（S-1402）と同じ組み立てを使う
         // （Trainee::personality_radar_data。2026-10 変更：当初はここで組み立てていた）。結果がなければ null
         $pdRadarData = $trainee->personality_radar_data;
+        // グラフの注記（今回の結果に点数なしのカテゴリがあるときだけ。2026-10-18 追加）
+        $pdMissingNote = $pdResults->first()?->missingScoresNote();
     @endphp
     <div class="card mb-3" id="personality-diagnosis" style="scroll-margin-top: 4.5rem;">
         <div class="card-header">
@@ -242,6 +246,10 @@
                             <ul class="list-unstyled d-flex flex-wrap flex-xl-column align-items-xl-start justify-content-center column-gap-3 row-gap-1 small mb-0"
                                 data-personality-radar-legend="personality-diagnosis-radar"></ul>
                         </div>
+                        {{-- 点数なしの注記（今回の結果に点数なしのカテゴリがあるときだけ。前回・初回の点数なしは点を描かないだけ。2026-10-18 追加） --}}
+                        @if($pdMissingNote)
+                            <p class="small text-muted text-center mt-2 mb-0" data-personality-radar-missing-note>{{ $pdMissingNote }}</p>
+                        @endif
                     </div>
 
                     <div class="col-12 col-xl-8">
@@ -273,7 +281,8 @@
                                             <th scope="row" class="fw-normal text-nowrap">{{ $result->answered_at->format('Y/m/d') }}</th>
                                             <td style="word-break: keep-all;">{!! collect(explode('・', $result->personality_type_label))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</td>
                                             @foreach(array_keys($pdCategories) as $category)
-                                                <td class="text-end text-nowrap">{{ $display[$category] }}</td>
+                                                {{-- 点数なし（答えがすべて「未経験」）は「—」。読み上げでは「点数なし」（2026-10-18 追加） --}}
+                                                <td class="text-end text-nowrap">@if($display[$category] === null)<span aria-hidden="true">—</span><span class="visually-hidden">点数なし</span>@else{{ $display[$category] }}@endif</td>
                                             @endforeach
                                             <td class="text-end text-nowrap">
                                                 <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"

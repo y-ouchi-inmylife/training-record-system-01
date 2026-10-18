@@ -1,5 +1,5 @@
 {
-  "description": "性格診断の採点とタイプの判定の突き合わせ用データ（設問の版 v1）。past-* はトレーナーさんの過去の回答から名前などを除いたもので、期待値は当時の GAS の出力と一致する。それ以外は境目を確かめるために作った回答で、期待値は GAS と同じ計算（未経験を除いた平均、丸める前の値で判定、同点は表の順、最大が1.5未満はのんびり、toFixed と同じ四捨五入）で求めた。",
+  "description": "性格診断の採点とタイプの判定の突き合わせ用データ（設問の版 v1）。past-* はトレーナーさんの過去の回答から名前などを除いたもので、期待値は当時の GAS の出力と一致する。それ以外は境目を確かめるために作った回答で、期待値は GAS と同じ計算（未経験を除いた平均、丸める前の値で判定、同点は表の順、最大が1.5未満はのんびり、toFixed と同じ四捨五入）で求めた。 2026-10-18 変更：全問 未経験 のカテゴリは点数なし（null）、全カテゴリが点数なしのタイプは判定なし（null）にした（GAS との意図した違い。all-na と category-all-na の期待値だけが GAS と違う）。",
   "question_version": "v1",
   "answer_values": "0〜4 の整数、または \"na\"（未経験）",
   "scores": "小数第2位の文字列（保存の値）",
@@ -400,7 +400,7 @@
     },
     {
       "name": "all-na",
-      "description": "全問 未経験 → 平均はすべて 0、のんびり",
+      "description": "全問 未経験 → 7 カテゴリとも点数なし（null）、タイプは判定なし（null）。2026-10-18 変更：GAS では平均はすべて 0、のんびり（意図した違い）",
       "answers": {
         "Q01": "na",
         "Q02": "na",
@@ -455,24 +455,24 @@
       },
       "expected": {
         "scores": {
-          "people": "0.00",
-          "dogs": "0.00",
-          "possessiveness": "0.00",
-          "separation": "0.00",
-          "fear": "0.00",
-          "trainability": "0.00",
-          "excitability": "0.00"
+          "people": null,
+          "dogs": null,
+          "possessiveness": null,
+          "separation": null,
+          "fear": null,
+          "trainability": null,
+          "excitability": null
         },
         "display": {
-          "people": "0.0",
-          "dogs": "0.0",
-          "possessiveness": "0.0",
-          "separation": "0.0",
-          "fear": "0.0",
-          "trainability": "0.0",
-          "excitability": "0.0"
+          "people": null,
+          "dogs": null,
+          "possessiveness": null,
+          "separation": null,
+          "fear": null,
+          "trainability": null,
+          "excitability": null
         },
-        "type": "calm"
+        "type": null
       }
     },
     {
@@ -939,7 +939,7 @@
     },
     {
       "name": "category-all-na",
-      "description": "分離不安が全問 未経験 → 分離不安は 0。ほかは通常どおり（対犬 → 慎重派）",
+      "description": "分離不安が全問 未経験 → 分離不安は点数なし（null）で、タイプの判定から外す。ほかは通常どおり（対犬 → 慎重派）。2026-10-18 変更：GAS では分離不安は 0（タイプは同じ）",
       "answers": {
         "Q01": 1,
         "Q02": 1,
@@ -997,7 +997,7 @@
           "people": "1.00",
           "dogs": "2.00",
           "possessiveness": "1.00",
-          "separation": "0.00",
+          "separation": null,
           "fear": "1.00",
           "trainability": "1.00",
           "excitability": "1.00"
@@ -1006,7 +1006,7 @@
           "people": "1.0",
           "dogs": "2.0",
           "possessiveness": "1.0",
-          "separation": "0.0",
+          "separation": null,
           "fear": "1.0",
           "trainability": "1.0",
           "excitability": "1.0"

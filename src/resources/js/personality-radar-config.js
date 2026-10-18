@@ -12,6 +12,8 @@
  *   （Chart.js の凡例はグラフの枠の中に描かれ、3 つの項目が 2 行に折り返すため。2026-10 変更）。
  *   凡例の項目と線の見本も、グラフと同じ SERIES_STYLES から作る（legendItems・legendSwatchSvg）
  * - 値は、下の表と同じ表示の値（小数第 1 位の文字列）を数にして使う（表とグラフで数字が食い違わないように）
+ * - 点数なし（そのカテゴリの答えがすべて「未経験」。値が null）は 0 にせず null のまま渡し、その回の点を描かない。
+ *   線は点数なしを飛ばして、となりの点どうしをつなぐ（spanGaps）ので、形は閉じたまま見える（2026-10-18 追加）
  * - 訓練性能の軸を真上（12 時）に置く（2026-10-18 追加。rotateToTop）。訓練性能だけは点数が高いほど良く、ほかの 6 項目は
  *   高いほど気をつけたい傾向のため、ほかと分けて見やすくする。点数の向きは変えない（参考にしている本などの向きに合わせる）。
  *   時計回りの順は変えず、グラフに渡す並びの始まりを訓練性能にずらす。トレーナー側と会員側（compact）の両方に効く
@@ -77,7 +79,7 @@ export const SERIES_STYLES = {
 };
 
 /**
- * @param {{labels: string[], keys?: string[], series: {key: 'current'|'previous'|'initial', date: string, values: string[]}[]}} data
+ * @param {{labels: string[], keys?: string[], series: {key: 'current'|'previous'|'initial', date: string, values: (string|null)[]}[]}} data
  *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、keys はカテゴリの値〔labels と同じ並び〕、
  *   series は重ねる回。date は回答日 Y/m/d、values は表示の値）
  * @param {{compact?: boolean}} [options]
@@ -94,7 +96,10 @@ export function buildRadarConfig(data, { compact = false } = {}) {
 
         return {
             label: seriesLabel(series),
-            data: series.values.map(Number),
+            // 点数なしは null のまま（0 の位置に描かない）
+            data: series.values.map((value) => (value === null ? null : Number(value))),
+            // 点数なしの項目を飛ばして、となりの点どうしをつなぐ（2026-10-18 追加）
+            spanGaps: true,
             borderColor: style.borderColor,
             backgroundColor: style.backgroundColor,
             pointBackgroundColor: style.borderColor,

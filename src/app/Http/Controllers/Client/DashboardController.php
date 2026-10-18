@@ -101,12 +101,14 @@ class DashboardController extends Controller
             'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'activePersonalityDiagnosisToken',
         ])->get();
 
-        // personality：結果がなければ null。あれば最新の結果のタイプ（表示名）と、レーダーチャートの値
-        // （今回・前回・初回。トレーナー側 S-0309 と同じ Trainee::personality_radar_data）
+        // personality：結果がなければ null。あれば最新の結果のタイプ（表示名。判定なしなら「判定なし」）と、レーダーチャートの値
+        // （今回・前回・初回。トレーナー側 S-0309 と同じ Trainee::personality_radar_data）、グラフの注記（今回に点数なしの
+        // カテゴリがあるときだけ。2026-10-18 追加。会員側には点数の表がないので、注記で伝える）
         return $trainees->map(fn ($trainee) => $trainee->weight_chart_data + [
             'personality' => $trainee->personalityDiagnosisResults->isEmpty() ? null : [
                 'type' => $trainee->personalityDiagnosisResults->first()->personality_type_label,
                 'radar' => $trainee->personality_radar_data,
+                'missingNote' => $trainee->personalityDiagnosisResults->first()->missingScoresNote(),
             ],
             'surveyNotices' => $this->surveyNotices($trainee),
         ])->all();

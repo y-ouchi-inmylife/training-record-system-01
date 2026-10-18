@@ -7,10 +7,14 @@ use InvalidArgumentException;
 /**
  * 性格診断の採点とタイプの判定（2026-10 追加）。
  *
- * 決まりは要件定義書 6-16「性格診断の採点とタイプの判定」。トレーナーさんの今の GAS と同じ結果にする：
- * - カテゴリごとに「未経験」を除いた回答の点数（0〜4）の平均。全問「未経験」のカテゴリは 0
+ * 決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」。トレーナーさんの今の GAS と同じ結果にする（下の 2 つの違いを除く）：
+ * - カテゴリごとに「未経験」を除いた回答の点数（0〜4）の平均。全問「未経験」のカテゴリは**点数なし（null）**
  * - 保存は小数第2位、表示は小数第1位。どちらも丸める前の値から四捨五入（ちょうど半分は切り上げ。GAS の toFixed と同じ）
- * - タイプは丸める前の平均で判定する。いちばん高い平均が 1.5 未満なら calm。同点はカテゴリの順で先のもの
+ * - タイプは丸める前の平均で判定する。点数なしのカテゴリは外す。いちばん高い平均が 1.5 未満なら calm。同点はカテゴリの順で先のもの。
+ *   全カテゴリが点数なし（50 問すべて「未経験」）なら**判定なし（null）**
+ *
+ * GAS との違い（2026-10-18 変更。意図した違い）：GAS では全問「未経験」のカテゴリは 0、全問「未経験」のタイプは calm。
+ * 「未経験」は「わからない」なので、0 点（傾向がまったくない）と見間違えないよう、点数なし・判定なしにした（トレーナーさんに確認）
  *
  * 浮動小数点の誤差で「ちょうど半分」や同点の扱いがずれないよう、平均は「点数の合計 / 問数」の分数のまま扱い、
  * 丸めも比べるのも整数の計算だけで行う（float・BCMath は使わない）。問数は多くても 8 なので、整数で足りる。
@@ -46,6 +50,14 @@ class PersonalityDiagnosisScorer
         foreach (PersonalityDiagnosisQuestions::questionIdsByCategory() as $category => $ids) {
             [$sum, $count] = $this->sumAndCount($answers, $ids);
 
+            // 全問「未経験」のカテゴリは点数なし（null）。タイプの判定からも外す（2026-10-18 変更：その前は 0）
+            if ($count === 0) {
+                $scores[$category] = null;
+                $display[$category] = null;
+
+                continue;
+            }
+
             $scores[$category] = $this->format($sum, $count, 2);
             $display[$category] = $this->format($sum, $count, 1);
 
@@ -55,10 +67,14 @@ class PersonalityDiagnosisScorer
             }
         }
 
-        [$bestSum, $bestCount, $bestCategory] = $best;
-        $type = $this->compare($bestSum, $bestCount, self::CALM_THRESHOLD_NUMERATOR, self::CALM_THRESHOLD_DENOMINATOR) < 0
-            ? 'calm'
-            : PersonalityDiagnosisQuestions::typeByCategory()[$bestCategory];
+        // 全カテゴリが点数なしなら判定なし（null。2026-10-18 変更：その前は calm）
+        $type = null;
+        if ($best !== null) {
+            [$bestSum, $bestCount, $bestCategory] = $best;
+            $type = $this->compare($bestSum, $bestCount, self::CALM_THRESHOLD_NUMERATOR, self::CALM_THRESHOLD_DENOMINATOR) < 0
+                ? 'calm'
+                : PersonalityDiagnosisQuestions::typeByCategory()[$bestCategory];
+        }
 
         return new PersonalityDiagnosisScore($scores, $display, $type);
     }
@@ -86,26 +102,23 @@ class PersonalityDiagnosisScorer
     }
 
     /**
-     * 平均（合計 / 問数）を小数第 $decimals 位に四捨五入した文字列。問数が 0 なら 0（例 "0.00"）。
+     * 平均（合計 / 問数）を小数第 $decimals 位に四捨五入した文字列。問数は 1 以上（0 のカテゴリは点数なしで、ここを通らない）。
      * 平均は 0 以上なので、四捨五入は floor(平均 × 10^n + 0.5) を整数だけで計算する
      */
     private function format(int $sum, int $count, int $decimals): string
     {
         $scale = 10 ** $decimals;
-        $scaled = $count === 0 ? 0 : intdiv(2 * $sum * $scale + $count, 2 * $count);
+        $scaled = intdiv(2 * $sum * $scale + $count, 2 * $count);
 
         return intdiv($scaled, $scale).'.'.str_pad((string) ($scaled % $scale), $decimals, '0', STR_PAD_LEFT);
     }
 
     /**
-     * 2 つの平均（a / b と c / d）を比べる。問数が 0 の平均は 0 とみなす。a/b < c/d なら負、等しければ 0、大きければ正
+     * 2 つの平均（a / b と c / d。b・d は 1 以上）を比べる。a/b < c/d なら負、等しければ 0、大きければ正
      */
     private function compare(int $a, int $b, int $c, int $d): int
     {
-        $left = $b === 0 ? 0 : $a * ($d === 0 ? 1 : $d);
-        $right = $d === 0 ? 0 : $c * ($b === 0 ? 1 : $b);
-
-        return $left <=> $right;
+        return ($a * $d) <=> ($c * $b);
     }
 
     /**

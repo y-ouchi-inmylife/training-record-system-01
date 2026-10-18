@@ -154,10 +154,11 @@ trait CreatesClientCountTables
             $table->timestamp('answered_at');
             $table->string('question_version', 10);
             $table->json('answers');
+            // 点数なし（全問「未経験」）・判定なしは NULL（2026-10-18 変更。2026_10_18_000002_make_personality_diagnosis_result_scores_nullable）
             foreach (['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'] as $category) {
-                $table->decimal('score_'.$category, 3, 2);
+                $table->decimal('score_'.$category, 3, 2)->nullable();
             }
-            $table->string('personality_type', 30);
+            $table->string('personality_type', 30)->nullable();
             $table->timestamps();
         });
     }

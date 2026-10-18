@@ -256,6 +256,11 @@
                                             <ul class="c-personality-legend list-unstyled d-flex flex-wrap flex-lg-column align-items-lg-start justify-content-center column-gap-3 row-gap-0 mb-0"
                                                 data-personality-radar-legend="personality-radar-{{ $chart['id'] }}"></ul>
                                         </div>
+                                        {{-- 点数なしの注記（今回の結果に点数なしのカテゴリがあるときだけ。2026-10-18 追加。会員側には点数の表がないので、
+                                             この注記で伝える。凡例と同じ小さめの文字） --}}
+                                        @if($chart['personality']['missingNote'])
+                                            <p class="c-personality-legend text-muted text-center mt-1 mb-0" data-personality-radar-missing-note>{{ $chart['personality']['missingNote'] }}</p>
+                                        @endif
                                     </div>
                                 @endif
                             </div>

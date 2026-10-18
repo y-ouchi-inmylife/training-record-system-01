@@ -14,11 +14,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * トレーナー側では閲覧のみ。お客様の操作で作られるため、created_by / updated_by は持たない。
  *
  * - answers：50 問の回答（キーは Q01〜Q50、値は 0〜4 の整数または未経験を表す "na"）。送られてきたとおりに残す
- * - score_*：7 カテゴリの平均（小数第2位に丸めた値）。列名の * はカテゴリの値（db-schema.md 5-23.）
- * - personality_type：タイプ（5-24.）。丸める前の平均から判定した値
+ * - score_*：7 カテゴリの平均（小数第2位に丸めた値）。列名の * はカテゴリの値（db-schema.md 5-23.）。
+ *   全問「未経験」のカテゴリは null（点数なし。2026-10-18 変更）
+ * - personality_type：タイプ（5-24.）。丸める前の平均から判定した値。全カテゴリが点数なしなら null（判定なし。2026-10-18 変更）
  */
 class TraineePersonalityDiagnosisResult extends Model
 {
+    /** タイプが判定なし（全カテゴリが点数なし）のときの表示（2026-10-18 追加） */
+    public const NO_TYPE_LABEL = '判定なし';
+
     protected $fillable = [
         'trainee_id',
         'trainee_personality_diagnosis_token_id',
@@ -51,15 +55,17 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 7 カテゴリの平均の保存の値（カテゴリの値 → 小数第2位の文字列。例 "1.13"）。並びは PersonalityDiagnosisQuestions::categories()
+     * 7 カテゴリの平均の保存の値（カテゴリの値 → 小数第2位の文字列。例 "1.13"）。並びは PersonalityDiagnosisQuestions::categories()。
+     * 点数なし（全問「未経験」）は null
      *
-     * @return array<string, string>
+     * @return array<string, string|null>
      */
     public function scores(): array
     {
         $scores = [];
         foreach (array_keys(PersonalityDiagnosisQuestions::categories()) as $category) {
-            $scores[$category] = (string) $this->{'score_'.$category};
+            $score = $this->{'score_'.$category};
+            $scores[$category] = $score === null ? null : (string) $score;
         }
 
         return $scores;
@@ -70,13 +76,16 @@ class TraineePersonalityDiagnosisResult extends Model
      *
      * 保存の値（小数第2位）から四捨五入する（ちょうど半分は切り上げ。設計書 S-0309「性格診断の欄」・要件定義書 6-16）。
      * 問数は多くても 8 なので、丸める前の値から第1位に丸めたとき（採点のクラスの表示の値・GAS の toFixed(1)）と
-     * 必ず同じ結果になる。浮動小数点の誤差を避けるため、文字列を百分の一の整数にしてから丸める
+     * 必ず同じ結果になる。浮動小数点の誤差を避けるため、文字列を百分の一の整数にしてから丸める。点数なしは null のまま
      *
-     * @return array<string, string>
+     * @return array<string, string|null>
      */
     public function displayScores(): array
     {
-        return array_map(function (string $score) {
+        return array_map(function (?string $score) {
+            if ($score === null) {
+                return null;
+            }
             [$integer, $fraction] = array_pad(explode('.', $score, 2), 2, '0');
             $hundredths = (int) $integer * 100 + (int) str_pad(substr($fraction, 0, 2), 2, '0');
             $tenths = intdiv($hundredths + 5, 10);
@@ -86,11 +95,41 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * タイプの表示名（db-schema.md 5-24.）
+     * タイプの表示名（db-schema.md 5-24.）。判定なし（全カテゴリが点数なし）は「判定なし」（2026-10-18 追加）
      */
     public function getPersonalityTypeLabelAttribute(): string
     {
+        if ($this->personality_type === null) {
+            return self::NO_TYPE_LABEL;
+        }
+
         return PersonalityDiagnosisQuestions::types()[$this->personality_type] ?? $this->personality_type;
+    }
+
+    /**
+     * 点数なし（全問「未経験」）のカテゴリの表示名（並びは categories()。2026-10-18 追加）
+     *
+     * @return list<string>
+     */
+    public function missingScoreLabels(): array
+    {
+        $labels = PersonalityDiagnosisQuestions::categories();
+
+        return array_values(array_map(
+            fn (string $category) => $labels[$category],
+            array_keys(array_filter($this->scores(), fn (?string $score) => $score === null)),
+        ));
+    }
+
+    /**
+     * グラフの注記（今回の結果に点数なしのカテゴリがあるときだけ。設計書 S-0309「点数なしの項目」）。
+     * 例：「※ 対犬・訓練性能は、答えがすべて「未経験」のため点数がありません。」。点数なしがなければ null
+     */
+    public function missingScoresNote(): ?string
+    {
+        $labels = $this->missingScoreLabels();
+
+        return $labels === [] ? null : '※ '.implode('・', $labels).'は、答えがすべて「未経験」のため点数がありません。';
     }
 
     public function trainee(): BelongsTo

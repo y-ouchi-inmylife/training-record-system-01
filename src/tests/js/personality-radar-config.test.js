@@ -192,3 +192,32 @@ describe('性格診断のレーダーチャートの向き', () => {
         }
     });
 });
+
+// 点数なし（そのカテゴリの答えがすべて「未経験」。2026-10-18 追加）
+describe('性格診断のレーダーチャートの点数なし', () => {
+    // 対犬（2 番目）と訓練性能（6 番目）が点数なし
+    const WITH_NULL = { key: 'current', date: '2026/06/01', values: ['2.0', null, '1.0', '1.4', '2.7', null, '1.0'] };
+
+    it('点数なしは 0 にせず null のまま渡し、となりの点どうしをつなぐ（spanGaps）', () => {
+        for (const options of [{}, { compact: true }]) {
+            const config = buildRadarConfig({ labels: LABELS, series: [WITH_NULL] }, options);
+            const dataset = config.data.datasets[0];
+
+            expect(dataset.data).toEqual([2, null, 1, 1.4, 2.7, null, 1]);
+            expect(dataset.spanGaps).toBe(true);
+        }
+    });
+
+    it('訓練性能を上に置く並べ直しでも、null は同じ項目の位置のまま動く', () => {
+        const config = buildRadarConfig({ labels: LABELS, keys: KEYS, series: [WITH_NULL, PREVIOUS] });
+
+        // 並べ直したあと：訓練性能・興奮性・対人・対犬・所有欲・分離不安・恐怖心
+        expect(config.data.labels).toEqual(['訓練性能', '興奮性', '対人', '対犬', '所有欲', '分離不安', '恐怖心']);
+        expect(config.data.datasets[0].data).toEqual([null, 1, 2, null, 1, 1.4, 2.7]);
+        expect(config.data.labels[config.data.datasets[0].data.indexOf(null)]).toBe('訓練性能');
+        expect(config.data.labels[config.data.datasets[0].data.lastIndexOf(null)]).toBe('対犬');
+        // ほかの回（点数なしがない）はそのまま数になる
+        expect(config.data.datasets[1].data).not.toContain(null);
+        expect(config.data.datasets.every((d) => d.spanGaps === true)).toBe(true);
+    });
+});
