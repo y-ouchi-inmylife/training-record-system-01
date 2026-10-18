@@ -199,6 +199,24 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('data-personality-radar-legend="personality-diagnosis-radar"', $html);
     }
 
+    public function test_見出しの右に会員のリンクと会員の内部IDを出す(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $html = $this->page($result);
+
+        // 2026-10-18 変更：トレーニー詳細（S-0309）の見出しの行と同じ形。内部ID は S-0305・S-0309・S-0403 と同じく会員の内部ID
+        $this->assertMatchesRegularExpression(
+            '/<div class="d-flex align-items-center gap-2 flex-wrap pb-2 border-bottom" data-personality-diagnosis-heading>\s*'
+            .'<h2 class="mb-0">モモの愛犬性格診断（2026\/06\/01）<\/h2>\s*'
+            .'<div class="d-flex align-items-baseline gap-2 ms-3">\s*<span class="text-muted small">会員<\/span>\s*'
+            .'<a href="'.preg_quote(route('clients.show', $this->client), '/').'">山田 太郎<\/a>\s*<\/div>\s*'
+            .'<div class="d-flex align-items-baseline gap-2 ms-3">\s*<span class="text-muted small">内部ID<\/span>\s*'
+            .'<span class="font-monospace fs-5">0001<\/span>\s*<\/div>\s*<\/div>/u',
+            $html
+        );
+    }
+
     public function test_名前が未登録なら見出しは名前未登録(): void
     {
         $this->trainee->update(['name' => null]);

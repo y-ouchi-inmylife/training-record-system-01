@@ -44,11 +44,12 @@ class TraineePersonalityDiagnosisResultController extends Controller
      * 愛犬性格診断詳細（GET /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}。S-0313）。
      *
      * レーダーチャートは、この結果を今回にし、それより前の結果から前回・初回を取る（Trainee::personalityRadarDataAsOf）。
-     * そのためトレーニーの結果を全部（新しい順に）読み込む。表示はアクセスログに記録しない
+     * そのためトレーニーの結果を全部（新しい順に）読み込む。表示はアクセスログに記録しない。
+     * 見出しの右の会員（S-0305 へのリンク）と内部ID のため、トレーニーの会員も読み込む（2026-10-18 追加）
      */
     public function show(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): View
     {
-        $trainee->load('personalityDiagnosisResults');
+        $trainee->load(['personalityDiagnosisResults', 'client']);
         $personalityDiagnosisResult->load(['evaluationUpdatedBy']);
 
         return view('trainees.personality-diagnosis-results.show', [

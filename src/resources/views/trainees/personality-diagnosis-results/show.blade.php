@@ -35,8 +35,21 @@
             @endif
         </div>
 
-        {{-- 2段目: 見出し（トレーナー側用の表示名。名前が未登録なら「名前未登録」） --}}
-        <h2 class="mb-0">{{ $trainee->display_name }}の{{ $pdName }}（{{ $answeredOn }}）</h2>
+        {{-- 2段目: 見出し（トレーナー側用の表示名。名前が未登録なら「名前未登録」）+ 会員（S-0305 リンク）+ 内部ID。
+             2026-10-18 変更：ユーザーレビューで、トレーニー詳細（S-0309）の 2 段目と同じ形にした（共通の部品はないので同じ書き方）。
+             内部ID は S-0305・S-0309・S-0403 と同じく会員の内部ID（診断の結果の ID ではない）。
+             見出しの行の下に線（S-0309 の属性の段の上の線と同じく、見出しの行から 0.5rem 下） --}}
+        <div class="d-flex align-items-center gap-2 flex-wrap pb-2 border-bottom" data-personality-diagnosis-heading>
+            <h2 class="mb-0">{{ $trainee->display_name }}の{{ $pdName }}（{{ $answeredOn }}）</h2>
+            <div class="d-flex align-items-baseline gap-2 ms-3">
+                <span class="text-muted small">会員</span>
+                <a href="{{ route('clients.show', $trainee->client) }}">{{ $trainee->client->full_name }}</a>
+            </div>
+            <div class="d-flex align-items-baseline gap-2 ms-3">
+                <span class="text-muted small">内部ID</span>
+                <span class="font-monospace fs-5">{{ $trainee->client->internal_id }}</span>
+            </div>
+        </div>
     </div>
 
     {{-- 結果（タイプ・この結果の時点のレーダーチャート・7 項目の点数）。並びは S-0309 の欄と同じ：xl 以上はグラフが左、それより狭いときはグラフが上 --}}
