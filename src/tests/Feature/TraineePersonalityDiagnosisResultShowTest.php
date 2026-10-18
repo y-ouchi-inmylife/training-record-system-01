@@ -20,8 +20,8 @@ use Tests\TestCase;
  * 愛犬性格診断詳細（S-0313）と評価文の保存（2026-10-18 追加。要件定義書 6-16-13〜6-16-15、設計書 S-0313）。
  *
  * - 見出し・［« トレーニー詳細へ戻る］・結果（タイプ・この結果の時点のレーダーチャート・7 項目の点数）・評価文・50問の回答
- * - 評価文：未作成・下書きはテキストエリアと［保存］（緑）。公開済みは表示だけと記録へのリンク。保存は 10,000 文字まで・
- *   空なら未作成に戻る・保存した人と日時・操作の記録。公開済みは保存を受け付けない（409）
+ * - 評価文：なし・下書きはテキストエリアと［保存］（緑）。公開済みは表示だけと記録へのリンク。保存は 10,000 文字まで・
+ *   空なら「なし」に戻る・保存した人と日時・操作の記録。公開済みは保存を受け付けない（409）
  * - ［トレーニング記録にして公開］（S-0313-M01。2026-10-18 追加）：欄の今の文を保存してから記録を作る。2 回目・公開済みは
  *   記録を増やさず作った記録の詳細へ。公開したあとは公開済み（表示だけ）
  * - 削除（管理者だけ。S-0313-M02。S-0309-M01 から移した）：結び付いた記録があるときの文。削除しても記録は残る
@@ -281,13 +281,13 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
     // ---- 評価文 ----
 
-    public function test_未作成は空のテキストエリアと緑の保存で最終保存は出さない(): void
+    public function test_なしは灰のバッジと空のテキストエリアと緑の保存で最終保存は出さない(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $card = $this->evaluationCard($this->page($result));
 
-        $this->assertStringContainsString('<span class="small text-muted" data-evaluation-status>未作成</span>', $card);
+        $this->assertStringContainsString('<span class="badge bg-secondary" data-evaluation-status>なし</span>', $card);
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]).'" novalidate data-evaluation-form>', $card);
         $this->assertStringContainsString('name="_method" value="PUT"', $card);
         $this->assertMatchesRegularExpression('/<textarea class="form-control " id="evaluation_text" name="evaluation_text"\s*rows="12" maxlength="10000"><\/textarea>/u', $card);
@@ -320,7 +320,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame('愛犬性格診断評価文保存', AccessLog::actionLabels()[$logs[0]->action]);
 
         $card = $this->evaluationCard($this->page($saved));
-        $this->assertStringContainsString('<span class="small" data-evaluation-status>下書き</span>', $card);
+        $this->assertStringContainsString('<span class="badge bg-warning text-dark" data-evaluation-status>下書き</span>', $card);
         $this->assertStringContainsString(">落ち着いた性格です。\nお散歩が好きです。</textarea>", $card);
         $this->assertStringContainsString('data-evaluation-updated>最終保存：2026/10/18 14:30 佐藤</p>', $card);
     }
@@ -332,7 +332,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame(0, AccessLog::query()->count());
     }
 
-    public function test_空で保存すると未作成に戻る(): void
+    public function test_空で保存するとなしに戻る(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         $result->update(['evaluation_text' => '下書き']);
@@ -340,7 +340,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->update($result, '   ')->assertRedirect($this->url($result));
 
         $this->assertNull($result->fresh()->evaluation_text);
-        $this->assertSame('未作成', $result->fresh()->evaluation_status_label);
+        $this->assertSame('なし', $result->fresh()->evaluation_status_label);
         // 保存した人と日時は残す（最後に保存した操作として）
         $this->assertSame(200, (int) $result->fresh()->evaluation_updated_by);
     }
@@ -381,7 +381,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $card = $this->evaluationCard($this->page($result));
 
-        $this->assertStringContainsString('<span class="small" data-evaluation-status>公開済み</span>', $card);
+        $this->assertStringContainsString('<span class="badge bg-success" data-evaluation-status>公開済み</span>', $card);
         $this->assertStringContainsString("<div class=\"mb-2\" style=\"white-space: pre-wrap;\" data-evaluation-text>公開した文\n2 行目</div>", $card);
         $this->assertStringNotContainsString('<textarea', $card);
         $this->assertStringNotContainsString('<form', $card);

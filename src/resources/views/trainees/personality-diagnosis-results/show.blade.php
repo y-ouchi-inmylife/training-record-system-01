@@ -21,7 +21,7 @@
      会員様向けの評価文を書く。結果の削除（管理者だけ）もここで行う（2026-10-18 変更：当初は S-0309 の行の［削除］）。
      - レーダーチャートは、この結果を今回にし、それより前の結果から前回・初回を取る（Trainee::personalityRadarDataAsOf）。
        作り（最大 300px の正方形・HTML の凡例・訓練性能を真上・点数なしは点を描かない）は S-0309 と同じ部品
-     - 評価文の状態（未作成・下書き・公開済み）は列に持たず、評価文と結び付いたトレーニング記録から決める（evaluation_status）。
+     - 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と結び付いたトレーニング記録から決める（evaluation_status）。
        公開済みは表示だけ（直すのはトレーニング記録の編集）
      - ［トレーニング記録にして公開］と確認のモーダル（S-0313-M01。2026-10-18 追加。要件定義書 6-16-16）：評価文が空なら押せない。
        モーダルの［公開する］で、欄の今の文（保存していない直しを含む）を公開の送り先に送る --}}
@@ -89,12 +89,13 @@
     </div>
 
     {{-- 評価文（要件定義書 6-16-15）。状態は見出しの右に文字で出す（色だけに頼らない）。
-         未作成・下書き：テキストエリア（10,000 文字以内）と［保存］（データ保存なので緑。4-4）。空で保存すると未作成に戻る。
+         なし・下書き：テキストエリア（10,000 文字以内）と［保存］（データ保存なので緑。4-4）。空で保存すると「なし」に戻る。
          公開済み：表示だけ（改行を保持）と、公開したトレーニング記録へのリンク --}}
     <div class="card mb-3" data-personality-diagnosis-evaluation>
         <div class="card-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0">評価文</h6>
-            <span @class(['small', 'text-muted' => $evaluationStatus === \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_NONE]) data-evaluation-status>{{ $result->evaluation_status_label }}</span>
+            {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
+            <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
         </div>
         <div class="card-body">
             @if($isPublished)

@@ -17,7 +17,7 @@ use Illuminate\View\View;
  *
  * 詳細と評価文の保存：
  * - トレーナー（一般・管理者）なら見られる・保存できる。{personalityDiagnosisResult} は {trainee} の結果に限る（scopeBindings）
- * - 評価文の状態（未作成・下書き・公開済み）は列に持たず、評価文と結び付いたトレーニング記録から決める（evaluation_status）
+ * - 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と結び付いたトレーニング記録から決める（evaluation_status）
  * - 公開済みの評価文は保存を受け付けない（409。直すのはトレーニング記録の編集。画面ではテキストエリアを出さない）
  * 評価文の公開（2026-10-18 追加。要件定義書 6-16-16）：
  * - 欄の今の文を保存してから、評価文を本文にしたトレーニング記録を作る（1 つの結果に記録は 1 件まで）
@@ -60,7 +60,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
      * 評価文を保存する（PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}）。
      *
      * - 10,000 文字以内。改行は LF にそろえてから数える（受付アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）
-     * - 空（空白だけを含む）で保存すると NULL（未作成に戻る）。それ以外は入力のまま保存する（前後の空白は TrimStrings で取れる）
+     * - 空（空白だけを含む）で保存すると NULL（「なし」に戻る）。それ以外は入力のまま保存する（前後の空白は TrimStrings で取れる）
      * - 最後に保存したトレーナーと日時を残す（evaluation_updated_by・evaluation_updated_at）
      * - 公開済みなら 409（保存しない）
      * - アクセスログ（edit_trainee_personality_diagnosis_evaluation）は LogAccess ミドルウェアで記録する
@@ -168,7 +168,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
      * 評価文の入力を確かめて、保存する値を返す（保存と公開で同じ決まり。2026-10-18 に保存から切り出した）。
      *
      * - 改行は LF にそろえてから数える（受付アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）。10,000 文字以内
-     * - 空（空白だけを含む）なら null（未作成）。公開では必須（空なら入力エラー）
+     * - 空（空白だけを含む）なら null（なし）。公開では必須（空なら入力エラー）
      */
     private function validateEvaluationText(Request $request, bool $required): ?string
     {

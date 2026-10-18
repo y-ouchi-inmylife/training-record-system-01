@@ -328,6 +328,6 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->assertNull(TrainingRecord::query()->sole()->trainee_personality_diagnosis_result_id);
-        $this->assertSame('未作成', $result->fresh()->evaluation_status_label);
+        $this->assertSame('なし', $result->fresh()->evaluation_status_label);
     }
 }

@@ -239,7 +239,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('data-bs-toggle="modal"', $card);
     }
 
-    public function test_評価文の列に未作成と下書きと公開済みを文字で出す(): void
+    public function test_評価文の列になしと下書きと公開済みを色のバッジで出す(): void
     {
         $none = $this->addResult('past-3', '2025-12-01 10:00:00');
         $draft = $this->addResult('past-2', '2026-03-10 11:00:00');
@@ -252,10 +252,11 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $card = $this->card($this->page());
 
-        preg_match_all('/<td class="text-nowrap( text-muted)?">(未作成|下書き|公開済み)<\/td>/u', $card, $m);
-        $this->assertSame(['公開済み', '下書き', '未作成'], $m[2]);
-        // 未作成だけ薄い文字
-        $this->assertSame(['', '', ' text-muted'], $m[1]);
+        preg_match_all('/<td class="text-nowrap"><span class="badge ([^"]+)">(なし|下書き|公開済み)<\/span><\/td>/u', $card, $m);
+        $this->assertSame(['公開済み', '下書き', 'なし'], $m[2]);
+        // 色：公開済み＝緑、下書き＝黄（文字は黒）、なし＝灰（2026-10-18 変更：その前は文字だけで、「未作成」は薄い文字）
+        $this->assertSame(['bg-success', 'bg-warning text-dark', 'bg-secondary'], $m[1]);
+        $this->assertStringNotContainsString('未作成', $card);
         $this->assertNotNull($none);
     }
 
@@ -457,7 +458,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         // 点数 7 つ＋ボタンの列
         $this->assertSame(8, substr_count($card, '<td class="text-end text-nowrap">'));
         // 評価文の状態とボタンの列も折り返さない
-        $this->assertSame(1, preg_match_all('/<td class="text-nowrap text-muted">未作成<\/td>/u', $card));
+        $this->assertSame(1, preg_match_all('/<td class="text-nowrap"><span class="badge bg-secondary">なし<\/span><\/td>/u', $card));
         $this->assertMatchesRegularExpression('/<td class="text-end text-nowrap">\s*<a href="[^"]+" class="btn btn-sm btn-outline-primary text-nowrap"/u', $card);
     }
 
