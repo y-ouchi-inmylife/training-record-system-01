@@ -429,44 +429,45 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString('古い回答', $html);
     }
 
-    // ---- 削除の確認：結果から作ったトレーニング記録（2026-10-18 追加。要件定義書 6-16-4・6-16-16） ----
+    // ---- 削除の確認：公開済みの評価文（2026-10-18 追加。要件定義書 6-16-4・6-16-16。2026-10-18 変更：その前は
+    //      結果から作ったトレーニング記録が残ることの文） ----
 
-    /** 評価文を公開して作った記録（最後の結果に結び付ける） */
-    private function addPublishedRecord(): void
+    /** 最後の結果の評価文を公開済みにする */
+    private function publishLatestEvaluation(): void
     {
-        DB::table('training_records')->insert([
-            'client_id' => $this->trainee->client_id, 'training_date' => '2026-10-17', 'trainer1_id' => 200,
-            'record_content' => '評価文', 'trainee_personality_diagnosis_result_id' => DB::table('trainee_personality_diagnosis_results')->max('id'),
-        ]);
+        DB::table('trainee_personality_diagnosis_results')->where('id', DB::table('trainee_personality_diagnosis_results')->max('id'))
+            ->update(['evaluation_text' => '評価文', 'evaluation_published_at' => '2026-10-17 10:00:00']);
     }
 
-    public function test_削除の確認_結果から作った記録があれば記録は残ることを足す(): void
+    public function test_削除の確認_公開済みの評価文があれば会員様の画面から消えることを足す(): void
     {
         $this->addPersonalityResult();
-        $this->addPublishedRecord();
+        $this->publishLatestEvaluation();
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('愛犬性格診断の結果も一緒に削除されます。愛犬性格診断の結果から作ったトレーニング記録は、グラフのない記録として残ります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('愛犬性格診断の結果も一緒に削除されます。公開済みの愛犬性格診断の評価文も、会員様のマイページから消えます。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
-    public function test_削除の確認_すべてあれば記録の文は消えるものの文のあと案内の文の前(): void
+    public function test_削除の確認_すべてあれば評価文の文は消えるものの文のあと案内の文の前(): void
     {
         $this->addResponse();
         $this->issueToken();
         $this->addPersonalityResult();
-        $this->addPublishedRecord();
+        $this->publishLatestEvaluation();
         $this->issuePersonalityToken();
         $this->addMeasurements(1);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
-        $this->assertSame('このトレーニーには 1 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。愛犬性格診断の結果から作ったトレーニング記録は、グラフのない記録として残ります。発行済みの受付アンケート案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+        $this->assertSame('このトレーニーには 1 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。受付アンケートの回答と愛犬性格診断の結果も一緒に削除されます。公開済みの愛犬性格診断の評価文も、会員様のマイページから消えます。発行済みの受付アンケート案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
-    public function test_削除の確認_結果があっても記録を作っていなければ記録の文は出さない(): void
+    public function test_削除の確認_評価文が下書きなら評価文の文は出さない(): void
     {
         $this->addPersonalityResult();
+        DB::table('trainee_personality_diagnosis_results')->update(['evaluation_text' => '下書き']);
         $html = $this->get(route('trainees.show', $this->trainee))->getContent();
 
+        $this->assertStringNotContainsString('会員様のマイページから消えます', $this->deleteConfirmMessage($html));
         $this->assertStringNotContainsString('グラフのない記録', $this->deleteConfirmMessage($html));
     }
 }

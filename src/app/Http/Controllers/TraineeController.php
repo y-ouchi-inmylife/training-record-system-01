@@ -59,9 +59,8 @@ class TraineeController extends Controller
         // latestIntakeSurveyResponse と activeIntakeSurveyToken は受付アンケートの欄の状態と、
         // 削除確認の文言に使う（2026-10 追加）。personalityDiagnosisResults は性格診断の欄の結果の一覧
         // （新しい順。2026-10 追加。何件あってもクエリは 1 本）。personalityDiagnosisResults と activePersonalityDiagnosisToken は
-        // 削除確認の文言にも使う（2026-10 追加）。personalityDiagnosisResults.trainingRecord は結果の表の評価文の状態に使う
-        // （公開済みかどうか。2026-10-18 追加。結果が何件あってもクエリは 1 本）
-        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults.trainingRecord', 'activePersonalityDiagnosisToken']);
+        // 削除確認の文言にも使う（2026-10 追加）。結果の表の評価文の状態は結果の列だけで決まる（2026-10-18）
+        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults', 'activePersonalityDiagnosisToken']);
 
         // 削除確認ダイアログに件数を含めるため、コントローラで数えて渡す。
         $measurementCount = $trainee->measurements->count();
@@ -86,8 +85,9 @@ class TraineeController extends Controller
         // 「発行済みの〜も使えなくなります。」）をこの順で足し、最後を「このトレーニーを削除しますか？」で締める。
         // 文と文は区切りなしで続ける（confirm() では改行が使えないため）。どれもないときは、これまでの文のまま
         // （0 件のときの出し方を含めて変えない）。2026-10 変更：性格診断の結果・案内を足した。
-        // 2026-10-18 追加：結果から作ったトレーニング記録（評価文を公開した記録）があるときは、消えるものの文のあとに
-        // 「愛犬性格診断の結果から作ったトレーニング記録は、グラフのない記録として残ります。」を足す（記録は会員の記録なので消えない）
+        // 2026-10-18 追加：公開済みの愛犬性格診断の評価文があるときは、消えるものの文のあとに
+        // 「公開済みの愛犬性格診断の評価文も、会員様のマイページから消えます。」を足す
+        // （2026-10-18 変更：その前は、結果から作ったトレーニング記録が残ることの文だった）
         $measurementSentence = $measurementCount > 0
             ? "このトレーニーには {$measurementCount} 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。"
             : '';
@@ -103,8 +103,8 @@ class TraineeController extends Controller
         if ($deleted !== []) {
             $intakeSurveySentence .= implode('と', $deleted).'も一緒に削除されます。';
         }
-        if ($trainee->personalityDiagnosisResults->contains(fn ($result) => $result->trainingRecord !== null)) {
-            $intakeSurveySentence .= __('messages.personality_diagnosis_name').'の結果から作ったトレーニング記録は、グラフのない記録として残ります。';
+        if ($trainee->personalityDiagnosisResults->contains(fn ($result) => $result->evaluation_published_at !== null)) {
+            $intakeSurveySentence .= '公開済みの'.__('messages.personality_diagnosis_name').'の評価文も、会員様のマイページから消えます。';
         }
         if ($invalidated !== []) {
             $intakeSurveySentence .= '発行済みの'.implode('と', $invalidated).'も使えなくなります。';

@@ -92,25 +92,6 @@
         </section>
     @endif
 
-    {{-- 愛犬性格診断(2026-10-18 追加。要件定義書 6-15-7・6-16-16、設計書 S-1404 セクション2.5)。評価文を公開して作った記録だけ。
-         写真と動画の下・ノートの上(S-0403 と同じ位置)。見出しは会員側の呼び名(「アイちゃん」)。
-         タイプと、その結果の時点のレーダーチャート(マイページの愛犬のカードと同じ小さな表示〔compact〕・同じ部品)。
-         点数の表・50 問の回答・評価文の状態・S-0313 へのリンクは出さない。注記も出さない(マイページと同じ)。
-         結び付きがない・結果が削除された記録には出さない --}}
-    @if($personalityDiagnosis)
-        <section class="c-detail-section" aria-labelledby="c-personality-heading" data-record-personality-diagnosis>
-            <p class="eyebrow" id="c-personality-heading">{{ $personalityDiagnosis['trainee']->client_call_name }}の{{ __('messages.personality_diagnosis_name') }}（{{ $personalityDiagnosis['result']->answered_at->format('Y/m/d') }}）</p>
-            <p class="fw-bold mb-1" style="word-break: keep-all;" data-record-personality-type>{!! collect(explode('・', $personalityDiagnosis['result']->personality_type_label))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
-            <div class="c-personality-radar">
-                <canvas id="record-personality-radar" role="img" aria-label="{{ $personalityDiagnosis['trainee']->client_call_name }}の{{ __('messages.personality_diagnosis_name') }}のグラフ"
-                        data-personality-radar="{{ json_encode($personalityDiagnosis['radar'], JSON_UNESCAPED_UNICODE) }}"
-                        data-personality-radar-compact></canvas>
-            </div>
-            <ul class="c-personality-legend list-unstyled d-flex flex-wrap column-gap-3 row-gap-0 mt-1 mb-0"
-                data-personality-radar-legend="record-personality-radar"></ul>
-        </section>
-    @endif
-
     {{-- トレーナーからのノート(record_content): 空ならブロックごと出さない(§4-4)
          注: impression は非開示フィールドのため一切出さない(§8-1-1) --}}
     @if($rec->record_content)
@@ -137,10 +118,6 @@
 {{-- 原寸ライトボックス(写真拡大・動画再生) — 共有パーシャル --}}
 @include('media-records._lightbox')
 
-{{-- 愛犬性格診断のレーダーチャート(欄があるときだけ読み込む。マイページと同じ部品。2026-10-18 追加) --}}
-@if($personalityDiagnosis)
-    @vite('resources/js/personality-radar.js')
-@endif
 @endsection
 
 @push('scripts')

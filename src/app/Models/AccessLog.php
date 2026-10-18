@@ -52,6 +52,8 @@ class AccessLog extends Model
             'delete_trainee_personality_diagnosis_result' => __('messages.personality_diagnosis_name').'結果削除',
             // 評価文の更新の表示名は、ほかの edit_* の「〜編集」にそろえる（2026-10-18 変更：その前は「…評価文保存」）
             'edit_trainee_personality_diagnosis_evaluation' => __('messages.personality_diagnosis_name').'評価文編集',
+            'publish_trainee_personality_diagnosis_evaluation' => __('messages.personality_diagnosis_name').'評価文公開',
+            'unpublish_trainee_personality_diagnosis_evaluation' => __('messages.personality_diagnosis_name').'評価文公開停止',
             'create_client_contract' => '契約登録',
             'edit_client_contract' => '契約編集',
             'delete_client_contract' => '契約削除',

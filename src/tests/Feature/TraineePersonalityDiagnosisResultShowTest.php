@@ -20,11 +20,12 @@ use Tests\TestCase;
  * 愛犬性格診断詳細（S-0313）と評価文の保存（2026-10-18 追加。要件定義書 6-16-13〜6-16-15、設計書 S-0313）。
  *
  * - 見出し・［« トレーニー詳細へ戻る］・結果（タイプ・この結果の時点のレーダーチャート・7 項目の点数）・評価文・50問の回答
- * - 評価文：なし・下書きはテキストエリアと［保存］（緑）。公開済みは表示だけと記録へのリンク。保存は 10,000 文字まで・
- *   空なら「なし」に戻る・保存した人と日時・操作の記録。公開済みは保存を受け付けない（409）
- * - ［トレーニング記録にして公開］（S-0313-M01。2026-10-18 追加）：欄の今の文を保存してから記録を作る。2 回目・公開済みは
- *   記録を増やさず作った記録の詳細へ。公開したあとは公開済み（表示だけ）
- * - 削除（管理者だけ。S-0313-M02。S-0309-M01 から移した）：結び付いた記録があるときの文。削除しても記録は残る
+ * - 評価文：どの状態でもテキストエリアと［更新］（緑）。更新は 10,000 文字まで・空なら「なし」に戻る（公開済みは空にできない）・
+ *   保存した人と日時・操作の記録。公開済みも直せる（完了メッセージで会員様に見えることを伝える）
+ * - ［公開］（S-0313-M01）：欄の今の文を保存してから、公開した日時・トレーナーを入れる。トレーニング記録は作らない。
+ *   2 回目は何もせず S-0313 へ（2026-10-18 変更：その前は公開で記録を作っていた）
+ * - ［公開をやめる］（白抜きの赤。S-0313-M03。2026-10-18 追加）：公開した日時・トレーナーを空に戻す（評価文は残る）
+ * - 削除（管理者だけ。S-0313-M02。S-0309-M01 から移した）：公開済みのときは会員様の画面からも消えることの文
  * - 権限：トレーナー（一般・管理者）は表示・保存、システム管理者は 403、URL のトレーニーと結果が合わなければ 404、未ログインはログイン画面へ
  *
  * ミドルウェア（auth・practitioners・LogAccess など）は外さず、実際の HTTP で確かめる。点数は固定データを結果として入れる
@@ -115,13 +116,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         return $this->get($this->url($result))->assertOk()->getContent();
     }
 
-    /** 結果を結び付けたトレーニング記録を入れる（公開は次の段階なので、列を直接入れる） */
-    private function linkRecord(TraineePersonalityDiagnosisResult $result, string $date = '2026-10-18'): int
+    /** 評価文を公開済みにする（公開した日時・トレーナーを直接入れる） */
+    private function markPublished(TraineePersonalityDiagnosisResult $result, string $text = '公開した文', string $at = '2026-10-18 10:00:00'): void
     {
-        return DB::table('training_records')->insertGetId([
-            'client_id' => $this->client->id, 'training_date' => $date, 'trainer1_id' => 200,
-            'record_content' => $result->evaluation_text, 'trainee_personality_diagnosis_result_id' => $result->id,
-        ]);
+        $result->update(['evaluation_text' => $text, 'evaluation_published_at' => $at, 'evaluation_published_by' => 200]);
     }
 
     /** 評価文のカード */
@@ -266,15 +264,20 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $html = $this->page($result);
 
-        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"\s*data-evaluation-publish\s*>トレーニング記録にして公開<\/button>/u', $html);
-        // ［保存］の右
+        // ボタンの名前は［公開］（2026-10-18 変更：その前は［トレーニング記録にして公開］）
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"\s*data-evaluation-publish\s*>公開<\/button>/u', $html);
+        $this->assertStringNotContainsString('トレーニング記録にして公開', $html);
+        // ［更新］の右
         $this->assertLessThan(strpos($html, 'data-evaluation-publish'), strpos($html, '>更新</button>'));
-        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">トレーニング記録にして公開</h5>', $html);
-        $this->assertStringContainsString('<p class="mb-0">トレーニング記録を作り、会員様に公開します。公開すると、評価文はトレーニング記録で直すことになります。</p>', $html);
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">評価文の公開</h5>', $html);
+        $this->assertStringContainsString('<p class="mb-0">会員様のマイページに公開します。公開したあとも、この画面で直せます。直すとすぐ会員様に見えます。</p>', $html);
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.publish', [$this->trainee, $result]).'" class="d-inline m-0" data-evaluation-publish-form>', $html);
         $this->assertStringContainsString('<input type="hidden" name="evaluation_text" value="">', $html);
         $this->assertStringContainsString('<button type="submit" class="btn btn-primary">公開する</button>', $html);
         $this->assertStringContainsString('<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>', $html);
+        // 公開をやめるは出さない
+        $this->assertStringNotContainsString('公開をやめる', $html);
+        $this->assertStringNotContainsString('data-personality-diagnosis-unpublish', $html);
     }
 
     public function test_評価文が空なら公開のボタンは押せない(): void
@@ -283,19 +286,26 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $html = $this->page($result);
 
-        $this->assertMatchesRegularExpression('/data-evaluation-publish\s+disabled>トレーニング記録にして公開<\/button>/u', $html);
+        $this->assertMatchesRegularExpression('/data-evaluation-publish\s+disabled>公開<\/button>/u', $html);
     }
 
-    public function test_公開済みには公開のボタンもモーダルも出さない(): void
+    public function test_公開済みには公開のボタンとモーダルを出さず公開をやめるとM03を出す(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $result->update(['evaluation_text' => '公開した文']);
-        $this->linkRecord($result);
+        $this->markPublished($result);
 
         $html = $this->page($result);
 
-        $this->assertStringNotContainsString('トレーニング記録にして公開', $html);
+        // ［公開］とモーダルは出さない（公開した日の data-evaluation-published-on とは別の属性）
+        $this->assertDoesNotMatchRegularExpression('/data-evaluation-publish[\s>]/', $html);
+        $this->assertStringNotContainsString('data-evaluation-publish-form>', $html);
         $this->assertStringNotContainsString('data-personality-diagnosis-publish', $html);
+        // ［公開をやめる］は白抜きの赤。M03 の実行は赤の塗り
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"\s*data-evaluation-unpublish>公開をやめる<\/button>/u', $html);
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-unpublish-label">評価文の公開をやめる</h5>', $html);
+        $this->assertStringContainsString('<p class="mb-0">会員様のマイページから評価文を外します。評価文は下書きとして残ります。</p>', $html);
+        $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, $result]).'" class="d-inline m-0" data-evaluation-unpublish-form>', $html);
+        $this->assertStringContainsString('<button type="submit" class="btn btn-danger">公開をやめる</button>', $html);
     }
 
     // ---- 評価文 ----
@@ -315,20 +325,20 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // form 属性で評価文のフォームを送る
         $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $card);
         $this->assertStringNotContainsString('>保存</button>', $card);
-        // 見出しの行：「評価文」→ すぐ右にバッジ → 右に［更新］［トレーニング記録にして公開］（2026-10-18 変更：その前はテキストエリアの上の行）
+        // 見出しの行：「評価文」→ すぐ右にバッジ → 右に［更新］［公開］（2026-10-18 変更：その前はテキストエリアの上の行）
         $header = $this->evaluationHeader($card);
         $this->assertStringContainsString('<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">', $header);
         $this->assertLessThan(strpos($header, 'data-evaluation-status>'), strpos($header, '<h6 class="mb-0">評価文</h6>'));
         $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, 'data-evaluation-status>'));
-        $this->assertLessThan(strpos($header, '>トレーニング記録にして公開</button>'), strpos($header, '>更新</button>'));
+        $this->assertLessThan(strpos($header, '>公開</button>'), strpos($header, '>更新</button>'));
         $this->assertStringContainsString('<div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>', $header);
         // 大きさは通常（ほかのカードの見出しのボタンと同じ。btn-sm にしない）
         $this->assertStringNotContainsString('btn-sm', $header);
         // テキストエリアの上のボタンの行はなくした（ボタンは見出しの行だけ）
         $this->assertStringNotContainsString('<button', substr($card, strpos($card, '<div class="card-body">')));
         $this->assertStringNotContainsString('最終更新', $card);
-        // 記録へのリンクは公開済みのときだけ
-        $this->assertStringNotContainsString('data-evaluation-record-link', $card);
+        // 公開した日は公開済みのときだけ
+        $this->assertStringNotContainsString('data-evaluation-published-on', $card);
         // 一度も更新していなければ、画面の下にも出さない
         $this->assertNull($this->updatedLine($this->page($result)));
     }
@@ -416,37 +426,61 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString(str_repeat('う', 10001).'</textarea>', $html);
     }
 
-    public function test_公開済みは表示だけで記録へのリンクを出し保存を受け付けない(): void
+    public function test_公開済みは見出しの行に公開した日と更新と公開をやめるを出しテキストエリアで直せる(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $result->update(['evaluation_text' => "公開した文\n2 行目", 'evaluation_updated_by' => 200, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
-        $recordId = $this->linkRecord($result, '2026-10-18');
+        $result->update(['evaluation_updated_by' => 200, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
+        $this->markPublished($result, "公開した文\n2 行目", '2026-10-18 10:00:00');
 
-        $card = $this->evaluationCard($this->page($result));
-
-        $this->assertStringContainsString('<span class="badge bg-success" data-evaluation-status>公開済み</span>', $card);
-        $this->assertStringContainsString("<div style=\"white-space: pre-wrap;\" data-evaluation-text>公開した文\n2 行目</div>", $card);
-        $this->assertStringNotContainsString('<textarea', $card);
-        $this->assertStringNotContainsString('<form', $card);
-        $this->assertStringNotContainsString('>更新</button>', $card);
-        // 見出しの行は「評価文」→ バッジ「公開済み」→「（トレーニング記録）」のリンク。ボタンは出さない
+        $html = $this->page($result);
+        $card = $this->evaluationCard($html);
         $header = $this->evaluationHeader($card);
-        $this->assertStringNotContainsString('data-evaluation-buttons', $card);
-        $this->assertStringNotContainsString('<button', $header);
-        $link = '<span class="small" data-evaluation-record-link>（<a href="'.route('training-records.show', $recordId).'">トレーニング記録</a>）</span>';
-        $this->assertStringContainsString($link, $header);
-        $this->assertLessThan(strpos($header, $link), strpos($header, 'data-evaluation-status>公開済み</span>'));
-        // カードの中の「公開済み（{日付}のトレーニング記録）」と案内の一文は出さない（2026-10-18 変更）。日付も出さない
-        $this->assertStringNotContainsString('data-evaluation-published', $card);
-        $this->assertStringNotContainsString('直すときは', $card);
-        $this->assertStringNotContainsString('公開済み（', $card);
-        $this->assertStringNotContainsString('2026/10/18', $card);
-        // 公開済みでも最終更新は出す（画面の下）
-        $this->assertStringNotContainsString('最終更新', $card);
-        $this->assertSame('最終更新: 2026/10/17 09:00 佐藤', $this->updatedLine($this->page($result)));
 
-        $this->update($result, '書き換え')->assertStatus(409);
-        $this->assertSame("公開した文\n2 行目", $result->fresh()->evaluation_text);
+        // 見出しの行：「評価文」→ バッジ「公開済み」→ 公開した日 → 右に［更新］［公開をやめる］
+        $this->assertStringContainsString('<span class="badge bg-success" data-evaluation-status>公開済み</span>', $header);
+        $this->assertStringContainsString('<span class="text-muted small" data-evaluation-published-on>2026/10/18 公開</span>', $header);
+        $this->assertLessThan(strpos($header, 'data-evaluation-published-on'), strpos($header, 'data-evaluation-status'));
+        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, 'data-evaluation-published-on'));
+        $this->assertLessThan(strpos($header, '>公開をやめる</button>'), strpos($header, '>更新</button>'));
+        $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $header);
+        // テキストエリアのまま直せる（2026-10-18 変更：その前は表示だけで、作った記録へのリンク）
+        $this->assertStringContainsString(">公開した文\n2 行目</textarea>", $card);
+        $this->assertStringNotContainsString('data-evaluation-text', $card);
+        $this->assertStringNotContainsString('data-evaluation-record-link', $html);
+        $this->assertStringNotContainsString('トレーニング記録', $card);
+        // 最終更新は画面の下
+        $this->assertSame('最終更新: 2026/10/17 09:00 佐藤', $this->updatedLine($html));
+    }
+
+    public function test_公開済みを更新すると会員様に見えることを伝え公開は続く(): void
+    {
+        Carbon::setTestNow('2026-10-19 08:00:00');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+
+        $response = $this->update($result, '直した文');
+
+        $response->assertRedirect($this->url($result));
+        $response->assertSessionHas('success', '評価文を更新しました。会員様のマイページにも反映されています。');
+        $saved = $result->fresh();
+        $this->assertSame('直した文', $saved->evaluation_text);
+        $this->assertSame('公開済み', $saved->evaluation_status_label);
+        // 公開した日時は変わらない
+        $this->assertSame('2026-10-18 10:00:00', $saved->evaluation_published_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-10-19 08:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_公開済みは空にできない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+
+        $response = $this->update($result, " \r\n ");
+
+        $response->assertRedirect($this->url($result));
+        $response->assertSessionHasErrors(['evaluation_text' => '公開中の評価文は空にできません。公開をやめてから消してください。']);
+        $this->assertSame('公開した文', $result->fresh()->evaluation_text);
+        $this->assertSame('公開済み', $result->fresh()->evaluation_status_label);
     }
 
     public function test_保存したトレーナーが削除されていれば最終更新は日時だけ(): void
@@ -460,13 +494,12 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
     public function test_評価文はエスケープして出す(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $result->update(['evaluation_text' => '<b>x</b>']);
-        $this->linkRecord($result);
+        $this->markPublished($result, '<b>x</b>');
 
         $this->assertStringNotContainsString('<b>x</b>', $this->page($result));
     }
 
-    // ---- 公開（S-0313-M01。2026-10-18 追加。要件定義書 6-16-16） ----
+    // ---- 公開（S-0313-M01）・公開をやめる（S-0313-M03）。2026-10-18 追加。要件定義書 6-16-16 ----
 
     private function publish(TraineePersonalityDiagnosisResult $result, mixed $text, ?Trainee $trainee = null)
     {
@@ -474,57 +507,61 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
             ->post(route('trainee-personality-diagnosis-results.publish', [$trainee ?? $this->trainee, $result]), ['evaluation_text' => $text]);
     }
 
-    public function test_URLとルート名は設計書のとおり_公開(): void
+    private function unpublish(TraineePersonalityDiagnosisResult $result, ?Trainee $trainee = null)
     {
-        $this->assertSame(
-            url('/trainees/'.$this->trainee->id.'/personality-diagnosis-results/5/publish'),
-            route('trainee-personality-diagnosis-results.publish', [$this->trainee, 5])
-        );
+        return $this->from($this->url($result, $trainee))
+            ->post(route('trainee-personality-diagnosis-results.unpublish', [$trainee ?? $this->trainee, $result]));
     }
 
-    public function test_公開すると記録を1件作り中身は設計書のとおりで記録の詳細へ移る(): void
+    public function test_URLとルート名は設計書のとおり_公開と公開をやめる(): void
     {
-        // 日付が変わった直後（アプリの時間帯＝日本時間）でも、公開した日になる
+        $base = url('/trainees/'.$this->trainee->id.'/personality-diagnosis-results/5');
+        $this->assertSame($base.'/publish', route('trainee-personality-diagnosis-results.publish', [$this->trainee, 5]));
+        $this->assertSame($base.'/unpublish', route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, 5]));
+    }
+
+    public function test_公開すると公開した日時とトレーナーが入り記録は作らずS_0313に戻る(): void
+    {
         Carbon::setTestNow(Carbon::parse('2026-10-19 00:10:00', 'Asia/Tokyo'));
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         $result->update(['evaluation_text' => '古い下書き']);
 
         $response = $this->publish($result, "保存していない直し\r\n2 行目");
 
-        $record = TrainingRecord::query()->sole();
-        $response->assertRedirect(route('training-records.show', $record));
-        $response->assertSessionHas('success', 'トレーニング記録を作り、会員様に公開しました。');
-        $this->assertSame($this->client->id, (int) $record->client_id);
-        $this->assertSame('2026-10-19', $record->training_date->format('Y-m-d'));
-        $this->assertNull($record->training_time);
-        $this->assertSame(200, (int) $record->trainer1_id);
-        $this->assertNull($record->trainer2_id);
-        $this->assertSame("保存していない直し\n2 行目", $record->record_content);
-        $this->assertNull($record->impression);
-        $this->assertSame(200, (int) $record->updated_by);
-        $this->assertSame($result->id, (int) $record->trainee_personality_diagnosis_result_id);
-        // 欄の今の文（保存していない直し）を保存してから公開する
+        $response->assertRedirect($this->url($result));
+        $response->assertSessionHas('success', '評価文を公開しました。');
         $saved = $result->fresh();
+        $this->assertSame('公開済み', $saved->evaluation_status_label);
+        $this->assertSame('2026-10-19 00:10:00', $saved->evaluation_published_at->format('Y-m-d H:i:s'));
+        $this->assertSame(200, (int) $saved->evaluation_published_by);
+        $this->assertSame('佐藤', $saved->evaluationPublishedBy->name);
+        // 欄の今の文（保存していない直し）を保存してから公開する
         $this->assertSame("保存していない直し\n2 行目", $saved->evaluation_text);
         $this->assertSame(200, (int) $saved->evaluation_updated_by);
         $this->assertSame('2026-10-19 00:10:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
-        $this->assertSame('公開済み', $saved->evaluation_status_label);
+        // トレーニング記録は作らない（2026-10-18 変更）
+        $this->assertSame(0, TrainingRecord::query()->count());
     }
 
-    public function test_公開は記録の登録と同じ操作の記録を残す(): void
+    public function test_公開と公開をやめるは操作の記録を残す(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $this->publish($result, '評価文');
+        $this->unpublish($result);
 
-        $logs = AccessLog::query()->get();
-        $this->assertCount(1, $logs);
-        $this->assertSame('create_training_record', $logs[0]->action);
-        $this->assertSame('TrainingRecord', $logs[0]->target_type);
-        $this->assertNull($logs[0]->target_id);
+        $logs = AccessLog::query()->orderBy('id')->get();
+        $this->assertSame(['publish_trainee_personality_diagnosis_evaluation', 'unpublish_trainee_personality_diagnosis_evaluation'], $logs->pluck('action')->all());
+        foreach ($logs as $log) {
+            $this->assertSame('Trainee', $log->target_type);
+            $this->assertSame($this->trainee->id, (int) $log->target_id);
+        }
+        $this->assertSame('愛犬性格診断評価文公開', AccessLog::actionLabels()['publish_trainee_personality_diagnosis_evaluation']);
+        $this->assertSame('愛犬性格診断評価文公開停止', AccessLog::actionLabels()['unpublish_trainee_personality_diagnosis_evaluation']);
+        $this->assertSame(0, AccessLog::query()->where('action', 'create_training_record')->count());
     }
 
-    public function test_公開のあとS_0313は公開済みで評価文は表示だけ(): void
+    public function test_公開のあとS_0313は公開済みで直せる(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         Carbon::setTestNow('2026-10-18 10:00:00');
@@ -533,10 +570,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $card = $this->evaluationCard($this->page($result));
         $this->assertStringContainsString('data-evaluation-status>公開済み</span>', $card);
-        $this->assertStringContainsString('data-evaluation-text>公開した文</div>', $card);
-        $this->assertStringNotContainsString('<textarea', $card);
-        $record = TrainingRecord::query()->sole();
-        $this->assertStringContainsString('（<a href="'.route('training-records.show', $record).'">トレーニング記録</a>）', $this->evaluationHeader($card));
+        $this->assertStringContainsString('data-evaluation-published-on>2026/10/18 公開</span>', $card);
+        $this->assertStringContainsString('>公開した文</textarea>', $card);
+        $this->assertStringContainsString('>公開をやめる</button>', $card);
     }
 
     public function test_評価文が空なら公開できない(): void
@@ -548,9 +584,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $response->assertRedirect($this->url($result));
         $response->assertSessionHasErrors(['evaluation_text' => '評価文を入力してください。']);
-        $this->assertSame(0, TrainingRecord::query()->count());
         // 保存もしない（下書きのまま）
         $this->assertSame('下書き', $result->fresh()->evaluation_text);
+        $this->assertNull($result->fresh()->evaluation_published_at);
     }
 
     public function test_10001文字は公開できない(): void
@@ -559,74 +595,103 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $this->publish($result, str_repeat('う', 10001))
             ->assertSessionHasErrors(['evaluation_text' => '評価文は10000文字以内で入力してください。']);
-        $this->assertSame(0, TrainingRecord::query()->count());
+        $this->assertNull($result->fresh()->evaluation_published_at);
     }
 
-    public function test_2回送っても記録は1件で2回目は作った記録の詳細へ(): void
+    public function test_2回送ってもエラーにせず公開した日時も文も1回目のまま(): void
     {
+        Carbon::setTestNow('2026-10-18 10:00:00');
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $this->publish($result, '1 回目');
-        $record = TrainingRecord::query()->sole();
-        $second = $this->publish($result, '2 回目');
+        Carbon::setTestNow('2026-10-18 10:05:00');
+        $second = $this->publish($result, '');
 
-        $second->assertRedirect(route('training-records.show', $record));
-        $second->assertSessionHas('success', 'この愛犬性格診断は、すでにトレーニング記録にして公開しています。');
-        $this->assertSame(1, TrainingRecord::query()->count());
-        // 2 回目の文は使わない（評価文も記録も 1 回目のまま）
-        $this->assertSame('1 回目', $result->fresh()->evaluation_text);
-        $this->assertSame('1 回目', $record->fresh()->record_content);
-    }
-
-    public function test_公開済みの結果に空の文を送っても入力エラーにせず作った記録の詳細へ(): void
-    {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $result->update(['evaluation_text' => '公開した文']);
-        $recordId = $this->linkRecord($result);
-
-        $this->publish($result, '')->assertRedirect(route('training-records.show', $recordId))->assertSessionHasNoErrors();
-        $this->assertSame(1, TrainingRecord::query()->count());
-    }
-
-    public function test_公開した記録を削除すると下書きに戻りもう一度公開できる(): void
-    {
-        $this->actingAsRole('admin');
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $this->publish($result, '公開した文');
-        $first = TrainingRecord::query()->sole();
-
-        $this->delete(route('training-records.destroy', $first))->assertRedirect(route('clients.show', $this->client->id));
-
+        $second->assertRedirect($this->url($result));
+        $second->assertSessionHasNoErrors();
+        $second->assertSessionHas('success', 'この評価文は、すでに公開しています。');
+        $saved = $result->fresh();
+        $this->assertSame('1 回目', $saved->evaluation_text);
+        $this->assertSame('2026-10-18 10:00:00', $saved->evaluation_published_at->format('Y-m-d H:i:s'));
         $this->assertSame(0, TrainingRecord::query()->count());
-        $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
-        $this->assertSame('公開した文', $result->fresh()->evaluation_text);
-        $this->assertStringContainsString('トレーニング記録にして公開', $this->page($result->fresh()));
-
-        $this->publish($result, '直して公開し直した文');
-        $second = TrainingRecord::query()->sole();
-        $this->assertNotSame($first->id, $second->id);
-        $this->assertSame('直して公開し直した文', $second->record_content);
-        $this->assertSame($result->id, (int) $second->trainee_personality_diagnosis_result_id);
     }
 
-    public function test_公開の権限は表示と同じ(): void
+    public function test_公開をやめると下書きに戻り評価文は残る(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+
+        $response = $this->unpublish($result);
+
+        $response->assertRedirect($this->url($result));
+        $response->assertSessionHas('success', '評価文の公開をやめました。');
+        $saved = $result->fresh();
+        $this->assertSame('下書き', $saved->evaluation_status_label);
+        $this->assertSame('公開した文', $saved->evaluation_text);
+        $this->assertNull($saved->evaluation_published_at);
+        $this->assertNull($saved->evaluation_published_by);
+    }
+
+    public function test_公開をやめるときは欄の直しを保存しない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+
+        $this->from($this->url($result))->post(route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, $result]), ['evaluation_text' => '保存していない直し']);
+
+        $this->assertSame('公開した文', $result->fresh()->evaluation_text);
+    }
+
+    public function test_公開していないのに公開をやめるを送ってもエラーにしない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '下書き']);
+
+        $response = $this->unpublish($result);
+
+        $response->assertRedirect($this->url($result));
+        $response->assertSessionHas('success', 'この評価文は公開していません。');
+        $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
+    }
+
+    public function test_公開をやめたあともう一度公開すると公開した日時はそのときになる(): void
+    {
+        Carbon::setTestNow('2026-10-18 10:00:00');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->publish($result, '最初の文');
+        $this->unpublish($result);
+
+        Carbon::setTestNow('2026-10-20 15:00:00');
+        $this->publish($result, '直して公開し直した文');
+
+        $saved = $result->fresh();
+        $this->assertSame('公開済み', $saved->evaluation_status_label);
+        $this->assertSame('直して公開し直した文', $saved->evaluation_text);
+        $this->assertSame('2026-10-20 15:00:00', $saved->evaluation_published_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_公開と公開をやめるの権限は表示と同じ(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         $other = Trainee::query()->create(['client_id' => $this->client->id, 'name' => 'ハナ']);
 
         // URL のトレーニーと結果が合わなければ 404
         $this->publish($result, '評価文', $other)->assertNotFound();
+        $this->unpublish($result, $other)->assertNotFound();
         // システム管理者は 403
         $this->actingAsRole('system_admin');
         $this->publish($result, '評価文')->assertForbidden();
         // ログインしていなければログイン画面へ
         auth('web')->logout();
         $this->publish($result, '評価文')->assertRedirect(route('login'));
-        $this->assertSame(0, TrainingRecord::query()->count());
-        // 一般のトレーナーは公開できる
+        $this->unpublish($result)->assertRedirect(route('login'));
+        $this->assertNull($result->fresh()->evaluation_published_at);
+        // 一般のトレーナーは公開・公開をやめるができる
         $this->actingAsRole('staff');
         $this->publish($result, '評価文');
-        $this->assertSame(1, TrainingRecord::query()->count());
+        $this->assertSame('公開済み', $result->fresh()->evaluation_status_label);
+        $this->unpublish($result);
+        $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
     }
 
     // ---- 削除（管理者だけ。S-0313-M02） ----
@@ -644,17 +709,20 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"', $html);
         $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除する</button>', $html);
         $this->assertStringContainsString('<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>', $html);
-        // 結び付いた記録がなければ、記録の文は出さない
-        $this->assertStringNotContainsString('data-personality-diagnosis-delete-linked', $html);
+        // 公開済みでなければ、会員様の画面から消えることの文は出さない
+        $this->assertStringNotContainsString('data-personality-diagnosis-delete-published', $html);
     }
 
-    public function test_結び付いた記録があれば確認の文に記録の日付と残ることを足す(): void
+    public function test_公開済みなら確認の文に会員様の画面から消えることを足す(): void
     {
         $this->actingAsRole('admin');
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $this->linkRecord($result, '2026-06-03');
+        $this->markPublished($result);
 
-        $this->assertStringContainsString('data-personality-diagnosis-delete-linked>2026/06/03のトレーニング記録に結び付いています。記録は残りますが、記録の中のグラフは消えます。</p>', $this->page($result));
+        $html = $this->page($result);
+
+        $this->assertStringContainsString('data-personality-diagnosis-delete-published>公開済みの評価文も、会員様のマイページから消えます。</p>', $html);
+        $this->assertStringNotContainsString('結び付いています', $html);
     }
 
     public function test_管理者でなければ削除のボタンも確認モーダルも出さない(): void
@@ -667,20 +735,18 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('btn-danger', $html);
     }
 
-    public function test_削除するとトレーニー詳細に戻り結び付いた記録は残る(): void
+    public function test_削除するとトレーニー詳細に戻り公開済みの評価文も一緒に消える(): void
     {
         $this->actingAsRole('admin');
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $recordId = $this->linkRecord($result);
+        $this->markPublished($result);
 
         $response = $this->delete(route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]));
 
         $response->assertRedirect(route('trainees.show', $this->trainee));
         $response->assertSessionHas('success', '愛犬性格診断の結果を削除しました。');
         $this->assertFalse(TraineePersonalityDiagnosisResult::query()->whereKey($result->id)->exists());
-        $record = TrainingRecord::query()->find($recordId);
-        $this->assertNotNull($record);
-        $this->assertNull($record->trainee_personality_diagnosis_result_id);
+        $this->assertSame(0, TrainingRecord::query()->count());
     }
 
     // ---- 権限 ----

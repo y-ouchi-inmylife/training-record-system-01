@@ -150,10 +150,14 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'update'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.update');
-            // 評価文の公開（S-0313 の［トレーニング記録にして公開］と S-0313-M01。2026-10-18 追加）。評価文を本文にしたトレーニング記録を作る
+            // 評価文の公開（S-0313 の［公開］と S-0313-M01）・公開をやめる（［公開をやめる］と S-0313-M03）。2026-10-18 追加。
+            // 評価文そのものに公開した日時を付ける（トレーニング記録は作らない。2026-10-18 変更）
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish', [TraineePersonalityDiagnosisResultController::class, 'publish'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.publish');
+            Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish', [TraineePersonalityDiagnosisResultController::class, 'unpublish'])
+                ->scopeBindings()
+                ->name('trainee-personality-diagnosis-results.unpublish');
             // 愛犬性格診断の結果の削除（S-0313 の［削除］。管理者のみ。2026-10 追加。2026-10-18 変更：当初は S-0309 の結果の表の行の［削除］）。
             // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
             Route::delete('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'destroy'])

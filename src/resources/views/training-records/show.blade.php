@@ -108,37 +108,6 @@
         </div>
     </div>
 
-    {{-- 愛犬性格診断の欄（2026-10-18 追加。要件定義書 6-4-4・6-16-16、設計書 S-0403 セクション2.5）。評価文を公開して作った記録だけ。
-         メディアの下・ノートの上（評価文〔ノート〕を読む前に、タイプとグラフが目に入るように）。
-         グラフはその結果の時点（その結果を今回、それより前の結果から前回・初回）。トレーニー詳細（S-0309）と同じ部品・同じ大きさ。
-         点数は出さない（S-0313 で見る）。結び付きがない・結果が削除された記録には出さない --}}
-    @if($personalityDiagnosis)
-        <div class="card mb-3" data-record-personality-diagnosis>
-            <div class="card-header">
-                <h6 class="mb-0">{{ $personalityDiagnosis['trainee']->display_name }}の{{ __('messages.personality_diagnosis_name') }}（{{ $personalityDiagnosis['result']->answered_at->format('Y/m/d') }}）</h6>
-            </div>
-            <div class="card-body">
-                <div class="row gy-3 align-items-center">
-                    <div class="col-12 col-md-5 col-xl-4">
-                        <div class="trainee-personality-radar mx-auto">
-                            <canvas id="record-personality-radar" role="img" aria-label="{{ __('messages.personality_diagnosis_name') }}のレーダーチャート"
-                                    data-personality-radar="{{ json_encode($personalityDiagnosis['radar'], JSON_UNESCAPED_UNICODE) }}"></canvas>
-                        </div>
-                        <div class="d-flex justify-content-center mt-2">
-                            <ul class="list-unstyled d-flex flex-wrap justify-content-center column-gap-3 row-gap-1 small mb-0"
-                                data-personality-radar-legend="record-personality-radar"></ul>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-7 col-xl-8">
-                        <div class="text-muted small">タイプ</div>
-                        <p class="fs-5 mb-2" style="word-break: keep-all;" data-record-personality-type>{!! collect(explode('・', $personalityDiagnosis['result']->personality_type_label))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
-                        <a href="{{ route('trainee-personality-diagnosis-results.show', [$personalityDiagnosis['trainee'], $personalityDiagnosis['result']]) }}">{{ __('messages.personality_diagnosis_name') }}の詳細</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
     {{-- トレーナーからのノート --}}
     <div class="card mb-3">
         <div class="card-header">
@@ -176,10 +145,6 @@
 {{-- 原寸ライトボックス（写真拡大・動画再生） --}}
 @include('media-records._lightbox')
 
-{{-- 愛犬性格診断のレーダーチャート（欄があるときだけ読み込む。2026-10-18 追加） --}}
-@if($personalityDiagnosis)
-    @vite('resources/js/personality-radar.js')
-@endif
 @endsection
 
 @push('scripts')

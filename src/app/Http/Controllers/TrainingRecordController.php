@@ -240,10 +240,7 @@ class TrainingRecordController extends Controller
             ];
         })->values()->all();
 
-        // 愛犬性格診断の欄（評価文を公開して作った記録だけ。2026-10-18 追加）。結び付きがなければ null で欄を出さない
-        $personalityDiagnosis = $trainingRecord->personalityDiagnosisSection();
-
-        return view('training-records.show', compact('trainingRecord', 'mediaItems', 'personalityDiagnosis'));
+        return view('training-records.show', compact('trainingRecord', 'mediaItems'));
     }
 
     /**
@@ -278,9 +275,8 @@ class TrainingRecordController extends Controller
     public function update(Request $request, TrainingRecord $trainingRecord): RedirectResponse
     {
         // 既存ルールに media_record_ids（多対多紐づけ）を追加。store には足さない（編集時のみ受け付け）。
-        // 会員（client_id）は受け取らない（作ったときのまま。2026-10-18 変更：評価文を公開して作った記録の会員が、
-        // 結び付けた結果のトレーニーの会員とずれないようにするため。画面の会員の欄は表示だけ）。
-        // 結び付けた愛犬性格診断の結果（trainee_personality_diagnosis_result_id）はルールにも fillable にもないので受け取らない
+        // 会員（client_id）は受け取らない（作ったときのまま。2026-10-18 変更：記録の会員を変えると、記録に結び付くメディアや
+        // 会員詳細の表示がずれるため。画面の会員の欄は表示だけ）
         $validated = $request->validate(array_merge(Arr::except($this->validationRules(), ['client_id']), [
             'media_record_ids'   => 'nullable|array',
             'media_record_ids.*' => 'integer|distinct|exists:media_records,id',

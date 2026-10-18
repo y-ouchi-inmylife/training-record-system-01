@@ -245,10 +245,8 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $draft = $this->addResult('past-2', '2026-03-10 11:00:00');
         $published = $this->addResult('past-1', '2026-06-01 09:00:00');
         $draft->update(['evaluation_text' => '下書きの文']);
-        DB::table('training_records')->insert([
-            'client_id' => $this->client->id, 'training_date' => '2026-06-02', 'trainer1_id' => 200,
-            'record_content' => '公開した文', 'trainee_personality_diagnosis_result_id' => $published->id,
-        ]);
+        // 公開済みは公開した日時で決まる（2026-10-18 変更：その前は結び付いたトレーニング記録で決めていた）
+        $published->update(['evaluation_text' => '公開した文', 'evaluation_published_at' => '2026-06-02 10:00:00']);
 
         $card = $this->card($this->page());
 

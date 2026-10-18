@@ -163,14 +163,17 @@ trait CreatesClientCountTables
             $table->text('evaluation_text')->nullable();
             $table->unsignedBigInteger('evaluation_updated_by')->nullable();
             $table->timestamp('evaluation_updated_at')->nullable();
+            // 評価文を公開した日時とトレーナー（2026-10-18 追加。2026_10_18_000005_add_evaluation_published_to_…）
+            $table->timestamp('evaluation_published_at')->nullable();
+            $table->unsignedBigInteger('evaluation_published_by')->nullable();
             $table->timestamps();
         });
     }
 
     /**
-     * 愛犬性格診断の結果を結び付けるところだけを持つトレーニング記録（D-0200。2026-10-18 追加）。評価文の状態（公開済み）と、
-     * 結果を消したときに結び付きが NULL になり記録が残ることを確かめるため。結び付けの列の一意と外部キーは本番と同じ。
-     * 本番の列のうち、ここで使わないもの（メディアなど）は持たない。結果の表を先に作っておく
+     * 愛犬性格診断のテストで使うトレーニング記録（D-0200。2026-10-18 追加）。評価文の公開でトレーニング記録が増えないこと、
+     * 記録の詳細・一覧に愛犬性格診断の欄や印が出ないことを確かめるため。本番の列のうち、ここで使わないもの（メディアなど）は持たない。
+     * 2026-10-18 変更：結び付けた結果の列（trainee_personality_diagnosis_result_id）は 2026_10_18_000006 で外したので持たない
      */
     protected function createTrainingRecordsTableForPersonalityDiagnosis(): void
     {
@@ -183,9 +186,6 @@ trait CreatesClientCountTables
             $table->unsignedBigInteger('trainer2_id')->nullable();
             $table->text('record_content')->nullable();
             $table->text('impression')->nullable();
-            $table->unsignedBigInteger('trainee_personality_diagnosis_result_id')->nullable()->unique();
-            $table->foreign('trainee_personality_diagnosis_result_id')
-                ->references('id')->on('trainee_personality_diagnosis_results')->nullOnDelete();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });

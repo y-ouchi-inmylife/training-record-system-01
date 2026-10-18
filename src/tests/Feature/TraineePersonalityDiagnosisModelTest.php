@@ -6,7 +6,6 @@ use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\TraineePersonalityDiagnosisToken;
 use App\Models\TrainingRecord;
-use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -19,7 +18,7 @@ use Tests\TestCase;
  * - トレーニーのリレーション（案内・有効な案内・結果〔新しい順〕・最新の結果）
  * - answers の配列への変換、7 カテゴリの平均の decimal
  * - トレーニーを消したら案内と結果も消える。案内を消したら結果の案内の列は NULL（外部キー。db-schema.md）
- * - 評価文の状態（なし・下書き・公開済み）、結果とトレーニング記録の結び付き（一意・結果を消すと NULL で記録は残る）、
+ * - 評価文の状態（なし・下書き・公開済み。公開した日時で決まる。2026-10-18 変更：その前は結び付いたトレーニング記録で決めていた）、
  *   指定した結果の時点のレーダーチャートの値（2026-10-18 追加。要件定義書 6-16-15・6-16-16）
  */
 class TraineePersonalityDiagnosisModelTest extends TestCase
@@ -152,23 +151,14 @@ class TraineePersonalityDiagnosisModelTest extends TestCase
         $this->assertNull($fresh->token);
     }
 
-    // ---- 評価文と、トレーニング記録との結び付き（2026-10-18 追加） ----
+    // ---- 評価文の状態と公開（2026-10-18 追加。2026-10-18 変更：公開した日時で決める） ----
 
-    /** 結果を結び付けたトレーニング記録を入れる（記録の id を返す） */
-    private function linkRecord(TraineePersonalityDiagnosisResult $result, string $date = '2026-10-18'): int
-    {
-        return DB::table('training_records')->insertGetId([
-            'client_id' => 1, 'training_date' => $date, 'trainer1_id' => 200, 'record_content' => '評価文',
-            'trainee_personality_diagnosis_result_id' => $result->id,
-        ]);
-    }
-
-    public function test_評価文の状態は評価文と結び付いた記録から決める(): void
+    public function test_評価文の状態は評価文と公開した日時から決める(): void
     {
         $result = $this->makeResult('2026-06-01 09:00:00');
         $this->assertSame(TraineePersonalityDiagnosisResult::EVALUATION_NONE, $result->evaluation_status);
-        $this->assertSame('bg-secondary', $result->evaluation_status_badge_class);
         $this->assertSame('なし', $result->evaluation_status_label);
+        $this->assertSame('bg-secondary', $result->evaluation_status_badge_class);
 
         // 空白だけはなしのまま
         $result->update(['evaluation_text' => "  \n "]);
@@ -178,68 +168,38 @@ class TraineePersonalityDiagnosisModelTest extends TestCase
         $this->assertSame(TraineePersonalityDiagnosisResult::EVALUATION_DRAFT, $result->fresh()->evaluation_status);
         $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
 
-        // 結び付いた記録があれば公開済み（評価文の有無によらない）
-        $recordId = $this->linkRecord($result);
+        // 公開した日時があれば公開済み
+        $result->update(['evaluation_published_at' => '2026-10-18 10:00:00', 'evaluation_published_by' => 200]);
         $this->assertSame(TraineePersonalityDiagnosisResult::EVALUATION_PUBLISHED, $result->fresh()->evaluation_status);
         $this->assertSame('公開済み', $result->fresh()->evaluation_status_label);
-        $result->update(['evaluation_text' => null]);
-        $this->assertSame('公開済み', $result->fresh()->evaluation_status_label);
+        $this->assertSame('bg-success', $result->fresh()->evaluation_status_badge_class);
+        $this->assertSame('2026-10-18 10:00:00', $result->fresh()->evaluation_published_at->format('Y-m-d H:i:s'));
 
-        // 公開した記録を削除すると、結び付きもなくなるので下書きに戻る
-        $result->update(['evaluation_text' => '落ち着いた性格です。']);
-        TrainingRecord::query()->whereKey($recordId)->delete();
+        // 公開をやめると（公開した日時を空に戻すと）下書きに戻る
+        $result->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
         $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
     }
 
-    public function test_結果と記録の結び付きは両方向から引ける(): void
+    public function test_評価文の状態は関連を読み込まずに決まる(): void
     {
-        $result = $this->makeResult('2026-06-01 09:00:00');
-        $recordId = $this->linkRecord($result);
+        $this->makeResult('2026-06-01 09:00:00')->update(['evaluation_text' => '文', 'evaluation_published_at' => '2026-10-18 10:00:00']);
+        $result = TraineePersonalityDiagnosisResult::query()->sole();
 
-        $this->assertSame($recordId, $result->fresh()->trainingRecord->id);
-        $this->assertSame($result->id, TrainingRecord::query()->find($recordId)->personalityDiagnosisResult->id);
-        // 結び付きの列は記録の登録・編集から変えられない（fillable に入れない）
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->assertSame('公開済み', $result->evaluation_status_label);
+        $this->assertSame([], DB::getQueryLog());
+        DB::disableQueryLog();
+    }
+
+    public function test_結果とトレーニング記録の結び付きはもうない(): void
+    {
+        // 2026-10-18 変更：評価文を記録にしなくなったため、結び付けの関連と列を外した（000006）
+        $this->assertFalse(method_exists(TraineePersonalityDiagnosisResult::class, 'trainingRecord'));
+        $this->assertFalse(method_exists(TrainingRecord::class, 'personalityDiagnosisResult'));
+        $this->assertFalse(method_exists(TrainingRecord::class, 'personalityDiagnosisSection'));
+        $this->assertFalse(Schema::hasColumn('training_records', 'trainee_personality_diagnosis_result_id'));
         $this->assertNotContains('trainee_personality_diagnosis_result_id', (new TrainingRecord)->getFillable());
-    }
-
-    public function test_1つの結果に結び付けられる記録は1件まで(): void
-    {
-        $result = $this->makeResult('2026-06-01 09:00:00');
-        $this->linkRecord($result);
-
-        $this->expectException(QueryException::class);
-        $this->linkRecord($result, '2026-10-19');
-    }
-
-    public function test_結び付けていない記録は何件あってもよい(): void
-    {
-        foreach (['2026-10-01', '2026-10-02'] as $date) {
-            DB::table('training_records')->insert(['client_id' => 1, 'training_date' => $date, 'trainer1_id' => 200]);
-        }
-
-        $this->assertSame(2, DB::table('training_records')->whereNull('trainee_personality_diagnosis_result_id')->count());
-    }
-
-    public function test_結果を消すと記録は残り結び付きだけがNULLになる(): void
-    {
-        $result = $this->makeResult('2026-06-01 09:00:00');
-        $recordId = $this->linkRecord($result);
-
-        $result->delete();
-
-        $record = TrainingRecord::query()->find($recordId);
-        $this->assertNotNull($record);
-        $this->assertNull($record->trainee_personality_diagnosis_result_id);
-        $this->assertSame('評価文', $record->record_content);
-    }
-
-    public function test_トレーニーを消しても結び付いた記録は残る(): void
-    {
-        $recordId = $this->linkRecord($this->makeResult('2026-06-01 09:00:00'));
-
-        $this->trainee->delete();
-
-        $this->assertNull(TrainingRecord::query()->find($recordId)->trainee_personality_diagnosis_result_id);
     }
 
     // ---- 指定した結果の時点のレーダーチャート（2026-10-18 追加） ----

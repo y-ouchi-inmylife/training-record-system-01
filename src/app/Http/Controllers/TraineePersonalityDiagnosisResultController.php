@@ -4,26 +4,25 @@ namespace App\Http\Controllers;
 
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
-use App\Models\TrainingRecord;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
- * 愛犬性格診断詳細（S-0313）と評価文の保存（2026-10-18 追加。要件定義書 6-16-15）、愛犬性格診断の結果の削除
- * （要件定義書 6-16-14、api-design.md 4-1-16。2026-10 追加。2026-10-18 変更：送信元を S-0309 から S-0313 に移した）。
+ * 愛犬性格診断詳細（S-0313）と評価文の更新・公開・公開をやめる（2026-10-18 追加。要件定義書 6-16-15・6-16-16）、
+ * 愛犬性格診断の結果の削除（要件定義書 6-16-14、api-design.md 4-1-16。2026-10 追加。2026-10-18 変更：送信元を S-0309 から S-0313 に移した）。
  *
- * 詳細と評価文の保存：
- * - トレーナー（一般・管理者）なら見られる・保存できる。{personalityDiagnosisResult} は {trainee} の結果に限る（scopeBindings）
- * - 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と結び付いたトレーニング記録から決める（evaluation_status）
- * - 公開済みの評価文は保存を受け付けない（409。直すのはトレーニング記録の編集。画面ではテキストエリアを出さない）
- * 評価文の公開（2026-10-18 追加。要件定義書 6-16-16）：
- * - 欄の今の文を保存してから、評価文を本文にしたトレーニング記録を作る（1 つの結果に記録は 1 件まで）
- * - 2 回送られても記録は 1 件（結果の行のロックと、記録の結び付けの列の一意の制約）。2 回目・公開済みへの送信は
- *   エラーにせず、作った記録の詳細へ移す
- * - アクセスログは、記録の登録と同じ create_training_record（LogAccess ミドルウェア）
+ * 詳細と評価文：
+ * - トレーナー（一般・管理者）なら見られる・更新・公開・公開をやめるができる。{personalityDiagnosisResult} は {trainee} の結果に限る（scopeBindings）
+ * - 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と公開した日時（evaluation_published_at）から決める（evaluation_status）
+ * - 公開は評価文そのものに「公開済み」の印（公開した日時・公開したトレーナー）を付ける。トレーニング記録は作らない
+ *   （2026-10-18 変更：評価文と記録の本文の二重持ちをやめるため。その前は、公開で評価文を本文にしたトレーニング記録を作っていた）
+ * - 公開済みの評価文も更新できる（すぐ会員様の画面に出る）。ただし公開済みのあいだは空にできない
+ * - 公開・公開をやめるは、結果の行を排他ロックして状態を確かめ直す。すでに公開済み・すでに公開をやめているときは、
+ *   エラーにせず S-0313 に戻す（2 回押されても困らないように）
+ * - アクセスログ（edit_／publish_／unpublish_trainee_personality_diagnosis_evaluation）は LogAccess ミドルウェアで記録する
  *
  * 結果の削除：
  *
@@ -33,11 +32,14 @@ use Illuminate\View\View;
  * - 権限はトレーニーの削除（TraineeController::destroy）と同じ：管理者だけ（同じ確かめ方・同じ文言の 403）。
  *   システム管理者は、トレーニー管理のルートの practitioners ミドルウェアで 403
  * - {personalityDiagnosisResult} は {trainee} の結果に限る（ルートの scopeBindings。別のトレーニーの結果なら 404）
- * - 物理削除。結果に使った案内（回答済みのトークン）は消さない
+ * - 物理削除。結果に使った案内（回答済みのトークン）は消さない。公開済みの評価文も一緒に消える
  * - アクセスログ（delete_trainee_personality_diagnosis_result）は LogAccess ミドルウェアで記録する
  */
 class TraineePersonalityDiagnosisResultController extends Controller
 {
+    /** 公開済みのあいだに空で更新しようとしたときの文言（設計書 S-0313「バリデーションチェック」） */
+    private const EMPTY_WHILE_PUBLISHED_MESSAGE = '公開中の評価文は空にできません。公開をやめてから消してください。';
+
     /**
      * 愛犬性格診断詳細（GET /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}。S-0313）。
      *
@@ -47,7 +49,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
     public function show(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): View
     {
         $trainee->load('personalityDiagnosisResults');
-        $personalityDiagnosisResult->load(['trainingRecord', 'evaluationUpdatedBy']);
+        $personalityDiagnosisResult->load(['evaluationUpdatedBy']);
 
         return view('trainees.personality-diagnosis-results.show', [
             'trainee' => $trainee,
@@ -57,21 +59,20 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * 評価文を保存する（PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}）。
+     * 評価文を更新する（PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}）。
      *
      * - 10,000 文字以内。改行は LF にそろえてから数える（受付アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）
-     * - 空（空白だけを含む）で保存すると NULL（「なし」に戻る）。それ以外は入力のまま保存する（前後の空白は TrimStrings で取れる）
+     * - 空（空白だけを含む）で保存すると NULL（「なし」に戻る）。ただし公開済みのあいだは空にできない（入力エラー）
+     * - 公開済みでも保存できる（そのまま会員様の画面に出る。2026-10-18 変更：その前は公開済みなら 409）
      * - 最後に保存したトレーナーと日時を残す（evaluation_updated_by・evaluation_updated_at）
-     * - 公開済みなら 409（保存しない）
-     * - アクセスログ（edit_trainee_personality_diagnosis_evaluation）は LogAccess ミドルウェアで記録する
      */
     public function update(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
     {
-        if ($personalityDiagnosisResult->evaluation_status === TraineePersonalityDiagnosisResult::EVALUATION_PUBLISHED) {
-            abort(409, 'この評価文は公開済みです。直すときは、トレーニング記録の編集で直してください。');
-        }
-
+        $isPublished = $personalityDiagnosisResult->evaluation_status === TraineePersonalityDiagnosisResult::EVALUATION_PUBLISHED;
         $text = $this->validateEvaluationText($request, required: false);
+        if ($isPublished && $text === null) {
+            throw ValidationException::withMessages(['evaluation_text' => self::EMPTY_WHILE_PUBLISHED_MESSAGE]);
+        }
 
         $personalityDiagnosisResult->update([
             'evaluation_text' => $text,
@@ -81,69 +82,65 @@ class TraineePersonalityDiagnosisResultController extends Controller
 
         return redirect()
             ->route('trainee-personality-diagnosis-results.show', [$trainee, $personalityDiagnosisResult])
-            ->with('success', '評価文を更新しました。');
+            ->with('success', $isPublished ? '評価文を更新しました。会員様のマイページにも反映されています。' : '評価文を更新しました。');
     }
 
     /**
-     * 評価文を公開する（POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish。S-0313-M01）。
+     * 評価文を公開する（POST …/{personalityDiagnosisResult}/publish。S-0313-M01）。
      *
-     * 1 つのトランザクションで、結果の行を排他ロックして取り直し、結び付いた記録がなければ、欄の文を保存（保存と同じ決まり。
-     * 公開では必須）してから記録を作る。作る記録：会員＝トレーニーの会員、トレーニング日＝今日（アプリの時間帯）、時刻・担当2・
-     * 所感は空、担当1・最終更新者＝公開したトレーナー、ノート＝評価文、結び付けた結果＝この結果。メディアは結び付けない。
-     *
-     * 公開済みなら（2 回目の送信を含む）、作らずにその記録の詳細へ移す（入力のチェックより先に見る）。ロックをすり抜けて
-     * 一意の制約にかかったときも同じ
+     * 公開済みなら（2 回目の送信を含む）、入力のチェックより先に見て、何もせず S-0313 に戻す。そうでなければ、
+     * 1 つのトランザクションで結果の行を排他ロックして取り直し、欄の文を保存（保存と同じ決まり。公開では必須）してから、
+     * 公開した日時・公開したトレーナーを入れる（保存していない直しも公開される）。トレーニング記録は作らない
      */
     public function publish(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
     {
-        $published = $personalityDiagnosisResult->trainingRecord;
-        if ($published !== null) {
-            return $this->redirectToPublished($published);
+        if ($personalityDiagnosisResult->evaluation_status === TraineePersonalityDiagnosisResult::EVALUATION_PUBLISHED) {
+            return $this->backToShow($trainee, $personalityDiagnosisResult, 'この評価文は、すでに公開しています。');
         }
 
         $text = $this->validateEvaluationText($request, required: true);
 
-        try {
-            [$record, $created] = DB::transaction(function () use ($trainee, $personalityDiagnosisResult, $text) {
-                $result = TraineePersonalityDiagnosisResult::query()->whereKey($personalityDiagnosisResult->id)->lockForUpdate()->firstOrFail();
-                $existing = $result->trainingRecord()->first();
-                if ($existing !== null) {
-                    return [$existing, false];
-                }
+        $published = DB::transaction(function () use ($personalityDiagnosisResult, $text) {
+            $result = TraineePersonalityDiagnosisResult::query()->whereKey($personalityDiagnosisResult->id)->lockForUpdate()->firstOrFail();
+            if ($result->evaluation_published_at !== null) {
+                return false;
+            }
 
-                $result->update([
-                    'evaluation_text' => $text,
-                    'evaluation_updated_by' => auth()->id(),
-                    'evaluation_updated_at' => now(),
-                ]);
+            $now = now();
+            $result->update([
+                'evaluation_text' => $text,
+                'evaluation_updated_by' => auth()->id(),
+                'evaluation_updated_at' => $now,
+                'evaluation_published_at' => $now,
+                'evaluation_published_by' => auth()->id(),
+            ]);
 
-                $record = new TrainingRecord([
-                    'client_id' => $trainee->client_id,
-                    'training_date' => today(),
-                    'training_time' => null,
-                    'trainer1_id' => auth()->id(),
-                    'trainer2_id' => null,
-                    'record_content' => $text,
-                    'impression' => null,
-                    'updated_by' => auth()->id(),
-                ]);
-                // 結び付けの列は fillable に入れていない（記録の登録・編集からは入れない）。公開のときだけここで入れる
-                $record->trainee_personality_diagnosis_result_id = $result->id;
-                $record->save();
+            return true;
+        });
 
-                return [$record, true];
-            });
-        } catch (UniqueConstraintViolationException) {
-            return $this->redirectToPublished($personalityDiagnosisResult->trainingRecord()->firstOrFail());
-        }
+        return $this->backToShow($trainee, $personalityDiagnosisResult, $published ? '評価文を公開しました。' : 'この評価文は、すでに公開しています。');
+    }
 
-        if (! $created) {
-            return $this->redirectToPublished($record);
-        }
+    /**
+     * 評価文の公開をやめる（POST …/{personalityDiagnosisResult}/unpublish。S-0313-M03。2026-10-18 追加）。
+     *
+     * 結果の行を排他ロックして取り直し、公開済みなら公開した日時・公開したトレーナーを NULL に戻す（評価文は残す。状態は下書き）。
+     * 公開していなければ何もせず S-0313 に戻す。欄に保存していない直しがあっても保存しない（リクエストの評価文は使わない）
+     */
+    public function unpublish(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
+    {
+        $unpublished = DB::transaction(function () use ($personalityDiagnosisResult) {
+            $result = TraineePersonalityDiagnosisResult::query()->whereKey($personalityDiagnosisResult->id)->lockForUpdate()->firstOrFail();
+            if ($result->evaluation_published_at === null) {
+                return false;
+            }
 
-        return redirect()
-            ->route('training-records.show', $record)
-            ->with('success', 'トレーニング記録を作り、会員様に公開しました。');
+            $result->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
+
+            return true;
+        });
+
+        return $this->backToShow($trainee, $personalityDiagnosisResult, $unpublished ? '評価文の公開をやめました。' : 'この評価文は公開していません。');
     }
 
     /**
@@ -165,7 +162,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * 評価文の入力を確かめて、保存する値を返す（保存と公開で同じ決まり。2026-10-18 に保存から切り出した）。
+     * 評価文の入力を確かめて、保存する値を返す（更新と公開で同じ決まり。2026-10-18 に保存から切り出した）。
      *
      * - 改行は LF にそろえてから数える（受付アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）。10,000 文字以内
      * - 空（空白だけを含む）なら null（なし）。公開では必須（空なら入力エラー）
@@ -184,12 +181,12 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * 公開済みの結果に公開が送られたとき（2 回目の送信を含む）。エラーにせず、作った記録の詳細へ移す
+     * S-0313 に戻り、完了メッセージを出す（公開・公開をやめるの成功と、すでにその状態だったとき）
      */
-    private function redirectToPublished(TrainingRecord $record): RedirectResponse
+    private function backToShow(Trainee $trainee, TraineePersonalityDiagnosisResult $result, string $message): RedirectResponse
     {
         return redirect()
-            ->route('training-records.show', $record)
-            ->with('success', 'この'.__('messages.personality_diagnosis_name').'は、すでにトレーニング記録にして公開しています。');
+            ->route('trainee-personality-diagnosis-results.show', [$trainee, $result])
+            ->with('success', $message);
     }
 }

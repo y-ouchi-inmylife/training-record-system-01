@@ -14,13 +14,14 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 評価文を公開して作ったトレーニング記録の見え方（2026-10-18 追加。要件定義書 6-4-3〜6-4-5・6-15-6・6-15-7・6-16-16）。
+ * トレーニング記録と愛犬性格診断の評価文（2026-10-18 追加。要件定義書 6-4-3〜6-4-5・6-15-6・6-15-7・6-16-16）。
  *
- * - 記録の詳細（トレーナー側 S-0403・会員側 S-1404）に「愛犬性格診断」の欄（タイプと、その結果の時点のレーダーチャート）。
- *   トレーナー側は S-0313 へのリンク。会員側は呼び名の見出し・小さなグラフで、点数の表とリンクは出さない
- * - 結び付きがない・結果が削除された記録には欄も JS も出さない
- * - 一覧の印（トレーナー側 S-0402、マイページの最新の記録と、これまでの記録）
- * - 記録の更新（S-0404）は会員と結び付けを受け取らない
+ * 2026-10-18 変更：評価文の公開でトレーニング記録を作らなくなったため（評価文と記録の本文の二重持ちをやめた）、
+ * 段階1 の②で作った「記録の詳細の愛犬性格診断の欄」「一覧の印」を外した。ここでは外したことを確かめる。
+ * - 記録の詳細（トレーナー側 S-0403・会員側 S-1404）に愛犬性格診断の欄もレーダーの JS も出さない（公開済みの評価文があっても）
+ * - 一覧（トレーナー側 S-0402、マイページ）に印を出さない
+ * - 記録の更新（S-0404）は会員（client_id）を受け取らない（この直しは残す）
+ * 公開済みの評価文をマイページ・会員詳細に混ぜて出すのは次の段階
  */
 class TrainingRecordPersonalityDiagnosisTest extends TestCase
 {
@@ -112,25 +113,22 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         return TraineePersonalityDiagnosisResult::query()->create($attributes);
     }
 
-    /** 記録を入れる（結果を渡せば結び付ける） */
-    private function record(string $date, ?TraineePersonalityDiagnosisResult $result = null, ?Client $client = null): TrainingRecord
+    /** 記録を入れる */
+    private function record(string $date, ?Client $client = null): TrainingRecord
     {
         $id = DB::table('training_records')->insertGetId([
             'client_id' => ($client ?? $this->client)->id, 'training_date' => $date, 'trainer1_id' => 200,
             'record_content' => 'ノート '.$date, 'impression' => '所感 '.$date,
-            'trainee_personality_diagnosis_result_id' => $result?->id,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
         return TrainingRecord::query()->find($id);
     }
 
-    /** レーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
-    private function radarData(string $html): array
+    /** 結果の評価文を公開済みにする */
+    private function publishEvaluation(TraineePersonalityDiagnosisResult $result): void
     {
-        $this->assertSame(1, preg_match('/<canvas id="record-personality-radar"[^>]*data-personality-radar="([^"]*)"/u', $html, $m));
-
-        return json_decode(html_entity_decode($m[1], ENT_QUOTES), true);
+        $result->update(['evaluation_text' => '公開した評価文', 'evaluation_published_at' => '2026-06-02 10:00:00', 'evaluation_published_by' => 200]);
     }
 
     private function trainerShow(TrainingRecord $record): string
@@ -146,151 +144,76 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
             ->get(route('client-portal.training-records.show', $record))->assertOk()->getContent();
     }
 
-    // ---- トレーナー側の記録の詳細（S-0403） ----
+    // ---- 記録の詳細・一覧（②で作った愛犬性格診断の欄・印を外した。2026-10-18 変更） ----
 
-    public function test_トレーナー側の詳細はノートの上に欄を出しタイプとその時点のグラフと詳細へのリンク(): void
+    public function test_トレーナー側の記録の詳細には愛犬性格診断の欄もJSも出さない(): void
     {
-        $this->addResult('past-3', '2025-12-01 10:00:00');
-        $this->addResult('past-2', '2026-03-10 11:00:00');
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $record = $this->record('2026-06-02', $result);
+        $this->publishEvaluation($this->addResult('past-1', '2026-06-01 09:00:00'));
+        $record = $this->record('2026-06-02');
 
         $html = $this->trainerShow($record);
 
-        $this->assertStringContainsString('<h6 class="mb-0">アイの愛犬性格診断（2026/06/01）</h6>', $html);
-        $this->assertStringContainsString('data-record-personality-type>繊細・<wbr>デリケートタイプ</p>', $html);
-        $this->assertStringContainsString('<a href="'.route('trainee-personality-diagnosis-results.show', [$this->trainee, $result]).'">愛犬性格診断の詳細</a>', $html);
-        $this->assertSame(['2026/06/01', '2026/03/10', '2025/12/01'], array_column($this->radarData($html)['series'], 'date'));
-        $this->assertStringContainsString('class="trainee-personality-radar mx-auto"', $html);
-        $this->assertStringContainsString('personality-radar', $html);
-        // メディアの下・ノートの上
-        $section = strpos($html, 'data-record-personality-diagnosis');
-        $this->assertLessThan($section, strpos($html, '>メディア（0件）</h6>'));
-        $this->assertGreaterThan($section, strpos($html, '>トレーナーからのノート</h6>'));
-    }
-
-    public function test_あとで新しい結果が増えても記録の中のグラフはその時点のまま(): void
-    {
-        $this->addResult('past-2', '2026-03-10 11:00:00');
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $record = $this->record('2026-06-02', $result);
-        $before = $this->radarData($this->trainerShow($record));
-
-        $this->addResult('past-3', '2026-09-01 09:00:00');
-
-        $after = $this->trainerShow($record);
-        $this->assertSame($before, $this->radarData($after));
-        $this->assertSame(['2026/06/01', '2026/03/10'], array_column($before['series'], 'date'));
-        // 値は今回の結果のもの
-        $this->assertSame(array_values($this->fixtureCase('past-1')['expected']['display']), $before['series'][0]['values']);
-    }
-
-    public function test_結び付きのない記録には欄もJSも出さない(): void
-    {
-        $html = $this->trainerShow($this->record('2026-06-02'));
-
-        $this->assertStringNotContainsString('data-record-personality-diagnosis', $html);
-        $this->assertStringNotContainsString('personality-radar', $html);
-        $html = $this->clientShow($this->record('2026-06-03'));
-        $this->assertStringNotContainsString('data-record-personality-diagnosis', $html);
-        $this->assertStringNotContainsString('personality-radar', $html);
-    }
-
-    public function test_結果を削除すると記録は残り欄は出ない(): void
-    {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $record = $this->record('2026-06-02', $result);
-
-        $result->delete();
-
-        $html = $this->trainerShow($record->fresh());
         $this->assertStringContainsString('ノート 2026-06-02', $html);
         $this->assertStringNotContainsString('data-record-personality-diagnosis', $html);
-        $this->assertStringNotContainsString('data-record-personality-diagnosis', $this->clientShow($record->fresh()));
+        $this->assertStringNotContainsString('愛犬性格診断', $html);
+        $this->assertStringNotContainsString('personality-radar', $html);
     }
 
-    // ---- 会員側の記録の詳細（S-1404） ----
-
-    public function test_会員側の詳細は呼び名の見出しとタイプと小さなグラフで点数とリンクは出さない(): void
+    public function test_会員側の記録の詳細には愛犬性格診断の欄もJSも出さない(): void
     {
-        $this->addResult('past-2', '2026-03-10 11:00:00');
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $record = $this->record('2026-06-02', $result);
-        // あとから足した結果は使わない
-        $this->addResult('past-3', '2026-09-01 09:00:00');
+        $this->publishEvaluation($this->addResult('past-1', '2026-06-01 09:00:00'));
+        $record = $this->record('2026-06-02');
 
         $html = $this->clientShow($record);
 
-        $this->assertStringContainsString('<p class="eyebrow" id="c-personality-heading">アイちゃんの愛犬性格診断（2026/06/01）</p>', $html);
-        $this->assertStringContainsString('data-record-personality-type>繊細・<wbr>デリケートタイプ</p>', $html);
-        $this->assertSame(['2026/06/01', '2026/03/10'], array_column($this->radarData($html)['series'], 'date'));
-        $this->assertMatchesRegularExpression('/<canvas id="record-personality-radar" role="img" aria-label="アイちゃんの愛犬性格診断のグラフ"[^>]*data-personality-radar-compact><\/canvas>/u', $html);
-        $this->assertStringContainsString('personality-radar', $html);
-        // 点数の表・S-0313 へのリンク・評価文の状態・所感・注記は出さない
-        $this->assertStringNotContainsString('personality-diagnosis-results', $html);
-        $this->assertStringNotContainsString('<table', $html);
-        $this->assertStringNotContainsString('公開済み', $html);
-        $this->assertStringNotContainsString('所感', $html);
-        $this->assertStringNotContainsString('data-personality-radar-missing-note', $html);
-        // 写真と動画の下（ここでは写真と動画がないので見出しの下）・ノートの上
-        $this->assertLessThan(strpos($html, 'id="c-note-heading"'), strpos($html, 'data-record-personality-diagnosis'));
+        $this->assertStringContainsString('ノート 2026-06-02', $html);
+        $this->assertStringNotContainsString('data-record-personality-diagnosis', $html);
+        $this->assertStringNotContainsString('personality-radar', $html);
+        $this->assertStringNotContainsString('公開した評価文', $html);
     }
 
     public function test_会員はほかの会員の記録を見られない(): void
     {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $record = $this->record('2026-06-02', $result);
+        $record = $this->record('2026-06-02');
         $other = Client::query()->create(['internal_id' => '0002', 'last_name' => '佐藤', 'email' => 'sato@example.com']);
 
         $this->actingAs($other, 'client')->get(route('client-portal.training-records.show', $record))->assertForbidden();
     }
 
-    // ---- 一覧の印 ----
-
-    public function test_トレーナー側の一覧は結び付いた記録だけに印を出す(): void
+    public function test_トレーナー側の一覧に愛犬性格診断の印を出さない(): void
     {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $this->record('2026-06-02', $result);
-        $this->record('2026-06-03');
+        $this->publishEvaluation($this->addResult('past-1', '2026-06-01 09:00:00'));
+        $this->record('2026-06-02');
         $this->actingAsTrainer();
 
         $html = $this->get(route('training-records.index'))->assertOk()->getContent();
 
-        $this->assertSame(1, substr_count($html, 'data-record-personality-badge'));
-        $this->assertStringContainsString('<td class="text-nowrap">2026/06/02<span class="badge rounded-pill text-bg-light border fw-normal ms-2" data-record-personality-badge>愛犬性格診断</span></td>', $html);
-        $this->assertStringContainsString('<td class="text-nowrap">2026/06/03</td>', $html);
+        $this->assertStringContainsString('<td>2026/06/02</td>', $html);
+        $this->assertStringNotContainsString('data-record-personality-badge', $html);
     }
 
-    public function test_マイページは最新の記録とこれまでの記録の結び付いた記録だけに印を出す(): void
+    public function test_マイページの記録に愛犬性格診断の印を出さない(): void
     {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $old = $this->addResult('past-2', '2026-03-10 11:00:00');
-        $this->record('2026-06-02', $result);
+        $this->publishEvaluation($this->addResult('past-1', '2026-06-01 09:00:00'));
+        $this->record('2026-06-02');
         $this->record('2026-05-01');
-        $this->record('2026-03-11', $old);
 
         $html = $this->actingAs($this->client, 'client')->get(route('client-portal.dashboard'))->assertOk()->getContent();
 
-        $this->assertSame(2, substr_count($html, 'data-record-personality-badge'));
-        $this->assertStringContainsString('<p class="c-session-tag mb-2" data-record-personality-badge>愛犬性格診断</p>', $html);
-        // 最新の記録（2026/06/02）のカードに 1 つ
-        $hero = substr($html, strpos($html, 'id="c-latest-heading"'), strpos($html, 'id="c-past-heading"') - strpos($html, 'id="c-latest-heading"'));
-        $this->assertSame(1, substr_count($hero, 'data-record-personality-badge'));
+        $this->assertStringNotContainsString('data-record-personality-badge', $html);
+        $this->assertStringNotContainsString('<p class="c-session-tag', $html);
     }
 
     // ---- 記録の更新（S-0404） ----
 
-    public function test_記録の更新は会員と結び付けを受け取らない(): void
+    public function test_記録の更新は会員を受け取らない(): void
     {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $record = $this->record('2026-06-02', $result);
+        $record = $this->record('2026-06-02');
         $other = Client::query()->create(['internal_id' => '0002', 'last_name' => '佐藤']);
-        $otherResult = $this->addResult('past-2', '2026-03-10 11:00:00');
         $this->actingAsTrainer();
 
         $this->put(route('training-records.update', $record), [
             'client_id' => $other->id,
-            'trainee_personality_diagnosis_result_id' => $otherResult->id,
             'training_date' => '2026-06-05',
             'trainer1_id' => 201,
             'record_content' => '直したノート',
@@ -298,12 +221,10 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
 
         $fresh = $record->fresh();
         $this->assertSame($this->client->id, (int) $fresh->client_id);
-        $this->assertSame($result->id, (int) $fresh->trainee_personality_diagnosis_result_id);
-        // ほかの項目は今までどおり変わる。ノートを直しても結果の側の評価文は変わらない
+        // ほかの項目は今までどおり変わる
         $this->assertSame('2026-06-05', $fresh->training_date->format('Y-m-d'));
         $this->assertSame(201, (int) $fresh->trainer1_id);
         $this->assertSame('直したノート', $fresh->record_content);
-        $this->assertNull($result->fresh()->evaluation_text);
     }
 
     public function test_記録の更新は会員を送らなくても通る(): void
@@ -315,19 +236,5 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('training-records.show', $record));
         $this->assertSame($this->client->id, (int) $record->fresh()->client_id);
-    }
-
-    public function test_記録の登録は結び付けを受け取らない(): void
-    {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $this->actingAsTrainer();
-
-        $this->post(route('training-records.store'), [
-            'client_id' => $this->client->id, 'training_date' => '2026-06-05', 'trainer1_id' => 200,
-            'trainee_personality_diagnosis_result_id' => $result->id,
-        ])->assertSessionHasNoErrors();
-
-        $this->assertNull(TrainingRecord::query()->sole()->trainee_personality_diagnosis_result_id);
-        $this->assertSame('なし', $result->fresh()->evaluation_status_label);
     }
 }

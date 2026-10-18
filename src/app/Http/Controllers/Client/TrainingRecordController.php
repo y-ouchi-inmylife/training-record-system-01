@@ -52,11 +52,6 @@ class TrainingRecordController extends Controller
             ];
         })->values()->all();
 
-        // 愛犬性格診断の欄（評価文を公開して作った記録だけ。2026-10-18 追加。要件定義書 6-15-7）。結び付いた結果は
-        // この記録に結び付いているので、記録の本人認可を通れば見せてよい（公開のとき、記録の会員を結果のトレーニーの会員にしている）。
-        // 会員側にはタイプとグラフだけを出す（点数の表・50 問の回答・評価文の状態・S-0313 へのリンクは出さない）
-        $personalityDiagnosis = $trainingRecord->personalityDiagnosisSection();
-
-        return view('client.training-records.show', compact('trainingRecord', 'mediaItems', 'personalityDiagnosis'));
+        return view('client.training-records.show', compact('trainingRecord', 'mediaItems'));
     }
 }

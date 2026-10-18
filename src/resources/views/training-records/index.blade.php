@@ -159,8 +159,7 @@
                         <td>{{ $record->client->internal_id ?? '' }}</td>
                         <td>{{ $record->client->display_name ?? '' }}</td>
                         <td>{{ $record->client->trainees_label ?? '' }}</td>
-                        {{-- 愛犬性格診断の印（評価文を公開して作った記録だけ。2026-10-18 追加。設計書 S-0402）：日付の右に小さく。列は足さない --}}
-                        <td class="text-nowrap">{{ $record->training_date->format('Y/m/d') }}@if($record->trainee_personality_diagnosis_result_id)<span class="badge rounded-pill text-bg-light border fw-normal ms-2" data-record-personality-badge>{{ __('messages.personality_diagnosis_name') }}</span>@endif</td>
+                        <td>{{ $record->training_date->format('Y/m/d') }}</td>
                         <td>{{ $record->trainer1->name ?? '' }}</td>
                         <td>{{ $record->trainer2->name ?? '' }}</td>
                         <td>{{ $record->media_records_count }}</td>
