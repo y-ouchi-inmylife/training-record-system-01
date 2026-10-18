@@ -28,12 +28,13 @@
 
     {{-- ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402「ご連絡先の登録のお願い」）。契約がある会員で住所か電話番号が空のとき、
          あいさつのすぐ下（愛犬のカードより上）に出す。会員全体のことなので、愛犬ごとの回答待ちの案内（愛犬のカードの中）とは分けて上に置く。
-         見た目は回答待ちの案内の帯と同じ作り（.c-survey-notice。色は会員側の青〔--contact〕。アイコンは家）。
+         見た目は回答待ちの案内の帯と同じ作り（.c-survey-notice。色は注意の琥珀色〔--contact〕、アイコンは注意の印〔三角に「！」〕。
+         2026-10-18 変更：ユーザーレビューで、急ぎであることが分かるように目立つ色にした。その前は会員側の青と家のアイコン。アイコンは読み上げない）。
          ［登録する］は登録情報の変更（S-1411）。閉じるボタンは付けない（入力すれば消えるため） --}}
     @if($contactNotice)
         <div class="c-survey-notice c-survey-notice--contact c-contact-notice" data-client-contact-notice="{{ implode(' ', $contactNotice['missing']) }}">
             <p class="c-survey-notice-text mb-0">
-                <svg class="c-survey-notice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5z"/></svg>
+                <svg class="c-survey-notice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-contact-notice-icon="exclamation-triangle"><path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.15.15 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.2.2 0 0 1-.054.06.1.1 0 0 1-.066.017H1.146a.1.1 0 0 1-.066-.017.2.2 0 0 1-.054-.06.18.18 0 0 1 .002-.183L7.884 2.073a.15.15 0 0 1 .054-.057m1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767z"/><path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/></svg>
                 <span>{{ $contactNotice['text'] }}</span>
             </p>
             <a href="{{ $contactNotice['url'] }}" class="btn btn-primary btn-sm text-nowrap">{{ __('messages.client_contact_notice.register') }}</a>

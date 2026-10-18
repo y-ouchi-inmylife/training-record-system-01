@@ -202,6 +202,8 @@ class ClientContactDetailsTest extends TestCase
             .'<a href="'.preg_quote(route('client-portal.profile.edit'), '/').'" class="btn btn-primary btn-sm text-nowrap">登録する<\/a>\s*<\/div>/su',
             $html
         );
+        // アイコンは注意の印（三角に「！」。2026-10-18 変更：その前は家）。読み上げない
+        $this->assertMatchesRegularExpression('/<svg class="c-survey-notice-icon"[^>]*aria-hidden="true"[^>]*data-contact-notice-icon="exclamation-triangle">/u', $html);
         // あいさつのすぐ下（愛犬のカード・最新の記録より上）。閉じるボタンはない
         $this->assertLessThan(strpos($html, 'data-client-contact-notice'), strpos($html, 'こんにちは'));
         $this->assertLessThan(strpos($html, 'id="c-latest-heading"') ?: strpos($html, 'aria-label="空状態"'), strpos($html, 'data-client-contact-notice'));

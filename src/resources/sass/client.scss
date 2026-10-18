@@ -29,6 +29,10 @@ $brand-deep:   #162D66; // 深い紺：ヘッダー帯・H1/H2/Display の色・
 $brand-bright: #2A4A94; // 明るい紺：主要ボタン・日付ブロック帯（面 + mat 文字）およびリンクの文字色
 $madder:       #7F1D1D; // エラー・破棄アクション（mat 面上のみ）
 $driftwood:    #6B6155; // 補助アクション面（$secondary）
+// 注意（急ぎのお願い）の色（2026-10-18 追加）。マイページの「ご連絡先の登録のお願い」の帯に使う。赤（$madder。エラー・破棄）とは分ける。
+// 線とアイコンは濃い琥珀色（面の上で 4.61:1。図の部品に要る 3:1 を超える）、面は薄いオレンジ（$ink の文字と 15.96:1）
+$caution:      #B45309;
+$caution-bg:   #FFF4E0;
 
 // -----------------------------------------------------------------------------
 // Bootstrap 変数の上書き（Bootstrap import の前）
@@ -1434,11 +1438,13 @@ input[type="tel"] {
     --c-survey-notice-color: #{$purple};
     background-color: mix($purple, $mat, 8%);
 }
-// ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402）。回答待ちの案内と同じ帯の作りで、色は会員側の青（$brand-bright）。
+// ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402）。回答待ちの案内と同じ帯の作りで、色は注意の琥珀色（$caution・$caution-bg）。
+// 2026-10-18 変更：ユーザーレビューで、急ぎであることが分かるように目立つ色にした（その前は会員側の青〔$brand-bright〕で、愛犬ごとの案内と同じくらいの目立ち方）。
+// 文字は今までどおり $ink の太字、［登録する］は会員側の主な操作の青の塗りのまま（ボタンの色の決まり）。
 // 愛犬のカードの外（あいさつのすぐ下）に置くので、下の愛犬のカードとの間をあける
 .c-survey-notice--contact {
-    --c-survey-notice-color: #{$brand-bright};
-    background-color: mix($brand-bright, $mat, 8%);
+    --c-survey-notice-color: #{$caution};
+    background-color: $caution-bg;
 }
 .c-contact-notice {
     margin-bottom: 1rem;
