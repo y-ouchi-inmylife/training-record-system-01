@@ -89,7 +89,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | GET | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果 1 件の詳細（タイプ・レーダーチャート・点数・50問の回答・評価文）を表示する（ルート名 `trainee-personality-diagnosis-results.show`。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 評価文を保存する（ルート名 `trainee-personality-diagnosis-results.update`。公開済みでも保存できる〔空にはできない〕。**2026-10-18 変更**：その前は公開済みなら 409。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish` | 評価文を保存して公開する（公開した日時・トレーナーを入れる。トレーニング記録は作らない。ルート名 `trainee-personality-diagnosis-results.publish`。**2026-10-18 追加**。**2026-10-18 変更**：その前は評価文を本文にしたトレーニング記録を作っていた） | auth | 管理者、一般 |
-| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish` | 評価文の公開をやめる（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish` | 評価文の公開取消（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果を 1 件削除する（物理削除。公開済みの評価文も一緒に消え、会員様の画面からも消える。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**。**2026-10-18 変更**：送信元を S-0309 から S-0313 に移した） | auth | 管理者 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
@@ -1483,7 +1483,7 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - ログイン中のクライアント自身のトレーニング記録の一覧を、日付の新しい順（降順）で取得し、view に渡す。同じ日は時刻の新しい順（時刻のない記録はその日のいちばん後ろ。**2026-10-18 追加**：S-0305 と並びをそろえるため）
-- **公開済みの愛犬性格診断の評価文を混ぜる**（**2026-10-18 追加**。requirements.md 6-15-6）：自分のトレーニーの結果のうち `evaluation_published_at` が NULL でないものを読み込み、記録と 1 本の並び（S-0305 と同じ並び。評価文は公開した日時。`App\Support\RecordTimeline::merge`）に組み立てて `timeline` として渡す。最新の記録のカード（hero）は、混ぜた並びの先頭。「全 N 回」は記録だけを数える（`recordCount`。0 のときは出さない）。ページ送りはない（今の記録と同じく全件）。下書き・公開をやめたもの・ほかの会員のものは入れない
+- **公開済みの愛犬性格診断の評価文を混ぜる**（**2026-10-18 追加**。requirements.md 6-15-6）：自分のトレーニーの結果のうち `evaluation_published_at` が NULL でないものを読み込み、記録と 1 本の並び（S-0305 と同じ並び。評価文は公開した日時。`App\Support\RecordTimeline::merge`）に組み立てて `timeline` として渡す。最新の記録のカード（hero）は、混ぜた並びの先頭。「全 N 回」は記録だけを数える（`recordCount`。0 のときは出さない）。ページ送りはない（今の記録と同じく全件）。下書き・公開を取り消したもの・ほかの会員のものは入れない
 - トレーニーごとの体重推移データ（6-15-14）と、**トレーニー写真の表示用 URL**（6-15-15）も view に渡す。写真 URL は `Storage::disk('media')->temporaryUrl($trainee->photo_path, ...)` で発行する（`photo_path` が NULL のトレーニーは URL を渡さず、Blade で「写真を登録」の案内に切り替える）
 
 **レスポンス**:
@@ -2205,7 +2205,7 @@ POST /training-records に以下を追加する。
 
 **権限**:
 - `auth:client`。ログインしていなければログイン画面（S-1401）へ
-- 結果のトレーニーがログイン中のクライアントのトレーニーで、かつ公開済み（`evaluation_published_at` が NULL でない）のときだけ見せる。それ以外（下書き・なし・公開をやめた・ほかのクライアントのもの・存在しない）は **404**（公開していない評価文があることも分からないように）
+- 結果のトレーニーがログイン中のクライアントのトレーニーで、かつ公開済み（`evaluation_published_at` が NULL でない）のときだけ見せる。それ以外（下書き・なし・公開を取り消した・ほかのクライアントのもの・存在しない）は **404**（公開していない評価文があることも分からないように）
 - トレーナー側のルート（`trainee-personality-diagnosis-results.*`）は会員に開放しない
 
 **処理**:
@@ -2376,7 +2376,7 @@ POST /training-records に以下を追加する。
 
 ##### S-0313 愛犬性格診断詳細画面
 
-**2026-10-18 追加**（requirements.md 6-16-15・6-16-16）。愛犬性格診断の結果 1 件の詳細と、評価文の保存・公開・公開をやめる。**2026-10-18 変更**：2026-10-18 のユーザーレビューで、評価文と記録の本文の二重持ちをやめるため、公開でトレーニング記録を作らず、結果の行に公開した日時・トレーナーを持たせる形にした（その前〔段階1 の②〕は公開で記録を作っていた）。
+**2026-10-18 追加**（requirements.md 6-16-15・6-16-16）。愛犬性格診断の結果 1 件の詳細と、評価文の保存・公開・公開取消。**2026-10-18 変更**：2026-10-18 のユーザーレビューで、評価文と記録の本文の二重持ちをやめるため、公開でトレーニング記録を作らず、結果の行に公開した日時・トレーナーを持たせる形にした（その前〔段階1 の②〕は公開で記録を作っていた）。
 
 **共通**（下の 4 つのルートと、上の DELETE）:
 - `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果・存在しない結果は 404）。DELETE と同じ
@@ -2406,7 +2406,7 @@ POST /training-records に以下を追加する。
 | evaluation_text | string |  | nullable, string, max:10000 | 評価文。空なら NULL で保存する（「なし」に戻る）。改行は LF にそろえる（受付アンケートの自由記述と同じ） |
 
 **処理**:
-- 公開済み（`evaluation_published_at` が NULL でない）でも保存できる（そのまま会員様の画面に出る）。ただし**公開済みのときは空にできない**：空（空白だけを含む）なら入力エラー「公開中の評価文は空にできません。公開をやめてから消してください。」（キー `evaluation_text`）（**2026-10-18 変更**：その前は公開済みなら 409）
+- 公開済み（`evaluation_published_at` が NULL でない）でも保存できる（そのまま会員様の画面に出る）。ただし**公開済みのときは空にできない**：空（空白だけを含む）なら入力エラー「公開中の評価文は空にできません。公開を取り消してから消してください。」（キー `evaluation_text`）（**2026-10-18 変更**：その前は公開済みなら 409）
 - `evaluation_text`・`evaluation_updated_by`（ログイン中のトレーナー）・`evaluation_updated_at`（今）を保存する
 - アクセスログに記録する（`edit_trainee_personality_diagnosis_evaluation`。`target_type='Trainee'`、`target_id` はトレーニーの id）
 
@@ -2439,7 +2439,7 @@ POST /training-records に以下を追加する。
 
 ###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish
 
-**概要**: 評価文の公開をやめる（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**）。
+**概要**: 評価文の公開取消（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**）。
 
 **リクエスト**: パラメータなし（欄に保存していない直しがあっても保存しない）
 
@@ -2450,8 +2450,8 @@ POST /training-records に以下を追加する。
 - アクセスログに記録する（`unpublish_trainee_personality_diagnosis_evaluation`。`target_type='Trainee'`、`target_id` はトレーニーの id）
 
 **レスポンス**:
-- 成功：S-0313 へ。フラッシュ `success` に「評価文の公開をやめました。」
-- すでに公開をやめている：同じ S-0313 へ。フラッシュ `success` に「この評価文は公開していません。」（エラーにしない）
+- 成功：S-0313 へ。フラッシュ `success` に「愛犬性格診断の公開を取り消しました。」（名前は `personality_diagnosis_name`。**2026-10-18 変更**：2026-10-18 のユーザーレビューで、［公開をやめる］を［公開取消］にし、ほかの案内の取消とそろえた。その前は「評価文の公開をやめました。」）
+- すでに公開を取り消している：同じ S-0313 へ。フラッシュ `success` に「この評価文は公開していません。」（エラーにしない）
 - 押下時に確認モーダルを挟む（screen-design.md S-0313-M03）
 - ルートを `DELETE …/publish` にしないのは、評価文を消す操作と取り違えないため（公開の印を外すだけ）
 
