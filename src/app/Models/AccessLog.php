@@ -50,6 +50,7 @@ class AccessLog extends Model
             'create_trainee_personality_diagnosis_token' => __('messages.personality_diagnosis_name').'案内発行',
             'delete_trainee_personality_diagnosis_token' => __('messages.personality_diagnosis_name').'案内取消',
             'delete_trainee_personality_diagnosis_result' => __('messages.personality_diagnosis_name').'結果削除',
+            'edit_trainee_personality_diagnosis_evaluation' => __('messages.personality_diagnosis_name').'評価文保存',
             'create_client_contract' => '契約登録',
             'edit_client_contract' => '契約編集',
             'delete_client_contract' => '契約削除',

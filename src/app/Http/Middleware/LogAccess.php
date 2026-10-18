@@ -41,6 +41,9 @@ class LogAccess
         'trainee-personality-diagnosis-tokens.destroy' => 'delete_trainee_personality_diagnosis_token',
         // 性格診断の結果の削除（2026-10 追加）。対象はトレーニー（target_id はルートの {trainee}。結果の id は記録しない）
         'trainee-personality-diagnosis-results.destroy' => 'delete_trainee_personality_diagnosis_result',
+        // 愛犬性格診断の評価文の保存（S-0313。2026-10-18 追加）。対象はトレーニー（結果の削除と同じ。結果の id は記録しない）。
+        // 愛犬性格診断詳細の表示は記録しない（トレーニー詳細を見たことと同じ）
+        'trainee-personality-diagnosis-results.update' => 'edit_trainee_personality_diagnosis_evaluation',
         // 契約（D-0900）・利用（D-1000）。参照は view_client に含めるため view_ 系は作らない。
         'client-contracts.store' => 'create_client_contract',
         'client-contracts.update' => 'edit_client_contract',

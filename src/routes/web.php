@@ -142,7 +142,15 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 性格診断案内画面（S-0312）。会員詳細の「性格診断」の行の［案内を表示］から開く（2026-10-17 変更：当初は別タブ）
             Route::get('trainees/{trainee}/personality-diagnosis-tokens/print', [TraineePersonalityDiagnosisTokenController::class, 'print'])
                 ->name('trainee-personality-diagnosis-tokens.print');
-            // 性格診断の結果の削除（S-0309 の結果の表の行の［削除］。管理者のみ。2026-10 追加）。
+            // 愛犬性格診断詳細（S-0313。2026-10-18 追加）と評価文の保存。S-0309 の結果の表の行の［詳細］から開く。
+            // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
+            Route::get('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'show'])
+                ->scopeBindings()
+                ->name('trainee-personality-diagnosis-results.show');
+            Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'update'])
+                ->scopeBindings()
+                ->name('trainee-personality-diagnosis-results.update');
+            // 愛犬性格診断の結果の削除（S-0313 の［削除］。管理者のみ。2026-10 追加。2026-10-18 変更：当初は S-0309 の結果の表の行の［削除］）。
             // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
             Route::delete('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'destroy'])
                 ->scopeBindings()

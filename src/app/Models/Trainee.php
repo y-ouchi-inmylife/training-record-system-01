@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -511,7 +512,37 @@ class Trainee extends Model
      */
     public function getPersonalityRadarDataAttribute(): ?array
     {
-        $results = $this->personalityDiagnosisResults;
+        return self::buildPersonalityRadarData($this->personalityDiagnosisResults);
+    }
+
+    /**
+     * 指定した結果の時点のレーダーチャートの値（2026-10-18 追加。要件定義書 6-16-15・6-16-16）。形は personality_radar_data と同じ。
+     *
+     * 指定した結果を今回にし、前回・初回は、それより前の結果（personalityDiagnosisResults の新しい順で、指定した結果より後ろ。
+     * 同じ回答日時なら id の小さいほう）から取る。決まり（前回＝1 つ前、初回＝いちばん古い回で 3 つ以上のときだけ）は今の組み立てと同じ。
+     * 指定した結果がこのトレーニーの結果でなければ null。結果は personalityDiagnosisResults（新しい順）。呼ぶ側で先に読み込んでおく
+     *
+     * @return array{labels: string[], keys: string[], series: array{key: string, date: string, values: (string|null)[]}[]}|null
+     */
+    public function personalityRadarDataAsOf(TraineePersonalityDiagnosisResult $result): ?array
+    {
+        $results = $this->personalityDiagnosisResults->values();
+        $index = $results->search(fn (TraineePersonalityDiagnosisResult $item) => $item->id === $result->id);
+        if ($index === false) {
+            return null;
+        }
+
+        return self::buildPersonalityRadarData($results->slice($index)->values());
+    }
+
+    /**
+     * 新しい順の結果から、レーダーチャートの値を組み立てる（いちばん前が今回。2026-10-18 に personality_radar_data から切り出し、
+     * 指定した結果の時点の組み立て〔personalityRadarDataAsOf〕と共通にした）。結果がなければ null
+     *
+     * @param  Collection<int, TraineePersonalityDiagnosisResult>  $results  新しい順（キーは 0 から）
+     */
+    private static function buildPersonalityRadarData(Collection $results): ?array
+    {
         if ($results->isEmpty()) {
             return null;
         }

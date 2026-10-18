@@ -8,6 +8,7 @@ use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\Trainer;
 use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
@@ -17,9 +18,10 @@ use Tests\TestCase;
  * トレーニー詳細（S-0309）の性格診断の欄（2026-10 追加。設計書 S-0309「性格診断の欄」）。
  *
  * - 計測値の下・暮らしの様子の欄の上に、いつも出す（id="personality-diagnosis"・scroll-margin-top。2026-10 変更：当初は暮らしの様子の欄の下）。結果がなければ「（未回答）」だけ
- * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（新しい順。2026-10 変更：当初は古い順。回答日・タイプ・7 カテゴリ・［回答］）
- * - 50 問の回答は 1 回ごとのモーダル（2026-10 変更：当初は回ごとに見出しの行・グラフ・点数の表を並べ、開閉していた）
- * - 管理者にだけ、各行の［削除］と削除確認モーダル（S-0309-M01。1 行ごと）を出す（2026-10 追加。要件定義書 6-16-14）
+ * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（新しい順。2026-10 変更：当初は古い順。回答日・タイプ・7 カテゴリ・評価文の状態・［詳細］）
+ * - 各行の［詳細］で愛犬性格診断詳細（S-0313）へ。50 問の回答・評価文・削除は S-0313（2026-10-18 変更：当初は各行の［回答］で
+ *   50 問の回答のモーダルを出し、管理者には各行の［削除］と削除確認モーダル S-0309-M01 を出していた。S-0313 の形は
+ *   TraineePersonalityDiagnosisResultShowTest）
  *
  * 点数は固定データ（tests/fixtures/personality-diagnosis-cases.json）を結果として入れ、表示の値が固定データの display と
  * 一致することを確かめる。
@@ -65,6 +67,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->createTraineeIntakeSurveyResponsesTable();
         $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();
+        $this->createTrainingRecordsTableForPersonalityDiagnosis();
 
         $trainer = new Trainer(['name' => 'テスト', 'role' => 'staff']);
         $trainer->id = 200;
@@ -136,22 +139,12 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return $rows;
     }
 
-    /** 結果の表の行の結果の id（表の上から順。各行の［回答］が開くモーダルの id から取る） */
+    /** 結果の表の行の結果の id（表の上から順。各行の［詳細］のリンク先から取る） */
     private function tableRowIds(string $html): array
     {
-        preg_match_all('/data-bs-target="#personality-diagnosis-answers-(\d+)"/u', $html, $m);
+        preg_match_all('/personality-diagnosis-results\/(\d+)" class="btn btn-sm btn-outline-primary text-nowrap"/u', $html, $m);
 
         return array_map('intval', $m[1]);
-    }
-
-    /** 1 回分のモーダル */
-    private function modal(string $html, TraineePersonalityDiagnosisResult $result): string
-    {
-        $start = strpos($html, '<div class="modal fade" id="personality-diagnosis-answers-'.$result->id.'"');
-        $this->assertNotFalse($start);
-        $end = strpos($html, '<div class="modal fade"', $start + 10);
-
-        return substr($html, $start, ($end === false ? strlen($html) : $end) - $start);
     }
 
     private function expectedRow(string $caseName): array
@@ -203,12 +196,12 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             '2026/03/10' => $this->expectedRow('past-2'),
             '2025/12/01' => $this->expectedRow('past-3'),
         ], $this->tableRows($card));
-        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・ボタンの列（読み上げ用に「操作」）
+        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・評価文（2026-10-18 追加）・ボタンの列（読み上げ用に「操作」）
         $this->assertSame(1, substr_count($card, '<table'));
         $this->assertStringContainsString('<div class="table-responsive position-relative">', $card);
         preg_match_all('/<th scope="col"[^>]*>(.*?)<\/th>/u', $card, $heads);
         $this->assertSame(
-            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['<span class="visually-hidden">操作</span>']),
+            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['評価文', '<span class="visually-hidden">操作</span>']),
             $heads[1]
         );
         // 回ごとの開閉はない
@@ -225,7 +218,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         }
     }
 
-    public function test_各行の回答のボタンがその回のモーダルを開く(): void
+    public function test_各行の詳細はその回の愛犬性格診断詳細へ移る白抜きの青のリンク(): void
     {
         $old = $this->addResult('past-2', '2026-03-10 11:00:00');
         $new = $this->addResult('past-1', '2026-06-01 09:00:00');
@@ -235,38 +228,54 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         foreach ([[$old, '2026/03/10'], [$new, '2026/06/01']] as [$result, $date]) {
             $this->assertMatchesRegularExpression(
                 '/<th scope="row" class="fw-normal text-nowrap">'.preg_quote($date, '/').'<\/th>[\s\S]*?'
-                .'<button type="button" class="btn btn-sm btn-outline-primary text-nowrap"\s*'
-                .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-'.$result->id.'"\s*'
-                .'aria-label="'.preg_quote($date, '/').'の50問の回答">回答<\/button>/u',
+                .'<a href="'.preg_quote(route('trainee-personality-diagnosis-results.show', [$this->trainee, $result]), '/').'" class="btn btn-sm btn-outline-primary text-nowrap"\s*'
+                .'aria-label="'.preg_quote($date, '/').'の愛犬性格診断の詳細">詳細<\/a>/u',
                 $card
             );
         }
-        // ボタンの文字は［回答］（2026-10 変更：当初は［50問の回答］）。読み上げ用の aria-label は回答日つきのまま
-        $this->assertStringNotContainsString('>50問の回答</button>', $card);
-        $this->assertSame(2, substr_count($card, '">回答</button>'));
+        $this->assertSame(2, substr_count($card, '">詳細</a>'));
+        // ［回答］とモーダルは出さない（2026-10-18 変更：50 問の回答は S-0313 に移した）
+        $this->assertStringNotContainsString('>回答</button>', $card);
+        $this->assertStringNotContainsString('data-bs-toggle="modal"', $card);
     }
 
-    public function test_モーダルにその回の50問の回答をカテゴリごとに出す(): void
+    public function test_評価文の列に未作成と下書きと公開済みを文字で出す(): void
     {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $answers = $this->fixtureCase('past-1')['answers'];
+        $none = $this->addResult('past-3', '2025-12-01 10:00:00');
+        $draft = $this->addResult('past-2', '2026-03-10 11:00:00');
+        $published = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $draft->update(['evaluation_text' => '下書きの文']);
+        DB::table('training_records')->insert([
+            'client_id' => $this->client->id, 'training_date' => '2026-06-02', 'trainer1_id' => 200,
+            'record_content' => '公開した文', 'trainee_personality_diagnosis_result_id' => $published->id,
+        ]);
 
-        $modal = $this->modal($this->page(), $result);
+        $card = $this->card($this->page());
 
-        $this->assertStringContainsString('<div class="modal-dialog modal-dialog-scrollable modal-lg">', $modal);
-        $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="personality-diagnosis-answers-'.$result->id.'-label">50問の回答（2026\/06\/01）<\/h5>/u', $modal);
-        foreach (PersonalityDiagnosisQuestions::categories() as $label) {
-            $this->assertStringContainsString('>'.$label.'</p>', $modal);
-        }
-        $this->assertSame(50, substr_count($modal, '<dt class="col-sm-8 fw-normal">'));
-        // 数字の答えと「未経験」（past-1 の Q01 は na、Q02 は 4）
-        $this->assertSame('na', $answers['Q01']);
-        $this->assertSame(4, $answers['Q02']);
-        $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">①知らない人が家に入ってきた時に吠える・唸る<\/dt>\s*<dd class="col-sm-4 mb-1">未経験<\/dd>/u', $modal);
-        $this->assertMatchesRegularExpression('/<dt class="col-sm-8 fw-normal">②窓の外を誰かが通りかかっただけで、敏感に反応して吠える<\/dt>\s*<dd class="col-sm-4 mb-1">4：常にある<\/dd>/u', $modal);
-        // Q11 は文末を直した文で出す（保存済みの結果〔v1〕でも。2026-10-18 変更：当初は「…喧嘩になり」）
-        $this->assertStringContainsString('<dt class="col-sm-8 fw-normal">③ドッグランなどで他の犬に追いかけられると、本気で怒って喧嘩になる</dt>', $modal);
-        $this->assertStringNotContainsString('喧嘩になり', $modal);
+        preg_match_all('/<td class="text-nowrap( text-muted)?">(未作成|下書き|公開済み)<\/td>/u', $card, $m);
+        $this->assertSame(['公開済み', '下書き', '未作成'], $m[2]);
+        // 未作成だけ薄い文字
+        $this->assertSame(['', '', ' text-muted'], $m[1]);
+        $this->assertNotNull($none);
+    }
+
+    public function test_評価文の状態を出してもクエリの数は結果の数で増えない(): void
+    {
+        $count = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->page();
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+
+        $this->addResult('past-1', '2026-06-01 09:00:00');
+        $one = $count();
+        $this->addResult('past-2', '2026-03-10 11:00:00');
+        $this->addResult('past-3', '2025-12-01 10:00:00');
+
+        $this->assertSame($one, $count());
     }
 
     public function test_別のトレーニーの結果は出さない(): void
@@ -278,7 +287,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $this->assertStringContainsString('（未回答）', $this->card($html));
         $this->assertStringNotContainsString('聡明・スマート優等生タイプ', $html);
-        $this->assertStringNotContainsString('data-personality-diagnosis-answers', $html);
+        $this->assertStringNotContainsString('personality-diagnosis-results/', $html);
     }
 
     // ---- レーダーチャート（1 つ。今回・前回・初回を重ねる） ----
@@ -447,8 +456,9 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertSame(1, substr_count($card, '<th scope="row" class="fw-normal text-nowrap">'));
         // 点数 7 つ＋ボタンの列
         $this->assertSame(8, substr_count($card, '<td class="text-end text-nowrap">'));
-        // ボタンの列も折り返さない（［回答］と［削除］を横に並べたまま）
-        $this->assertMatchesRegularExpression('/<td class="text-end text-nowrap">\s*<button type="button" class="btn btn-sm btn-outline-primary text-nowrap"/u', $card);
+        // 評価文の状態とボタンの列も折り返さない
+        $this->assertSame(1, preg_match_all('/<td class="text-nowrap text-muted">未作成<\/td>/u', $card));
+        $this->assertMatchesRegularExpression('/<td class="text-end text-nowrap">\s*<a href="[^"]+" class="btn btn-sm btn-outline-primary text-nowrap"/u', $card);
     }
 
     public function test_表の文字は少し小さくしボタンはbtn_smのまま(): void
@@ -462,7 +472,6 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringContainsString('<table class="table table-sm small align-middle mb-0" data-personality-diagnosis-results>', $card);
         // ボタンは btn-sm のまま（表の文字に合わせて小さくしない）
         $this->assertStringContainsString('class="btn btn-sm btn-outline-primary text-nowrap"', $card);
-        $this->assertStringContainsString('class="btn btn-sm btn-outline-danger text-nowrap ms-1"', $card);
     }
 
     public function test_タイプは中点のあとに折り返しの印を入れほかの位置では折り返さない(): void
@@ -503,15 +512,6 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('点数は下の表のとおり', $html);
     }
 
-    public function test_モーダルの見出しは今までどおり50問の回答と回答日(): void
-    {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-
-        $html = $this->page();
-
-        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-answers-'.$result->id.'-label">50問の回答（2026/06/01）</h5>', $html);
-    }
-
     public function test_結果がなければ並びの枠も出さない(): void
     {
         $card = $this->card($this->page());
@@ -531,7 +531,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringContainsString('id="'.$m[1].'"', $this->page());
     }
 
-    // ---- 結果の削除（管理者だけ。S-0309-M01。2026-10 追加） ----
+    // ---- 結果の削除（管理者だけ。2026-10 追加。2026-10-18 変更：S-0313 に移した。S-0313 の形は TraineePersonalityDiagnosisResultShowTest） ----
 
     private function actingAsRole(string $role): void
     {
@@ -541,58 +541,32 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->actingAs($trainer, 'web');
     }
 
-    /** 1 回分の削除確認モーダル */
-    private function deleteModal(string $html, TraineePersonalityDiagnosisResult $result): string
-    {
-        $start = strpos($html, '<div class="modal fade" id="personality-diagnosis-delete-'.$result->id.'"');
-        $this->assertNotFalse($start);
-        $end = strpos($html, '<div class="modal fade"', $start + 10);
-
-        return substr($html, $start, ($end === false ? strlen($html) : $end) - $start);
-    }
-
-    public function test_管理者には各行の削除のボタンと確認モーダルを出す(): void
+    public function test_管理者にも各行の削除のボタンと確認モーダルを出さない(): void
     {
         $this->actingAsRole('admin');
-        $old = $this->addResult('past-2', '2026-03-10 11:00:00');
-        $new = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->addResult('past-2', '2026-03-10 11:00:00');
+        $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $html = $this->page();
         $card = $this->card($html);
 
-        // 最後の列の読み上げ用の見出しは、管理者でも「操作」（管理者でないときは上の表のテストで確かめる）
+        // 最後の列の読み上げ用の見出しは「操作」のまま。中身は［詳細］だけ
         $this->assertStringContainsString('<th scope="col"><span class="visually-hidden">操作</span></th>', $card);
-        // 行の［削除］：［50問の回答］の右・白抜きの赤・読み上げ用の aria-label・その行のモーダルを開く
-        $this->assertSame(2, substr_count($card, 'btn-outline-danger'));
-        foreach ([[$old, '2026/03/10'], [$new, '2026/06/01']] as [$result, $date]) {
-            $this->assertMatchesRegularExpression(
-                '/aria-label="'.preg_quote($date, '/').'の50問の回答">回答<\/button>.*?'
-                .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"\s*'
-                .'data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-'.$result->id.'"\s*'
-                .'aria-label="'.preg_quote($date, '/').'の愛犬性格診断の結果を削除">削除<\/button>/us',
-                $card
-            );
-
-            $modal = $this->deleteModal($html, $result);
-            $this->assertStringContainsString('>愛犬性格診断の結果の削除</h5>', $modal);
-            $this->assertStringContainsString($date.' の愛犬性格診断の結果を削除します。元に戻せません。', $modal);
-            $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"', $modal);
-            $this->assertStringContainsString('name="_method" value="DELETE"', $modal);
-            $this->assertStringContainsString('<button type="submit" class="btn btn-danger">削除する</button>', $modal);
-            $this->assertStringContainsString('<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>', $modal);
-        }
-        $this->assertSame(2, substr_count($html, 'data-personality-diagnosis-delete'));
+        $this->assertStringNotContainsString('btn-outline-danger', $card);
+        $this->assertStringNotContainsString('の結果を削除', $html);
+        $this->assertStringNotContainsString('data-personality-diagnosis-delete', $html);
+        $this->assertStringNotContainsString('data-personality-diagnosis-answers', $html);
+        $this->assertSame(2, substr_count($card, '">詳細</a>'));
     }
 
-    public function test_管理者でなければ削除のボタンも確認モーダルも出さない(): void
+    public function test_管理者でなくても各行の詳細は出す(): void
     {
-        $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
 
         $html = $this->page();
 
-        $this->assertStringNotContainsString('性格診断の結果を削除', $html);
-        $this->assertStringNotContainsString('data-personality-diagnosis-delete', $html);
-        $this->assertStringNotContainsString('/personality-diagnosis-results/', $html);
+        $this->assertStringContainsString('href="'.route('trainee-personality-diagnosis-results.show', [$this->trainee, $result]).'"', $this->card($html));
+        $this->assertStringNotContainsString('の結果を削除', $html);
         $this->assertStringNotContainsString('btn-outline-danger', $this->card($html));
     }
 
@@ -639,30 +613,20 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         ], $this->radarData($html)['series']);
     }
 
-    public function test_各行の回答と削除はその行の結果を開く(): void
+    public function test_各行の詳細はその行の結果を開く(): void
     {
-        $this->actingAsRole('admin');
         $old = $this->addResult('past-3', '2025-12-01 10:00:00');
         $mid = $this->addResult('past-2', '2026-03-10 11:00:00');
         $new = $this->addResult('past-1', '2026-06-01 09:00:00');
 
-        $html = $this->page();
-        $card = $this->card($html);
+        $card = $this->card($this->page());
 
-        // 行ごとに、回答日・［回答］の開くモーダル・［削除］の開く確認のモーダルが同じ結果
         preg_match_all('/<tr>\s*<th scope="row" class="fw-normal text-nowrap">([0-9\/]+)<\/th>.*?<\/tr>/us', $card, $rows);
         $this->assertCount(3, $rows[0]);
         foreach ([[$new, '2026/06/01'], [$mid, '2026/03/10'], [$old, '2025/12/01']] as $i => [$result, $date]) {
             $this->assertSame($date, $rows[1][$i]);
-            $this->assertStringContainsString('data-bs-target="#personality-diagnosis-answers-'.$result->id.'"', $rows[0][$i]);
-            $this->assertStringContainsString('data-bs-target="#personality-diagnosis-delete-'.$result->id.'"', $rows[0][$i]);
-            // モーダルの中身もその結果のもの（50 問の回答の見出しの日付、削除の送り先）
-            $this->assertStringContainsString('50問の回答（'.$date.'）', $this->modal($html, $result));
-            $this->assertStringContainsString(
-                'action="'.route('trainee-personality-diagnosis-results.destroy', [$this->trainee, $result]).'"',
-                $this->deleteModal($html, $result)
-            );
-            $this->assertStringContainsString($date.' の愛犬性格診断の結果を削除します。', $this->deleteModal($html, $result));
+            $this->assertStringContainsString('href="'.route('trainee-personality-diagnosis-results.show', [$this->trainee, $result]).'"', $rows[0][$i]);
+            $this->assertStringContainsString('aria-label="'.$date.'の愛犬性格診断の詳細"', $rows[0][$i]);
         }
     }
 
@@ -676,9 +640,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $html = $this->page();
 
         $this->assertStringContainsString('<h6 class="mb-0">愛犬性格診断</h6>', $html);
-        $this->assertStringContainsString('-label">愛犬性格診断の結果の削除</h5>', $html);
-        $this->assertStringContainsString('2026/06/01 の愛犬性格診断の結果を削除します。', $html);
-        $this->assertStringContainsString('aria-label="2026/06/01の愛犬性格診断の結果を削除"', $html);
+        $this->assertStringContainsString('aria-label="2026/06/01の愛犬性格診断の詳細"', $html);
         $this->assertOnlyFullPersonalityDiagnosisName($html);
         $this->assertNotNull($result);
     }

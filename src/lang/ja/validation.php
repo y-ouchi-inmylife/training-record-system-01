@@ -343,6 +343,8 @@ return [
         'recent_events' => '最近の様子',
         'ideal_days' => '理想の毎日',
         'health_concerns' => '体のこと',
+        // 愛犬性格診断の評価文（S-0313。2026-10-18 追加）
+        'evaluation_text' => '評価文',
         'password' => 'パスワード',
         'password_confirmation' => 'パスワード（確認）',
         'current_password' => '現在のパスワード',

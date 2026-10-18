@@ -63,6 +63,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         // 性格診断の欄（2026-10 追加）
         $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();
+        $this->createTrainingRecordsTableForPersonalityDiagnosis();
 
         $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
         $admin->id = 100;

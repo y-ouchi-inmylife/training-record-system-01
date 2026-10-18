@@ -203,15 +203,14 @@
          - 点数なし（そのカテゴリの答えがすべて「未経験」）は表で「—」（読み上げは「点数なし」）、タイプの判定なしは「判定なし」。
            グラフでは点を描かない（2026-10-18 追加。要件定義書 6-16）。グラフの下に注記は出さない（表の「—」で分かるため。
            2026-10-18 変更：一度、今回に点数なしがあるときだけ注記を出していた）
-         - 表の各行の［回答］で、その回の 50 問の回答をモーダルで出す（1 回ごとにモーダルを置き、中身はサーバーで出す）。
-           設問は結果の設問の版に合った文（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は設問の ID）
+         - 表の各行に評価文の状態（未作成・下書き・公開済み）と［詳細］を出す。［詳細］で愛犬性格診断詳細（S-0313）へ移る。
+           50 問の回答・評価文・結果の削除は S-0313 で行う（2026-10-18 変更：当初は各行の［回答］で 50 問の回答をモーダルで出し、
+           管理者には各行の［削除］と確認モーダル S-0309-M01 を出していた）
          - 操作（発行・表示・取消）は置かない（会員詳細 S-0305 だけで行う）
          - id="personality-diagnosis" と scroll-margin-top は、会員詳細の「性格診断」のリンクの飛び先にするため（暮らしの様子と同じ値） --}}
     @php
         $pdResults = $trainee->personalityDiagnosisResults;
         $pdCategories = \App\Support\PersonalityDiagnosisQuestions::categories();
-        $pdIdsByCategory = \App\Support\PersonalityDiagnosisQuestions::questionIdsByCategory();
-        $pdChoices = \App\Support\PersonalityDiagnosisQuestions::choices();
         // レーダーチャートに重ねる回（今回・前回・初回）と値。会員側のマイページ（S-1402）と同じ組み立てを使う
         // （Trainee::personality_radar_data。2026-10 変更：当初はここで組み立てていた）。結果がなければ null
         $pdRadarData = $trainee->personality_radar_data;
@@ -263,6 +262,7 @@
                                         @foreach($pdCategories as $categoryLabel)
                                             <th scope="col" class="fw-normal text-muted text-end text-nowrap">{{ $categoryLabel }}</th>
                                         @endforeach
+                                        <th scope="col" class="fw-normal text-muted text-nowrap">評価文</th>
                                         <th scope="col"><span class="visually-hidden">操作</span></th>
                                     </tr>
                                 </thead>
@@ -279,17 +279,12 @@
                                                 {{-- 点数なし（答えがすべて「未経験」）は「—」。読み上げでは「点数なし」（2026-10-18 追加） --}}
                                                 <td class="text-end text-nowrap">@if($display[$category] === null)<span aria-hidden="true">—</span><span class="visually-hidden">点数なし</span>@else{{ $display[$category] }}@endif</td>
                                             @endforeach
+                                            {{-- 評価文の状態（2026-10-18 追加。要件定義書 6-16-15）。文字で出す（未作成は薄い文字） --}}
+                                            <td @class(['text-nowrap', 'text-muted' => $result->evaluation_status === \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_NONE])>{{ $result->evaluation_status_label }}</td>
+                                            {{-- ［詳細］：愛犬性格診断詳細（S-0313）へ。任意の操作なので青の白抜き（4-4） --}}
                                             <td class="text-end text-nowrap">
-                                                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
-                                                        data-bs-toggle="modal" data-bs-target="#personality-diagnosis-answers-{{ $result->id }}"
-                                                        aria-label="{{ $result->answered_at->format('Y/m/d') }}の50問の回答">回答</button>
-                                                {{-- 結果の削除（管理者だけ。2026-10 追加。要件定義書 6-16-14）。一覧の行の中の削除なので白抜き（4-4）。
-                                                     確認は S-0309-M01（1 行ごとのモーダル） --}}
-                                                @if(auth()->user()->isAdmin())
-                                                    <button type="button" class="btn btn-sm btn-outline-danger text-nowrap ms-1"
-                                                            data-bs-toggle="modal" data-bs-target="#personality-diagnosis-delete-{{ $result->id }}"
-                                                            aria-label="{{ $result->answered_at->format('Y/m/d') }}の{{ __('messages.personality_diagnosis_name') }}の結果を削除">削除</button>
-                                                @endif
+                                                <a href="{{ route('trainee-personality-diagnosis-results.show', [$trainee, $result]) }}" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                   aria-label="{{ $result->answered_at->format('Y/m/d') }}の{{ __('messages.personality_diagnosis_name') }}の詳細">詳細</a>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -351,64 +346,6 @@
             @endif
         </div>
     </div>
-
-    {{-- 性格診断の結果の削除確認モーダル（S-0309-M01。2026-10 追加。管理者だけ）。1 行ごとに置き、回答日はサーバーで出す
-         （50 問の回答のモーダルと同じ作り）。見せ方は S-0305-M06 と同じ形（説明文・実行ボタン btn-danger・キャンセル）。
-         キャンセルは 4-4 のとおり塗り（btn-secondary）。削除のあとはトレーニー詳細の上から開く（完了メッセージが画面の上端に出るため） --}}
-    @if(auth()->user()->isAdmin())
-        @foreach($pdResults as $result)
-            <div class="modal fade" id="personality-diagnosis-delete-{{ $result->id }}" tabindex="-1"
-                 aria-labelledby="personality-diagnosis-delete-{{ $result->id }}-label" aria-hidden="true" data-personality-diagnosis-delete>
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="personality-diagnosis-delete-{{ $result->id }}-label">{{ __('messages.personality_diagnosis_name') }}の結果の削除</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p class="mb-0">{{ $result->answered_at->format('Y/m/d') }} の{{ __('messages.personality_diagnosis_name') }}の結果を削除します。元に戻せません。</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                            <form method="POST" action="{{ route('trainee-personality-diagnosis-results.destroy', [$trainee, $result]) }}" class="d-inline m-0">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger">削除する</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        @endforeach
-    @endif
-
-    {{-- 50 問の回答のモーダル（1 回ごと。中身はサーバーで出し、スクリプトで差し替えない）。長いので中身をスクロールできる形 --}}
-    @foreach($pdResults as $result)
-        @php($questions = \App\Support\PersonalityDiagnosisQuestions::questionsFor($result->question_version))
-        <div class="modal fade" id="personality-diagnosis-answers-{{ $result->id }}" tabindex="-1"
-             aria-labelledby="personality-diagnosis-answers-{{ $result->id }}-label" aria-hidden="true" data-personality-diagnosis-answers>
-            <div class="modal-dialog modal-dialog-scrollable modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="personality-diagnosis-answers-{{ $result->id }}-label">50問の回答（{{ $result->answered_at->format('Y/m/d') }}）</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
-                    </div>
-                    <div class="modal-body">
-                        @foreach($pdIdsByCategory as $category => $ids)
-                            <p class="fw-bold small mb-1 @if(! $loop->first) mt-3 @endif">{{ $pdCategories[$category] }}</p>
-                            <dl class="row small mb-0">
-                                @foreach($ids as $id)
-                                    @php($value = $result->answers[$id] ?? null)
-                                    <dt class="col-sm-8 fw-normal">{{ $questions[$id]['text'] ?? $id }}</dt>
-                                    <dd class="col-sm-4 mb-1">{{ $value === null ? '' : ($pdChoices[(string) $value] ?? $value) }}</dd>
-                                @endforeach
-                            </dl>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endforeach
 
     {{-- 計測値の登録・編集モーダル（登録・編集で共用。この画面だけで使う）。登録・編集・削除の後は
          S-0309 に戻る。ID を一意化した辞書形式の経緯は設計書 S-0309「計測値モーダル」参照。 --}}

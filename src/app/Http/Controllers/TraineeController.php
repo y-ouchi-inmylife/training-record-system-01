@@ -59,8 +59,9 @@ class TraineeController extends Controller
         // latestIntakeSurveyResponse と activeIntakeSurveyToken は受付アンケートの欄の状態と、
         // 削除確認の文言に使う（2026-10 追加）。personalityDiagnosisResults は性格診断の欄の結果の一覧
         // （新しい順。2026-10 追加。何件あってもクエリは 1 本）。personalityDiagnosisResults と activePersonalityDiagnosisToken は
-        // 削除確認の文言にも使う（2026-10 追加）
-        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults', 'activePersonalityDiagnosisToken']);
+        // 削除確認の文言にも使う（2026-10 追加）。personalityDiagnosisResults.trainingRecord は結果の表の評価文の状態に使う
+        // （公開済みかどうか。2026-10-18 追加。結果が何件あってもクエリは 1 本）
+        $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults.trainingRecord', 'activePersonalityDiagnosisToken']);
 
         // 削除確認ダイアログに件数を含めるため、コントローラで数えて渡す。
         $measurementCount = $trainee->measurements->count();

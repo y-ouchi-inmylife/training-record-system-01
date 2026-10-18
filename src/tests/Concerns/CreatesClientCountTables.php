@@ -159,7 +159,35 @@ trait CreatesClientCountTables
                 $table->decimal('score_'.$category, 3, 2)->nullable();
             }
             $table->string('personality_type', 30)->nullable();
+            // 評価文と、最後に評価文を保存したトレーナー・日時（2026-10-18 追加。2026_10_18_000003_add_evaluation_to_…）
+            $table->text('evaluation_text')->nullable();
+            $table->unsignedBigInteger('evaluation_updated_by')->nullable();
+            $table->timestamp('evaluation_updated_at')->nullable();
             $table->timestamps();
+        });
+    }
+
+    /**
+     * 愛犬性格診断の結果を結び付けるところだけを持つトレーニング記録（D-0200。2026-10-18 追加）。評価文の状態（公開済み）と、
+     * 結果を消したときに結び付きが NULL になり記録が残ることを確かめるため。結び付けの列の一意と外部キーは本番と同じ。
+     * 本番の列のうち、ここで使わないもの（メディアなど）は持たない。結果の表を先に作っておく
+     */
+    protected function createTrainingRecordsTableForPersonalityDiagnosis(): void
+    {
+        Schema::create('training_records', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('client_id');
+            $table->date('training_date');
+            $table->time('training_time')->nullable();
+            $table->unsignedBigInteger('trainer1_id');
+            $table->unsignedBigInteger('trainer2_id')->nullable();
+            $table->text('record_content')->nullable();
+            $table->text('impression')->nullable();
+            $table->unsignedBigInteger('trainee_personality_diagnosis_result_id')->nullable()->unique();
+            $table->foreign('trainee_personality_diagnosis_result_id')
+                ->references('id')->on('trainee_personality_diagnosis_results')->nullOnDelete();
+            $table->timestamps();
+            $table->unsignedBigInteger('updated_by')->nullable();
         });
     }
 }
