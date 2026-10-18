@@ -127,6 +127,32 @@ h2 {
 .invitation-panel-header {
     min-height: calc(#{$btn-font-size} * #{$btn-line-height} + 2 * #{$btn-padding-y} + 2 * #{$btn-border-width} + 2 * var(--bs-card-cap-padding-y) + var(--bs-card-border-width));
 }
+// 「LINE・メールで送る」の見出しの行（2026-10-18 追加）。見出し・知らせ（data-copy-status）・［コピー］の順に並べる。
+// 知らせが出ても消えても見出しの行の高さ・ボタンの位置が変わらないようにする：
+// - 576px 以上：見出しを左、ボタンを右に寄せ、知らせはその間の空いた所（ボタンの左）に出す。知らせは小さい文字の 1 行で、
+//   ボタンより低く、いちばん長い「コピーできませんでした」でも空いた所に収まるので、行の高さも折り返しも変わらない
+// - 576px より狭いとき：1 行に収まらないことがあるので、知らせは見出しの行の下の 1 行（右寄せ）に出し、その高さを先に取っておく
+.invitation-send-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.5rem;
+
+    h2 {
+        margin-right: auto;
+    }
+}
+.invitation-copy-status {
+    white-space: nowrap;
+    line-height: 1.5;
+
+    @include media-breakpoint-down(sm) {
+        order: 1;
+        flex-basis: 100%;
+        min-height: 1.5em;
+        text-align: right;
+    }
+}
 .invitation-message {
     white-space: pre-wrap;
     overflow-wrap: anywhere;

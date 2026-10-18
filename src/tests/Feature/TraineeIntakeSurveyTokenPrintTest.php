@@ -116,12 +116,17 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertMatchesRegularExpression('/>受付アンケートのご案内<\/span><\/h1>\s*<div class="row g-3 align-items-start">/u', $html);
         $this->assertLessThan(strpos($html, 'QR コード</h2>'), strpos($html, 'LINE・メールで送る</h2>'));
         // ［コピー］は「LINE・メールで送る」の見出しの行の右（青の塗り・ふつうの大きさ。読み上げは「文面をコピー」）。文面の下にボタンはない
-        // （2026-10-18 変更：その前は文面の下の右に［文面をコピー］）
-        $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex flex-wrap justify-content-between align-items-center gap-2">\\s*'
+        // （2026-10-18 変更：その前は文面の下の右に［文面をコピー］）。ボタンの左に知らせの場所（aria-live。押すと「コピーしました」を出す）。
+        // ボタンの文字は［コピー］のまま変えず、最低の幅も付けない（2026-10-18 変更：その前はボタンの文字を変え、「コピーしました」の幅を最低の幅にしていた）
+        $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header invitation-send-header" data-copy-area>\\s*'
             .'<h2 class="h6 mb-0" id="invitation-message-heading">LINE・メールで送る<\\/h2>\\s*'
-            .'<button type="button" class="btn btn-primary ms-auto" aria-label="文面をコピー" data-copy-message data-copy-text="[^"]*">コピー<\\/button>\\s*<\\/div>\\s*'
+            .'<span class="invitation-copy-status small" role="status" aria-live="polite" data-copy-status><\\/span>\\s*'
+            .'<button type="button" class="btn btn-primary" aria-label="文面をコピー" data-copy-message data-copy-text="[^"]*">コピー<\\/button>\\s*<\\/div>\\s*'
             .'<div class="card-body">\\s*<div class="invitation-message" data-invitation-message>[^<]*<\\/div>\\s*<\\/div>/u', $html);
         $this->assertSame(1, substr_count($html, 'data-copy-message '));
+        $this->assertSame(1, substr_count($html, 'aria-live="polite" data-copy-status'));
+        $this->assertDoesNotMatchRegularExpression('/<button[^>]*data-copy-message[^>]*style=/u', $html);
+        $this->assertStringNotContainsString('min-width', $html);
         $this->assertStringNotContainsString('>文面をコピー<', $html);
         $this->assertMatchesRegularExpression('/<div class="card-header invitation-panel-header d-flex align-items-center">\\s*<h2 class="h6 mb-0" id="invitation-qr-heading">QR コード<\\/h2>/u', $html);
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="受付アンケート案内の QR コード"></canvas>', $html);
@@ -199,6 +204,7 @@ class TraineeIntakeSurveyTokenPrintTest extends TestCase
         $this->assertStringNotContainsString('data-qr-url', $html);
         $this->assertStringNotContainsString('data-invitation-message', $html);
         $this->assertStringNotContainsString('data-copy-message', $html);
+        $this->assertStringNotContainsString('data-copy-status', $html);
         $this->assertStringNotContainsString('発行', $html);
         // ［戻る］は出す（会員詳細へのふつうのリンク。2026-10-17 変更：その前は［閉じる］）
         $this->assertStringContainsString('<a href="'.route('clients.show', $this->client).'" class="btn btn-outline-secondary btn-sm">戻る</a>', $html);
