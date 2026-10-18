@@ -175,7 +175,7 @@ erDiagram
     clients ||--o{ client_password_reset_tokens : "パスワード再設定"
     trainees ||--o{ trainee_intake_survey_tokens : "受付アンケート案内"
     trainers ||--o{ trainee_intake_survey_tokens : "発行"
-    trainees ||--o{ trainee_personality_diagnosis_tokens : "性格診断の案内"
+    trainees ||--o{ trainee_personality_diagnosis_tokens : "愛犬性格診断の案内"
     trainers ||--o{ trainee_personality_diagnosis_tokens : "発行"
 
 
@@ -219,7 +219,7 @@ erDiagram
     trainees ||--o{ trainee_measurements : "計測される"
     trainees ||--o{ trainee_intake_survey_responses : "受付アンケートに回答される"
     trainee_intake_survey_tokens |o--o{ trainee_intake_survey_responses : "回答に使う（NULL はトークン削除済み）"
-    trainees ||--o{ trainee_personality_diagnosis_results : "性格診断に回答される"
+    trainees ||--o{ trainee_personality_diagnosis_results : "愛犬性格診断に回答される"
     trainee_personality_diagnosis_tokens |o--o{ trainee_personality_diagnosis_results : "回答に使う（NULL はトークン削除済み）"
 
 
@@ -847,7 +847,7 @@ erDiagram
 - **回答の保存の流れ**（同時送信の防ぎ方を含む）は DS-1000 の備考参照
 
 
-#### D-1200 trainee_personality_diagnosis_results（性格診断の結果）
+#### D-1200 trainee_personality_diagnosis_results（愛犬性格診断の結果）
 
 **2026-10 追加**（要件定義書 D-1200・6-15-18・6-16-13）
 
@@ -857,18 +857,18 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | trainee_id | BIGINT UNSIGNED | NO | — | 回答の対象のトレーニーのID（外部キー） |
-| trainee_personality_diagnosis_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った性格診断用 URL のトークン（DS-1100）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も結果は残すため NULL 許容（D-1100 と同じ） |
+| trainee_personality_diagnosis_token_id | BIGINT UNSIGNED | YES | NULL | 回答に使った愛犬性格診断用 URL のトークン（DS-1100）のID（外部キー）。回答済みのトークンは取消できず残るため通常は NULL にならないが、トークンだけが消えた場合も結果は残すため NULL 許容（D-1100 と同じ） |
 | answered_at | TIMESTAMP | NO | — | 回答日時。送信時に自動設定する。回答の記録を兼ねる（お客様の回答はアクセスログに記録しない） |
 | question_version | VARCHAR(10) | NO | — | 回答に使った設問の版（今は `v1`）。設問はコードに持ち（下の注記）、設問の意味や採点が変わるように文を直したときに版を上げる（誤字や文末の直しのように、意味も採点も変わらないときは上げない。**2026-10-18 追加**：Q11 の文末の直し） |
 | answers | JSON | NO | — | 50問の回答。キーは `Q01`〜`Q50`、値は `0`〜`4` の整数、または「未経験」を表す文字列 `"na"`（5-25.）。例：`{"Q01": 2, "Q02": "na", …}`。**送られてきたとおりに残す**（採点の決まりが変わっても、ここから計算し直せるように） |
-| score_people | DECIMAL(3,2) | NO | — | カテゴリ「対人」（Q01〜Q08）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| score_dogs | DECIMAL(3,2) | NO | — | カテゴリ「対犬」（Q09〜Q16）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| score_possessiveness | DECIMAL(3,2) | NO | — | カテゴリ「所有欲」（Q17〜Q21）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| score_separation | DECIMAL(3,2) | NO | — | カテゴリ「分離不安」（Q22〜Q28）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| score_fear | DECIMAL(3,2) | NO | — | カテゴリ「恐怖心」（Q29〜Q35）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| score_trainability | DECIMAL(3,2) | NO | — | カテゴリ「訓練性能」（Q36〜Q42）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| score_excitability | DECIMAL(3,2) | NO | — | カテゴリ「興奮性」（Q43〜Q50）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「性格診断の採点とタイプの判定」 |
-| personality_type | VARCHAR(30) | NO | — | タイプ（5-24. の値）。**丸める前の**平均から判定する（要件定義書 6-16「性格診断の採点とタイプの判定」）。表示名はコードに持つ |
+| score_people | DECIMAL(3,2) | NO | — | カテゴリ「対人」（Q01〜Q08）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| score_dogs | DECIMAL(3,2) | NO | — | カテゴリ「対犬」（Q09〜Q16）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| score_possessiveness | DECIMAL(3,2) | NO | — | カテゴリ「所有欲」（Q17〜Q21）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| score_separation | DECIMAL(3,2) | NO | — | カテゴリ「分離不安」（Q22〜Q28）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| score_fear | DECIMAL(3,2) | NO | — | カテゴリ「恐怖心」（Q29〜Q35）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| score_trainability | DECIMAL(3,2) | NO | — | カテゴリ「訓練性能」（Q36〜Q42）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| score_excitability | DECIMAL(3,2) | NO | — | カテゴリ「興奮性」（Q43〜Q50）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら 0.00）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
+| personality_type | VARCHAR(30) | NO | — | タイプ（5-24. の値）。**丸める前の**平均から判定する（要件定義書 6-16「愛犬性格診断の採点とタイプの判定」）。表示名はコードに持つ |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
 
@@ -1280,14 +1280,14 @@ erDiagram
 
 ---
 
-#### DS-1100 trainee_personality_diagnosis_tokens（性格診断用 URL のトークン）
+#### DS-1100 trainee_personality_diagnosis_tokens（愛犬性格診断用 URL のトークン）
 
-**概要**（**2026-10 追加**）: トレーナーがトレーニーごとに発行する、性格診断の案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに性格診断に回答し（結果は D-1200）、送信するとトークンは使用済みになる。**DS-1000（受付アンケート用 URL のトークン）と同じ作り**。
+**概要**（**2026-10 追加**）: トレーナーがトレーニーごとに発行する、愛犬性格診断の案内（QR コード・URL）の URL のトークンを管理する。お客様はこの URL からログインせずに愛犬性格診断に回答し（結果は D-1200）、送信するとトークンは使用済みになる。**DS-1000（受付アンケート用 URL のトークン）と同じ作り**。
 
 **対応する要件**:
-- 性格診断の案内の発行（6-16-11）
-- 性格診断の案内の取消（6-16-12）
-- 性格診断の回答（6-15-18）
+- 愛犬性格診断の案内の発行（6-16-11）
+- 愛犬性格診断の案内の取消（6-16-12）
+- 愛犬性格診断の回答（6-15-18）
 
 ##### カラム定義
 
@@ -1295,7 +1295,7 @@ erDiagram
 |---------|-----|------|----------|------|
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。重複不可。DS-1000 と同じ |
-| trainee_id | BIGINT UNSIGNED | NO | — | 性格診断の対象のトレーニーのID（外部キー） |
+| trainee_id | BIGINT UNSIGNED | NO | — | 愛犬性格診断の対象のトレーニーのID（外部キー） |
 | answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない。DS-1000 と同じ） |
 | created_at | TIMESTAMP | YES | NULL | 発行日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
@@ -1325,7 +1325,7 @@ erDiagram
 - **同時送信の防ぎ方**（要件定義書 6-15-18 動作）：回答の送信は次の順で 1 つのトランザクションの中で行う（DS-1000 と同じ作り）
   1. トークンの行を**排他ロック**する
   2. `answered_at` が NULL であることを確かめる（NULL でなければ、結果を保存せず「すでに回答済み」の画面を返す）
-  3. 回答を採点し（要件定義書 6-16「性格診断の採点とタイプの判定」）、結果（D-1200）を保存する
+  3. 回答を採点し（要件定義書 6-16「愛犬性格診断の採点とタイプの判定」）、結果（D-1200）を保存する
   4. トークンの `answered_at` に回答日時を記録する（D-1200 の `answered_at` と同じ値）
   - DS-1000 と違い、トレーニー（D-0700）は書き換えない（トレーニーの行のロックは要らない）
 - お客様の回答はアクセスログ（DS-0500）に記録しない。発行・取消はトレーナーの操作として記録する（`create_trainee_personality_diagnosis_token` / `delete_trainee_personality_diagnosis_token`。5-16.）
@@ -1385,9 +1385,9 @@ erDiagram
 | delete_trainee_measurement | トレーニー計測値削除 |
 | create_trainee_intake_survey_token | 受付アンケート案内の発行 |
 | delete_trainee_intake_survey_token | 受付アンケート案内の取消 |
-| create_trainee_personality_diagnosis_token | 性格診断の案内の発行（**2026-10 追加**） |
-| delete_trainee_personality_diagnosis_token | 性格診断の案内の取消（**2026-10 追加**） |
-| delete_trainee_personality_diagnosis_result | 性格診断の結果の削除（**2026-10 追加**） |
+| create_trainee_personality_diagnosis_token | 愛犬性格診断の案内の発行（**2026-10 追加**） |
+| delete_trainee_personality_diagnosis_token | 愛犬性格診断の案内の取消（**2026-10 追加**） |
+| delete_trainee_personality_diagnosis_result | 愛犬性格診断の結果の削除（**2026-10 追加**） |
 | create_client_contract | 契約登録 |
 | edit_client_contract | 契約編集 |
 | delete_client_contract | 契約削除 |
@@ -1399,7 +1399,7 @@ erDiagram
 
 - **`view_trainee` を持たない注記の前提について**（2026-10 追記）：上の「トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため」は、トレーニーを会員詳細の中だけで扱っていた段階①の前提で書いたもの。その後、トレーニー詳細は独立した画面（S-0309、`trainees.show`）になったが、トレーニー詳細の参照は記録していない（`view_trainee` は持たない）点は変わっていない。2026-10 に受付アンケートの回答（D-1100。愛犬の健康状態などを含む）を S-0309 で表示するようになったが、本書では参照の操作種別を追加していない。**第1段階では記録しない**。受付アンケートの回答を S-0309 で見せるようになっても、参照を記録しない既存の方針のまま。第2段階（回答を AI に送る段階）で、個人情報の扱いと一緒に見直す
 - **受付アンケート案内**（2026-10 追加）：`create_trainee_intake_survey_token`（発行）・`delete_trainee_intake_survey_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（トークンの行は取消で物理削除されるため、トークンではなくトレーニーを対象として記録する）。案内の発行は会員詳細（S-0305）の「受付アンケートの案内を発行」だけで行う（トレーニー登録 S-0308 では発行しない。**2026-10 変更**）ため、発行は必ず `create_trainee_intake_survey_token` として記録される
-- **性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）と、結果の削除 `delete_trainee_personality_diagnosis_result` の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（受付アンケート案内と同じ。結果の id は記録しない）。お客様の性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
+- **愛犬性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）と、結果の削除 `delete_trainee_personality_diagnosis_result` の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（受付アンケート案内と同じ。結果の id は記録しない）。お客様の愛犬性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
 - **お客様の受付アンケートの回答は記録しない**：アクセスログはトレーナーの操作の記録で、`access_logs.trainer_id` が NOT NULL のため（お客様の操作を入れる先がない）。回答の記録は D-1100 の `answered_at` が兼ねる
 
 ### 5-17. メディア種別
@@ -1469,9 +1469,9 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケート�
 | dont_know | 分からない。トレーニーに反映するときは 5-21. の `unknown`（不明）に置き換える |
 
 
-### 5-23. 性格診断のカテゴリ
+### 5-23. 愛犬性格診断のカテゴリ
 
-**2026-10 追加**（要件定義書 6-16「性格診断の採点とタイプの判定」・D-1200）。D-1200 の `score_{値}` の列名と、コードでの設問の割り当てに使う。並びは同点のときの優先の順（上が先）
+**2026-10 追加**（要件定義書 6-16「愛犬性格診断の採点とタイプの判定」・D-1200）。D-1200 の `score_{値}` の列名と、コードでの設問の割り当てに使う。並びは同点のときの優先の順（上が先）
 
 | 値 | 表示 | 設問 |
 |----|------|------|
@@ -1483,7 +1483,7 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケート�
 | trainability | 訓練性能 | Q36〜Q42 |
 | excitability | 興奮性 | Q43〜Q50 |
 
-### 5-24. 性格診断のタイプ
+### 5-24. 愛犬性格診断のタイプ
 
 **2026-10 追加**。D-1200 `personality_type` の値。表示名はコードに持つ
 
@@ -1496,7 +1496,7 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（受付アンケート�
 | energetic | エネルギッシュ・アスリートタイプ | 興奮性 |
 | calm | のんびり・平和主義タイプ | （いちばん高い平均が 1.5 未満） |
 
-### 5-25. 性格診断の回答の値
+### 5-25. 愛犬性格診断の回答の値
 
 **2026-10 追加**。D-1200 `answers` の各問の値（フォームの選択肢の値も同じ）
 

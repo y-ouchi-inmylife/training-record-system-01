@@ -122,8 +122,8 @@ flowchart TD
 | オートコンプリート | Select2 4.1.0-rc.0 + select2-bootstrap-5-theme 1.3.0 + jQuery 3.7.1（npm、ビルドに含める。**いずれもバージョンを完全固定**） | 会員・登録者の選択欄の検索・候補表示に使用（録音準備・音声アップロード・文字起こしテキスト・メディア一覧）。Bootstrap 5 テーマで見た目を統一。jQuery は Select2 の依存としてだけ使い、ほかの用途では使わない。入口は `resources/js/select2.js` に集約し、`window.$`・`window.jQuery` に jQuery を載せ、Select2 を jQuery に組み込み、Select2 の CSS とテーマの CSS もこの入口から取り込む。使う画面でだけ `@vite(['resources/js/select2.js'])` して読み込む（共通の `app.js` には載せない）。**外部 CDN からは読み込まない** |
 | ドラッグ&ドロップ並べ替え | sortablejs 1.15.7（npm、ビルドに含める。**バージョンを完全固定**） | トレーニング記録の登録・編集画面のメディアセクションの並べ替えに使用。入口 `resources/js/sortable.js` で `import Sortable from 'sortablejs'` し `window.Sortable` に載せる。使う画面でだけ `@vite(['resources/js/sortable.js'])` して読み込む（共通の `app.js` には載せない）。**外部 CDN からは読み込まない** |
 | アイコン・UIライブラリ | 該当なし（Bootstrap標準のみ） | 専用アイコンライブラリは未導入。必要に応じて将来導入を検討 |
-| QR コード生成 | qrcode 1.5.4（npm、ビルドに含める） | メールアドレス登録用 URL の QR コード表示（S-0307 印刷ページ）と、受付アンケート用 URL の QR コード表示（S-0311 受付アンケート案内画面。**2026-10 追加**）、性格診断用 URL の QR コード表示（S-0312 性格診断案内画面。**2026-10 追加**）で使用。**外部 CDN からは読み込まない**（面談中にネット接続が不安定でも QR を表示できるようにするため） |
-| グラフ描画 | Chart.js 4.5.1（npm、ビルドに含める） | 会員ダッシュボード（S-1402）のトレーニー体重推移グラフで使用。トレーニー詳細（S-0309）の性格診断のレーダーチャートでも使う（**2026-10 追加**。新しいパッケージは足さず、読み込む部品に `RadarController`・`RadialLinearScale` などを足す）。**外部 CDN からは読み込まない**（qrcode と同じ方針。既存プロジェクトが npm 統一のためそれに合わせる）。バンドルサイズ抑制のため必要なコンポーネントだけを `Chart.register()` で登録するツリーシェイク前提の import 形式を採る |
+| QR コード生成 | qrcode 1.5.4（npm、ビルドに含める） | メールアドレス登録用 URL の QR コード表示（S-0307 印刷ページ）と、受付アンケート用 URL の QR コード表示（S-0311 受付アンケート案内画面。**2026-10 追加**）、愛犬性格診断用 URL の QR コード表示（S-0312 愛犬性格診断案内画面。**2026-10 追加**）で使用。**外部 CDN からは読み込まない**（面談中にネット接続が不安定でも QR を表示できるようにするため） |
+| グラフ描画 | Chart.js 4.5.1（npm、ビルドに含める） | 会員ダッシュボード（S-1402）のトレーニー体重推移グラフで使用。トレーニー詳細（S-0309）の愛犬性格診断のレーダーチャートでも使う（**2026-10 追加**。新しいパッケージは足さず、読み込む部品に `RadarController`・`RadialLinearScale` などを足す）。**外部 CDN からは読み込まない**（qrcode と同じ方針。既存プロジェクトが npm 統一のためそれに合わせる）。バンドルサイズ抑制のため必要なコンポーネントだけを `Chart.register()` で登録するツリーシェイク前提の import 形式を採る |
 | 日付選択 | flatpickr 4.6.13（npm、ビルドに含める） | トレーナー側のフォーム・検索・計測値モーダルの `.datepicker` 入力欄で使用。**外部 CDN からは読み込まない**（qrcode・Chart.js と同じ方針）。**バージョンは `package.json` で完全固定**（範囲指定の `^` を使わない）。`resources/js/app.js` で `import` し、`localize(Japanese)` で日本語化。CSS は `resources/sass/app.scss` から `@import 'flatpickr/dist/flatpickr.css'` で読み込む。インラインの script 側は `window.flatpickr` で参照する（会員側のログイン前のレイアウトでは使わず、`<input type="date">` を使う）。**2026-10 変更**：トレーニーの誕生日（S-0308・S-0310）は年・月・日の 3 つの数字欄（`type="text" inputmode="numeric"`）に変わり、flatpickr を使わなくなった（requirements.md 6-16「年齢の表示規則」）。会員側の初回設定（S-1403）からも愛犬の誕生日の `<input type="date">` がなくなり、受付アンケート（S-1413）の誕生日もトレーナー側と同じ数字欄のため、会員側で日付の入力欄を使う画面は今はない。他のトレーナー側の `.datepicker`（会員・トレーニング記録・計測値・契約・利用・検索など）は引き続き flatpickr を使う |
 | ビルドツール | Vite 7.0.7 + laravel-vite-plugin 2.0.0 | Laravel標準のビルドツール。高速な開発サーバーとビルドを提供 |
 
@@ -233,7 +233,7 @@ flowchart TD
 - **期限が新しく 3 日になるのはトレーナーが URL を発行し直したときだけ**
 - **設定値も 1 つ**（`client_tokens.email_registration_expires_days`）に集約。ログイン用リンク専用の設定値は持たない
 
-**受付アンケート用 URL（DS-1000 `trainee_intake_survey_tokens`）と性格診断用 URL（DS-1100 `trainee_personality_diagnosis_tokens`。**2026-10 追加**）は有効期限を持たない**（**2026-10 追加**）：
+**受付アンケート用 URL（DS-1000 `trainee_intake_survey_tokens`）と愛犬性格診断用 URL（DS-1100 `trainee_personality_diagnosis_tokens`。**2026-10 追加**）は有効期限を持たない**（**2026-10 追加**）：
 
 - 回答の送信で使い切り（`answered_at` を記録）、放置されたものはトレーナーの取消で削除する（物理削除）。そのため上の表に設定値を置かない
 - 期限を設けない理由：メールアドレス登録用 URL はアカウントを開設できるため、第三者に渡ると成りすましの危険がある。一方、受付アンケート用 URL は回答を受け付けるだけで、画面に個人情報を出さず、送信すれば使い切りになる。危険の大きさが違うため（requirements.md 6-15-17 備考）
@@ -250,7 +250,7 @@ flowchart TD
 | `app.client_portal_name` | `CLIENT_PORTAL_NAME` | 「トレーニング記録」 | ヘッダー帯のワードマーク・ブラウザタイトル。Blade にベタ書きしない |
 | `app.client_portal_company` | `CLIENT_PORTAL_COMPANY` | null | pre-auth フッターのトレーニング提供会社名（`&copy; YYYY {会社名}`）。null/空なら `<footer>` ブロックごと出力しない。**メールの件名の「【事業者名】」および差出人（From）の表示名にも使う**（null/空なら「【】」は付けず、表示名を付けない。詳細は client-portal-design-plan.md §6-1・§6-1-1） |
 | `app.client_portal_logo` | `CLIENT_PORTAL_LOGO` | null | ヘッダー帯左のロゴ画像 URL（`public/` からの相対または絶対）。null/空ならテキスト（プロダクト名）を出す |
-| `app.client_portal_privacy_url` | `CLIENT_PORTAL_PRIVACY_URL` | null | プライバシーポリシー文書の URL。お客様が最初に個人情報を預ける画面（S-1405 メールアドレス登録・S-1403 初回設定・S-1413 受付アンケート回答・S-1415 性格診断回答）で、送信ボタンの手前に同意文を表示するときに使う。**null/空なら同意文のブロックごと出力しない**（詳細は requirements.md 6-15-13） |
+| `app.client_portal_privacy_url` | `CLIENT_PORTAL_PRIVACY_URL` | null | プライバシーポリシー文書の URL。お客様が最初に個人情報を預ける画面（S-1405 メールアドレス登録・S-1403 初回設定・S-1413 受付アンケート回答・S-1415 愛犬性格診断回答）で、送信ボタンの手前に同意文を表示するときに使う。**null/空なら同意文のブロックごと出力しない**（詳細は requirements.md 6-15-13） |
 | `app.client_portal_reply_to` | `CLIENT_PORTAL_REPLY_TO` | null | お客様に送るメールの Reply-To（返信先）アドレス。お客様が受信メールに返信したときの届き先。**null/空なら Reply-To ヘッダを付けない**（返信は From アドレスに届く）。従前は開発会社アドレスがハードコードされていたが、お客様の返信は事業者に届くべきで、事業者側の問い合わせアドレスが確定するまでは空にしておく。詳細は client-portal-design-plan.md §6-1-1 |
 
 **取り扱いの共通ルール**：
