@@ -12,7 +12,32 @@
  *   （Chart.js の凡例はグラフの枠の中に描かれ、3 つの項目が 2 行に折り返すため。2026-10 変更）。
  *   凡例の項目と線の見本も、グラフと同じ SERIES_STYLES から作る（legendItems・legendSwatchSvg）
  * - 値は、下の表と同じ表示の値（小数第 1 位の文字列）を数にして使う（表とグラフで数字が食い違わないように）
+ * - 訓練性能の軸を真上（12 時）に置く（2026-10-18 追加。radarStartAngle）。訓練性能だけは点数が高いほど良く、ほかの 6 項目は
+ *   高いほど気をつけたい傾向のため、ほかと分けて見やすくする。点数の向きは変えない（参考にしている本などの向きに合わせる）。
+ *   項目の並び（時計回りの順）は変えず、全体を回すだけ。トレーナー側と会員側（compact）の両方に効く
  */
+
+/** 真上に置くカテゴリ（値。PersonalityDiagnosisQuestions::categories() のキー） */
+export const TOP_CATEGORY_KEY = 'trainability';
+
+/**
+ * レーダーの軸の始まりの角度（Chart.js の scales.r.startAngle。度。0 が真上で、時計回り）。
+ * Chart.js は 1 つ目の項目を startAngle の位置に置き、そこから 360 / 項目の数 ずつ時計回りに並べるので、
+ * index 番目の項目（訓練性能）を真上に置くには、全体を -(index × 360 / 項目の数) 度回す。
+ * 角度は数を直に書かず、並びの中の位置と項目の数から計算する（並びや項目の数が変わっても、訓練性能が上に来るように）。
+ * 訓練性能が見つからないとき（keys がない古いデータなど）は回さない（0）
+ *
+ * @param {string[]|undefined} keys カテゴリの値（labels と同じ並び）
+ * @returns {number}
+ */
+export function radarStartAngle(keys) {
+    const index = Array.isArray(keys) ? keys.indexOf(TOP_CATEGORY_KEY) : -1;
+    if (index <= 0) {
+        return 0;
+    }
+
+    return -(index * 360) / keys.length;
+}
 
 /** 回の種類ごとの名前と見た目。並びは凡例の順（今回 → 前回 → 初回） */
 export const SERIES_STYLES = {
@@ -40,9 +65,9 @@ export const SERIES_STYLES = {
 };
 
 /**
- * @param {{labels: string[], series: {key: 'current'|'previous'|'initial', date: string, values: string[]}[]}} data
- *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、series は重ねる回。date は回答日 Y/m/d、
- *   values は表示の値）
+ * @param {{labels: string[], keys?: string[], series: {key: 'current'|'previous'|'initial', date: string, values: string[]}[]}} data
+ *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、keys はカテゴリの値〔labels と同じ並び〕、
+ *   series は重ねる回。date は回答日 Y/m/d、values は表示の値）
  * @param {{compact?: boolean}} [options]
  *   compact：会員側のマイページ（S-1402）の小さなグラフ用（2026-10 追加）。枠の縦横比に合わせず（maintainAspectRatio: false）、
  *   枠の高さいっぱいに描き、項目名と目盛りの文字を小さくし、周りの余白をなくす。指定しなければ（トレーナー側 S-0309）
@@ -80,6 +105,8 @@ export function buildRadarConfig(data, { compact = false } = {}) {
                     min: 0,
                     max: 4,
                     beginAtZero: true,
+                    // 訓練性能の軸を真上に置く（2026-10-18 追加。上の radarStartAngle）
+                    startAngle: radarStartAngle(data.keys),
                     ticks: { stepSize: 1 },
                 },
             },

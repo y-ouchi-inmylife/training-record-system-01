@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildRadarConfig, legendItems, legendSwatchSvg, SERIES_STYLES } from '../../resources/js/personality-radar-config.js';
+import { buildRadarConfig, legendItems, legendSwatchSvg, radarStartAngle, SERIES_STYLES, TOP_CATEGORY_KEY } from '../../resources/js/personality-radar-config.js';
 
 const LABELS = ['対人', '対犬', '所有欲', '分離不安', '恐怖心', '訓練性能', '興奮性'];
+const KEYS = ['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'];
 const CURRENT = { key: 'current', date: '2026/06/01', values: ['2.0', '1.9', '1.0', '1.4', '2.7', '0.9', '1.0'] };
 const PREVIOUS = { key: 'previous', date: '2026/03/10', values: ['2.2', '2.0', '1.0', '1.7', '0.7', '1.3', '1.6'] };
 const INITIAL = { key: 'initial', date: '2025/12/01', values: ['0.1', '1.0', '0.0', '0.7', '0.8', '2.9', '1.1'] };
@@ -124,5 +125,54 @@ describe('性格診断のレーダーチャートの HTML の凡例', () => {
 
         expect(dataset.fill).toBe(true);
         expect(dataset.backgroundColor).toBe('rgba(10, 79, 168, 0.15)');
+    });
+});
+
+// 訓練性能の軸を真上に置く（2026-10-18 追加）。項目の並び（時計回りの順）は変えず、全体を回す
+describe('性格診断のレーダーチャートの向き', () => {
+    /** その項目の軸の角度（度。0 が真上、時計回り。Chart.js は 1 つ目の項目を startAngle に置き、360 / 項目の数 ずつ並べる） */
+    const axisAngle = (startAngle, index, count) => (((startAngle + (index * 360) / count) % 360) + 360) % 360;
+
+    it('訓練性能の位置と項目の数から角度を計算し、訓練性能の軸が真上（0 度）になる', () => {
+        const angle = radarStartAngle(KEYS);
+
+        expect(TOP_CATEGORY_KEY).toBe('trainability');
+        expect(angle).toBeCloseTo(-(5 * 360) / 7, 10);
+        expect(axisAngle(angle, KEYS.indexOf('trainability'), KEYS.length)).toBeCloseTo(0, 10);
+    });
+
+    it('並びや項目の数が変わっても、訓練性能が真上に来る', () => {
+        for (const keys of [
+            ['trainability', 'people', 'dogs'],
+            ['people', 'trainability', 'dogs', 'fear'],
+            ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'trainability'],
+        ]) {
+            const angle = radarStartAngle(keys);
+            const top = axisAngle(angle, keys.indexOf('trainability'), keys.length);
+            expect(Math.min(top, 360 - top)).toBeCloseTo(0, 10);
+        }
+        // 1 つ目にあるときは回さない
+        expect(radarStartAngle(['trainability', 'people'])).toBe(0);
+    });
+
+    it('訓練性能が見つからないとき（keys がない古いデータなど）は回さない', () => {
+        expect(radarStartAngle(undefined)).toBe(0);
+        expect(radarStartAngle(['people', 'dogs'])).toBe(0);
+    });
+
+    it('トレーナー側と会員側（compact）の両方の設定に入り、項目の並びは変えない', () => {
+        for (const options of [{}, { compact: true }]) {
+            const config = buildRadarConfig({ labels: LABELS, keys: KEYS, series: [CURRENT] }, options);
+
+            expect(config.options.scales.r.startAngle).toBeCloseTo(-(5 * 360) / 7, 10);
+            expect(config.data.labels).toEqual(LABELS);
+            expect(config.data.datasets[0].data).toEqual([2, 1.9, 1, 1.4, 2.7, 0.9, 1]);
+        }
+    });
+
+    it('keys を渡さないときは今までどおり回さない', () => {
+        const config = buildRadarConfig({ labels: LABELS, series: [CURRENT] });
+
+        expect(config.options.scales.r.startAngle).toBe(0);
     });
 });

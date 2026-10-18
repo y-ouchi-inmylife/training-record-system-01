@@ -310,6 +310,8 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
 
         $this->assertSame([
             'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
+            // カテゴリの値（labels と同じ並び。訓練性能の軸を真上に置くため JS が使う。2026-10-18 追加）
+            'keys' => ['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'],
             'series' => [$this->series('current', 'past-1', '2026/06/01')],
         ], $this->radarData($html));
         $this->assertStringContainsString('personality-radar', $html);

@@ -467,7 +467,10 @@ class Trainee extends Model
      * 2 つのときは前回と初回が同じ回なので重ねない）。間の回は重ねない。値は表示の値（小数第 1 位）と回答日。
      * 結果は personalityDiagnosisResults（新しい順）。呼ぶ側で先に読み込んでおく（N+1 にしないため）
      *
-     * @return array{labels: string[], series: array{key: string, date: string, values: string[]}[]}|null
+     * keys はカテゴリの値（labels と同じ並び。2026-10-18 追加）。グラフで訓練性能の軸を真上に置くため、JS が訓練性能の位置を
+     * 表示名ではなく値（trainability）で探すのに使う（personality-radar-config.js の radarStartAngle）
+     *
+     * @return array{labels: string[], keys: string[], series: array{key: string, date: string, values: string[]}[]}|null
      */
     public function getPersonalityRadarDataAttribute(): ?array
     {
@@ -484,6 +487,7 @@ class Trainee extends Model
 
         return [
             'labels' => array_values(PersonalityDiagnosisQuestions::categories()),
+            'keys' => array_keys(PersonalityDiagnosisQuestions::categories()),
             'series' => collect($series)->map(fn (TraineePersonalityDiagnosisResult $result, string $key) => [
                 'key' => $key,
                 'date' => $result->answered_at->format('Y/m/d'),
