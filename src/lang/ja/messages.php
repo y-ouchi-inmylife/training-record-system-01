@@ -58,7 +58,7 @@ return [
     // 設計書 screen-design.md S-0307「LINE・メールで送る文面」）。文面は App\Support\InvitationMessage が行をつないで組み立てる
     // （画面に出す文と［文面をコピー］でコピーする文は同じもの）。トレーナーさんに確かめてもらって直すときは、ここだけを直す。
     // :name＝会員の氏名、:company＝訓練所の名前（config('app.client_portal_company')。空なら from の行ごと出さない）、
-    // :callName＝トレーニーの呼び名（「アイちゃん」。名前が空なら「愛犬」）、:expires＝有効期限（2026年10月21日（水））、:count＝問題の数
+    // :callName＝トレーニーの呼び名（「アイちゃん」。名前が空なら「愛犬」）、:expires＝有効期限（2026年10月25日（日）。発行から 7 日）、:count＝問題の数
     'invitation_message' => [
         'greeting' => ':name 様',
         'from' => ':companyです。',
