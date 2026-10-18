@@ -215,7 +215,11 @@ class ClientController extends Controller
             TraineePersonalityDiagnosisResult::publishedEvaluationsOfClient($client->id),
         );
 
-        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline'));
+        // 契約の登録のモーダル（S-0305-M04）の有効期限の初期値：今日（アプリの時間帯）の月の最終日（2026-10-18 追加。
+        // 設計書 S-0305-M04「有効期限の初期値」）。契約日を変えたときに合わせて変えるのはモーダルの JS（contract-expires-on.js）
+        $contractDefaultExpiresOn = now()->endOfMonth()->toDateString();
+
+        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline', 'contractDefaultExpiresOn'));
     }
 
     /**

@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
@@ -180,6 +181,32 @@ class ClientCountRenderingTest extends TestCase
     }
 
     // ---- 会員一覧（S-0304） ----
+
+    // ---- 契約の登録のモーダルの有効期限の初期値（今日の月の最終日。2026-10-18 追加） ----
+
+    public static function contractDefaultExpiresOnCases(): array
+    {
+        return [
+            '月の途中' => ['2026-10-18 10:00:00', '2026-10-31'],
+            'うるう年の 2 月' => ['2028-02-10 10:00:00', '2028-02-29'],
+            'うるう年でない 2 月' => ['2026-02-10 10:00:00', '2026-02-28'],
+            '12 月の最終日' => ['2026-12-31 23:30:00', '2026-12-31'],
+            '30 日の月の 1 日' => ['2026-11-01 00:10:00', '2026-11-30'],
+        ];
+    }
+
+    #[DataProvider('contractDefaultExpiresOnCases')]
+    public function test_契約の登録の有効期限の初期値は今日の月の最終日(string $now, string $expected): void
+    {
+        Carbon::setTestNow($now);
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/id="expires_on" name="expires_on"\s*value="'.$expected.'"/u', $html);
+        $this->assertStringContainsString('const DEFAULT_EXPIRES_ON = "'.$expected.'";', $html);
+        Carbon::setTestNow();
+    }
 
     public function test_会員一覧のご利用回数列(): void
     {

@@ -752,7 +752,7 @@
 
             {{-- 契約・利用の登録・編集モーダル（S-0305-M04 / M05）。回数カードのボタン・見出し・マスから開く。
                  $openModal はエラーで戻ったときに開き直すモーダルの種別（ClientController::show 参照）。 --}}
-            @include('clients._contract-modal', ['client' => $client, 'openModal' => $openModal])
+            @include('clients._contract-modal', ['client' => $client, 'openModal' => $openModal, 'defaultExpiresOn' => $contractDefaultExpiresOn])
             @include('clients._usage-modal', [
                 'client' => $client,
                 'openModal' => $openModal,

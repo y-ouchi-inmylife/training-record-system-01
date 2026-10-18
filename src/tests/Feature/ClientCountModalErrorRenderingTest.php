@@ -34,7 +34,7 @@ class ClientCountModalErrorRenderingTest extends TestCase
         request()->setLaravelSession($session);
 
         $view = $this->withViewErrors($errors)->blade(
-            "@include('clients._contract-modal', ['client' => \$client, 'openModal' => \$openModal])\n"
+            "@include('clients._contract-modal', ['client' => \$client, 'openModal' => \$openModal, 'defaultExpiresOn' => '2026-10-31'])\n"
             ."@include('clients._usage-modal', ['client' => \$client, 'openModal' => \$openModal,"
             ." 'contractOptions' => \$contractOptions, 'defaultContractId' => \$defaultContractId])\n"
             ."@stack('scripts')",
@@ -80,10 +80,10 @@ class ClientCountModalErrorRenderingTest extends TestCase
         return substr($html, $start, $end - $start);
     }
 
-    /** 利用モーダルの JS（2 つ目の <script>） */
+    /** 利用モーダルの JS（2 つ目の <script>。@vite の <script type="module" …> は数えない） */
     private function usageScript(string $html): string
     {
-        $first = strpos($html, '</script>');
+        $first = strpos($html, '</script>', strpos($html, '<script>'));
         $start = strpos($html, '<script>', $first);
         $end = strpos($html, '</script>', $start);
 
@@ -165,6 +165,56 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $end = strpos($html, '</select>', $start);
 
         return preg_replace('/\s+/u', ' ', substr($html, $start, $end - $start));
+    }
+
+    // ---- 有効期限の初期値（契約日の月の最終日。2026-10-18 追加。設計書 S-0305-M04「有効期限の初期値」） ----
+
+    public function test_エラーがなければ有効期限の欄に初期値が入り登録で開くときに使う(): void
+    {
+        $html = $this->renderModals(null, []);
+
+        $this->assertMatchesRegularExpression('/id="expires_on" name="expires_on"\s*value="2026-10-31"/u', $this->contractPart($html));
+        $script = $this->contractScript($html);
+        $this->assertStringContainsString('const DEFAULT_EXPIRES_ON = "2026-10-31";', $script);
+        // 登録で開くときは初期値を入れて契約日に合わせ、編集では合わせない
+        $this->assertMatchesRegularExpression('/setExpiresOn\(DEFAULT_EXPIRES_ON\);\s*expiresOnFollows = true;/u', $script);
+        $this->assertMatchesRegularExpression('/expiresOnFollows = false;\s*setExpiresOn\(data\.expiresOn \|\| \'\'\);/u', $script);
+        // 月の最終日の計算の JS（resources/js/contract-expires-on.js）を読み込む
+        $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*\/build\/assets\/contract-expires-on-[^"]+\.js"><\/script>/u', $html);
+    }
+
+    public function test_エラーで戻ったときは送った有効期限を出し初期値で上書きしない(): void
+    {
+        $html = $this->renderModals('contract', ['count' => 'ERR_count'], [
+            '_form_type' => 'contract', 'contracted_on' => '2026-11-05', 'count' => '', 'expires_on' => '2027-01-15',
+        ]);
+
+        $contract = $this->contractPart($html);
+        $this->assertMatchesRegularExpression('/id="expires_on" name="expires_on"\s*value="2027-01-15"/u', $contract);
+        $this->assertStringNotContainsString('value="2026-10-31"', $contract);
+        // 登録で開き直すときは、送った有効期限が契約日の月の最終日のままかで、合わせ続けるかを決める
+        $this->assertStringContainsString('isFollowingContractedOn(contractedOnInput.value, expiresOnInput.value)', $this->contractScript($html));
+    }
+
+    public function test_エラーで戻ったとき有効期限を空で送っていれば空のまま(): void
+    {
+        $html = $this->renderModals('contract', ['count' => 'ERR_count'], [
+            '_form_type' => 'contract', 'contracted_on' => '2026-11-05', 'count' => '', 'expires_on' => '',
+        ]);
+
+        $contract = $this->contractPart($html);
+        $this->assertMatchesRegularExpression('/id="expires_on" name="expires_on"\s*value=""/u', $contract);
+        $this->assertStringNotContainsString('value="2026-10-31"', $contract);
+    }
+
+    public function test_編集でエラーのときは送った有効期限のまま合わせない(): void
+    {
+        $html = $this->renderModals('contract', ['count' => 'ERR_count'], [
+            '_form_type' => 'contract', '_contract_id' => '7', 'contracted_on' => '2026-09-03', 'count' => '', 'expires_on' => '2026-12-15',
+        ]);
+
+        $this->assertMatchesRegularExpression('/id="expires_on" name="expires_on"\s*value="2026-12-15"/u', $this->contractPart($html));
+        $this->assertMatchesRegularExpression('/setEditMode\(oldContractId\);\s*expiresOnFollows = false;/u', $this->contractScript($html));
     }
 
     public function test_契約の選択肢は使い切りが無効で最後に契約なしが来る(): void

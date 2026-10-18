@@ -13,6 +13,16 @@
        - $client    : App\Models\Client（store URL の生成に使う）
        - $openModal : ?string エラーで戻ったときに開き直すモーダル（'contract' / 'usage' / null）。
                       ClientController::show で old('_form_type') から決めて渡す。
+       - $defaultExpiresOn : string 登録のときの有効期限の初期値（今日〔アプリの時間帯〕の月の最終日。YYYY-MM-DD）。
+                      ClientController::show で決めて渡す（2026-10-18 追加）。
+
+     ## 有効期限の初期値（2026-10-18 追加。設計書 S-0305-M04「有効期限の初期値」）
+
+     登録で開いたとき、有効期限に契約日の月の最終日を入れる（初期値はサーバーで決めた $defaultExpiresOn）。
+     契約日を変えたとき、有効期限をまだ手で触っていなければ、変えた契約日の月の最終日に合わせる
+     （月の最終日の計算は contract-expires-on.js。手で直した・空にしたあとは変えない）。
+     エラーで戻ったときは送った値（old()）のまま。送った有効期限が契約日の月の最終日と同じなら「触っていない」とみなす。
+     編集では合わせない（今までどおり）。
 
      ## エラーのあとの開き直し（設計書 S-0305「S-0305-M04・M05 に共通の決まり」）
 
@@ -71,7 +81,7 @@
                             <label for="expires_on" class="form-label">有効期限</label>
                             <input type="text" class="form-control datepicker @if($openModal === 'contract') @error('expires_on') is-invalid @enderror @endif"
                                    id="expires_on" name="expires_on"
-                                   value="{{ $openModal === 'contract' ? old('expires_on') : '' }}"
+                                   value="{{ $openModal === 'contract' ? old('expires_on') : $defaultExpiresOn }}"
                                    placeholder="例: 2026-12-15" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
                                    autocomplete="off">
                             @if($openModal === 'contract')
@@ -110,6 +120,8 @@
     </div>
 </div>
 
+@vite('resources/js/contract-expires-on.js')
+
 @push('scripts')
 <script>
 (function () {
@@ -118,6 +130,8 @@
     // 編集・削除時の URL テンプレート。プレースホルダを実 ID で置換する。
     const UPDATE_URL_TEMPLATE = @json(route('client-contracts.update', ['contract' => '__ID__']));
     const DESTROY_URL_TEMPLATE = @json(route('client-contracts.destroy', ['contract' => '__ID__']));
+    // 登録のときの有効期限の初期値（今日〔アプリの時間帯〕の月の最終日。サーバーで決める。2026-10-18 追加）
+    const DEFAULT_EXPIRES_ON = @json($defaultExpiresOn);
 
     // 登録時の初期値「今日」はモーダルを開いた瞬間のブラウザの日付を使う
     // （計測値モーダルの「新規登録時の初期値」と同じ考え方）。
@@ -142,6 +156,30 @@
     let noteInput = null;
     // 編集中の契約に割り当てられた利用の件数（削除の確認ダイアログの文言に使う。回数ではない）
     let editingUsageCount = 0;
+    // 有効期限を契約日に合わせて変えるか（2026-10-18 追加）。登録で開いたときは true。有効期限を手で触ったら false。
+    // 編集では合わせない（false）
+    let expiresOnFollows = false;
+
+    // 有効期限の欄に値を入れる（Flatpickr の選んだ日付もそろえる。change は出さないので「手で触った」にならない）
+    function setExpiresOn(value) {
+        if (expiresOnInput._flatpickr) {
+            if (value) {
+                expiresOnInput._flatpickr.setDate(value, false);
+            } else {
+                expiresOnInput._flatpickr.clear(false);
+            }
+        }
+        expiresOnInput.value = value;
+    }
+
+    // 契約日を変えたとき：有効期限を触っていなければ、契約日の月の最終日に合わせる
+    function onContractedOnChange() {
+        if (!expiresOnFollows || !window.ContractExpiresOn) return;
+        const next = window.ContractExpiresOn.followExpiresOn(contractedOnInput.value, expiresOnInput.value, false);
+        if (next !== expiresOnInput.value) {
+            setExpiresOn(next);
+        }
+    }
 
     // 契約の見出し（data-usage-count を持つ button）から、割り当てられた利用の件数を読む。
     // エラーで編集モードに開き直したときも、見出しから同じ値を取れる。
@@ -166,6 +204,13 @@
         countInput = document.getElementById('contract_count');
         expiresOnInput = document.getElementById('expires_on');
         noteInput = document.getElementById('contract_note');
+
+        // 契約日を変えたら有効期限を合わせ、有効期限を手で触ったら合わせるのをやめる（2026-10-18 追加）。
+        // Flatpickr で日付を選ぶと change、手で打つと input が出る
+        contractedOnInput.addEventListener('input', onContractedOnChange);
+        contractedOnInput.addEventListener('change', onContractedOnChange);
+        expiresOnInput.addEventListener('input', function () { expiresOnFollows = false; });
+        expiresOnInput.addEventListener('change', function () { expiresOnFollows = false; });
 
         // 割り当てられた利用があるときだけ、「契約なし」になる件数を添える（設計書 S-0305-M04）。
         // 利用が「契約なし」になるのは DB の外部キー（ON DELETE SET NULL）の処理。
@@ -208,7 +253,9 @@
         setCreateMode();
         contractedOnInput.value = todayString();
         countInput.value = '';
-        expiresOnInput.value = '';
+        // 有効期限の初期値は、今日の月の最終日（サーバーで決めた値）。契約日を変えたら合わせる
+        setExpiresOn(DEFAULT_EXPIRES_ON);
+        expiresOnFollows = true;
         noteInput.value = '';
         modal.show();
     }
@@ -221,7 +268,9 @@
         setEditMode(data.id);
         contractedOnInput.value = data.contractedOn || '';
         countInput.value = data.count || '';
-        expiresOnInput.value = data.expiresOn || '';
+        // 編集では有効期限を契約日に合わせない（今までどおり）
+        expiresOnFollows = false;
+        setExpiresOn(data.expiresOn || '');
         noteInput.value = data.note || '';
         modal.show();
     }
@@ -236,8 +285,12 @@
             const oldContractId = @json(old('_contract_id'));
             if (oldContractId) {
                 setEditMode(oldContractId);
+                expiresOnFollows = false;
             } else {
                 setCreateMode();
+                // 送った有効期限が契約日の月の最終日のままなら、触っていないとみなして合わせ続ける（空・違う日なら合わせない）
+                expiresOnFollows = !!window.ContractExpiresOn
+                    && window.ContractExpiresOn.isFollowingContractedOn(contractedOnInput.value, expiresOnInput.value);
             }
             modal.show();
         @endif
