@@ -1264,7 +1264,7 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。カラム型 VARCHAR(64) は将来の長さ拡張に備えた余裕。重複不可。既存のトークン（DS-0600〜DS-0900）と同じく平文で持つ |
 | trainee_id | BIGINT UNSIGNED | NO | — | 愛犬アンケートの対象のトレーニーのID（外部キー）。発行時から特定のトレーニーに紐づく |
-| client_email_registration_token_id | BIGINT UNSIGNED | YES | NULL | 回答を終えた完了の画面で誘導するマイページ登録の案内（DS-0700）のID（外部キー。**2026-10-19 追加**。マイグレーション `2026_10_19_000003`。要件定義書 6-16-18）。「マイページ登録の案内も発行する」をオンで発行したとき、お客様が最後に答える案内に入る（単独の愛犬アンケートの案内のとき。組み合わせでは愛犬性格診断の案内の方に入り、こちらは NULL）。NULL は誘導しない |
+| ~~client_email_registration_token_id~~ | BIGINT UNSIGNED | YES | NULL | **2026-10-19 外した**（マイグレーション `2026_10_19_000004`。2026-10-19 のユーザーレビュー（2 回目）で、すでにマイページ登録の案内を発行している会員（登録待ち）にもチェックボックスが出て、「…も発行する」ともう 1 件発行されるように見えて分かりにくかったため、簡単にした。お誘いは会員に有効なマイページ登録の案内があるかで決めるので、結び付けは要らなくなった）。以下は経緯：回答を終えた完了の画面で誘導するマイページ登録の案内（DS-0700）のID（外部キー。**2026-10-19 追加**。マイグレーション `2026_10_19_000003`。要件定義書 6-16-18）。「マイページ登録の案内も発行する」をオンで発行したとき、お客様が最後に答える案内に入る（単独の愛犬アンケートの案内のとき。組み合わせでは愛犬性格診断の案内の方に入り、こちらは NULL）。NULL は誘導しない |
 | trainee_personality_diagnosis_token_id | BIGINT UNSIGNED | YES | NULL | 続けて答える愛犬性格診断の案内（DS-1100）のID（外部キー。**2026-10-19 追加**。マイグレーション `2026_10_19_000002`）。「愛犬アンケート＆愛犬性格診断」の案内（要件定義書 6-16-17）として発行したときに入る。NULL は単独の愛犬アンケートの案内（追加より前の案内も NULL のまま） |
 | expires_at | TIMESTAMP | YES | NULL | 有効期限（**2026-10-19 追加**。マイグレーション `2026_10_19_000001`）。発行した日から 7 日後の日の終わり（23:59:59）。NULL は期限なし（期限を付ける前に発行した案内。答えるまで使える）。期限が切れた未回答の案内は「回答待ち」に数えない（行は残す）。architecture.md §3-1 |
 | answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。回答の送信を受け付けた時点で設定する。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない） |
@@ -1280,7 +1280,7 @@ erDiagram
 | trainee_intake_survey_tokens_token_unique | token | UNIQUE | トークン文字列の重複を防ぐ。URLアクセス時の検索にも使用 |
 | trainee_intake_survey_tokens_trainee_id_idx | trainee_id | INDEX | トレーニーによる検索・逆引き（有効な案内の有無の判定） |
 | trainee_intake_survey_tokens_created_by_idx | created_by | INDEX | 発行者による検索・絞り込み |
-| trainee_intake_survey_tokens_email_reg_token_id_idx | client_email_registration_token_id | INDEX | マイページ登録の案内からの逆引き（**2026-10-19 追加**。名前は 64 文字以内に短くした） |
+| ~~trainee_intake_survey_tokens_email_reg_token_id_idx~~ | client_email_registration_token_id | INDEX | **2026-10-19 外した**（列と一緒に。`2026_10_19_000004`）。経緯：マイページ登録の案内からの逆引き（**2026-10-19 追加**。名前は 64 文字以内に短くした） |
 | trainee_intake_survey_tokens_pd_token_id_idx | trainee_personality_diagnosis_token_id | INDEX | 愛犬性格診断の案内からの逆引き（回答の画面の進み具合 2/2 を出すか。**2026-10-19 追加**。名前は自動で付く名前が MySQL の上限 64 文字を超えるため短くした） |
 
 ##### 制約
@@ -1289,7 +1289,7 @@ erDiagram
 |--------|------|------|-----------|------|
 | trainee_intake_survey_tokens_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時はトークンも削除する（特定トレーニー専用のトークンのため。削除後にその URL を開くと「ご利用いただけません」の画面になる。要件定義書 6-15-17） |
 | trainee_intake_survey_tokens_created_by_foreign | FOREIGN KEY | created_by → trainers(id) | SET NULL | 発行者トレーナー削除時は NULL にする |
-| trainee_intake_survey_tokens_email_reg_token_id_foreign | FOREIGN KEY | client_email_registration_token_id → client_email_registration_tokens(id) | SET NULL | マイページ登録の案内が消えたら（発行し直し・取消・会員の削除）NULL にする（**2026-10-19 追加**） |
+| ~~trainee_intake_survey_tokens_email_reg_token_id_foreign~~（**2026-10-19 外した**。`2026_10_19_000004`） | FOREIGN KEY | client_email_registration_token_id → client_email_registration_tokens(id) | SET NULL | マイページ登録の案内が消えたら（発行し直し・取消・会員の削除）NULL にする（**2026-10-19 追加**） |
 | trainee_intake_survey_tokens_pd_token_id_foreign | FOREIGN KEY | trainee_personality_diagnosis_token_id → trainee_personality_diagnosis_tokens(id) | SET NULL | 結び付いた愛犬性格診断の案内が消えたら（取消・トレーニーの削除）NULL にする（**2026-10-19 追加**） |
 
 **備考**:
@@ -1325,7 +1325,7 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。重複不可。DS-1000 と同じ |
 | trainee_id | BIGINT UNSIGNED | NO | — | 愛犬性格診断の対象のトレーニーのID（外部キー） |
-| client_email_registration_token_id | BIGINT UNSIGNED | YES | NULL | 回答を終えた完了の画面で誘導するマイページ登録の案内（DS-0700）のID（外部キー。**2026-10-19 追加**。マイグレーション `2026_10_19_000003`。要件定義書 6-16-18）。「マイページ登録の案内も発行する」をオンで発行したとき、お客様が最後に答える案内に入る（単独の愛犬性格診断の案内と、愛犬アンケート＆愛犬性格診断の愛犬性格診断の案内）。NULL は誘導しない |
+| ~~client_email_registration_token_id~~ | BIGINT UNSIGNED | YES | NULL | **2026-10-19 外した**（マイグレーション `2026_10_19_000004`。2026-10-19 のユーザーレビュー（2 回目）で、すでにマイページ登録の案内を発行している会員（登録待ち）にもチェックボックスが出て、「…も発行する」ともう 1 件発行されるように見えて分かりにくかったため、簡単にした。お誘いは会員に有効なマイページ登録の案内があるかで決めるので、結び付けは要らなくなった）。以下は経緯：回答を終えた完了の画面で誘導するマイページ登録の案内（DS-0700）のID（外部キー。**2026-10-19 追加**。マイグレーション `2026_10_19_000003`。要件定義書 6-16-18）。「マイページ登録の案内も発行する」をオンで発行したとき、お客様が最後に答える案内に入る（単独の愛犬性格診断の案内と、愛犬アンケート＆愛犬性格診断の愛犬性格診断の案内）。NULL は誘導しない |
 | expires_at | TIMESTAMP | YES | NULL | 有効期限（**2026-10-19 追加**。DS-1000 と同じ）。NULL は期限なし（期限を付ける前に発行した案内） |
 | answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない。DS-1000 と同じ） |
 | created_at | TIMESTAMP | YES | NULL | 発行日時 |
@@ -1348,7 +1348,7 @@ erDiagram
 | trainee_personality_diagnosis_tokens_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時はトークンも削除する（DS-1000 と同じ。削除後にその URL を開くと「ご利用いただけません」の画面になる） |
 | trainee_personality_diagnosis_tokens_created_by_foreign | FOREIGN KEY | created_by → trainers(id) | SET NULL | 発行者トレーナー削除時は NULL にする |
 
-**マイページ登録の案内の結び付け**（**2026-10-19 追加**）：索引 `trainee_pd_tokens_email_reg_token_id_idx`（client_email_registration_token_id）、外部キー `trainee_pd_tokens_email_reg_token_id_foreign`（→ client_email_registration_tokens(id)、ON DELETE SET NULL）。名前は MySQL の上限 64 文字以内に短くした。使い方は DS-1000 の `client_email_registration_token_id` と同じ
+**マイページ登録の案内の結び付け**（**2026-10-19 追加 → 同じ日に外した**。マイグレーション `2026_10_19_000004` で列・索引・外部キーとも外した。理由は DS-1000 の同じ列）。経緯：索引 `trainee_pd_tokens_email_reg_token_id_idx`（client_email_registration_token_id）、外部キー `trainee_pd_tokens_email_reg_token_id_foreign`（→ client_email_registration_tokens(id)、ON DELETE SET NULL）。名前は MySQL の上限 64 文字以内に短くした。使い方は DS-1000 の `client_email_registration_token_id` と同じ
 
 **備考**:
 - **有効期限（`expires_at`）は持たない**（要件定義書 6-15-18 備考。DS-1000 と同じ理由）。`architecture.md` §3-1 の有効期限の設定値も持たない

@@ -2415,12 +2415,12 @@ POST /training-records に以下を追加する。
 **マイページ登録の案内を付ける**（**2026-10-19 追加**。requirements.md 6-16-18。`POST …/intake-survey-tokens`・`POST …/personality-diagnosis-tokens`・`POST …/combined-survey-tokens` の 3 つで共通）:
 - **リクエスト**：`with_mypage_registration`（任意。`1` でオン。モーダル S-0305-M08 のチェックボックス）
 - **処理**：オンで、案内を発行できたときだけ、案内の発行と同じトランザクションで次を行う（`App\Services\SurveyMypageRegistrationService`）
-  - 会員の行をロックし、マイページの状態（`Client::status`）が「メールアドレスなし」か「メールアドレス登録待ち」（期限切れを含む）であることを確かめる。そうでなければ何もしない（オンで送られても付けない）
-  - 期限内（未使用で期限内）のマイページ登録の案内（`client_email_registration_tokens`）があればそれを使う。なければ、`POST /clients/{client}/email-registration-tokens` と同じ処理（`App\Services\ClientEmailRegistrationTokenService`。未使用の期限切れの案内と未使用のログイン用リンクを物理削除して 1 件作る）で作る
-  - お客様が最後に答える案内（単独の案内はその案内、組み合わせは愛犬性格診断の案内）の `client_email_registration_token_id` に、そのマイページ登録の案内の id を入れる
-- **レスポンス**：完了メッセージのあとに、作ったときは「マイページ登録の案内も発行しました。」、使ったときは「マイページ登録の案内は、発行済みのものを使います。」を続ける
+  - 会員の行をロックし、マイページの状態（`Client::status`）が「メールアドレスなし」か「メールアドレス登録待ち」で、**有効な（未使用で期限内の）マイページ登録の案内がない**ことを確かめる。そうでなければ何もしない（オンで送られても作らない）
+  - `POST /clients/{client}/email-registration-tokens` と同じ処理（`App\Services\ClientEmailRegistrationTokenService`。未使用の期限切れの案内と未使用のログイン用リンクを物理削除して 1 件作る）で作る
+- **レスポンス**：作ったときは、完了メッセージのあとに「マイページ登録の案内も発行しました。」を続ける
+- **2026-10-19 変更**（2026-10-19 のユーザーレビュー（2 回目）で、すでにマイページ登録の案内を発行している会員（登録待ち）にもチェックボックスが出て、「…も発行する」ともう 1 件発行されるように見えて分かりにくかったため、簡単にした）：その前（同じ日の最初の作り）は、「登録待ち」（期限内）でも受け付けて期限内の案内を使い（「マイページ登録の案内は、発行済みのものを使います。」）、お客様が最後に答える案内の `client_email_registration_token_id` に結び付けていた。結び付けの列は外した（db-schema.md DS-1000・DS-1100）
 - アクセスログ：案内の発行の記録が 1 件（今と同じ）。マイページ登録の案内の発行は、今も記録していない（`POST /clients/{client}/email-registration-tokens` は LogAccess の対象外）ので、記録を足さない
-- **会員側の回答の送信の変更**：`POST /client-portal/intake-survey/{token}`・`POST /client-portal/personality-diagnosis/{token}` で完了の画面へ移るとき、答えた案内に結び付けたマイページ登録の案内がまだ使える（未使用・期限内）で、会員がメールアドレス・パスワードを持たず、ログインしていなければ、そのマイページ登録の案内の URL（`/client-portal/email-registration/{token}`）をフラッシュ `mypageRegistrationUrl` で渡す（完了の画面 S-1414・S-1416 のお誘い）。組み合わせの愛犬アンケートのあと（愛犬性格診断へ進む）は渡さない
+- **会員側の回答の送信の変更**：`POST /client-portal/intake-survey/{token}`・`POST /client-portal/personality-diagnosis/{token}` で完了の画面へ移るとき、答えた会員に有効なマイページ登録の案内（未使用・期限内。いちばん新しいもの）があり（**2026-10-19 変更**：その前は、答えた案内に結び付けたマイページ登録の案内がまだ使えるとき）、会員がメールアドレス・パスワードを持たず、ログインしていなければ、そのマイページ登録の案内の URL（`/client-portal/email-registration/{token}`）をフラッシュ `mypageRegistrationUrl` で渡す（完了の画面 S-1414・S-1416 のお誘い）。組み合わせの愛犬アンケートのあと（愛犬性格診断へ進む）は渡さない
 
 ###### DELETE /trainees/{trainee}/combined-survey-tokens
 
