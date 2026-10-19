@@ -8,6 +8,48 @@
         （権限: {{ Auth::user()->role_display_name }}）
     </div>
 
+    {{-- 過去 30 日の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
+         最近のトレーニング記録の上。見た目・期間の決め方・行のリンク・0 件の出し方・狭い幅（横スクロール）は最近のトレーニング記録に合わせる。
+         公開済みも含めてすべて出し、状態は S-0313 と同じバッジ。未公開（なし・下書き）があれば見出しのあとに件数。
+         会員の列のリンクを押したときは、行のリンク（S-0313）を動かさない。
+         狭い幅では、列の見出しと回答日・会員・トレーニー・状態の列を折り返さず（text-nowrap）、表を横にスクロールする
+         （1 文字ずつに押しつぶされないように）。タイプは「・」のあとでだけ折り返す。見出しの「（未公開 n件）」は途中で折り返さない --}}
+    <div class="d-flex align-items-baseline mb-2">
+        <h4 class="mb-0" data-recent-diagnoses-heading>過去30日の愛犬性格診断@if($unpublishedDiagnosisCount > 0)<span class="text-nowrap" data-unpublished-diagnosis-count>（未公開 {{ $unpublishedDiagnosisCount }}件）</span>@endif</h4>
+    </div>
+
+    @if($recentDiagnoses->isEmpty())
+        <div class="alert alert-secondary mb-4" data-recent-diagnoses-empty>
+            過去30日の愛犬性格診断はありません。
+        </div>
+    @else
+        <div class="table-responsive mb-4">
+            <table class="table table-hover" data-recent-diagnoses>
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-nowrap">回答日</th>
+                        <th class="text-nowrap">会員</th>
+                        <th class="text-nowrap">トレーニー</th>
+                        <th class="text-nowrap">タイプ</th>
+                        <th class="text-nowrap">状態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($recentDiagnoses as $diagnosis)
+                        <tr style="cursor: pointer;" onclick="location.href='{{ route('trainee-personality-diagnosis-results.show', [$diagnosis->trainee, $diagnosis]) }}'">
+                            <td class="text-nowrap">{{ $diagnosis->answered_at->format('Y/m/d') }}</td>
+                            <td class="text-nowrap"><a href="{{ route('clients.show', $diagnosis->trainee->client) }}" onclick="event.stopPropagation();">{{ $diagnosis->trainee->client->display_name }}</a></td>
+                            <td class="text-nowrap">{{ $diagnosis->trainee->display_name }}</td>
+                            {{-- タイプは「・」のあとでだけ折り返す（S-0309 の結果の表と同じ） --}}
+                            <td style="word-break: keep-all;">{!! collect(explode('・', $diagnosis->personality_type_label))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</td>
+                            <td class="text-nowrap"><span class="badge {{ $diagnosis->evaluation_status_badge_class }}">{{ $diagnosis->evaluation_status_label }}</span></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
     {{-- 最近のトレーニング記録（S-0201 セクション「最近のトレーニング記録」、2026-09 追加）。
          過去 1 週間（今日を含む 7 日間、未来日は含めない）を日付の新しい順で表示。
          見出しのすぐ右に「すべて表示」（S-0402 へ）、行の右端に絞り込みセレクト
