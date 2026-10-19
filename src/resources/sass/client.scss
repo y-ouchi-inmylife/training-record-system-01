@@ -1453,6 +1453,28 @@ input[type="tel"] {
         color: $purple;
     }
 }
+// 完了の画面（S-1414・S-1416）のマイページ登録のお誘いの箇条書き（2026-10-19 追加。client/_mypage-registration-invite）。
+// 黒丸の代わりにチェックの丸の印（会員側の主な色 $brand-bright）を頭に置き、印と文を横に並べる（flex）。文が 2 行に折り返しても、
+// 2 行目は印の下に回らず文の頭にそろう。印は 1 行目の文字の高さの真ん中に置く（行の高さ 1.5 の 1 行目に合わせて少し下げる）
+.c-invite-list {
+    li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    li + li {
+        margin-top: 0.5rem;
+    }
+}
+.c-invite-list-icon {
+    flex-shrink: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.1875rem;
+    color: $brand-bright;
+}
+
 // 愛犬アンケート＆愛犬性格診断の案内の進み具合（2026-10-19 追加。回答の画面 S-1413・S-1415 の見出しの上。client/_survey-progress）。
 // 「1/2」の札（会員側の青の塗り・白の文字）と、組み合わせの名前（本文の色の小さめの太字）を横に並べる。狭い幅では名前が折り返す
 .c-survey-progress {

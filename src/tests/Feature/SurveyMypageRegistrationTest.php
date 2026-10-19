@@ -253,7 +253,16 @@ class SurveyMypageRegistrationTest extends TestCase
     private function assertInvite(string $html, string $token = 'regtokenregtokenregtokenregtoken'): void
     {
         $this->assertStringContainsString('data-mypage-registration-invite', $html);
-        $this->assertStringContainsString('マイページにご登録いただくと、トレーニングの記録や愛犬の診断結果をいつでもご覧いただけます。', $html);
+        // リードの文と、マイページでできることの 3 つの項目をこの順に（2026-10-19 変更：その前は「…トレーニングの記録や愛犬の診断結果を…」の 1 文）
+        $this->assertStringContainsString('<p class="mb-2">マイページにご登録いただくと、次のことができます。</p>', $html);
+        $this->assertSame(1, preg_match('/data-mypage-registration-invite-items>(.*?)<\/ul>/su', $html, $m));
+        preg_match_all('/<li><svg class="c-invite-list-icon"[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span>([^<]*)<\/span><\/li>/su', $m[1], $items);
+        $this->assertSame([
+            '愛犬性格診断の結果を、パソコンやスマートフォンでいつでもご覧いただけます',
+            '愛犬の写真を登録できます',
+            '愛犬のプロフィールをご覧いただけます',
+        ], $items[1]);
+        $this->assertStringNotContainsString('トレーニングの記録や', $html);
         $this->assertStringContainsString(
             '<a href="'.route('client-portal.email-registration.show', ['token' => $token]).'" class="btn btn-primary">マイページに登録する</a>',
             $html
@@ -294,6 +303,7 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->answerIntake()->assertRedirect(route('client-portal.personality-diagnosis.show', ['token' => self::PERSONALITY]));
         $html = $this->get(route('client-portal.personality-diagnosis.show', ['token' => self::PERSONALITY]))->assertOk()->getContent();
         $this->assertStringNotContainsString('data-mypage-registration-invite', $html);
+        $this->assertStringNotContainsString('次のことができます', $html);
 
         // 愛犬性格診断のあと：完了の画面にお誘い
         $this->answerPersonality();
@@ -313,7 +323,10 @@ class SurveyMypageRegistrationTest extends TestCase
             $this->surveyTokens();
 
             $this->answerIntake()->assertRedirect(route('client-portal.intake-survey.thanks'));
-            $this->assertStringNotContainsString('data-mypage-registration-invite', $this->thanksPage('client-portal.intake-survey.thanks'), $case);
+            $html = $this->thanksPage('client-portal.intake-survey.thanks');
+            $this->assertStringNotContainsString('data-mypage-registration-invite', $html, $case);
+            $this->assertStringNotContainsString('次のことができます', $html, $case);
+            $this->assertStringNotContainsString('愛犬の写真を登録できます', $html, $case);
         }
     }
 
@@ -326,7 +339,10 @@ class SurveyMypageRegistrationTest extends TestCase
             $this->surveyTokens();
 
             $this->answerIntake();
-            $this->assertStringNotContainsString('data-mypage-registration-invite', $this->thanksPage('client-portal.intake-survey.thanks'), $case);
+            $html = $this->thanksPage('client-portal.intake-survey.thanks');
+            $this->assertStringNotContainsString('data-mypage-registration-invite', $html, $case);
+            $this->assertStringNotContainsString('次のことができます', $html, $case);
+            $this->assertStringNotContainsString('愛犬の写真を登録できます', $html, $case);
         }
 
         // ログインして答えた（マイページから開いた）：今の［マイページへ戻る］のまま
@@ -338,6 +354,7 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->answerIntake();
         $html = $this->thanksPage('client-portal.intake-survey.thanks');
         $this->assertStringNotContainsString('data-mypage-registration-invite', $html);
+        $this->assertStringNotContainsString('次のことができます', $html);
         $this->assertStringContainsString('マイページへ戻る', $html);
     }
 }
