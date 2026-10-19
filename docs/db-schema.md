@@ -1425,7 +1425,7 @@ erDiagram
 | delete_trainee_measurement | トレーニー計測値削除 |
 | create_trainee_intake_survey_token | 愛犬アンケート案内の発行 |
 | delete_trainee_intake_survey_token | 愛犬アンケート案内の取消 |
-| create_trainee_personality_diagnosis_token | 愛犬性格診断の案内の発行（**2026-10 追加**） |
+| create_trainee_personality_diagnosis_token | 愛犬性格診断の案内の発行（**2026-10 追加**。**2026-10-19 から新しくは記録しない**：単独の愛犬性格診断の案内を新しく発行しなくなったため。今までの記録の表示は残す） |
 | create_trainee_combined_survey_token | 愛犬アンケート＆愛犬性格診断の案内の発行（**2026-10-19 追加**。2 つの案内を作るが、操作は 1 つなので 1 件） |
 | delete_trainee_combined_survey_token | 愛犬アンケート＆愛犬性格診断の案内の取消（**2026-10-19 追加**） |
 | delete_trainee_personality_diagnosis_token | 愛犬性格診断の案内の取消（**2026-10 追加**） |
