@@ -8,7 +8,7 @@ use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Claude（Anthropic）でアドバイスとスタッフ用メモの下書きを作る（2026-10-19 追加。EvaluationDraftGenerator の実装）。
+ * Claude（Anthropic）でアドバイスとスタッフ用メモを自動生成する（2026-10-19 追加。EvaluationDraftGenerator の実装。2026-10-19 変更：呼び名を「下書き」から変えた）。
  *
  * 音声の要約（App\Services\SummarizationService）と同じ作り：anthropic-ai/sdk、キー・モデルは config('services.anthropic.*')
  * （ANTHROPIC_API_KEY・ANTHROPIC_MODEL）。違うところ：
@@ -32,7 +32,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         $apiKey = config('services.anthropic.api_key');
         $model = (string) config('services.anthropic.model');
         if (empty($apiKey)) {
-            Log::error('アドバイスのAI下書き：Anthropic の API キーが設定されていません', ['result_id' => $result->id]);
+            Log::error('アドバイスのAI自動生成：Anthropic の API キーが設定されていません', ['result_id' => $result->id]);
             throw new EvaluationDraftFailedException('Anthropic API key is not set.');
         }
 
@@ -50,7 +50,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
                 model: $model,
             );
         } catch (\Throwable $e) {
-            Log::error('アドバイスのAI下書き：呼び出しに失敗しました', [
+            Log::error('アドバイスのAI自動生成：呼び出しに失敗しました', [
                 'result_id' => $result->id,
                 'model' => $model,
                 'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
@@ -63,7 +63,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         foreach ($response->content as $block) {
             $text .= $block->text ?? '';
         }
-        Log::info('アドバイスのAI下書き：作成しました', [
+        Log::info('アドバイスのAI自動生成：作成しました', [
             'result_id' => $result->id,
             'model' => $model,
             'input_tokens' => $response->usage->inputTokens,
@@ -75,7 +75,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         try {
             return EvaluationDraft::fromResponse($text);
         } catch (EvaluationDraftFailedException $e) {
-            Log::error('アドバイスのAI下書き：返事が空でした', ['result_id' => $result->id, 'model' => $model]);
+            Log::error('アドバイスのAI自動生成：返事が空でした', ['result_id' => $result->id, 'model' => $model]);
             throw $e;
         }
     }

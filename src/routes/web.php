@@ -170,11 +170,10 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish', [TraineePersonalityDiagnosisResultController::class, 'unpublish'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.unpublish');
-            // スタッフ用メモの保存（S-0313 のスタッフ用メモの［更新］）と、アドバイス・スタッフ用メモの AI の下書き（［AIで下書き］。JSON を返す）。
+            // アドバイス・スタッフ用メモの AI の自動生成（［AIで自動生成］。JSON を返す。2026-10-19 変更：その前の呼び名は［AIで下書き］）。
             // 2026-10-19 追加。権限はアドバイスの［更新］と同じ（管理者・一般のトレーナー）。scopeBindings で別のトレーニーの結果は 404
-            Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo', [TraineePersonalityDiagnosisResultController::class, 'updateStaffMemo'])
-                ->scopeBindings()
-                ->name('trainee-personality-diagnosis-results.staff-memo.update');
+            // 2026-10-19 変更：スタッフ用メモだけを保存していたルート（PUT …/staff-memo）は外した。アドバイスの［更新］（…update）で
+            // アドバイスとスタッフ用メモを両方まとめて受け取る（S-0313 のカードと［更新］を 1 つにまとめたため）
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft', [TraineePersonalityDiagnosisResultController::class, 'draft'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.evaluation-draft');

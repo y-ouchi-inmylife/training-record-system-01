@@ -127,47 +127,33 @@
         </div>
     </div>
 
-    {{-- アドバイス（要件定義書 6-16-15・6-16-16）。どの状態でもテキストエリア（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。
-         空で保存すると「なし」に戻る（公開済みのときは空にできない）。公開済みのときも直せ、直すとそのまま会員様の画面に出る
-         （2026-10-18 変更：その前は、公開でトレーニング記録を作り、公開済みは表示だけで記録へのリンクを出していた） --}}
-    {{-- AI の下書きのお知らせ（2026-10-19 追加）。［AIで下書き］のあと、下のスクリプトが文を入れて出す（成功は緑、失敗は赤）。
+    {{-- アドバイスとスタッフ用メモ（要件定義書 6-16-15・6-16-16・6-16-19、設計書 S-0313「アドバイスとスタッフ用メモのカード」）。
+         2026-10-19 変更：ユーザーレビューで、［更新］が 2 つあり分かりにくく、［AIで下書き］がアドバイスのカードにあってスタッフ用メモも
+         書き換わるように見えなかったため、2 つのカードを 1 つにまとめ、カードの見出しの右に［AIで自動生成］と［更新］を 1 つずつ置いた。
+         その前は「アドバイス」と「スタッフ用メモ」の 2 つのカードにそれぞれ［更新］があり、スタッフ用メモは別のフォーム・別のルート（PUT …/staff-memo）で保存していた。
+         - ［更新］は 1 つのフォーム（id="evaluation-form"）で、アドバイスとスタッフ用メモを両方まとめて保存する（PUT …/{result}）。
+           ボタンはフォームの外（カードの見出し）にあるので form 属性で送る
+         - ［AIで自動生成］（2026-10-19 変更：その前は［AIで下書き］）：いつも使うとはかぎらない操作なので青の枠線（4-4）。押すとアドバイスと
+           スタッフ用メモを AI で自動生成し、2 つの欄に入れる（保存はしない。下のスクリプト）。どちらかの欄に文があるときは、先に確かめる（S-0313-M04）
+         - 上のまとまり：小見出し「アドバイス」（入力欄の label）＋状態のバッジ（S-0309 の結果の表と同じ色）＋公開済みのときは公開した日。行の右に
+           ［公開］（青の塗り。業務の中で必ず使う操作。欄が空〔空白だけを含む〕なら押せない）または［公開取消］（白抜きの赤。4-4）。
+           空で保存すると「なし」に戻る（公開済みのときは空にできない）。公開済みのときも直せ、直すとそのまま会員様の画面に出る
+         - 下のまとまり：小見出し「スタッフ用メモ」（入力欄の label）＋「（会員様には表示されません）」（text-muted small。入力欄の aria-describedby）。
+           トレーナーだけが見るメモで、会員様の画面には一切出さない
+         - 2 つのまとまりのあいだは薄い線（border-top）と上下の空きで分ける
+         - 見出しの行・アドバイスの小見出しの行とも、上下の真ん中をそろえ、狭い幅で 1 行に収まらないときはボタンを次の行へ折り返して右に寄せる
+           （flex-wrap と ms-auto） --}}
+    {{-- AI の自動生成のお知らせ（2026-10-19 追加）。［AIで自動生成］のあと、下のスクリプトが文を入れて出す（成功は緑、失敗は赤）。
          読み上げで伝わるよう role="status"。最初は出さない --}}
     <div class="alert d-none" role="status" data-evaluation-draft-notice></div>
 
     <div class="card mb-3" data-personality-diagnosis-evaluation>
-        {{-- 見出しの行：左に「アドバイス」とすぐ右に状態のバッジ（公開済みのときは、その右に公開した日）、右にボタン
-             （なし・下書き：［更新］［公開］、公開済み：［更新］［公開取消］）。ボタンの大きさは、ほかのカードの見出しのボタン
-             （計測値の［新規登録］など）と同じ通常の大きさ。狭い幅で 1 行に収まらないときは、ボタンのまとまりを次の行へ折り返して
-             右に寄せる（flex-wrap と ms-auto）。2026-10-18 変更：ユーザーレビューで、ボタンをテキストエリアの上の行から見出しの行に移し、
-             バッジを見出しのすぐ右にした --}}
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <h6 class="mb-0">アドバイス</h6>
-                {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
-                <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
-                {{-- 公開済みのときだけ、バッジの右に公開した日（会員様の一覧に出る日付と同じ）。2026-10-18 変更：その前は、
-                     ここに作った記録へのリンク「（トレーニング記録）」を出していた --}}
-                @if($isPublished)
-                    <span class="text-muted small" data-evaluation-published-on>{{ $result->evaluation_published_at->format('Y/m/d') }} 公開</span>
-                @endif
-            </div>
-            {{-- ［更新］はフォームの外にあるので、form 属性で下のアドバイスのフォーム（id="evaluation-form"）を送る。
-                 ［公開］（青の塗り。業務の中で必ず使う操作）は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで
-                 切り替える。サーバーでも必須を確かめる）。押すとモーダル（S-0313-M01）で、欄の今の文（保存していない直しを含む）を送る。
-                 ［公開取消］は白抜きの赤（4-4 の「取消など、消す操作で目立たせすぎたくないもの」）。押すとモーダル（S-0313-M03） --}}
-            {{-- ［AIで下書き］（2026-10-19 追加）：［更新］の左。いつも使うとはかぎらない操作なので青の枠線（4-4）。押すとアドバイスとスタッフ用メモの
-                 下書きを AI で作り、2 つの欄に入れる（保存はしない。下のスクリプト）。どちらかの欄に文があるときは、先に確かめる（S-0313-M04） --}}
+            <h6 class="mb-0">アドバイスとスタッフ用メモ</h6>
             <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>
                 <button type="button" class="btn btn-outline-primary" data-evaluation-draft
-                        data-url="{{ route('trainee-personality-diagnosis-results.evaluation-draft', [$trainee, $result]) }}">AIで下書き</button>
+                        data-url="{{ route('trainee-personality-diagnosis-results.evaluation-draft', [$trainee, $result]) }}">AIで自動生成</button>
                 <button type="submit" form="evaluation-form" class="btn btn-success">更新</button>
-                @if($isPublished)
-                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"
-                            data-evaluation-unpublish>公開取消</button>
-                @else
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
-                            data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>公開</button>
-                @endif
             </div>
         </div>
         <div class="card-body">
@@ -176,41 +162,41 @@
             <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate id="evaluation-form" data-evaluation-form>
                 @csrf
                 @method('PUT')
-                <label for="evaluation_text" class="visually-hidden">アドバイス</label>
-                <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
-                          rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
-                <x-form-error field="evaluation_text" />
-            </form>
-        </div>
-    </div>
+                <div data-evaluation-section>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <label for="evaluation_text" class="fw-bold mb-0">アドバイス</label>
+                            {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
+                            <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
+                            {{-- 公開済みのときだけ、バッジの右に公開した日（会員様の一覧に出る日付と同じ） --}}
+                            @if($isPublished)
+                                <span class="text-muted small" data-evaluation-published-on>{{ $result->evaluation_published_at->format('Y/m/d') }} 公開</span>
+                            @endif
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-publish-buttons>
+                            @if($isPublished)
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"
+                                        data-evaluation-unpublish>公開取消</button>
+                            @else
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
+                                        data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>公開</button>
+                            @endif
+                        </div>
+                    </div>
+                    <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
+                              rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
+                    <x-form-error field="evaluation_text" />
+                </div>
 
-    {{-- スタッフ用メモ（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「スタッフ用メモ」）。トレーナーだけが見るメモで、会員様の画面には一切出さない。
-         アドバイスの下に置く。入力欄（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。公開・公開取消はない。
-         アドバイスの［更新］とは別のフォーム・別のルート（PUT …/staff-memo）で、スタッフ用メモだけを保存する（アドバイスの［更新］ではスタッフ用メモは変わらない）。
-         ［AIで下書き］で、AI のスタッフ用の下書きが入る --}}
-    <div class="card mb-3" data-personality-diagnosis-staff-memo>
-        {{-- 見出しの行：左に「スタッフ用メモ」とすぐ右に「（会員様には表示されません）」、右に［更新］。作りはアドバイスの欄の見出しの行と同じ
-             （上下の真ん中をそろえ〔align-items-center〕、狭い幅で 1 行に収まらないときは［更新］を次の行へ折り返して右に寄せる〔flex-wrap と ms-auto〕）。
-             説明の文は、アドバイスの欄の見出しの右の「YYYY/MM/DD 公開」と同じ小さい薄い灰色（text-muted small）。読み上げでは入力欄の説明として
-             結び付ける（textarea の aria-describedby）。2026-10-19 変更：ユーザーレビューで見出しの右に移した。その前は本文の上（入力欄の上）に出していた。
-             同じ日に、全角の括弧で括り、文の終わりの「。」をなくした（その前は「会員様には表示されません。」） --}}
-        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <h6 class="mb-0">スタッフ用メモ</h6>
-                <span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）</span>
-            </div>
-            <div class="d-flex flex-wrap gap-2 ms-auto">
-                <button type="submit" form="staff-memo-form" class="btn btn-success">更新</button>
-            </div>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ route('trainee-personality-diagnosis-results.staff-memo.update', [$trainee, $result]) }}" novalidate id="staff-memo-form" data-staff-memo-form>
-                @csrf
-                @method('PUT')
-                <label for="staff_memo" class="visually-hidden">スタッフ用メモ</label>
-                <textarea class="form-control @error('staff_memo') is-invalid @enderror" id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"
-                          rows="6" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH }}">{{ old('staff_memo', $result->staff_memo) }}</textarea>
-                <x-form-error field="staff_memo" />
+                <div class="border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ</label>
+                        <span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）</span>
+                    </div>
+                    <textarea class="form-control @error('staff_memo') is-invalid @enderror" id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"
+                              rows="6" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH }}">{{ old('staff_memo', $result->staff_memo) }}</textarea>
+                    <x-form-error field="staff_memo" />
+                </div>
             </form>
         </div>
     </div>
@@ -244,26 +230,26 @@
         </div>
     @endif
     {{-- 公開の確認モーダル（S-0313-M01。2026-10-18 追加）。公開済みでないときだけ置く。［公開する］で、アドバイスの欄の今の文を
-         隠しの欄に写してから送る（下のスクリプト。二重に押されないよう、送ったらボタンを押せなくする）。キャンセルは 4-4 のとおり塗り。
+         （2026-10-19 変更：スタッフ用メモの欄の今の文も）隠しの欄に写してから送る（下のスクリプト。二重に押されないよう、送ったらボタンを押せなくする）。キャンセルは 4-4 のとおり塗り。
          2026-10-18 変更：公開でトレーニング記録を作らなくなったため、見出しと文を変えた（その前は「トレーニング記録にして公開」）。
          2026-10-18 変更：ユーザーレビューで、見出しを「{名前}の公開」、文を「会員のマイページに{名前}を公開します。」にした
          （その前は「評価文の公開」と、直せること・すぐ見えることを添えた文）。名前は $pdName（lang/ja/messages.php の 1 か所）。
          2026-10-18 変更：ユーザーレビューで、文のあとに「よろしいですか？」を足した（同じ行に続け、全角の「？」。トレーナー側のほかの確認にそろえた）。
          2026-10-18 変更：ユーザーレビューで、公開取消の確認（M03「会員のマイページから{名前}の公開を取り消しますか？」）と言い方をそろえ、
          「会員のマイページに{名前}を公開しますか？」にした（その前は「〜を公開します。よろしいですか？」） --}}
-    {{-- AI の下書きの確かめモーダル（S-0313-M04。2026-10-19 追加）。アドバイスかスタッフ用メモのどちらかに文があるときだけ、［AIで下書き］で開く
-         （どちらも空なら開かずに作る）。［キャンセル］は灰色の塗り（この画面のほかの確認のモーダルと同じ。4-4）、［置き換える］は青の塗り
+    {{-- AI の自動生成の確かめモーダル（S-0313-M04。2026-10-19 追加）。アドバイスかスタッフ用メモのどちらかに文があるときだけ、［AIで自動生成］で開く
+         （どちらも空なら開かずに作る。2026-10-19 変更：見出しと文を「AIで下書き」「…AIの下書きで置き換えます。…」から変えた）。［キャンセル］は灰色の塗り（この画面のほかの確認のモーダルと同じ。4-4）、［置き換える］は青の塗り
          （設計書 S-0313-M04。2026-10-19 変更：その前の［キャンセル］は赤の枠線） --}}
     <div class="modal fade" id="personality-diagnosis-draft-confirm" tabindex="-1"
          aria-labelledby="personality-diagnosis-draft-confirm-label" aria-hidden="true" data-evaluation-draft-confirm>
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで下書き</h5>
+                    <h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで自動生成</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">アドバイスとスタッフ用メモを、AIの下書きで置き換えます。よろしいですか？</p>
+                    <p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した文で置き換えます。よろしいですか？</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
@@ -290,6 +276,8 @@
                         <form method="POST" action="{{ route('trainee-personality-diagnosis-results.publish', [$trainee, $result]) }}" class="d-inline m-0" data-evaluation-publish-form>
                             @csrf
                             <input type="hidden" name="evaluation_text" value="">
+                            {{-- 2026-10-19 追加：スタッフ用メモの欄の今の文も送り、保存してから公開する --}}
+                            <input type="hidden" name="staff_memo" value="">
                             <button type="submit" class="btn btn-primary">公開する</button>
                         </form>
                     </div>
@@ -367,7 +355,7 @@
 @push('scripts')
 {{-- アドバイスの公開（S-0313-M01）と公開取消（S-0313-M03）。2026-10-18 追加。
      - 欄が空（空白だけ）なら［公開］を押せなくする
-     - モーダルの［公開する］では、欄の今の文を隠しの欄に写して送る
+     - モーダルの［公開する］では、欄の今の文（アドバイスとスタッフ用メモ。2026-10-19 からスタッフ用メモも）を隠しの欄に写して送る
      - どちらのモーダルも、送ったら実行のボタンを押せなくする（二重に押されないように） --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -383,6 +371,11 @@ document.addEventListener('DOMContentLoaded', function () {
         update();
         publishForm.addEventListener('submit', function () {
             publishForm.querySelector('input[name="evaluation_text"]').value = textarea.value;
+            // 2026-10-19 追加：スタッフ用メモの欄の今の文も送る（保存してから公開する）
+            var memoField = document.querySelector('[data-evaluation-form] textarea[name="staff_memo"]');
+            if (memoField) {
+                publishForm.querySelector('input[name="staff_memo"]').value = memoField.value;
+            }
             publishForm.querySelector('button[type="submit"]').disabled = true;
         });
     }
@@ -392,12 +385,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ［AIで下書き］（2026-10-19 追加。設計書 S-0313「AIで下書き」）
+    // ［AIで自動生成］（2026-10-19 追加。設計書 S-0313「AIで自動生成・スタッフ用メモ」。2026-10-19 にボタン名と文を変えた。前の文は Blade のコメントと設計書に残す）
     // - どちらかの欄に文があれば、先に確かめのモーダル（S-0313-M04）。どちらも空なら確かめずに作る
-    // - 作っている間はボタンを「作成中…」にして押せなくする。返ってきたら 2 つの欄に入れる（保存はしない）
+    // - 作っている間はボタンを「生成中…」にして押せなくする。返ってきたら 2 つの欄に入れる（保存はしない）
     // - 欄に入れたら input のイベントを出し、［公開］を押せるかどうか（上の update）も動かす
     var draftButton = document.querySelector('[data-evaluation-draft]');
-    var staffMemo = document.querySelector('[data-staff-memo-form] textarea[name="staff_memo"]');
+    var staffMemo = document.querySelector('[data-evaluation-form] textarea[name="staff_memo"]');
     var notice = document.querySelector('[data-evaluation-draft-notice]');
     var confirmEl = document.querySelector('[data-evaluation-draft-confirm]');
     if (draftButton && textarea && staffMemo && notice && confirmEl) {
@@ -409,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
         var makeDraft = function () {
             draftButton.disabled = true;
-            draftButton.textContent = '作成中…';
+            draftButton.textContent = '生成中…';
             notice.classList.add('d-none');
             fetch(draftButton.getAttribute('data-url'), {
                 method: 'POST',
@@ -429,13 +422,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 staffMemo.value = body.staff_memo || '';
                 textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 staffMemo.dispatchEvent(new Event('input', { bubbles: true }));
-                var message = 'AIの下書きを入れました。内容を確かめて、アドバイスとスタッフ用メモをそれぞれ［更新］で保存してください。';
+                var message = 'AIで自動生成した文を入れました。内容を確かめて、［更新］で保存してください。';
                 if (body.staff_memo_missing) {
                     message += 'スタッフ用メモは作れませんでした。';
                 }
                 showNotice(true, message);
             }).catch(function () {
-                showNotice(false, 'AIの下書きを作れませんでした。時間をおいてもう一度お試しください。');
+                showNotice(false, 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');
             }).finally(function () {
                 draftButton.disabled = false;
                 draftButton.textContent = label;

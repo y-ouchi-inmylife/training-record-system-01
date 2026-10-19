@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AccessLog;
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Services\EvaluationDraft\EvaluationDraftFailedException;
@@ -25,7 +26,9 @@ use Illuminate\View\View;
  * - 公開済みのアドバイスも更新できる（すぐ会員様の画面に出る）。ただし公開済みのあいだは空にできない
  * - 公開・公開取消は、結果の行を排他ロックして状態を確かめ直す。すでに公開済み・すでに公開を取り消しているときは、
  *   エラーにせず S-0313 に戻す（2 回押されても困らないように）
- * - アクセスログ（edit_／publish_／unpublish_trainee_personality_diagnosis_evaluation）は LogAccess ミドルウェアで記録する
+ * - アクセスログ：公開・公開取消（publish_／unpublish_trainee_personality_diagnosis_evaluation）は LogAccess ミドルウェアで記録する。
+ *   アドバイス・スタッフ用メモの編集（edit_trainee_personality_diagnosis_evaluation・edit_trainee_personality_diagnosis_staff_memo）は、
+ *   変わった方だけをこのコントローラで記録する（2026-10-19 変更：［更新］を 1 つにまとめたため。その前はルートごとにミドルウェアで記録していた）
  *
  * 結果の削除：
  *
@@ -63,30 +66,31 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * アドバイスを更新する（PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}）。
+     * アドバイスとスタッフ用メモを更新する（PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}。
+     * S-0313 のカード「アドバイスとスタッフ用メモ」の［更新］。2026-10-19 変更：ユーザーレビューで［更新］が 2 つあり分かりにくかったため、
+     * 2 つを 1 つのフォームで受け取って両方まとめて保存する。その前はアドバイスだけを保存し、スタッフ用メモは別のルート〔PUT …/staff-memo〕）。
      *
-     * - 10,000 文字以内。改行は LF にそろえてから数える（愛犬アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）
-     * - 空（空白だけを含む）で保存すると NULL（「なし」に戻る）。ただし公開済みのあいだは空にできない（入力エラー）
-     * - 公開済みでも保存できる（そのまま会員様の画面に出る。2026-10-18 変更：その前は公開済みなら 409）
-     * - 最後に保存したトレーナーと日時を残す（evaluation_updated_by・evaluation_updated_at）
+     * - どちらも 10,000 文字以内。改行は LF にそろえてから数える（ブラウザは改行を 1 文字と数えるため）。空（空白だけを含む）なら NULL
+     * - 公開済みのあいだはアドバイスを空にできない（入力エラー）。公開済みでも保存できる（そのまま会員様の画面に出る）
+     * - スタッフ用メモが送られてこなければ（キーがなければ）変えない
+     * - アドバイスの最終更新（evaluation_updated_by・evaluation_updated_at）は、アドバイスが変わったときだけ変える
+     * - アクセスログは変わった方だけを残す（どちらも変わらなければ残さない）
      */
     public function update(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
     {
         $isPublished = $personalityDiagnosisResult->evaluation_status === TraineePersonalityDiagnosisResult::EVALUATION_PUBLISHED;
-        $text = $this->validateEvaluationText($request, required: false);
+        [$text, $memo, $hasMemo] = $this->validateTexts($request, evaluationRequired: false);
         if ($isPublished && $text === null) {
             throw ValidationException::withMessages(['evaluation_text' => self::EMPTY_WHILE_PUBLISHED_MESSAGE]);
         }
 
-        $personalityDiagnosisResult->update([
-            'evaluation_text' => $text,
-            'evaluation_updated_by' => auth()->id(),
-            'evaluation_updated_at' => now(),
-        ]);
+        $evaluationChanged = $this->saveTexts($request, $trainee, $personalityDiagnosisResult, $text, $memo, $hasMemo);
 
         return redirect()
             ->route('trainee-personality-diagnosis-results.show', [$trainee, $personalityDiagnosisResult])
-            ->with('success', $isPublished ? 'アドバイスを更新しました。会員様のマイページにも反映されています。' : 'アドバイスを更新しました。');
+            ->with('success', $isPublished && $evaluationChanged
+                ? 'アドバイスとスタッフ用メモを更新しました。会員様のマイページにも反映されています。'
+                : 'アドバイスとスタッフ用メモを更新しました。');
     }
 
     /**
@@ -94,7 +98,10 @@ class TraineePersonalityDiagnosisResultController extends Controller
      *
      * 公開済みなら（2 回目の送信を含む）、入力のチェックより先に見て、何もせず S-0313 に戻す。そうでなければ、
      * 1 つのトランザクションで結果の行を排他ロックして取り直し、欄の文を保存（保存と同じ決まり。公開では必須）してから、
-     * 公開した日時・公開したトレーナーを入れる（保存していない直しも公開される）。トレーニング記録は作らない
+     * 公開した日時・公開したトレーナーを入れる（保存していない直しも公開される）。トレーニング記録は作らない。
+     * 2026-10-19 変更：スタッフ用メモの欄の文も一緒に保存してから公開する（1 つの［更新］にまとめたため。直したまま押しても、
+     * 保存し忘れた古い文が残らないように）。保存でアドバイス・スタッフ用メモが変わっていれば、変わった方の編集の記録も残す
+     * （公開の記録は今までどおり LogAccess ミドルウェア）
      */
     public function publish(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
     {
@@ -102,14 +109,16 @@ class TraineePersonalityDiagnosisResultController extends Controller
             return $this->backToShow($trainee, $personalityDiagnosisResult, 'このアドバイスは、すでに公開しています。');
         }
 
-        $text = $this->validateEvaluationText($request, required: true);
+        [$text, $memo, $hasMemo] = $this->validateTexts($request, evaluationRequired: true);
 
-        $published = DB::transaction(function () use ($personalityDiagnosisResult, $text) {
+        $changes = DB::transaction(function () use ($personalityDiagnosisResult, $text, $memo, $hasMemo) {
             $result = TraineePersonalityDiagnosisResult::query()->whereKey($personalityDiagnosisResult->id)->lockForUpdate()->firstOrFail();
             if ($result->evaluation_published_at !== null) {
-                return false;
+                return null;
             }
 
+            $evaluationChanged = $result->evaluation_text !== $text;
+            $memoChanged = $hasMemo && $result->staff_memo !== $memo;
             $now = now();
             $result->update([
                 'evaluation_text' => $text,
@@ -117,10 +126,15 @@ class TraineePersonalityDiagnosisResultController extends Controller
                 'evaluation_updated_at' => $now,
                 'evaluation_published_at' => $now,
                 'evaluation_published_by' => auth()->id(),
+                ...($hasMemo ? ['staff_memo' => $memo] : []),
             ]);
 
-            return true;
+            return [$evaluationChanged, $memoChanged];
         });
+        $published = $changes !== null;
+        if ($published) {
+            $this->logEdits($request, $trainee, ...$changes);
+        }
 
         return $this->backToShow($trainee, $personalityDiagnosisResult, $published ? 'アドバイスを公開しました。' : 'このアドバイスは、すでに公開しています。');
     }
@@ -167,32 +181,11 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * スタッフ用メモを更新する（PUT …/{personalityDiagnosisResult}/staff-memo。S-0313 のスタッフ用メモの［更新］。2026-10-19 追加）。
-     *
-     * アドバイスの［更新］とは別のルート・別のフォーム（スタッフ用メモだけを保存し、アドバイス・公開の状態・最終更新〔アドバイスの〕は変えない。
-     * 逆にアドバイスの［更新］ではスタッフ用メモを変えない）。10,000 文字以内。改行は LF にそろえてから数える（アドバイスと同じ）。
-     * 空（空白だけを含む）なら NULL。会員様の画面には一切出さない
-     */
-    public function updateStaffMemo(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
-    {
-        $text = $request->input('staff_memo');
-        if (is_string($text)) {
-            $request->merge(['staff_memo' => str_replace(["\r\n", "\r"], "\n", $text)]);
-        }
-        $validated = $request->validate([
-            'staff_memo' => 'nullable|string|max:'.TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH,
-        ]);
-
-        $personalityDiagnosisResult->update(['staff_memo' => blank($validated['staff_memo'] ?? null) ? null : $validated['staff_memo']]);
-
-        return $this->backToShow($trainee, $personalityDiagnosisResult, 'スタッフ用メモを更新しました。');
-    }
-
-    /**
-     * アドバイスとスタッフ用メモの下書きを AI で作る（POST …/{personalityDiagnosisResult}/evaluation-draft。S-0313 の［AIで下書き］。2026-10-19 追加）。
+     * アドバイスとスタッフ用メモを AI で自動生成する（POST …/{personalityDiagnosisResult}/evaluation-draft。S-0313 の［AIで自動生成］。2026-10-19 追加。
+     * 2026-10-19 変更：ボタン名・呼び名を［AIで下書き］から変えた。メソッド・ルートの名前は変えない）。
      *
      * その場で AI を呼び（キューは使わない）、JSON の { evaluation, staff_memo, staff_memo_missing } を返す。何も保存しない
-     * （画面の JS が 2 つの欄に入れ、トレーナーがそれぞれ［更新］で保存する）。公開済みでも作れる。何度でも作れる。
+     * （画面の JS が 2 つの欄に入れ、トレーナーが 1 つの［更新］で保存する）。公開済みでも作れる。何度でも作れる。
      * 失敗したら 502 と決まった文だけを返す（細かい原因はログにだけ。EvaluationDraftGenerator の実装が残す）。
      * AI の会社は EvaluationDraftGenerator の実装で決まる（今は Claude）。アクセスログには記録しない
      */
@@ -201,7 +194,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
         try {
             $draft = $generator->generate($personalityDiagnosisResult);
         } catch (EvaluationDraftFailedException) {
-            return response()->json(['message' => 'AIの下書きを作れませんでした。時間をおいてもう一度お試しください。'], 502);
+            return response()->json(['message' => 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。'], 502);
         }
 
         return response()->json([
@@ -212,22 +205,78 @@ class TraineePersonalityDiagnosisResultController extends Controller
     }
 
     /**
-     * アドバイスの入力を確かめて、保存する値を返す（更新と公開で同じ決まり。2026-10-18 に保存から切り出した）。
+     * アドバイスとスタッフ用メモの入力を確かめて、保存する値を返す（更新と公開で同じ決まり。2026-10-18 に保存から切り出した。
+     * 2026-10-19 変更：スタッフ用メモも一緒に確かめる）。
      *
-     * - 改行は LF にそろえてから数える（愛犬アンケートの自由記述と同じ。ブラウザは改行を 1 文字と数えるため）。10,000 文字以内
-     * - 空（空白だけを含む）なら null（なし）。公開では必須（空なら入力エラー）
+     * - 改行は LF にそろえてから数える（ブラウザは改行を 1 文字と数えるため）。どちらも 10,000 文字以内
+     * - 空（空白だけを含む）なら null。アドバイスは公開では必須（空なら入力エラー）
+     * - スタッフ用メモのキーが送られてこなければ、3 つ目を false にして返す（変えない）
+     *
+     * @return array{0: ?string, 1: ?string, 2: bool} [アドバイス, スタッフ用メモ, スタッフ用メモが送られてきたか]
      */
-    private function validateEvaluationText(Request $request, bool $required): ?string
+    private function validateTexts(Request $request, bool $evaluationRequired): array
     {
-        $text = $request->input('evaluation_text');
-        if (is_string($text)) {
-            $request->merge(['evaluation_text' => str_replace(["\r\n", "\r"], "\n", $text)]);
+        foreach (['evaluation_text', 'staff_memo'] as $key) {
+            $value = $request->input($key);
+            if (is_string($value)) {
+                $request->merge([$key => str_replace(["\r\n", "\r"], "\n", $value)]);
+            }
         }
         $validated = $request->validate([
-            'evaluation_text' => ($required ? 'required' : 'nullable').'|string|max:'.TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH,
+            'evaluation_text' => ($evaluationRequired ? 'required' : 'nullable').'|string|max:'.TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH,
+            'staff_memo' => 'nullable|string|max:'.TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH,
         ]);
 
-        return blank($validated['evaluation_text'] ?? null) ? null : $validated['evaluation_text'];
+        $text = blank($validated['evaluation_text'] ?? null) ? null : $validated['evaluation_text'];
+        $memo = blank($validated['staff_memo'] ?? null) ? null : $validated['staff_memo'];
+
+        return [$text, $memo, $request->exists('staff_memo')];
+    }
+
+    /**
+     * アドバイスとスタッフ用メモを保存し、変わった方だけアクセスログを残す（［更新］。2026-10-19 追加）。
+     * アドバイスの最終更新は、アドバイスが変わったときだけ変える。アドバイスが変わったかを返す
+     */
+    private function saveTexts(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $result, ?string $text, ?string $memo, bool $hasMemo): bool
+    {
+        $evaluationChanged = $result->evaluation_text !== $text;
+        $memoChanged = $hasMemo && $result->staff_memo !== $memo;
+
+        $attributes = [];
+        if ($evaluationChanged) {
+            $attributes += ['evaluation_text' => $text, 'evaluation_updated_by' => auth()->id(), 'evaluation_updated_at' => now()];
+        }
+        if ($memoChanged) {
+            $attributes['staff_memo'] = $memo;
+        }
+        if ($attributes !== []) {
+            $result->update($attributes);
+        }
+        $this->logEdits($request, $trainee, $evaluationChanged, $memoChanged);
+
+        return $evaluationChanged;
+    }
+
+    /**
+     * アドバイス・スタッフ用メモの編集のアクセスログを、変わった方だけ残す（2026-10-19 追加。種類は今までのもの。
+     * 対象・IP・ブラウザの残し方は LogAccess ミドルウェアと同じ。対象はトレーニー）
+     */
+    private function logEdits(Request $request, Trainee $trainee, bool $evaluationChanged, bool $memoChanged): void
+    {
+        $actions = array_keys(array_filter([
+            'edit_trainee_personality_diagnosis_evaluation' => $evaluationChanged,
+            'edit_trainee_personality_diagnosis_staff_memo' => $memoChanged,
+        ]));
+        foreach ($actions as $action) {
+            AccessLog::create([
+                'trainer_id' => auth()->id(),
+                'action' => $action,
+                'target_type' => 'Trainee',
+                'target_id' => $trainee->id,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr($request->userAgent() ?? '', 0, 500),
+            ]);
+        }
     }
 
     /**

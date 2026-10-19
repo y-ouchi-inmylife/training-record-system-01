@@ -308,14 +308,14 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->postJson($this->draftUrl($result, $this->trainee))->assertNotFound();
     }
 
-    public function test_AIの失敗のときは決まった文のエラーを返す(): void
+    public function test_AIの失敗のときは決まった文のエラーを返す_AIで自動生成できませんでした(): void
     {
         $result = $this->makeResult();
         $this->fakeGenerator(new EvaluationDraftFailedException('timeout'));
 
         $this->postJson($this->draftUrl($result))
             ->assertStatus(502)
-            ->assertExactJson(['message' => 'AIの下書きを作れませんでした。時間をおいてもう一度お試しください。']);
+            ->assertExactJson(['message' => 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。']);
         $this->assertNull($result->fresh()->evaluation_text);
     }
 
@@ -329,30 +329,31 @@ class PersonalityEvaluationDraftTest extends TestCase
             ->assertExactJson(['evaluation' => '全部お客様用', 'staff_memo' => '', 'staff_memo_missing' => true]);
     }
 
-    // ---- スタッフ用メモの保存 ----
+    // ---- スタッフ用メモの保存（2026-10-19 変更：アドバイスと同じ［更新］〔PUT …/{result}〕で保存する。その前は PUT …/staff-memo） ----
 
-    private function staffMemoUrl(TraineePersonalityDiagnosisResult $result): string
+    private function updateUrl(TraineePersonalityDiagnosisResult $result): string
     {
-        return route('trainee-personality-diagnosis-results.staff-memo.update', [$this->trainee, $result]);
+        return route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]);
     }
 
-    public function test_スタッフ用メモを保存できアドバイスは変わらない(): void
+    public function test_スタッフ用メモは更新で保存し空にするとNULL(): void
     {
         $result = $this->makeResult();
         $result->update(['evaluation_text' => 'アドバイス', 'evaluation_updated_at' => '2026-10-18 10:00:00', 'evaluation_updated_by' => 200]);
 
-        $this->put($this->staffMemoUrl($result), ['staff_memo' => "メモ\r\n2行目"])
+        $this->put($this->updateUrl($result), ['evaluation_text' => 'アドバイス', 'staff_memo' => "メモ\r\n2行目"])
             ->assertRedirect(route('trainee-personality-diagnosis-results.show', [$this->trainee, $result]))
-            ->assertSessionHas('success', 'スタッフ用メモを更新しました。');
+            ->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。');
 
         $fresh = $result->fresh();
         $this->assertSame("メモ\n2行目", $fresh->staff_memo);
         $this->assertSame('アドバイス', $fresh->evaluation_text);
+        // アドバイスは変わっていないので最終更新は変えず、記録はスタッフ用メモの編集だけ
         $this->assertSame('2026-10-18 10:00:00', $fresh->evaluation_updated_at->format('Y-m-d H:i:s'));
-        $this->assertSame('edit_trainee_personality_diagnosis_staff_memo', DB::table('access_logs')->value('action'));
+        $this->assertSame(['edit_trainee_personality_diagnosis_staff_memo'], DB::table('access_logs')->pluck('action')->all());
 
         // 空にすると NULL
-        $this->put($this->staffMemoUrl($result), ['staff_memo' => '  ']);
+        $this->put($this->updateUrl($result), ['evaluation_text' => 'アドバイス', 'staff_memo' => '  ']);
         $this->assertNull($result->fresh()->staff_memo);
     }
 
@@ -360,12 +361,12 @@ class PersonalityEvaluationDraftTest extends TestCase
     {
         $result = $this->makeResult();
 
-        $this->put($this->staffMemoUrl($result), ['staff_memo' => str_repeat('あ', 10000)])->assertSessionHasNoErrors();
-        $this->put($this->staffMemoUrl($result), ['staff_memo' => str_repeat('あ', 10001)])->assertSessionHasErrors('staff_memo');
+        $this->put($this->updateUrl($result), ['evaluation_text' => '', 'staff_memo' => str_repeat('あ', 10000)])->assertSessionHasNoErrors();
+        $this->put($this->updateUrl($result), ['evaluation_text' => '', 'staff_memo' => str_repeat('あ', 10001)])->assertSessionHasErrors('staff_memo');
         $this->assertSame(10000, mb_strlen($result->fresh()->staff_memo));
     }
 
-    public function test_アドバイスの更新ではスタッフ用メモが変わらない(): void
+    public function test_スタッフ用メモを送らなければスタッフ用メモは変わらない(): void
     {
         $result = $this->makeResult();
         $result->update(['staff_memo' => 'メモ']);

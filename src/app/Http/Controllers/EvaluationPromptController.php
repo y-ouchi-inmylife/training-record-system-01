@@ -11,7 +11,7 @@ use Illuminate\View\View;
 /**
  * 愛犬性格診断のアドバイスのプロンプト設定（2026-10-19 追加。設計書 S-0602）。要約プロンプト（SummaryPromptController）と同じ作り。
  *
- * S-0313 の［AIで下書き］で AI に渡す指示文を、管理者が直す。値は system_settings の evaluation_prompt_current。
+ * S-0313 の［AIで自動生成］（2026-10-19 変更：その前は［AIで下書き］）で AI に渡す指示文を、管理者が直す。値は system_settings の evaluation_prompt_current。
  * 保存したことがなければ、画面には既定の指示文（PersonalityEvaluationPrompt::DEFAULT_TEMPLATE）を出す
  */
 class EvaluationPromptController extends Controller

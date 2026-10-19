@@ -12,6 +12,7 @@ use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\AssertsPersonalityDiagnosisName;
 use Tests\Concerns\CreatesClientCountTables;
@@ -124,14 +125,31 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $result->update(['evaluation_text' => $text, 'evaluation_published_at' => $at, 'evaluation_published_by' => 200]);
     }
 
-    /** アドバイスのカード */
+    /** アドバイスとスタッフ用メモのカード（2026-10-19 変更：2 つのカードを 1 つにまとめた。カードの終わりは 50 問の回答のカードの手前） */
     private function evaluationCard(string $html): string
     {
         $start = strpos($html, 'data-personality-diagnosis-evaluation');
         $this->assertNotFalse($start);
 
-        // アドバイスのカードの終わり（2026-10-19 変更：すぐ下にスタッフ用メモのカードを置いた）
-        return substr($html, $start, strpos($html, 'data-personality-diagnosis-staff-memo', $start) - $start);
+        return substr($html, $start, strpos($html, 'data-personality-diagnosis-answers', $start) - $start);
+    }
+
+    /** カードの中のアドバイスのまとまり（小見出し「アドバイス」の行と入力欄。スタッフ用メモのまとまりの手前まで） */
+    private function evaluationSection(string $card): string
+    {
+        $start = strpos($card, 'data-evaluation-section');
+        $this->assertNotFalse($start);
+
+        return substr($card, $start, strpos($card, 'data-personality-diagnosis-staff-memo', $start) - $start);
+    }
+
+    /** カードの中のスタッフ用メモのまとまり */
+    private function staffMemoSection(string $card): string
+    {
+        $start = strpos($card, 'data-personality-diagnosis-staff-memo');
+        $this->assertNotFalse($start);
+
+        return substr($card, $start);
     }
 
     /** 画面の下の「最終更新」の文（前後の空白を除く）。出ていなければ null */
@@ -144,13 +162,21 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         return $m[1];
     }
 
-    /** アドバイスのカードの見出しの行（card-header の中） */
+    /** カードの見出しの行（card-header の中） */
     private function evaluationHeader(string $card): string
     {
         $start = strpos($card, '<div class="card-header');
         $this->assertNotFalse($start);
 
         return substr($card, $start, strpos($card, '<div class="card-body">') - $start);
+    }
+
+    /** HTML の中のボタンの文字（出てくる順） */
+    private function buttonLabels(string $html): array
+    {
+        preg_match_all('/<button[^>]*>([^<]*)<\/button>/u', $html, $m);
+
+        return array_map('trim', $m[1]);
     }
 
     /** レーダーチャートの canvas の data-personality-radar（JSON を戻したもの） */
@@ -161,9 +187,16 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         return json_decode(html_entity_decode($m[1][0], ENT_QUOTES), true);
     }
 
+    /** ［更新］（アドバイスだけを送る。スタッフ用メモのキーがなければスタッフ用メモは変えない） */
     private function update(TraineePersonalityDiagnosisResult $result, mixed $text)
     {
         return $this->from($this->url($result))->put(route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]), ['evaluation_text' => $text]);
+    }
+
+    /** ［更新］（画面と同じく、アドバイスとスタッフ用メモを両方送る。2026-10-19 追加） */
+    private function updateBoth(TraineePersonalityDiagnosisResult $result, mixed $text, mixed $memo)
+    {
+        return $this->from($this->url($result))->put(route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]), ['evaluation_text' => $text, 'staff_memo' => $memo]);
     }
 
     // ---- URL と表示 ----
@@ -189,7 +222,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // 2026-10-19 変更：会員様向けの文は「アドバイス」と呼ぶ（その前は「評価文」）。カードの見出し・入力欄の名前・確認のモーダル・
         // お知らせのどこにも「評価文」は出さない
         $this->assertStringNotContainsString('評価文', $html);
-        $this->assertMatchesRegularExpression('/<h6 class="mb-0">アドバイス<\/h6>/u', $html);
+        $this->assertMatchesRegularExpression('/<h6 class="mb-0">アドバイスとスタッフ用メモ<\/h6>/u', $html);
         // タイプは「・」のあとでだけ折り返す
         $this->assertStringContainsString('data-personality-diagnosis-type>愛情たっぷり・<wbr>甘えん坊タイプ</p>', $html);
         // 7 項目の点数（1 行の表）。見出しはカテゴリの順
@@ -386,22 +419,28 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]).'" novalidate id="evaluation-form" data-evaluation-form>', $card);
         $this->assertStringContainsString('name="_method" value="PUT"', $card);
         $this->assertMatchesRegularExpression('/<textarea class="form-control " id="evaluation_text" name="evaluation_text"\s*rows="12" maxlength="10000"><\/textarea>/u', $card);
-        $this->assertStringContainsString('<label for="evaluation_text" class="visually-hidden">アドバイス</label>', $card);
+        // 見える小見出し「アドバイス」を入力欄の label にする（2026-10-19 変更：その前は見えない label）
+        $this->assertStringContainsString('<label for="evaluation_text" class="fw-bold mb-0">アドバイス</label>', $card);
+        $this->assertStringNotContainsString('visually-hidden">アドバイス<', $card);
         // ボタンの名前は［更新］（2026-10-18 変更：その前は［保存］）。［更新］はフォームの外（カードの見出しの行）にあり、
-        // form 属性でアドバイスのフォームを送る
+        // form 属性でフォーム（アドバイスとスタッフ用メモ）を送る
         $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $card);
         $this->assertStringNotContainsString('>保存</button>', $card);
-        // 見出しの行：「アドバイス」→ すぐ右にバッジ → 右に［更新］［公開］（2026-10-18 変更：その前はテキストエリアの上の行）
+        // カードの見出しの行：「アドバイスとスタッフ用メモ」→ 右に［AIで自動生成］［更新］（2026-10-19 変更：カードを 1 つにまとめた）
         $header = $this->evaluationHeader($card);
-        $this->assertStringContainsString('<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">', $header);
-        $this->assertLessThan(strpos($header, 'data-evaluation-status>'), strpos($header, '<h6 class="mb-0">アドバイス</h6>'));
-        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, 'data-evaluation-status>'));
-        $this->assertLessThan(strpos($header, '>公開</button>'), strpos($header, '>更新</button>'));
+        $this->assertMatchesRegularExpression('/<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">\s*<h6 class="mb-0">アドバイスとスタッフ用メモ<\/h6>/u', $header);
         $this->assertStringContainsString('<div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>', $header);
+        $this->assertSame(['AIで自動生成', '更新'], $this->buttonLabels($header));
         // 大きさは通常（ほかのカードの見出しのボタンと同じ。btn-sm にしない）
-        $this->assertStringNotContainsString('btn-sm', $header);
-        // テキストエリアの上のボタンの行はなくした（ボタンは見出しの行だけ）
-        $this->assertStringNotContainsString('<button', substr($card, strpos($card, '<div class="card-body">')));
+        $this->assertStringNotContainsString('btn-sm', $card);
+        // アドバイスの小見出しの行：「アドバイス」→ すぐ右にバッジ → 行の右に［公開］
+        $section = $this->evaluationSection($card);
+        $this->assertLessThan(strpos($section, 'data-evaluation-status>'), strpos($section, '>アドバイス</label>'));
+        $this->assertLessThan(strpos($section, '>公開</button>'), strpos($section, 'data-evaluation-status>'));
+        $this->assertStringContainsString('<div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-publish-buttons>', $section);
+        $this->assertSame(['公開'], $this->buttonLabels($section));
+        // ［更新］はカードに 1 つだけ
+        $this->assertSame(1, substr_count($card, '>更新</button>'));
         $this->assertStringNotContainsString('最終更新', $card);
         // 公開した日は公開済みのときだけ
         $this->assertStringNotContainsString('data-evaluation-published-on', $card);
@@ -417,7 +456,8 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $response = $this->update($result, "落ち着いた性格です。\r\nお散歩が好きです。");
 
         $response->assertRedirect($this->url($result));
-        $response->assertSessionHas('success', 'アドバイスを更新しました。');
+        // 2026-10-19 変更：［更新］を 1 つにまとめたので、完了メッセージは「アドバイスとスタッフ用メモを更新しました。」
+        $response->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。');
         $saved = $result->fresh();
         // 改行は LF にそろえる
         $this->assertSame("落ち着いた性格です。\nお散歩が好きです。", $saved->evaluation_text);
@@ -501,13 +541,16 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $html = $this->page($result);
         $card = $this->evaluationCard($html);
         $header = $this->evaluationHeader($card);
+        $section = $this->evaluationSection($card);
 
-        // 見出しの行：「アドバイス」→ バッジ「公開済み」→ 公開した日 → 右に［更新］［公開取消］
-        $this->assertStringContainsString('<span class="badge bg-success" data-evaluation-status>公開済み</span>', $header);
-        $this->assertStringContainsString('<span class="text-muted small" data-evaluation-published-on>2026/10/18 公開</span>', $header);
-        $this->assertLessThan(strpos($header, 'data-evaluation-published-on'), strpos($header, 'data-evaluation-status'));
-        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, 'data-evaluation-published-on'));
-        $this->assertLessThan(strpos($header, '>公開取消</button>'), strpos($header, '>更新</button>'));
+        // アドバイスの小見出しの行：「アドバイス」→ バッジ「公開済み」→ 公開した日 → 行の右に［公開取消］。
+        // カードの見出しの行には［AIで自動生成］［更新］（2026-10-19 変更：カードを 1 つにまとめた）
+        $this->assertStringContainsString('<span class="badge bg-success" data-evaluation-status>公開済み</span>', $section);
+        $this->assertStringContainsString('<span class="text-muted small" data-evaluation-published-on>2026/10/18 公開</span>', $section);
+        $this->assertLessThan(strpos($section, 'data-evaluation-published-on'), strpos($section, 'data-evaluation-status'));
+        $this->assertLessThan(strpos($section, '>公開取消</button>'), strpos($section, 'data-evaluation-published-on'));
+        $this->assertSame(['公開取消'], $this->buttonLabels($section));
+        $this->assertSame(['AIで自動生成', '更新'], $this->buttonLabels($header));
         $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $header);
         // テキストエリアのまま直せる（2026-10-18 変更：その前は表示だけで、作った記録へのリンク）
         $this->assertStringContainsString(">公開した文\n2 行目</textarea>", $card);
@@ -527,7 +570,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $response = $this->update($result, '直した文');
 
         $response->assertRedirect($this->url($result));
-        $response->assertSessionHas('success', 'アドバイスを更新しました。会員様のマイページにも反映されています。');
+        $response->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。会員様のマイページにも反映されています。');
         $saved = $result->fresh();
         $this->assertSame('直した文', $saved->evaluation_text);
         $this->assertSame('公開済み', $saved->evaluation_status_label);
@@ -617,7 +660,8 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->unpublish($result);
 
         $logs = AccessLog::query()->orderBy('id')->get();
-        $this->assertSame(['publish_trainee_personality_diagnosis_evaluation', 'unpublish_trainee_personality_diagnosis_evaluation'], $logs->pluck('action')->all());
+        // 公開の前に欄の文を保存し、アドバイスが変わったので編集の記録も残す（2026-10-19 変更：保存してから公開する）
+        $this->assertSame(['edit_trainee_personality_diagnosis_evaluation', 'publish_trainee_personality_diagnosis_evaluation', 'unpublish_trainee_personality_diagnosis_evaluation'], $logs->pluck('action')->all());
         foreach ($logs as $log) {
             $this->assertSame('Trainee', $log->target_type);
             $this->assertSame($this->trainee->id, (int) $log->target_id);
@@ -863,55 +907,64 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertNull($result->fresh()->evaluation_text);
     }
 
-    // ---- ［AIで下書き］とスタッフ用メモ（2026-10-19 追加。設計書 S-0313） ----
+    // ---- ［AIで自動生成］とスタッフ用メモ（2026-10-19 追加。設計書 S-0313。2026-10-19 変更：その前は［AIで下書き］・2 つのカード） ----
 
-    public function test_AIで下書きのボタンは更新の左で青の枠線(): void
+    public function test_AIで自動生成のボタンはカードの見出しの行の更新の左で青の枠線(): void
     {
         $result = $this->addResult('past-1', '2026-10-15 10:30:00');
 
         $header = $this->evaluationHeader($this->evaluationCard($this->page($result)));
 
         $this->assertMatchesRegularExpression(
-            '/<button type="button" class="btn btn-outline-primary" data-evaluation-draft\s*data-url="'.preg_quote(route('trainee-personality-diagnosis-results.evaluation-draft', [$this->trainee, $result]), '/').'">AIで下書き<\/button>/u',
+            '/<button type="button" class="btn btn-outline-primary" data-evaluation-draft\s*data-url="'.preg_quote(route('trainee-personality-diagnosis-results.evaluation-draft', [$this->trainee, $result]), '/').'">AIで自動生成<\/button>/u',
             $header
         );
-        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, '>AIで下書き</button>'));
+        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, '>AIで自動生成</button>'));
     }
 
-    public function test_スタッフ用メモの欄はアドバイスの下で会員様には表示されないの文と緑の更新(): void
+    public function test_スタッフ用メモは同じカードのアドバイスの下で会員様には表示されないの文と結び付く(): void
     {
         $result = $this->addResult('past-1', '2026-10-15 10:30:00');
         $result->update(['staff_memo' => 'メモの文']);
 
         $html = $this->page($result);
+        $card = $this->evaluationCard($html);
 
-        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-staff-memo'), strpos($html, 'data-personality-diagnosis-evaluation'));
-        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-answers'), strpos($html, 'data-personality-diagnosis-staff-memo'));
-        $card = substr($html, strpos($html, 'data-personality-diagnosis-staff-memo'));
-        $card = substr($card, 0, strpos($card, 'data-personality-diagnosis-answers'));
-        $this->assertStringContainsString('<h6 class="mb-0">スタッフ用メモ</h6>', $card);
-        $this->assertStringContainsString('<button type="submit" form="staff-memo-form" class="btn btn-success">更新</button>', $card);
-        // 「（会員様には表示されません）」は見出しのすぐ右（見出しの行の中）。本文には出さない（2026-10-19 変更：その前は本文の上）。
-        // 見た目はアドバイスの欄の「YYYY/MM/DD 公開」と同じ text-muted small
-        $header = substr($card, 0, strpos($card, '<div class="card-body">'));
-        $body = substr($card, strpos($card, '<div class="card-body">'));
+        // カードは 1 つ（2026-10-19 変更：その前はスタッフ用メモのカードが別にあり、［更新］も別だった）
+        $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-evaluation'));
+        $this->assertStringNotContainsString('<h6 class="mb-0">スタッフ用メモ</h6>', $html);
+        $this->assertStringNotContainsString('staff-memo-form', $html);
+        $memo = $this->staffMemoSection($card);
+        $this->assertLessThan(strpos($card, 'data-personality-diagnosis-staff-memo'), strpos($card, 'data-evaluation-section'));
+        // 2 つのまとまりのあいだは薄い線と空き
+        $this->assertStringContainsString('<div class="border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>', $card);
+        // 小見出し「スタッフ用メモ」は入力欄の label。すぐ右に「（会員様には表示されません）」（text-muted small）
         $this->assertMatchesRegularExpression(
-            '/<div class="d-flex flex-wrap align-items-center gap-2">\s*<h6 class="mb-0">スタッフ用メモ<\/h6>\s*'
+            '/<div class="d-flex flex-wrap align-items-center gap-2 mb-2">\s*<label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ<\/label>\s*'
             .'<span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）<\/span>\s*<\/div>/u',
-            $header
+            $memo
         );
-        $this->assertStringNotContainsString('会員様には表示されません', $body);
-        $this->assertSame(1, substr_count($card, '（会員様には表示されません）'));
-        // 全角の括弧で括り、文の終わりの「。」は付けない（2026-10-19 変更：その前は「会員様には表示されません。」）
-        $this->assertStringNotContainsString('会員様には表示されません。', $card);
-        $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.staff-memo.update', [$this->trainee, $result]).'"', $card);
-        // 入力欄の説明として、見出しの右の文を読み上げで結び付ける（aria-describedby）
-        $this->assertMatchesRegularExpression('/<textarea class="form-control " id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"\s*rows="6" maxlength="10000">メモの文<\/textarea>/u', $card);
-        // 公開・公開取消はない
-        $this->assertStringNotContainsString('公開', $card);
+        $this->assertSame(1, substr_count($html, '（会員様には表示されません）'));
+        $this->assertStringNotContainsString('会員様には表示されません。', $html);
+        // 入力欄は同じフォーム（PUT …/{result}）の中。説明として、小見出しの右の文を読み上げで結び付ける（aria-describedby）
+        $this->assertMatchesRegularExpression('/<textarea class="form-control " id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"\s*rows="6" maxlength="10000">メモの文<\/textarea>/u', $memo);
+        $form = substr($card, strpos($card, '<form '), strpos($card, '</form>') - strpos($card, '<form '));
+        $this->assertStringContainsString('name="staff_memo"', $form);
+        $this->assertStringContainsString('name="evaluation_text"', $form);
+        // スタッフ用メモのまとまりにボタンはない（公開・公開取消・更新はない）
+        $this->assertSame([], $this->buttonLabels($memo));
     }
 
-    public function test_AIの下書きの確かめのモーダルとお知らせの置き場所(): void
+    public function test_スタッフ用メモだけを保存していたルートはない(): void
+    {
+        // 2026-10-19 変更：PUT …/staff-memo は外した（［更新］で両方まとめて保存する）
+        $this->assertFalse(Route::has('trainee-personality-diagnosis-results.staff-memo.update'));
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+        $this->put($this->url($result).'/staff-memo', ['staff_memo' => 'メモ'])->assertNotFound();
+        $this->assertNull($result->fresh()->staff_memo);
+    }
+
+    public function test_AIで自動生成の確かめのモーダルとお知らせの置き場所と文(): void
     {
         $result = $this->addResult('past-1', '2026-10-15 10:30:00');
 
@@ -919,21 +972,28 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $modal = substr($html, strpos($html, 'data-evaluation-draft-confirm>'));
         $modal = substr($modal, 0, strpos($modal, '</div>', strpos($modal, 'modal-footer')) + 6);
-        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで下書き</h5>', $modal);
-        $this->assertStringContainsString('<p class="mb-0">アドバイスとスタッフ用メモを、AIの下書きで置き換えます。よろしいですか？</p>', $modal);
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで自動生成</h5>', $modal);
+        $this->assertStringContainsString('<p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した文で置き換えます。よろしいですか？</p>', $modal);
         // ［キャンセル］は灰色の塗り（2026-10-19 変更：この画面のほかの確認のモーダルの［キャンセル］とそろえた。その前は赤の枠線）
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える<\/button>/u', $modal);
         $this->assertStringNotContainsString('btn-outline-danger', $modal);
-        // お知らせはアドバイスのカードの上（最初は出さない）
+        // お知らせはカードの上（最初は出さない）
         $this->assertStringContainsString('<div class="alert d-none" role="status" data-evaluation-draft-notice></div>', $html);
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-evaluation'), strpos($html, 'data-evaluation-draft-notice'));
         // ブラウザの confirm は使わない
         $this->assertStringNotContainsString('confirm(', $html);
         // 画面のスクリプトの文
-        $this->assertStringContainsString("'作成中…'", $html);
-        $this->assertStringContainsString('AIの下書きを入れました。内容を確かめて、アドバイスとスタッフ用メモをそれぞれ［更新］で保存してください。', $html);
+        // 2026-10-19 変更：ボタン名を［AIで自動生成］にし、文もそろえた（その前は「作成中…」「AIの下書きを…」）
+        $this->assertStringContainsString("'生成中…'", $html);
+        $this->assertStringContainsString('AIで自動生成した文を入れました。内容を確かめて、［更新］で保存してください。', $html);
         $this->assertStringContainsString('スタッフ用メモは作れませんでした。', $html);
-        $this->assertStringContainsString('AIの下書きを作れませんでした。時間をおいてもう一度お試しください。', $html);
+        $this->assertStringContainsString('AIで自動生成できませんでした。時間をおいてもう一度お試しください。', $html);
+        foreach (['AIで下書き', 'AIの下書き', '作成中…', 'それぞれ［更新］'] as $old) {
+            $this->assertStringNotContainsString($old, $html, $old);
+        }
+        // 状態のバッジの「下書き」（公開していないアドバイス）は AI とは別の意味なので変えない
+        $result->update(['evaluation_text' => '下書きの文']);
+        $this->assertStringContainsString('<span class="badge bg-warning text-dark" data-evaluation-status>下書き</span>', $this->page($result));
     }
 
     public function test_確かめのモーダルのキャンセルはどれも灰色の塗り(): void
@@ -990,7 +1050,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-life'), strpos($html, '<h6 class="mb-0">結果</h6>'));
         $this->assertLessThan(strpos($html, 'data-evaluation-draft-notice'), strpos($html, 'data-personality-diagnosis-life'));
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-staff-memo'), strpos($html, 'data-personality-diagnosis-evaluation'));
-        $this->assertStringContainsString('<h6 class="mb-0">スタッフ用メモ</h6>', $html);
+        $this->assertStringContainsString('<h6 class="mb-0">アドバイスとスタッフ用メモ</h6>', $html);
 
         $card = $this->lifeCard($html);
         $questions = PersonalityDiagnosisQuestions::lifeQuestions();
@@ -1014,5 +1074,154 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $this->assertSame(4, substr_count($card, '>（未回答）</dd>'));
         $this->assertStringNotContainsString('pre-wrap', $card);
+    }
+
+    // ---- ［更新］を 1 つにまとめた（2026-10-19 変更。設計書 S-0313「アドバイスとスタッフ用メモのカード」） ----
+
+    /** @return list<string> */
+    private function logActions(): array
+    {
+        return AccessLog::query()->orderBy('id')->pluck('action')->all();
+    }
+
+    public function test_更新で両方を保存し両方変わればアドバイスとスタッフ用メモの記録を両方残す(): void
+    {
+        Carbon::setTestNow('2026-10-19 09:00:00');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $this->updateBoth($result, "アドバイス\r\n2 行目", "メモ\r\n2 行目")
+            ->assertRedirect($this->url($result))
+            ->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。');
+
+        $saved = $result->fresh();
+        $this->assertSame("アドバイス\n2 行目", $saved->evaluation_text);
+        $this->assertSame("メモ\n2 行目", $saved->staff_memo);
+        $this->assertSame('2026-10-19 09:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+        $this->assertSame(['edit_trainee_personality_diagnosis_evaluation', 'edit_trainee_personality_diagnosis_staff_memo'], $this->logActions());
+        foreach (AccessLog::query()->get() as $log) {
+            $this->assertSame('Trainee', $log->target_type);
+            $this->assertSame($this->trainee->id, (int) $log->target_id);
+            $this->assertSame(200, (int) $log->trainer_id);
+        }
+        $this->assertSame('愛犬性格診断スタッフ用メモ編集', AccessLog::actionLabels()['edit_trainee_personality_diagnosis_staff_memo']);
+    }
+
+    public function test_スタッフ用メモだけ変えたらスタッフ用メモの記録だけで最終更新は変えない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '元の文', 'evaluation_updated_by' => 200, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
+        Carbon::setTestNow('2026-10-19 09:00:00');
+
+        $this->updateBoth($result, '元の文', '新しいメモ')->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。');
+
+        $saved = $result->fresh();
+        $this->assertSame('新しいメモ', $saved->staff_memo);
+        $this->assertSame('2026-10-17 09:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+        $this->assertSame(['edit_trainee_personality_diagnosis_staff_memo'], $this->logActions());
+    }
+
+    public function test_アドバイスだけ変えたらアドバイスの記録だけ(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['staff_memo' => 'メモ']);
+
+        $this->updateBoth($result, '新しいアドバイス', 'メモ');
+
+        $this->assertSame('新しいアドバイス', $result->fresh()->evaluation_text);
+        $this->assertSame(['edit_trainee_personality_diagnosis_evaluation'], $this->logActions());
+    }
+
+    public function test_どちらも変えなければ記録を残さず最終更新も変えない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '文', 'staff_memo' => 'メモ', 'evaluation_updated_by' => 200, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
+        Carbon::setTestNow('2026-10-19 09:00:00');
+
+        $this->updateBoth($result, '文', 'メモ')->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。');
+
+        $this->assertSame([], $this->logActions());
+        $this->assertSame('2026-10-17 09:00:00', $result->fresh()->evaluation_updated_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_公開中にスタッフ用メモだけ変えたときは会員様への反映を伝えない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result, '公開した文');
+
+        $this->updateBoth($result, '公開した文', 'メモ')->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。');
+        $this->updateBoth($result, '直した文', 'メモ')->assertSessionHas('success', 'アドバイスとスタッフ用メモを更新しました。会員様のマイページにも反映されています。');
+    }
+
+    public function test_スタッフ用メモは10000字までで超えたらどちらも保存しない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+
+        $this->updateBoth($result, '文', str_repeat('あ', 10001))
+            ->assertSessionHasErrors(['staff_memo' => 'スタッフ用メモは10000文字以内で入力してください。']);
+        $this->assertNull($result->fresh()->evaluation_text);
+        $this->assertNull($result->fresh()->staff_memo);
+
+        $this->updateBoth($result, '文', str_repeat('あ', 10000))->assertSessionHasNoErrors();
+        $this->assertSame(10000, mb_strlen($result->fresh()->staff_memo));
+    }
+
+    public function test_公開中のアドバイスは空にできずスタッフ用メモも保存しない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result, '公開した文');
+
+        $this->updateBoth($result, '', '新しいメモ')
+            ->assertSessionHasErrors(['evaluation_text' => '公開中のアドバイスは空にできません。公開を取り消してから消してください。']);
+        $this->assertSame('公開した文', $result->fresh()->evaluation_text);
+        $this->assertNull($result->fresh()->staff_memo);
+        $this->assertSame([], $this->logActions());
+    }
+
+    public function test_公開すると直したままの2つの文を保存してから公開する(): void
+    {
+        Carbon::setTestNow('2026-10-19 10:00:00');
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '保存した文', 'staff_memo' => '保存したメモ']);
+
+        $this->from($this->url($result))->post(route('trainee-personality-diagnosis-results.publish', [$this->trainee, $result]), [
+            'evaluation_text' => "直したまま\r\nの文", 'staff_memo' => '直したままのメモ',
+        ])->assertSessionHas('success', 'アドバイスを公開しました。');
+
+        $saved = $result->fresh();
+        $this->assertSame("直したまま\nの文", $saved->evaluation_text);
+        $this->assertSame('直したままのメモ', $saved->staff_memo);
+        $this->assertSame('2026-10-19 10:00:00', $saved->evaluation_published_at->format('Y-m-d H:i:s'));
+        $this->assertSame(['edit_trainee_personality_diagnosis_evaluation', 'edit_trainee_personality_diagnosis_staff_memo', 'publish_trainee_personality_diagnosis_evaluation'], $this->logActions());
+    }
+
+    public function test_公開の確認のモーダルはスタッフ用メモの欄の文も送る(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '下書き']);
+
+        $html = $this->page($result);
+
+        $form = substr($html, strpos($html, 'data-evaluation-publish-form>'));
+        $form = substr($form, 0, strpos($form, '</form>'));
+        $this->assertStringContainsString('<input type="hidden" name="evaluation_text" value="">', $form);
+        $this->assertStringContainsString('<input type="hidden" name="staff_memo" value="">', $form);
+        $this->assertStringContainsString("publishForm.querySelector('input[name=\"staff_memo\"]').value = memoField.value;", $html);
+    }
+
+    public function test_公開取消は直しかけの文を保存しない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result, '公開した文');
+        $result->update(['staff_memo' => '保存したメモ']);
+
+        $this->post(route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, $result]), [
+            'evaluation_text' => '直しかけ', 'staff_memo' => '直しかけのメモ',
+        ])->assertSessionHas('success', '愛犬性格診断の公開を取り消しました。');
+
+        $saved = $result->fresh();
+        $this->assertSame('公開した文', $saved->evaluation_text);
+        $this->assertSame('保存したメモ', $saved->staff_memo);
+        $this->assertNull($saved->evaluation_published_at);
+        $this->assertSame(['unpublish_trainee_personality_diagnosis_evaluation'], $this->logActions());
     }
 }

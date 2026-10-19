@@ -50,6 +50,9 @@ class EvaluationPromptSettingsTest extends TestCase
         }
         $this->assertStringContainsString('お客様用とスタッフ用は「#####」で分けて出すよう指示してください', $html);
         $this->assertStringContainsString('（「#####」の前がアドバイス、後ろがスタッフ用メモの欄に入ります）', $html);
+        // ［AIで自動生成］の指示書であること（2026-10-19 変更：その前は［AIで下書き］・「…の下書きを作る際の…」）
+        $this->assertStringContainsString('詳細の［AIで自動生成］で、AI がアドバイスとスタッフ用メモを自動生成する際の「指示書」です。', $html);
+        $this->assertStringNotContainsString('下書き', $html);
         // 既定の指示文の呼び名と欄の対応（2026-10-19 追加）
         $this->assertStringContainsString('<p class="mb-2" data-evaluation-prompt-mapping>既定の指示文の「お客様用レポート」がアドバイスの欄、「スタッフ用メモ」がスタッフ用メモの欄に入ります。</p>', $html);
         // 「評価文」とは呼ばない（2026-10-19 変更：アドバイスと呼ぶことにした。画面の題・メニュー・案内とも）
