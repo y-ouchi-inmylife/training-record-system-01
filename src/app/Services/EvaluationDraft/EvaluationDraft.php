@@ -66,10 +66,38 @@ final class EvaluationDraft
         return implode("\n", $lines);
     }
 
-    /** 後始末をしてから前後の空白・改行を取る */
+    /** 最初の行から外す呼び名（指示文の中の呼び名。2026-10-19 追加） */
+    public const LABELS = ['お客様用レポート', 'お客様用', 'スタッフ用指示書', 'スタッフ用メモ'];
+
+    /**
+     * 念のための後始末（2026-10-19 追加）。AI が指示文の呼び名（「お客様用レポート」など）を見出しとして書いたときのために、
+     * 最初の行（先頭の空の行は飛ばす）が呼び名だけの行なら外す。呼び名の前後の飾り（【】「」『』＜＞<>:：と空白）は許す。
+     * 最初の行だけを見る（本文の途中・呼び名のあとに文が続く行・2 行目以降の呼び名は外さない）。外したあと先頭に残った空の行も取る。
+     * Markdown の後始末（stripMarkdown）のあとに呼ぶ（「## お客様用レポート」「**スタッフ用メモ**」でも外れるように）
+     */
+    public static function stripLeadingLabel(string $text): string
+    {
+        $text = self::trimStart($text);
+        $lines = preg_split('/\R/u', $text, 2);
+        $decoration = '[【】「」『』＜＞<>:：\s\x{3000}]*';
+        $labels = implode('|', array_map(fn (string $label) => preg_quote($label, '/'), self::LABELS));
+        if (preg_match('/\A'.$decoration.'(?:'.$labels.')'.$decoration.'\z/u', $lines[0])) {
+            return self::trimStart($lines[1] ?? '');
+        }
+
+        return $text;
+    }
+
+    /** 後始末をしてから前後の空白・改行を取る（順番：Markdown の後始末 → 呼び名の行を外す → 前後の空白を取る） */
     private static function clean(string $text): string
     {
-        return self::trim(self::stripMarkdown($text));
+        return self::trim(self::stripLeadingLabel(self::stripMarkdown($text)));
+    }
+
+    /** 先頭の空白・改行（全角の空白も）を取る */
+    private static function trimStart(string $text): string
+    {
+        return preg_replace('/\A[\s\x{3000}]+/u', '', $text);
     }
 
     /** 前後の空白・改行（全角の空白も）を取る */

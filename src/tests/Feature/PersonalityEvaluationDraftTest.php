@@ -307,14 +307,62 @@ class PersonalityEvaluationDraftTest extends TestCase
     {
         $draft = EvaluationDraft::fromResponse("## お客様用レポート\n**モモちゃん**は慎重派です。\n- 散歩を楽しむ\n---\n#####\n## スタッフ用メモ\n* 吠えに注意\n");
 
-        $this->assertSame("お客様用レポート\nモモちゃんは慎重派です。\n・散歩を楽しむ", $draft->evaluation);
-        $this->assertSame("スタッフ用メモ\n・吠えに注意", $draft->staffMemo);
+        // 最初の行の呼び名の見出しも外れる（2026-10-19 変更：その前は「お客様用レポート」「スタッフ用メモ」の行が残っていた）
+        $this->assertSame("モモちゃんは慎重派です。\n・散歩を楽しむ", $draft->evaluation);
+        $this->assertSame('・吠えに注意', $draft->staffMemo);
         $this->assertFalse($draft->staffMemoMissing);
 
         // 区切りがないときも全部に後始末をする
         $draft = EvaluationDraft::fromResponse("# 見出し\n- 項目\n");
         $this->assertSame("見出し\n・項目", $draft->evaluation);
         $this->assertTrue($draft->staffMemoMissing);
+    }
+
+    // ---- 呼び名の行を外す（2026-10-19 追加：AI が指示文の呼び名を見出しとして書き、会員様の画面に出てしまうため） ----
+
+    public function test_最初の行が呼び名だけなら外し先頭の空の行も取る(): void
+    {
+        $cases = [
+            'お客様用レポート', '【お客様用レポート】', 'お客様用レポート：', 'お客様用レポート:', '「お客様用レポート」', '『お客様用』',
+            '＜スタッフ用メモ＞', '<スタッフ用メモ>', 'スタッフ用指示書', '　【 スタッフ用メモ 】　', 'お客様用',
+        ];
+        foreach ($cases as $label) {
+            $this->assertSame("本文の1行目\n本文の2行目", EvaluationDraft::stripLeadingLabel($label."\n\n　\n本文の1行目\n本文の2行目"), $label);
+        }
+        // 先頭の空の行は飛ばして最初の行を見る
+        $this->assertSame('本文', EvaluationDraft::stripLeadingLabel("\n\n【お客様用レポート】\n本文"));
+        // 呼び名だけの返事なら空になる
+        $this->assertSame('', EvaluationDraft::stripLeadingLabel("スタッフ用メモ\n"));
+    }
+
+    public function test_呼び名の行はMarkdownの記号が付いていても外れる(): void
+    {
+        foreach (['## お客様用レポート', '**スタッフ用メモ**', '# 【お客様用レポート】', '### **スタッフ用指示書**：'] as $label) {
+            $draft = EvaluationDraft::fromResponse($label."\n本文です。\n#####\n".$label."\nメモです。");
+            $this->assertSame('本文です。', $draft->evaluation, $label);
+            $this->assertSame('メモです。', $draft->staffMemo, $label);
+            $this->assertFalse($draft->staffMemoMissing, $label);
+        }
+    }
+
+    public function test_呼び名の行を外すのは最初の行の呼び名だけの行に限る(): void
+    {
+        $texts = [
+            // 文が続く最初の行
+            "お客様用レポートとして、モモちゃんの様子をまとめます。\n本文",
+            "お客様用レポート：モモちゃんは慎重派です。\n本文",
+            '【お客様用レポート】モモちゃんは慎重派です。',
+            // 本文の途中の呼び名・2 行目以降の呼び名の行
+            'モモちゃんは慎重派です。お客様用レポートの続きです。',
+            "モモちゃんは慎重派です。\nお客様用レポート\n本文",
+            "【見出し】\nスタッフ用メモ\n本文",
+            // 呼び名に似た別の言葉
+            "お客様用のレポート\n本文",
+            "スタッフ用メモ欄\n本文",
+        ];
+        foreach ($texts as $text) {
+            $this->assertSame($text, EvaluationDraft::stripLeadingLabel($text), $text);
+        }
     }
 
     // ---- Claude に渡すもの（2026-10-19 追加。SDK の HTTP の送り手を差し替え、外部の AI は呼ばない） ----
@@ -329,6 +377,7 @@ class PersonalityEvaluationDraftTest extends TestCase
         $body = json_decode((string) $requests[0]['request']->getBody(), true);
         $this->assertSame(PersonalityEvaluationPrompt::FORMAT_RULES, $body['system']);
         $this->assertSame([['role' => 'user', 'content' => PersonalityEvaluationPrompt::render($result)]], $body['messages']);
+        $this->assertStringContainsString('などの呼び名を見出しとして書かず、それぞれ本文から書き始めてください。', $body['system']);
         $this->assertStringStartsWith('ドッグトレーナーとして、', $body['messages'][0]['content']);
         $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $body['messages'][0]['content']);
         $this->assertStringNotContainsString('プレーンテキスト', $body['messages'][0]['content']);
@@ -359,6 +408,7 @@ class PersonalityEvaluationDraftTest extends TestCase
             ."・出力は普通の文章（プレーンテキスト）で書き、Markdown の記号（#、*、**、-、---、>、表など）は使わないでください。\n"
             ."・見出しが必要なときは「【】」で囲んでください。\n"
             ."・箇条書きが必要なときは、行の頭に「・」を付けてください。\n"
+            ."・「お客様用レポート」「スタッフ用指示書」「スタッフ用メモ」などの呼び名を見出しとして書かず、それぞれ本文から書き始めてください。\n"
             .'・お客様用レポートとスタッフ用メモの区切りの「#####」だけは、そのまま出力してください。',
             PersonalityEvaluationPrompt::FORMAT_RULES
         );

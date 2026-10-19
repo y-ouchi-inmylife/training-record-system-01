@@ -63,6 +63,8 @@ class EvaluationPromptSettingsTest extends TestCase
         $this->assertStringContainsString('<p class="fw-bold mb-1" id="evaluation-format-rules-heading">書式の決まり</p>', $html);
         $this->assertStringContainsString('<p class="small text-muted mb-2">次の書式の決まりは、指示文とは別に毎回 AI に渡します。ここでは変更できません。</p>', $html);
         $this->assertStringContainsString('data-evaluation-format-rules-text>'.e(PersonalityEvaluationPrompt::FORMAT_RULES).'</div>', $html);
+        // 呼び名を見出しとして書かない決まり（2026-10-19 追加）も出る
+        $this->assertStringContainsString('・「お客様用レポート」「スタッフ用指示書」「スタッフ用メモ」などの呼び名を見出しとして書かず、それぞれ本文から書き始めてください。', $html);
         $form = substr($html, strpos($html, '<form id="evaluationPromptForm"'));
         $form = substr($form, 0, strpos($form, '</form>'));
         $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $form);
