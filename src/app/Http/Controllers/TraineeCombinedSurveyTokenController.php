@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Trainee;
+use App\Services\SurveyMypageRegistrationService;
 use App\Services\TraineeCombinedSurveyTokenService;
 use App\Support\CombinedSurveyName;
 use App\Support\InvitationMessage;
@@ -25,9 +26,18 @@ class TraineeCombinedSurveyTokenController extends Controller
      * 愛犬アンケート＆愛犬性格診断の案内を発行する（POST /trainees/{trainee}/combined-survey-tokens）。
      * 回答待ちの案内（どちらの種類でも）があれば発行せず、単独の発行と同じエラーの知らせを出す
      */
-    public function store(Request $request, Trainee $trainee, TraineeCombinedSurveyTokenService $service): RedirectResponse
+    public function store(Request $request, Trainee $trainee, TraineeCombinedSurveyTokenService $service, SurveyMypageRegistrationService $mypage): RedirectResponse
     {
-        $token = $service->issue($trainee, $request->user());
+        // 「マイページ登録の案内も発行する」がオンなら、同じトランザクションでマイページ登録の案内も用意して結び付ける
+        // （2026-10-19 追加。要件定義書 6-16-18。付けられない会員〔利用中・登録待ち（初回設定）〕なら何もしない）
+        [$token, $mypageResult] = DB::transaction(function () use ($request, $trainee, $service, $mypage) {
+            $token = $service->issue($trainee, $request->user());
+            $mypageResult = $token !== null && $request->boolean('with_mypage_registration')
+                ? $mypage->attach($token, $trainee, $request->user())
+                : null;
+
+            return [$token, $mypageResult];
+        });
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
 
@@ -35,7 +45,7 @@ class TraineeCombinedSurveyTokenController extends Controller
             return $redirect->with('error', $trainee->display_name.'には、すでに案内中の案内があります。');
         }
 
-        return $redirect->with('success', $trainee->display_name.'の'.CombinedSurveyName::name().'の案内を発行しました。');
+        return $redirect->with('success', $trainee->display_name.'の'.CombinedSurveyName::name().'の案内を発行しました。'.SurveyMypageRegistrationService::completionNote($mypageResult));
     }
 
     /**

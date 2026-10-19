@@ -92,6 +92,8 @@ trait CreatesClientCountTables
             // 続けて答える愛犬性格診断の案内（2026-10-19 追加。愛犬アンケート＆愛犬性格診断の案内。NULL は単独の案内）。
             // 愛犬性格診断の案内の表を作らないテストもあるので、外部キーは付けない
             $table->unsignedBigInteger('trainee_personality_diagnosis_token_id')->nullable();
+            // 回答を終えた完了の画面で誘導するマイページ登録の案内（2026-10-19 追加。NULL は誘導しない）。外部キーは付けない
+            $table->unsignedBigInteger('client_email_registration_token_id')->nullable();
             $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
             $table->timestamps();
@@ -136,6 +138,8 @@ trait CreatesClientCountTables
             $table->string('token', 64)->unique();
             $table->unsignedBigInteger('trainee_id');
             $table->foreign('trainee_id')->references('id')->on('trainees')->cascadeOnDelete();
+            // 回答を終えた完了の画面で誘導するマイページ登録の案内（2026-10-19 追加。NULL は誘導しない）。外部キーは付けない
+            $table->unsignedBigInteger('client_email_registration_token_id')->nullable();
             $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
             $table->timestamps();

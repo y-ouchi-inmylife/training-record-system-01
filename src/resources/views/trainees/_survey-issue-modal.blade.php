@@ -12,7 +12,10 @@
      - 種類はラジオボタン。開いたときはどちらも選ばない（どちらを出すかを毎回選んでもらうため。間違えると、取消してからでないと
        もう一方を出せない）。選ぶまで［発行する］は押せない。種類を選ぶと送信先を、選んだ種類の今の発行のルートに切り替える
      - 発行の確認のモーダルはもともとないので、このモーダルが確認を兼ねる。押したらボタンを押せなくして二重送信を防ぐ
-     - ［キャンセル］はほかの確認のモーダルと同じグレーの白抜き --}}
+     - ［キャンセル］はほかの確認のモーダルと同じグレーの白抜き
+     - 「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18）：会員のマイページが「未登録」「登録待ち」（期限切れも）の
+       ときだけ、選択肢の下に出す（$client は会員詳細の会員。状態は ClientController::show で読み込み済み）。開くたびにオフに戻す。
+       オンで発行すると、マイページ登録の案内も用意し、お客様が回答を終えた完了の画面でマイページの登録へ誘導する。3 つの種類のどれでも使える --}}
 <div class="modal fade" id="surveyIssueModal" tabindex="-1"
      aria-labelledby="surveyIssueModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -39,6 +42,14 @@
                             <label class="form-check-label" for="surveyIssueKindCombined">{{ \App\Support\CombinedSurveyName::name() }}</label>
                         </div>
                     </fieldset>
+                    @if(\App\Services\SurveyMypageRegistrationService::canAttach($client))
+                        <div class="form-check mt-3 pt-3 border-top" data-survey-issue-mypage>
+                            <input class="form-check-input" type="checkbox" name="with_mypage_registration" value="1" id="surveyIssueWithMypage"
+                                   aria-describedby="surveyIssueWithMypageHelp">
+                            <label class="form-check-label" for="surveyIssueWithMypage">マイページ登録の案内も発行する</label>
+                            <div class="form-text" id="surveyIssueWithMypageHelp">回答のあと、マイページの登録をご案内します。</div>
+                        </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
@@ -80,8 +91,12 @@
         const button = event.relatedTarget;
         traineeId = button ? button.getAttribute('data-survey-issue-trainee-id') : null;
         nameEl.textContent = button ? button.getAttribute('data-survey-issue-trainee-name') : '';
-        // 開くたびにどちらも選ばない状態に戻す
+        // 開くたびにどちらも選ばない状態に戻す（マイページ登録の案内のチェックもオフに戻す。2026-10-19 追加）
         radios.forEach(function (radio) { radio.checked = false; });
+        const mypageEl = formEl.querySelector('input[name="with_mypage_registration"]');
+        if (mypageEl) {
+            mypageEl.checked = false;
+        }
         updateAction();
     });
     radios.forEach(function (radio) { radio.addEventListener('change', updateAction); });

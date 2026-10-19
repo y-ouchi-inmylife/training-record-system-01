@@ -9,6 +9,7 @@ use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\TraineeIntakeSurveyToken;
 use App\Models\TraineePersonalityDiagnosisToken;
 use App\Support\ClientMypageLink;
+use App\Support\MypageRegistrationInvite;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -158,10 +159,12 @@ class IntakeSurveyController extends Controller
 
         // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加）。
         // 完了の画面はトークンを持たないので、ここで判定してフラッシュで渡す
-        $traineeId = TraineeIntakeSurveyToken::query()->where('token', $token)->value('trainee_id');
+        $tokenRecord = TraineeIntakeSurveyToken::query()->where('token', $token)->first();
 
         return redirect()->route('client-portal.intake-survey.thanks')
-            ->with('showMypageLink', ClientMypageLink::shouldShow($traineeId));
+            ->with('showMypageLink', ClientMypageLink::shouldShow($tokenRecord?->trainee_id))
+            // マイページ登録へのお誘い（2026-10-19 追加。結び付けたマイページ登録の案内がまだ使えるときだけ）
+            ->with('mypageRegistrationUrl', MypageRegistrationInvite::url($tokenRecord));
     }
 
     /**
@@ -172,6 +175,7 @@ class IntakeSurveyController extends Controller
     {
         return view('client.intake-survey.thanks', [
             'showMypageLink' => (bool) session('showMypageLink', false),
+            'mypageRegistrationUrl' => session('mypageRegistrationUrl'),
         ]);
     }
 

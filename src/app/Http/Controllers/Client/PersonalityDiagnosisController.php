@@ -8,6 +8,7 @@ use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\TraineePersonalityDiagnosisToken;
 use App\Support\ClientMypageLink;
+use App\Support\MypageRegistrationInvite;
 use App\Support\PersonalityDiagnosisQuestions;
 use App\Support\PersonalityDiagnosisScorer;
 use Illuminate\Contracts\View\View;
@@ -112,10 +113,13 @@ class PersonalityDiagnosisController extends Controller
 
         // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加。愛犬アンケートと同じ）。
         // 完了の画面はトークンを持たないので、ここで判定してフラッシュで渡す
-        $traineeId = TraineePersonalityDiagnosisToken::query()->where('token', $token)->value('trainee_id');
+        $tokenRecord = TraineePersonalityDiagnosisToken::query()->where('token', $token)->first();
 
         return redirect()->route('client-portal.personality-diagnosis.thanks')
-            ->with('showMypageLink', ClientMypageLink::shouldShow($traineeId));
+            ->with('showMypageLink', ClientMypageLink::shouldShow($tokenRecord?->trainee_id))
+            // マイページ登録へのお誘い（2026-10-19 追加。結び付けたマイページ登録の案内がまだ使えるときだけ。
+            // 愛犬アンケート＆愛犬性格診断は、最後のこの画面だけに出す）
+            ->with('mypageRegistrationUrl', MypageRegistrationInvite::url($tokenRecord));
     }
 
     /**
@@ -126,6 +130,7 @@ class PersonalityDiagnosisController extends Controller
     {
         return view('client.personality-diagnosis.thanks', [
             'showMypageLink' => (bool) session('showMypageLink', false),
+            'mypageRegistrationUrl' => session('mypageRegistrationUrl'),
         ]);
     }
 

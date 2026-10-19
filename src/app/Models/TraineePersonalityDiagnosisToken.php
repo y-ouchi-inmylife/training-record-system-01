@@ -30,6 +30,7 @@ class TraineePersonalityDiagnosisToken extends Model
     protected $fillable = [
         'token',
         'trainee_id',
+        'client_email_registration_token_id',
         'expires_at',
         'answered_at',
         'created_by',
@@ -52,6 +53,15 @@ class TraineePersonalityDiagnosisToken extends Model
     public function trainee(): BelongsTo
     {
         return $this->belongsTo(Trainee::class);
+    }
+
+    /**
+     * 回答を終えた完了の画面で誘導するマイページ登録の案内（2026-10-19 追加。要件定義書 6-16-18。付けずに発行したなら null。
+     * 相手が消えたら列は NULL になる）。結び付けは App\Services\SurveyMypageRegistrationService
+     */
+    public function emailRegistrationToken(): BelongsTo
+    {
+        return $this->belongsTo(ClientEmailRegistrationToken::class, 'client_email_registration_token_id');
     }
 
     /**

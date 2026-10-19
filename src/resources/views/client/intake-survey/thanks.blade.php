@@ -24,6 +24,9 @@
         </div>
     </div>
 
+    {{-- マイページ登録へのお誘い（2026-10-19 追加。出すときだけ） --}}
+    @include('client._mypage-registration-invite', ['url' => $mypageRegistrationUrl ?? null])
+
     @include('client._mypage-back-link')
 
     @if($companyName)

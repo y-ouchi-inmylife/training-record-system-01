@@ -3,13 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Models\ClientEmailRegistrationToken;
+use App\Services\ClientEmailRegistrationTokenService;
 use App\Support\InvitationMessage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * メールアドレス登録用 URL の発行コントローラ（トレーナー側の操作）
@@ -43,42 +42,11 @@ class ClientEmailRegistrationTokenController extends Controller
      *
      * 設計書: requirements.md 6-3-6 備考「発行のあとの戻り先」
      */
-    public function store(Client $client): RedirectResponse
+    public function store(Client $client, ClientEmailRegistrationTokenService $service): RedirectResponse
     {
-        $issued = DB::transaction(function () use ($client) {
-            Client::query()->whereKey($client->id)->lockForUpdate()->first();
-
-            // 有効な案内がすでにあれば、何も作らず・消さない
-            $hasActive = $client->emailRegistrationTokens()
-                ->where('is_used', false)
-                ->unexpired()
-                ->exists();
-            if ($hasActive) {
-                return false;
-            }
-
-            // 対象クライアントの未使用メールアドレス登録用トークン（期限切れ）を物理削除
-            $client->emailRegistrationTokens()
-                ->where('is_used', false)
-                ->delete();
-
-            // 対象クライアントの未使用ログイン用リンクも物理削除
-            // 発行し直したときに送信済みログイン用リンクも無効化するため
-            $client->loginLinkTokens()
-                ->where('is_used', false)
-                ->delete();
-
-            // 新しいトークンを 1 件作成。有効期限は設定値の日数後の日の終わり（ハードコード禁止。2026-10-18 変更：日の終わりにした）
-            ClientEmailRegistrationToken::create([
-                'token' => Str::random(32),
-                'client_id' => $client->id,
-                'expires_at' => ClientEmailRegistrationToken::expiresAtForNewToken(),
-                'is_used' => false,
-                'created_by' => Auth::id(),
-            ]);
-
-            return true;
-        });
+        // 発行の処理は ClientEmailRegistrationTokenService に移した（2026-10-19。愛犬アンケート・愛犬性格診断の案内の発行と一緒に使うため）。
+        // 有効な案内がすでにあれば作らない（2 つ目の値が false）
+        [, $issued] = $service->activeOrIssue($client, Auth::id());
 
         $redirect = redirect()->route('clients.show', $client);
 

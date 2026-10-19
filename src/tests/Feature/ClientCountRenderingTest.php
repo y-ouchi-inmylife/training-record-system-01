@@ -2347,4 +2347,37 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6[^>]*><a[^>]*>ポチ<\/a>/u', $html);
         $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6[^>]*><a[^>]*>タマ<\/a>/u', $html);
     }
+
+    // ---- 案内の発行のモーダルの「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18） ----
+
+    public function test_マイページが未登録か登録待ちならチェックボックスを出し利用中と登録待ち初回設定なら出さない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+        $html = fn () => $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $checkbox = '<input class="form-check-input" type="checkbox" name="with_mypage_registration" value="1" id="surveyIssueWithMypage"';
+
+        // 未登録（メールアドレスなし・案内なし）：最初はオフで、説明の一言を添える
+        $page = $html();
+        $this->assertStringContainsString($checkbox, $page);
+        $this->assertDoesNotMatchRegularExpression('/id="surveyIssueWithMypage"[^>]*checked/u', $page);
+        $this->assertStringContainsString('<label class="form-check-label" for="surveyIssueWithMypage">マイページ登録の案内も発行する</label>', $page);
+        $this->assertStringContainsString('回答のあと、マイページの登録をご案内します。', $page);
+
+        // 登録待ち（期限内）・登録待ち（期限切れ）
+        $tokenId = DB::table('client_email_registration_tokens')->insertGetId(['client_id' => $client->id, 'is_used' => false, 'expires_at' => '2026-10-26 23:59:59']);
+        $this->assertStringContainsString($checkbox, $html());
+        DB::table('client_email_registration_tokens')->where('id', $tokenId)->update(['expires_at' => '2026-10-18 23:59:59']);
+        $this->assertStringContainsString($checkbox, $html());
+
+        // 登録待ち（初回設定）：メールアドレスを入れて登録の途中
+        DB::table('clients')->where('id', $client->id)->update(['email' => 'a@example.com']);
+        $this->assertStringNotContainsString('with_mypage_registration" value', $html());
+
+        // 利用中
+        DB::table('clients')->where('id', $client->id)->update(['password' => 'x']);
+        $this->assertStringNotContainsString('with_mypage_registration" value', $html());
+    }
 }
