@@ -1224,4 +1224,71 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertNull($saved->evaluation_published_at);
         $this->assertSame(['unpublish_trainee_personality_diagnosis_evaluation'], $this->logActions());
     }
+
+    // ---- 公開の確認の 2 行目と、公開のときの最終更新（2026-10-19 変更。設計書 S-0313-M01） ----
+
+    public function test_公開の確認のモーダルに現在の編集内容が保存されることを書きほかのモーダルは今のまま(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '下書き']);
+        $this->actingAsRole('admin');
+
+        $html = $this->page($result);
+
+        $publish = substr($html, strpos($html, 'data-personality-diagnosis-publish>'));
+        $publish = substr($publish, 0, strpos($publish, 'modal-footer'));
+        $this->assertMatchesRegularExpression(
+            '/<p class="mb-0">会員のマイページに愛犬性格診断を公開しますか？<\/p>\s*<p class="mb-0 mt-2" data-evaluation-publish-saves>現在の編集内容は保存されます。<\/p>/u',
+            $publish
+        );
+        $this->assertSame(1, substr_count($html, '現在の編集内容は保存されます。'));
+        // M04・M02 は今のまま（公開取消 M03 は公開済みのときだけ。下で見る）
+        $draft = substr($html, strpos($html, 'data-evaluation-draft-confirm>'));
+        $draft = substr($draft, 0, strpos($draft, 'modal-footer'));
+        $this->assertMatchesRegularExpression('/<div class="modal-body">\s*<p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した文で置き換えます。よろしいですか？<\/p>\s*<\/div>/u', $draft);
+        $delete = substr($html, strpos($html, 'data-personality-diagnosis-delete>'));
+        $this->assertStringNotContainsString('現在の編集内容', substr($delete, 0, strpos($delete, 'modal-footer')));
+
+        $this->markPublished($result);
+        $html = $this->page($result);
+        $unpublish = substr($html, strpos($html, 'data-personality-diagnosis-unpublish>'));
+        $unpublish = substr($unpublish, 0, strpos($unpublish, 'modal-footer'));
+        $this->assertMatchesRegularExpression('/<div class="modal-body">\s*<p class="mb-0">会員のマイページから愛犬性格診断の公開を取り消しますか？<\/p>\s*<\/div>/u', $unpublish);
+        $this->assertStringNotContainsString('現在の編集内容', $html);
+    }
+
+    public function test_文を変えずに公開すると最終更新は変えず公開した日は入る(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '保存した文', 'evaluation_updated_by' => 999, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
+        Carbon::setTestNow('2026-10-19 10:00:00');
+
+        $this->publish($result, '保存した文')->assertSessionHas('success', 'アドバイスを公開しました。');
+
+        $saved = $result->fresh();
+        $this->assertSame('2026-10-17 09:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+        $this->assertSame(999, (int) $saved->evaluation_updated_by);
+        $this->assertSame('2026-10-19 10:00:00', $saved->evaluation_published_at->format('Y-m-d H:i:s'));
+        // 画面の最終更新も前のまま、公開した日は今日
+        $html = $this->page($saved);
+        $this->assertSame('最終更新: 2026/10/17 09:00', $this->updatedLine($html));
+        $this->assertStringContainsString('<span class="text-muted small" data-evaluation-published-on>2026/10/19 公開</span>', $html);
+        // アドバイスは変わっていないので編集の記録は残さない
+        $this->assertSame(['publish_trainee_personality_diagnosis_evaluation'], AccessLog::query()->orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_文を直して公開すると最終更新も変わる(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '保存した文', 'evaluation_updated_by' => 999, 'evaluation_updated_at' => '2026-10-17 09:00:00']);
+        Carbon::setTestNow('2026-10-19 10:00:00');
+
+        $this->publish($result, '直した文');
+
+        $saved = $result->fresh();
+        $this->assertSame('直した文', $saved->evaluation_text);
+        $this->assertSame('2026-10-19 10:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+        $this->assertSame(200, (int) $saved->evaluation_updated_by);
+        $this->assertSame('最終更新: 2026/10/19 10:00 佐藤', $this->updatedLine($this->page($saved)));
+    }
 }

@@ -270,6 +270,8 @@
                     </div>
                     <div class="modal-body">
                         <p class="mb-0">会員のマイページに{{ $pdName }}を公開しますか？</p>
+                        {{-- 2026-10-19 追加：［公開する］で 2 つの欄の今の文を保存してから公開することを伝える（1 行目と同じ大きさ・色。間を少し空ける） --}}
+                        <p class="mb-0 mt-2" data-evaluation-publish-saves>現在の編集内容は保存されます。</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>

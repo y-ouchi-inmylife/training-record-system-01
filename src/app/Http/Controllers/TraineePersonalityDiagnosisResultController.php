@@ -120,10 +120,11 @@ class TraineePersonalityDiagnosisResultController extends Controller
             $evaluationChanged = $result->evaluation_text !== $text;
             $memoChanged = $hasMemo && $result->staff_memo !== $memo;
             $now = now();
+            // アドバイスの最終更新は、［更新］と同じくアドバイスの文が変わったときだけ変える（2026-10-19 変更：最終更新を「文を直した日」に
+            // そろえた。その前は公開するたびに入れていた）。公開した日時・公開したトレーナーは公開するたびに入れる
             $result->update([
                 'evaluation_text' => $text,
-                'evaluation_updated_by' => auth()->id(),
-                'evaluation_updated_at' => $now,
+                ...($evaluationChanged ? ['evaluation_updated_by' => auth()->id(), 'evaluation_updated_at' => $now] : []),
                 'evaluation_published_at' => $now,
                 'evaluation_published_by' => auth()->id(),
                 ...($hasMemo ? ['staff_memo' => $memo] : []),
