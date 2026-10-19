@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\DashboardController;
 use App\Models\Client;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\Trainer;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\CreatesClientCountTables;
@@ -16,7 +18,8 @@ use Tests\TestCase;
  * トレーナー側のダッシュボード（S-0201）の「最近の愛犬性格診断」（2026-10-20 追加。要件定義書 6-2-1）。
  * アドバイスの公開し忘れがひと目で分かるように、最近のトレーニング記録の上に、すべての診断の結果を出す。
  *
- * - 期間で絞らない。20 件ずつのページ送り（ページの番号は diagnoses_page）。2026-10-20 変更：その前は過去 30 日のものだけ
+ * - 期間で絞らない。5 件ずつ（DashboardController::DIAGNOSES_PER_PAGE）のページ送り（ページの番号は diagnoses_page。見た目は S-0402 と同じ）。
+ *   2026-10-20 変更：その前は過去 30 日のものだけ。同じ日に、ページ送りを 20 件ずつから 5 件ずつにした
  * - 並びは回答日時の新しい順。アドバイスの状態は S-0313 と同じバッジ（列の名前は「アドバイス」）。
  *   未公開（なし・下書き）があれば、すべての診断の中の件数を見出しに出す
  * - 見せる範囲は最近のトレーニング記録と同じ（役割で変えない。「主担当のみ」は効かない）
@@ -164,19 +167,22 @@ class DashboardRecentDiagnosesTest extends TestCase
         return $results;
     }
 
-    public function test_20件ずつのページ送りで21件なら2ページ目に1件(): void
+    public function test_1ページの件数より1件多ければ2ページ目に1件(): void
     {
-        $results = $this->addMany(21);
+        // 5 件ずつ（2026-10-20 変更：その前は 20 件ずつ）。件数はコントローラーの定数 1 か所で決める
+        $perPage = DashboardController::DIAGNOSES_PER_PAGE;
+        $this->assertSame(5, $perPage);
+        $results = $this->addMany($perPage + 1);
         $this->actingAsRole();
 
         $html = $this->dashboard();
         $rows = $this->rows($html);
-        $this->assertCount(20, $rows);
+        $this->assertCount($perPage, $rows);
         $this->assertStringContainsString($this->showUrl($results[0]), $rows[0]);
-        $this->assertStringContainsString($this->showUrl($results[19]), $rows[19]);
-        // ページ送りはほかの一覧と同じ共通のビュー（全N件中 a〜b件）。ページの番号は diagnoses_page
+        $this->assertStringContainsString($this->showUrl($results[$perPage - 1]), $rows[$perPage - 1]);
+        // ページの番号は diagnoses_page
         $this->assertStringContainsString('data-recent-diagnoses-pagination', $html);
-        $this->assertStringContainsString('全21件中 1〜20件', $html);
+        $this->assertStringContainsString('全6件中 1〜5件', $html);
         $this->assertStringContainsString(route('dashboard').'?diagnoses_page=2', $html);
         $this->assertStringNotContainsString('?page=2', $html);
         // ページ送りは表のあと、最近のトレーニング記録の前
@@ -186,25 +192,45 @@ class DashboardRecentDiagnosesTest extends TestCase
         $page2 = $this->dashboard('?diagnoses_page=2');
         $rows2 = $this->rows($page2);
         $this->assertCount(1, $rows2);
-        $this->assertStringContainsString($this->showUrl($results[20]), $rows2[0]);
-        $this->assertStringContainsString('全21件中 21〜21件', $page2);
+        $this->assertStringContainsString($this->showUrl($results[$perPage]), $rows2[0]);
+        $this->assertStringContainsString('全6件中 6〜6件', $page2);
     }
 
-    public function test_20件以下ならページ送りを出さない(): void
+    public function test_ページ送りはトレーニング記録一覧と同じ共通のビューで包まずに出す(): void
     {
-        $this->addMany(20);
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1);
         $this->actingAsRole();
 
         $html = $this->dashboard();
 
-        $this->assertCount(20, $this->rows($html));
+        // S-0402 と同じ共通のページ送りのビュー（vendor/pagination/bootstrap-5）を、同じ件数・同じページで描いたものと同じ
+        $paginator = new LengthAwarePaginator(range(1, 5), 6, 5, 1, ['path' => route('dashboard'), 'pageName' => 'diagnoses_page']);
+        $this->assertMatchesRegularExpression(
+            '/<div class="mb-4" data-recent-diagnoses-pagination>\s*'.preg_quote(trim((string) $paginator->links()), '/').'\s*<\/div>/u',
+            $html
+        );
+        $this->assertStringContainsString('<nav class="d-flex flex-wrap justify-content-center align-items-center column-gap-3 row-gap-2 w-100 mb-3" aria-label="ページ送り">', $html);
+        // 表とページ送りのあいだは S-0402 と同じ（表の囲みに mb-4 を付けない）
+        $this->assertMatchesRegularExpression('/<div class="table-responsive ">\s*<table class="table table-hover" data-recent-diagnoses>/u', $html);
+    }
+
+    public function test_1ページの件数以下ならページ送りを出さない(): void
+    {
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE);
+        $this->actingAsRole();
+
+        $html = $this->dashboard();
+
+        $this->assertCount(DashboardController::DIAGNOSES_PER_PAGE, $this->rows($html));
         $this->assertStringNotContainsString('data-recent-diagnoses-pagination', $html);
-        $this->assertStringNotContainsString('全20件中', $html);
+        $this->assertStringNotContainsString('aria-label="ページ送り"', $html);
+        // ページ送りがないときは、表の下に次の欄との空き（mb-4）
+        $this->assertMatchesRegularExpression('/<div class="table-responsive mb-4">\s*<table class="table table-hover" data-recent-diagnoses>/u', $html);
     }
 
     public function test_ページを送ってもトレーニング記録の絞り込みは外れず絞り込みを変えてもページは戻らない(): void
     {
-        $this->addMany(21);
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1);
         $this->actingAsRole();
 
         // 絞り込み（主担当のみ）のままページを送る：ページ送りのリンクに recent が付き、絞り込みは「主担当のみ」のまま
@@ -221,14 +247,14 @@ class DashboardRecentDiagnosesTest extends TestCase
 
     public function test_見出しの未公開の件数はほかのページにある分も数える(): void
     {
-        // 新しい 20 件は公開済み、21 件目（2 ページ目）だけ下書き
-        $this->addMany(20, 'published');
+        // 1 ページ目の分は公開済み、2 ページ目の 1 件だけ下書き
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE, 'published');
         $this->addResult('2026-01-01 09:00:00', 'draft');
         $this->actingAsRole();
 
         $html = $this->dashboard();
 
-        $this->assertCount(20, $this->rows($html));
+        $this->assertCount(DashboardController::DIAGNOSES_PER_PAGE, $this->rows($html));
         $this->assertStringNotContainsString('下書き</span>', implode('', $this->rows($html)));
         $this->assertStringContainsString('<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断<span class="text-nowrap" data-unpublished-diagnosis-count>（未公開 1件）</span></h4>', $html);
         // 2 ページ目でも同じ（すべての診断の中の件数）

@@ -10,7 +10,7 @@
 
     {{-- 最近の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
          最近のトレーニング記録の上。見た目・行のリンク・0 件の出し方・狭い幅（横スクロール）は最近のトレーニング記録に合わせる。
-         すべての診断を公開済みも含めて出し（20 件ずつのページ送り。ほかの一覧と同じ）、アドバイスの状態は S-0313 と同じバッジ。
+         すべての診断を公開済みも含めて出し（5 件ずつのページ送り。見た目はトレーニング記録一覧 S-0402 と同じ）、アドバイスの状態は S-0313 と同じバッジ。
          未公開（なし・下書き）があれば見出しのあとに件数（すべての診断の中の数）。
          2026-10-20 変更：見出しを「最近の愛犬性格診断」、列「状態」を「アドバイス」にし、期間で絞るのをやめた。
          その前は「過去30日の愛犬性格診断」で、過去 30 日のものだけを出していた。
@@ -26,7 +26,8 @@
             愛犬性格診断はありません。
         </div>
     @else
-        <div class="table-responsive mb-4">
+        {{-- ページ送りがあるときは、表とページ送りのあいだを S-0402 と同じにする（表の既定の下の空きだけ。mb-4 は付けない） --}}
+        <div class="table-responsive {{ $recentDiagnoses->hasPages() ? '' : 'mb-4' }}">
             <table class="table table-hover" data-recent-diagnoses>
                 <thead class="table-light">
                     <tr>
@@ -51,9 +52,10 @@
                 </tbody>
             </table>
         </div>
-        {{-- ページ送り（ほかの一覧と同じ。20 件以下なら出さない） --}}
+        {{-- ページ送り（トレーニング記録一覧 S-0402 と同じ共通のビューを、包まずにそのまま出す。5 件以下なら出さない）。
+             囲みの mb-4 は、下の最近のトレーニング記録との空きを、ほかの欄のあいだと同じ 1.5rem にするため --}}
         @if($recentDiagnoses->hasPages())
-            <div class="d-flex justify-content-center mb-4" data-recent-diagnoses-pagination>
+            <div class="mb-4" data-recent-diagnoses-pagination>
                 {{ $recentDiagnoses->links() }}
             </div>
         @endif
