@@ -105,26 +105,8 @@ h2 {
     --print-band-color: #{$purple};
 }
 
-// 愛犬アンケート＆愛犬性格診断（S-0314。2026-10-19 追加）：左半分を愛犬アンケートの緑、右半分を愛犬性格診断の紫に塗り分ける。
-// 2 つの案内を 1 つにまとめたものと分かり、緑だけ・紫だけの帯（単独の案内）とも見分けがつく。白の文字とのコントラスト比はどちらの色も
-// 6.4:1 以上。右半分は ::after に、::before と同じく太い border-top を付けて塗る（印刷でも色が出る作り）。文字は塗りの上に重ねる（z-index）
-.print-band--combined {
-    --print-band-color: #{$green-600};
-
-    &::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 50%;
-        border-top: 50rem solid $purple;
-    }
-
-    .print-band-label {
-        z-index: 1;
-    }
-}
+// 愛犬アンケート＆愛犬性格診断（S-0314）は .print-band--personality と同じ紫（2026-10-19 変更：ユーザーレビューで紫だけにした。
+// その前は .print-band--combined で、左半分を緑・右半分を紫に塗り分けていた）
 
 // 塗り（::before）の上に文字とアイコンを重ねる
 .print-band-label {

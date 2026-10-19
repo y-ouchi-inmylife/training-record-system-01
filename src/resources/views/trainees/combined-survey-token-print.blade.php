@@ -15,7 +15,8 @@
     </div>
 
     {{-- 案内を見分ける帯＝ページの見出し（h1。左半分が緑・右半分が紫。アイコンはクリップボードとハート）。有効な案内がないときも出す --}}
-    <x-print-band :label="\App\Support\CombinedSurveyName::name().'のご案内'" variant="combined" icon="clipboard-heart" />
+    {{-- 帯は愛犬性格診断のご案内（S-0312）と同じ紫（2026-10-19 変更：ユーザーレビューで紫だけにした。その前は緑と紫の 2 色の combined） --}}
+    <x-print-band :label="\App\Support\CombinedSurveyName::name().'のご案内'" variant="personality" icon="clipboard-heart" />
 
     @if($url)
         @include('invitations._panels', [

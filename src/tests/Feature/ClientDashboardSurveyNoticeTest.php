@@ -395,7 +395,13 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $card = $this->card($this->open(), 'モモちゃん');
 
         $this->assertSame(['combined'], $this->noticeKinds($card));
-        $this->assertStringContainsString('<div class="c-survey-notice c-survey-notice--combined" data-client-survey-notice="combined">', $card);
+        // 色は愛犬性格診断と同じ紫のクラス（2026-10-19 変更：その前は緑と紫の 2 色の c-survey-notice--combined）
+        $this->assertStringContainsString('<div class="c-survey-notice c-survey-notice--personality" data-client-survey-notice="combined">', $card);
+        $this->assertStringNotContainsString('c-survey-notice--combined', $card);
+        // 2 色の指定（グラデーション）は、ビルドした会員側の CSS にも残っていない（2026-10-19 に外した）
+        $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+        $css = file_get_contents(public_path('build/'.$manifest['resources/sass/client.scss']['file']));
+        $this->assertStringNotContainsString('c-survey-notice--combined', $css);
         $this->assertStringContainsString('<span>愛犬アンケート＆愛犬性格診断にお答えください。</span>', $card);
         $this->assertStringContainsString(
             '<a href="'.route('client-portal.intake-survey.show', ['token' => 'intaketoken000000000000000000001']).'" class="btn btn-primary btn-sm text-nowrap">回答する</a>',

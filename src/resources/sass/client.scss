@@ -1440,19 +1440,9 @@ input[type="tel"] {
     --c-survey-notice-color: #{$purple};
     background-color: mix($purple, $mat, 8%);
 }
-// 愛犬アンケート＆愛犬性格診断（2026-10-19 追加）：ご案内の画面（S-0314）の帯と同じく、緑と紫の 2 色。左の線は上半分を緑・下半分を紫、
-// 面は左の薄い緑から右の薄い紫へ。緑だけ・紫だけの単独のお知らせと見分けがつく（文字は同じ $ink。色だけに頼らない）
-.c-survey-notice--combined {
-    border-left-color: transparent;
-    border-image: linear-gradient(to bottom, $green-600 50%, $purple 50%) 1;
-    background-color: transparent;
-    background-image: linear-gradient(to right, mix($green-600, $mat, 8%), mix($purple, $mat, 8%));
-
-    // アイコンは 1 つ目（愛犬アンケート）を緑、2 つ目（愛犬性格診断）を紫
-    .c-survey-notice-icon:last-of-type {
-        color: $purple;
-    }
-}
+// 愛犬アンケート＆愛犬性格診断のお知らせは .c-survey-notice--personality と同じ紫（ビューで personality のクラスを付ける。
+// 2026-10-19 変更：ユーザーレビューで、ご案内の画面 S-0314 の帯と同じく紫だけにした。その前は .c-survey-notice--combined で、
+// 左の線を上半分が緑・下半分が紫、面を薄い緑から薄い紫へのグラデーションにし、アイコンを緑と紫に塗り分けていた）
 // 完了の画面（S-1414・S-1416）のマイページ登録のお誘いの箇条書き（2026-10-19 追加。client/_mypage-registration-invite）。
 // 黒丸の代わりにチェックの丸の印（会員側の主な色 $brand-bright）を頭に置き、印と文を横に並べる（flex）。文が 2 行に折り返しても、
 // 2 行目は印の下に回らず文の頭にそろう。印は 1 行目の文字の高さの真ん中に置く（行の高さ 1.5 の 1 行目に合わせて少し下げる）

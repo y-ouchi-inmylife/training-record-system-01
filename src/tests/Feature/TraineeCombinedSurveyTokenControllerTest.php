@@ -250,10 +250,19 @@ class TraineeCombinedSurveyTokenControllerTest extends TestCase
         $html = $this->printPage();
 
         $this->assertStringContainsString('<title>愛犬アンケート＆愛犬性格診断のご案内', $html);
+        // 帯は愛犬性格診断のご案内（S-0312）と同じ紫のクラス（2026-10-19 変更：その前は緑と紫の 2 色の print-band--combined）。
+        // アイコン・見出しの文は今のまま
         $this->assertStringContainsString(
-            '<h1 class="print-band print-band--combined"><span class="print-band-label"><i class="bi bi-clipboard-heart" aria-hidden="true"></i>愛犬アンケート＆愛犬性格診断のご案内</span></h1>',
+            '<h1 class="print-band print-band--personality"><span class="print-band-label"><i class="bi bi-clipboard-heart" aria-hidden="true"></i>愛犬アンケート＆愛犬性格診断のご案内</span></h1>',
             $html
         );
+        $this->assertStringNotContainsString('print-band--combined', $html);
+        $this->assertStringNotContainsString('print-band--intake', $html);
+        // 2 色の塗り分けの指定は、ビルドした CSS にも残っていない（2026-10-19 に外した）
+        $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);
+        $css = file_get_contents(public_path('build/'.$manifest['resources/sass/app.scss']['file']));
+        $this->assertStringNotContainsString('print-band--combined', $css);
+        $this->assertStringContainsString('.print-band--personality{--print-band-color: #6f42c1}', $css);
         // QR コードの中身は渡すリンク（愛犬アンケートの案内のリンク）
         $this->assertStringContainsString('<canvas data-qr-url="'.$url.'" data-qr-size="280" aria-label="愛犬アンケート＆愛犬性格診断の案内の QR コード"></canvas>', $html);
 

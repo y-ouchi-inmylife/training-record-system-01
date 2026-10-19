@@ -5,10 +5,11 @@
      - 見た目は印刷した案内の帯にそろえる（愛犬アンケートは緑・clipboard-check、性格診断は紫・heart-pulse）。
        会員側は Bootstrap Icons のフォントを読み込んでいないので、アイコンは 2 つだけ SVG を直接書く（見た目の印なので読み上げない）
      - 愛犬アンケート＆愛犬性格診断（kind が combined。2026-10-19 追加）：2 つとも回答待ちのとき 1 つだけ出す。アイコンは 2 つとも並べ、
-       色は緑と紫の 2 色（ご案内の画面 S-0314 の帯に合わせる）。［回答する］は組み合わせのリンク（愛犬アンケートの案内のリンク）
+       色は愛犬性格診断と同じ紫（ご案内の画面 S-0314 の帯に合わせる。2026-10-19 変更：その前は緑と紫の 2 色の combined のクラス）。
+       ［回答する］は組み合わせのリンク（愛犬アンケートの案内のリンク）
      - スマホの幅（sm 未満）は文の下にボタン。閉じる（×）は付けない（回答すれば消えるため） --}}
 @foreach($notices as $notice)
-    <div class="c-survey-notice c-survey-notice--{{ $notice['kind'] }}" data-client-survey-notice="{{ $notice['kind'] }}">
+    <div class="c-survey-notice c-survey-notice--{{ $notice['kind'] === 'combined' ? 'personality' : $notice['kind'] }}" data-client-survey-notice="{{ $notice['kind'] }}">
         <p class="c-survey-notice-text mb-0">
             @if($notice['kind'] !== 'personality')
                 <svg class="c-survey-notice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M10.854 7.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 9.793l2.646-2.647a.5.5 0 0 1 .708 0"/><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z"/></svg>

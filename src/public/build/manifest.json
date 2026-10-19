@@ -116,7 +116,7 @@
     "isEntry": true
   },
   "resources/sass/app.scss": {
-    "file": "assets/app-ClHpeZYk.css",
+    "file": "assets/app-DxOoAJ3h.css",
     "src": "resources/sass/app.scss",
     "isEntry": true,
     "name": "app",
@@ -125,7 +125,7 @@
     ]
   },
   "resources/sass/client.scss": {
-    "file": "assets/client-DUOST6nT.css",
+    "file": "assets/client-ChKoqSBW.css",
     "src": "resources/sass/client.scss",
     "isEntry": true,
     "name": "client",
