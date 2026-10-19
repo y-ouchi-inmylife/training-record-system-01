@@ -99,10 +99,11 @@
                                 @if(Auth::user()->isAdminOnly())
                                     <li><a class="dropdown-item" href="{{ route('access-logs.index') }}">トレーナー操作履歴</a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="{{ route('settings.summary-prompts.edit') }}">要約プロンプト</a></li>
-                                    {{-- 愛犬性格診断のプロンプト（S-0602。2026-10-19 追加）。要約プロンプトのすぐ下。
-                                         2026-10-19 変更：その前は「…のアドバイスのプロンプト」 --}}
+                                    {{-- 愛犬性格診断のプロンプト（S-0602。2026-10-19 追加）。区切り線のすぐ下、要約プロンプトのすぐ上。
+                                         2026-10-19 変更：ユーザーレビューで要約プロンプトと上下を入れ替えた（その前は要約プロンプトのすぐ下）。
+                                         同じ日に、名前も変えた（その前は「…のアドバイスのプロンプト」） --}}
                                     <li><a class="dropdown-item" href="{{ route('settings.evaluation-prompts.edit') }}">{{ __('messages.personality_diagnosis_name') }}のプロンプト</a></li>
+                                    <li><a class="dropdown-item" href="{{ route('settings.summary-prompts.edit') }}">要約プロンプト</a></li>
                                 @endif
                             </ul>
                         </li>

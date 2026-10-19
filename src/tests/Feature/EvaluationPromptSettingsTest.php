@@ -75,8 +75,14 @@ class EvaluationPromptSettingsTest extends TestCase
         $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $form);
         $this->assertSame(1, substr_count($html, '<textarea'));
         $this->assertGreaterThan(strpos($html, '</form>'), strpos($html, 'data-evaluation-format-rules'));
-        // メニューの要約プロンプトのすぐ下
-        $this->assertMatchesRegularExpression('/>要約プロンプト<\\/a><\\/li>\\s*<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断のプロンプト<\\/a><\\/li>/u', $html);
+        // メニューの区切り線のすぐ下、要約プロンプトのすぐ上（2026-10-19 変更：上下を入れ替えた。その前は要約プロンプトのすぐ下）
+        $this->assertMatchesRegularExpression(
+            '/<li><a class="dropdown-item" href="'.preg_quote(route('access-logs.index'), '/').'">トレーナー操作履歴<\\/a><\\/li>\\s*<li><hr class="dropdown-divider"><\\/li>\\s*'
+            .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断のプロンプト<\\/a><\\/li>\\s*'
+            .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.summary-prompts.edit'), '/').'">要約プロンプト<\\/a><\\/li>\\s*<\\/ul>/u',
+            $html
+        );
+        $this->assertLessThan(strpos($html, '>要約プロンプト</a></li>'), strpos($html, '>愛犬性格診断のプロンプト</a></li>'));
     }
 
     public function test_一般のトレーナーとシステム管理者は開けない(): void
