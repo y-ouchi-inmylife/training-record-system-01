@@ -1167,19 +1167,20 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $html = $this->page($result);
 
-        // 結果の欄の右の列（col-xl-8）の中、点数の表のあと。見出しは置かず、区切りの線のあとに 4 問（2026-10-19 変更：その前は
-        // 「タイプ」のラベルと同じ見た目の見出しを置いていた）。4 問のまとまりには見えない名前「自由記述の質問」を付ける
+        // 結果の欄の右の列（col-xl-8）の中、点数の表のすぐあとに 4 問。見出しは置かない（2026-10-19 変更：その前は
+        // 「タイプ」のラベルと同じ見た目の見出しを置いていた）。区切りの線も引かず、空き（mt-4）だけで分ける（2026-10-19 変更：
+        // 点数の表の罫線と 2 本続いて見えたため。その前は .border-bottom の区切りの線）。4 問のまとまりには見えない名前「自由記述の質問」を付ける
         $this->assertSame(1, preg_match(
             '/<div class="col-12 col-xl-8">\s*<div class="text-muted small">タイプ<\/div>.*?data-personality-diagnosis-scores.*?<\/table>\s*<\/div>\s*'
-            .'(?:\{\{--.*?--\}\}\s*)?<div class="border-bottom mt-3 mb-3" aria-hidden="true" data-life-divider><\/div>\s*'
-            .'<div role="group" aria-label="自由記述の質問" data-personality-diagnosis-life>\s*<dl class="mb-0">\s*<dt class="fw-normal text-muted d-flex">/su',
+            .'(?:\{\{--.*?--\}\}\s*)?<div class="mt-4" role="group" aria-label="自由記述の質問" data-personality-diagnosis-life>\s*<dl class="mb-0">\s*<dt class="fw-normal text-muted d-flex">/su',
             $html
         ));
         // 見出し（当時の呼び名・今の呼び名とも）は画面に出さない。別のカードの見出しにもしない
         $this->assertStringNotContainsString('暮らしの様子', $html);
         $this->assertStringNotContainsString('id="personality-diagnosis-life-label"', $html);
         $this->assertStringNotContainsString('>自由記述の質問<', $html);
-        $this->assertSame(1, substr_count($html, 'data-life-divider'));
+        // 区切りの線はない（S-1415 の線は ClientPersonalityDiagnosisTest で今のままを確かめる）
+        $this->assertStringNotContainsString('data-life-divider', $html);
         $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-life'));
         // 結果のカードの中（アドバイスのお知らせ・アドバイス・スタッフ用メモの前）。アドバイスとスタッフ用メモの欄は今のまま
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-life'), strpos($html, '<h6 class="mb-0">結果</h6>'));

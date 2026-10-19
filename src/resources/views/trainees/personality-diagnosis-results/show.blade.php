@@ -104,17 +104,17 @@
                     {{-- 自由記述の質問（4 問。2026-10-19 追加。要件定義書 6-16-15、設計書 S-0313「自由記述の質問」）。右の列の点数の表の下
                          （2026-10-19 変更：ユーザーレビューで、結果の欄の右下が空いていたため、診断の答えとして結果と一緒に見られるようにした。
                          その前は「結果」と「アドバイス」のあいだの別のカード）。1200px より狭いときは、グラフ → タイプ → 点数の表 のあとに続く。
-                         - 見出しは置かず、点数の表と 4 問のあいだに区切りの線を 1 本引く（2026-10-19 変更：ユーザーレビューで、それまでの見出し
-                           〔当時の呼び名。「タイプ」のラベルと同じ見た目〕はトレーナーさんの元のフォームにない言葉だったため。元のフォームと同じく
-                           見出しなしで並べる）。線は会員側の回答の画面（S-1415）の 4 問の前の区切りの線と同じ書き方（.border-bottom の空の要素。
-                           読み上げない）。点数の表と線のあいだ・線と 1 問目のあいだは、タイプと点数の表のあいだ（タイプの mb-3）と同じ 1rem
+                         - 見出しは置かず、点数の表と 4 問のあいだは空き（mt-4。1.5rem）だけで分ける（2026-10-19 変更：ユーザーレビューで、
+                           点数の表の下の罫線と区切りの線が 2 本続いて見えたため、区切りの線を外した。空きは問と問のあいだ〔mb-3。1rem〕より広くし、
+                           まとまりの切れ目と分かるようにした）。経緯：同じ日に、見出し〔当時の呼び名。トレーナーさんの元のフォームにない言葉〕を外し、
+                           会員側の回答の画面（S-1415）と同じ書き方の区切りの線（.border-bottom の空の要素。上下 1rem）を引いていた。
+                           S-1415 の区切りの線は変えない（50 問のボタンのあとで、線がないと区切りが分からないため）
                          - 読み上げでは、4 問のまとまりに見えない名前「自由記述の質問」を付ける（role="group" と aria-label。
                            その前は見出しの id を aria-labelledby で結び付けていた）
                          - この診断で答えた 4 問（PersonalityDiagnosisQuestions::lifeQuestions()。回答の画面 S-1415 と共用）を、設問文と答えの対で出す。
                            設問文の先頭の「●」は読み上げでは読まず（aria-hidden）、d-flex で折り返したときに 2 行目を「●」の右から始める。
                            答えは改行を保持（pre-wrap）、空の問は「（未回答）」（text-muted）。見るだけ（編集・削除の操作は置かない） --}}
-                    <div class="border-bottom mt-3 mb-3" aria-hidden="true" data-life-divider></div>
-                    <div role="group" aria-label="自由記述の質問" data-personality-diagnosis-life>
+                    <div class="mt-4" role="group" aria-label="自由記述の質問" data-personality-diagnosis-life>
                         <dl class="mb-0">
                             @foreach(\App\Support\PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question)
                                 <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
