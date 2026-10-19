@@ -240,3 +240,30 @@ h2 {
     max-width: 300px;
 }
 
+// 愛犬性格診断詳細（S-0313）のアドバイスとスタッフ用メモ（2026-10-19 追加）。992px 以上は横に並べる（col-lg-8・col-lg-4）。
+// 992px 未満は今のまま（縦に並べ、間は横線。入力欄はアドバイス 12 行・スタッフ用メモ 6 行）。
+// - 小見出しの行：左（アドバイス）はふつうの大きさのボタン（［公開］／［公開取消］）があるので、左右の行の最小の高さをそろえて、
+//   2 つの入力欄の上の端をそろえる。1200px 以上はボタンの高さ（文字 1 行＋上下の余白＋枠）。992〜1199px は右の列が狭く、
+//   「スタッフ用メモ」＋「（会員様には表示されません）」が 2 行に折り返すので、その高さ（太字 1 行＋小さい文字 1 行＋行の間の空き〔gap-2〕）
+// - 入力欄：左右で同じ高さ（16 行分。上下の余白は .form-control の 0.25rem ずつ＋枠）
+// - 区切り：横線（border-top）と上の空きをやめ、列の間の空き（Bootstrap の既定の 1.5rem）だけにする
+.evaluation-heading-row {
+    @include media-breakpoint-up(lg) {
+        min-height: calc(#{$line-height-base} * 1rem + 0.5rem + #{$small-font-size} * #{$line-height-base});
+    }
+    @include media-breakpoint-up(xl) {
+        min-height: calc(#{$btn-font-size} * #{$btn-line-height} + 2 * #{$btn-padding-y} + 2 * #{$btn-border-width});
+    }
+}
+.evaluation-textarea {
+    @include media-breakpoint-up(lg) {
+        height: calc(16 * #{$input-line-height} * 1rem + 0.5rem + 2 * #{$input-border-width});
+    }
+}
+.evaluation-staff-memo {
+    @include media-breakpoint-up(lg) {
+        border-top: 0 !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+}

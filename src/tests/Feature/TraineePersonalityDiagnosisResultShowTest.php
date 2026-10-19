@@ -418,7 +418,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('<span class="badge bg-secondary" data-evaluation-status>なし</span>', $card);
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]).'" novalidate id="evaluation-form" data-evaluation-form>', $card);
         $this->assertStringContainsString('name="_method" value="PUT"', $card);
-        $this->assertMatchesRegularExpression('/<textarea class="form-control " id="evaluation_text" name="evaluation_text"\s*rows="12" maxlength="10000"><\/textarea>/u', $card);
+        $this->assertMatchesRegularExpression('/<textarea class="form-control evaluation-textarea " id="evaluation_text" name="evaluation_text"\s*rows="12" maxlength="10000"><\/textarea>/u', $card);
         // 見える小見出し「アドバイス」を入力欄の label にする（2026-10-19 変更：その前は見えない label）
         $this->assertStringContainsString('<label for="evaluation_text" class="fw-bold mb-0">アドバイス</label>', $card);
         $this->assertStringNotContainsString('visually-hidden">アドバイス<', $card);
@@ -528,7 +528,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $this->assertStringContainsString('入力内容に誤りがあります。', $html);
         $this->assertStringContainsString('アドバイスは10000文字以内で入力してください。', $html);
-        $this->assertMatchesRegularExpression('/<textarea class="form-control\s+is-invalid\s*" id="evaluation_text"/u', $html);
+        $this->assertMatchesRegularExpression('/<textarea class="form-control evaluation-textarea\s+is-invalid\s*" id="evaluation_text"/u', $html);
         $this->assertStringContainsString(str_repeat('う', 10001).'</textarea>', $html);
     }
 
@@ -1067,18 +1067,18 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('staff-memo-form', $html);
         $memo = $this->staffMemoSection($card);
         $this->assertLessThan(strpos($card, 'data-personality-diagnosis-staff-memo'), strpos($card, 'data-evaluation-section'));
-        // 2 つのまとまりのあいだは薄い線と空き
-        $this->assertStringContainsString('<div class="border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>', $card);
+        // 2 つのまとまりのあいだは薄い線と空き（992px 未満。992px 以上は evaluation-staff-memo で線をやめる。2026-10-19 変更）
+        $this->assertStringContainsString('<div class="evaluation-staff-memo border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>', $card);
         // 小見出し「スタッフ用メモ」は入力欄の label。すぐ右に「（会員様には表示されません）」（text-muted small）
         $this->assertMatchesRegularExpression(
-            '/<div class="d-flex flex-wrap align-items-center gap-2 mb-2">\s*<label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ<\/label>\s*'
+            '/<div class="evaluation-heading-row d-flex flex-wrap align-items-center gap-2 mb-2">\s*<label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ<\/label>\s*'
             .'<span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）<\/span>\s*<\/div>/u',
             $memo
         );
         $this->assertSame(1, substr_count($html, '（会員様には表示されません）'));
         $this->assertStringNotContainsString('会員様には表示されません。', $html);
         // 入力欄は同じフォーム（PUT …/{result}）の中。説明として、小見出しの右の文を読み上げで結び付ける（aria-describedby）
-        $this->assertMatchesRegularExpression('/<textarea class="form-control " id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"\s*rows="6" maxlength="10000">メモの文<\/textarea>/u', $memo);
+        $this->assertMatchesRegularExpression('/<textarea class="form-control evaluation-textarea " id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"\s*rows="6" maxlength="10000">メモの文<\/textarea>/u', $memo);
         $form = substr($card, strpos($card, '<form '), strpos($card, '</form>') - strpos($card, '<form '));
         $this->assertStringContainsString('name="staff_memo"', $form);
         $this->assertStringContainsString('name="evaluation_text"', $form);
@@ -1478,5 +1478,45 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // リンクは結果の欄の中、移り先は下
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-answers>'), strpos($html, 'data-personality-diagnosis-answers-link'));
         $this->assertLessThan(strpos($html, 'id="personality-diagnosis-radar"'), strpos($html, 'data-personality-diagnosis-answers-link'));
+    }
+
+    public function test_広い幅ではアドバイスを8_12スタッフ用メモを4_12で横に並べ狭い幅では縦に並べる(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+        $this->markPublished($result);
+        $result->update(['staff_memo' => 'メモ']);
+
+        $card = $this->evaluationCard($this->page($result));
+
+        // 1 つのフォームの中の row に、アドバイス（col-lg-8）→ スタッフ用メモ（col-lg-4）の順。992px 未満は col-12 で縦（2026-10-19 変更）
+        $this->assertMatchesRegularExpression(
+            '/<div class="row" data-evaluation-columns>\s*<div class="col-12 col-lg-8" data-evaluation-section>.*?'
+            .'<div class="col-12 col-lg-4">\s*<div class="evaluation-staff-memo border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>/us',
+            $card
+        );
+        $this->assertSame(1, substr_count($card, 'col-lg-8'));
+        $this->assertSame(1, substr_count($card, 'col-lg-4'));
+        $this->assertLessThan(strpos($card, 'id="staff_memo"'), strpos($card, 'id="evaluation_text"'));
+        $form = substr($card, strpos($card, '<form '), strpos($card, '</form>') - strpos($card, '<form '));
+        $this->assertStringContainsString('data-evaluation-columns', $form);
+        // 左右の小見出しの行は高さをそろえる印（evaluation-heading-row）、入力欄は左右同じ高さの印（evaluation-textarea）
+        $this->assertSame(2, substr_count($card, 'class="evaluation-heading-row d-flex flex-wrap'));
+        $this->assertSame(2, substr_count($card, 'class="form-control evaluation-textarea'));
+        // 入力欄と小見出しの結び付けは今のまま
+        $this->assertStringContainsString('<label for="evaluation_text" class="fw-bold mb-0">アドバイス</label>', $card);
+        $this->assertStringContainsString('<label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ</label>', $card);
+        $this->assertStringContainsString('id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"', $card);
+        // 狭い幅の行数は今のまま（アドバイス 12 行・スタッフ用メモ 6 行）
+        $this->assertMatchesRegularExpression('/id="evaluation_text" name="evaluation_text"\s*rows="12"/u', $card);
+        $this->assertMatchesRegularExpression('/aria-describedby="staff-memo-note"\s*rows="6"/u', $card);
+    }
+
+    public function test_広い幅の並べ方のスタイルはapp_scssにある(): void
+    {
+        $scss = file_get_contents(resource_path('sass/app.scss'));
+        // 992px 以上：小見出しの行の最小の高さ（1200px 以上はボタンの高さ）、入力欄は 16 行分、スタッフ用メモの上の線をやめる
+        $this->assertMatchesRegularExpression('/\.evaluation-heading-row \{\s*@include media-breakpoint-up\(lg\) \{\s*min-height: [^;]+;\s*\}\s*@include media-breakpoint-up\(xl\) \{\s*min-height: calc\(#\{\$btn-font-size\}[^;]+;\s*\}\s*\}/u', $scss);
+        $this->assertMatchesRegularExpression('/\.evaluation-textarea \{\s*@include media-breakpoint-up\(lg\) \{\s*height: calc\(16 \* [^;]+;\s*\}\s*\}/u', $scss);
+        $this->assertMatchesRegularExpression('/\.evaluation-staff-memo \{\s*@include media-breakpoint-up\(lg\) \{\s*border-top: 0 !important;\s*margin-top: 0 !important;\s*padding-top: 0 !important;\s*\}\s*\}/u', $scss);
     }
 }

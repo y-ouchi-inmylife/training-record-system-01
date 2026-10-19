@@ -168,40 +168,47 @@
             <form method="POST" action="{{ route('trainee-personality-diagnosis-results.update', [$trainee, $result]) }}" novalidate id="evaluation-form" data-evaluation-form>
                 @csrf
                 @method('PUT')
-                <div data-evaluation-section>
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <label for="evaluation_text" class="fw-bold mb-0">アドバイス</label>
-                            {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
-                            <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
-                            {{-- 公開済みのときだけ、バッジの右に公開した日（会員様の一覧に出る日付と同じ） --}}
-                            @if($isPublished)
-                                <span class="text-muted small" data-evaluation-published-on>{{ $result->evaluation_published_at->format('Y/m/d') }} 公開</span>
-                            @endif
+                {{-- 992px 以上は横に並べる（アドバイス 8/12・スタッフ用メモ 4/12。2026-10-19 変更：見比べながら直せるように。
+                     その前はどの幅でも縦に並べていた）。992px 未満は今のまま縦（アドバイス → 横線 → スタッフ用メモ）。
+                     左右の小見出しの行の高さ・入力欄の高さは app.scss の evaluation-heading-row・evaluation-textarea でそろえる --}}
+                <div class="row" data-evaluation-columns>
+                    <div class="col-12 col-lg-8" data-evaluation-section>
+                        <div class="evaluation-heading-row d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <label for="evaluation_text" class="fw-bold mb-0">アドバイス</label>
+                                {{-- 状態はバッジ（S-0309 の結果の表と同じ色。2026-10-18 変更：その前は小さな文字で、「未作成」は薄い文字） --}}
+                                <span class="badge {{ $result->evaluation_status_badge_class }}" data-evaluation-status>{{ $result->evaluation_status_label }}</span>
+                                {{-- 公開済みのときだけ、バッジの右に公開した日（会員様の一覧に出る日付と同じ） --}}
+                                @if($isPublished)
+                                    <span class="text-muted small" data-evaluation-published-on>{{ $result->evaluation_published_at->format('Y/m/d') }} 公開</span>
+                                @endif
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-publish-buttons>
+                                @if($isPublished)
+                                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"
+                                            data-evaluation-unpublish>公開取消</button>
+                                @else
+                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
+                                            data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>公開</button>
+                                @endif
+                            </div>
                         </div>
-                        <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-publish-buttons>
-                            @if($isPublished)
-                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"
-                                        data-evaluation-unpublish>公開取消</button>
-                            @else
-                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-publish"
-                                        data-evaluation-publish @disabled(blank(old('evaluation_text', $result->evaluation_text)))>公開</button>
-                            @endif
-                        </div>
+                        <textarea class="form-control evaluation-textarea @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
+                                  rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
+                        <x-form-error field="evaluation_text" />
                     </div>
-                    <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
-                              rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
-                    <x-form-error field="evaluation_text" />
-                </div>
 
-                <div class="border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                        <label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ</label>
-                        <span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）</span>
+                    <div class="col-12 col-lg-4">
+                        <div class="evaluation-staff-memo border-top mt-3 pt-3" data-personality-diagnosis-staff-memo>
+                            <div class="evaluation-heading-row d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <label for="staff_memo" class="fw-bold mb-0">スタッフ用メモ</label>
+                                <span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）</span>
+                            </div>
+                            <textarea class="form-control evaluation-textarea @error('staff_memo') is-invalid @enderror" id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"
+                                      rows="6" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH }}">{{ old('staff_memo', $result->staff_memo) }}</textarea>
+                            <x-form-error field="staff_memo" />
+                        </div>
                     </div>
-                    <textarea class="form-control @error('staff_memo') is-invalid @enderror" id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"
-                              rows="6" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH }}">{{ old('staff_memo', $result->staff_memo) }}</textarea>
-                    <x-form-error field="staff_memo" />
                 </div>
             </form>
         </div>
