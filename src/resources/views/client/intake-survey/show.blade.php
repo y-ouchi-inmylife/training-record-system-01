@@ -36,7 +36,8 @@
         @include('client._survey-progress', ['step' => 1])
     @endif
     <h1 class="mb-2">{{ __('messages.intake_survey_name') }}</h1>
-    <p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>
+    {{-- 説明文は lang/ja/messages.php の client_intake_survey.description（2026-10-19 変更：契約前のお客様も答えるため、完了の画面の文とそろえた） --}}
+    <p class="mb-4">{{ __('messages.client_intake_survey.description') }}</p>
 
     <div class="card c-login-card">
         <div class="card-body p-4">

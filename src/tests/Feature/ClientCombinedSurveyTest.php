@@ -109,6 +109,9 @@ class ClientCombinedSurveyTest extends TestCase
         // 1/2：愛犬アンケート
         $html = $this->get($this->intakeUrl())->assertOk()->getContent();
         $this->assertStringContainsString('<p class="c-survey-progress" data-survey-progress="1/2">', $html);
+        // 説明文は単独のリンクと同じ（2026-10-19 変更：契約前のお客様にもそぐう文）
+        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('トレーニングの参考に', $html);
         $this->assertStringContainsString('<span class="c-survey-progress-count" aria-hidden="true">1/2</span>', $html);
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち1つ目：</span>', $html);
         $this->assertStringContainsString('<span>愛犬アンケート＆愛犬性格診断</span>', $html);

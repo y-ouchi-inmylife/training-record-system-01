@@ -69,6 +69,16 @@ class ClientIntakeSurveyShowTest extends TestCase
         return '/client-portal/intake-survey/'.$token;
     }
 
+    public function test_ログインして答えるときも説明文は同じ(): void
+    {
+        $trainee = $this->traineeWithToken('モモ');
+
+        $html = $this->actingAs($trainee->client, 'client')->get($this->showPath())->assertOk()->getContent();
+
+        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('トレーニングの参考に', $html);
+    }
+
     // ---- ルート ----
 
     public function test_ルート名からパスを作れる(): void
@@ -105,8 +115,10 @@ class ClientIntakeSurveyShowTest extends TestCase
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
         $this->assertStringContainsString('<h1 class="mb-2">愛犬アンケート</h1>', $html);
-        // 説明文に愛犬の名前は使わない（2026-10 変更。設計書 S-1413）
-        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>', $html);
+        // 説明文に愛犬の名前は使わない（2026-10 変更。設計書 S-1413）。契約前のお客様にもそぐう文（2026-10-19 変更：
+        // その前は「愛犬のことを教えてください。トレーニングの参考にさせていただきます。」）
+        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('トレーニングの参考に', $html);
         $this->assertStringNotContainsString('モモちゃん', $html);
         // 名前は表示だけの行ではなく、常に必須の入力欄（2026-10 変更）。初期値はトレーニーの名前
         $this->assertMatchesRegularExpression('/<label for="name" class="form-label">名前 <span class="text-danger">\*<\/span><\/label>/u', $html);
