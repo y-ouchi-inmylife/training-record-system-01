@@ -361,6 +361,15 @@
      - どちらのモーダルも、送ったら実行のボタンを押せなくする（二重に押されないように） --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // 画面を離れるときの警告（2026-10-19 追加。設計書 S-0313「アドバイスとスタッフ用メモのカード」）。ほかの編集画面（S-0602 アドバイスの
+    // プロンプトなど）と同じ UnsavedChangesGuard を使う。見張るのはカードのフォーム（アドバイスとスタッフ用メモの 2 つの入力欄）。
+    // ［更新］はこのフォームを送るので警告しない。M01 の［公開する］は別のフォームなので、送る前に下で「変わっている」を消す
+    var unsavedGuard = new window.UnsavedChangesGuard({
+        formSelector: '#evaluation-form',
+        leaveLinkSelector: '.js-leave-link'
+    });
+    unsavedGuard.init();
+
     var textarea = document.querySelector('[data-evaluation-form] textarea[name="evaluation_text"]');
     var openButton = document.querySelector('[data-evaluation-publish]');
     var publishForm = document.querySelector('[data-evaluation-publish-form]');
@@ -379,6 +388,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 publishForm.querySelector('input[name="staff_memo"]').value = memoField.value;
             }
             publishForm.querySelector('button[type="submit"]').disabled = true;
+            // 2 つの欄を保存してから公開するので、画面を離れるときの警告は出さない（2026-10-19 追加）
+            unsavedGuard.hasChanges = false;
         });
     }
     if (unpublishForm) {

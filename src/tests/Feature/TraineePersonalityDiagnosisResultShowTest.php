@@ -1291,4 +1291,28 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame(200, (int) $saved->evaluation_updated_by);
         $this->assertSame('最終更新: 2026/10/19 10:00 佐藤', $this->updatedLine($this->page($saved)));
     }
+
+    // ---- 画面を離れるときの警告（2026-10-19 追加。設計書 S-0313「アドバイスとスタッフ用メモのカード」） ----
+
+    public function test_画面を離れるときの警告はほかの編集画面と同じ仕組みでカードのフォームを見張る(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $result->update(['evaluation_text' => '下書き']);
+
+        $html = $this->page($result);
+
+        // ほかの編集画面（S-0602 など）と同じ UnsavedChangesGuard。見張るのはアドバイスとスタッフ用メモの入ったフォーム
+        $this->assertMatchesRegularExpression(
+            "/var unsavedGuard = new window\\.UnsavedChangesGuard\\(\\{\\s*formSelector: '#evaluation-form',\\s*leaveLinkSelector: '\\.js-leave-link'\\s*\\}\\);\\s*unsavedGuard\\.init\\(\\);/u",
+            $html
+        );
+        $form = substr($html, strpos($html, 'id="evaluation-form"'), strpos($html, '</form>', strpos($html, 'id="evaluation-form"')) - strpos($html, 'id="evaluation-form"'));
+        $this->assertStringContainsString('name="evaluation_text"', $form);
+        $this->assertStringContainsString('name="staff_memo"', $form);
+        // ［更新］はこのフォームを送る（送るときは警告しない）。［公開する］は別のフォームなので、送る前に「変わっている」を消す
+        $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $html);
+        $this->assertStringContainsString('unsavedGuard.hasChanges = false;', $html);
+        // 仕組みは app.js から読み込む（ほかの画面と同じ）
+        $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*app-[^"]*\\.js"/u', $html);
+    }
 }
