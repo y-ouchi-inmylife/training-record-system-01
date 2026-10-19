@@ -758,9 +758,16 @@
                                              375px で約 76px〕で言葉の途中で折り返していたため）。keep-all で途中では折り返さず、<wbr> の位置でだけ折り返す。
                                              overflow-wrap: normal：上から受け継ぐ break-word を止める（375px では「性格診断」〔約 56px〕が列の中の文字の幅〔約 52px〕に
                                              収まらず、break-word だと「性格診／断」と折れていた。止めると列の右の余白〔12px〕の中に約 4px はみ出すだけで、日付には重ならない）。
-                                             labelHtml() は文のファイルの決まった文字を逃がしてから <wbr> でつないだもの（利用者の入力は入らない） --}}
-                                        <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis" style="word-break: keep-all; overflow-wrap: normal;"
-                                           aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">{{ \App\Support\PersonalityDiagnosisName::labelHtml() }}</a>
+                                             labelHtml() は文のファイルの決まった文字を逃がしてから <wbr> でつないだもの（利用者の入力は入らない）。
+                                             ラベルは診断の結果があるとき（右に日付を出すとき）だけリンクにし、「診断なし」のときはほかの項目のラベルと同じ
+                                             灰色の文字にする（2026-10-19 変更：暮らしの様子のラベル〔入力ありのときだけリンク〕とそろえた。その前はいつもリンク）。
+                                             判定は右の日付・「診断なし」と同じ latestPersonalityDiagnosisResult --}}
+                                        @if($trainee->latestPersonalityDiagnosisResult)
+                                            <a href="{{ route('trainees.show', $trainee) }}#personality-diagnosis" style="word-break: keep-all; overflow-wrap: normal;"
+                                               aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">{{ \App\Support\PersonalityDiagnosisName::labelHtml() }}</a>
+                                        @else
+                                            <span class="text-muted" style="word-break: keep-all; overflow-wrap: normal;">{{ \App\Support\PersonalityDiagnosisName::labelHtml() }}</span>
+                                        @endif
                                     </div>
                                     <div class="col-8 d-flex flex-wrap align-items-center gap-2">
                                         @if($trainee->latestPersonalityDiagnosisResult)

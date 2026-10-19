@@ -1272,6 +1272,8 @@ class ClientCountRenderingTest extends TestCase
         $answered = $this->trainee($client, 'ポチ');
         $tokenId = $this->intakeToken($answered, '2026-10-16 14:32:00');
         $this->intakeResponse($answered, $tokenId);
+        // ラベルがリンクになるよう、結果も持たせる（2026-10-19 変更：診断なしのときはリンクにしない）
+        $this->personalityResult($answered, '2026-10-15 10:30:00');
         $notIssued = $this->trainee($client, null);
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
@@ -1285,14 +1287,15 @@ class ClientCountRenderingTest extends TestCase
             $html
         );
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
-        // 名前未登録・結果も案内もない（愛犬アンケートも未回答の）トレーニーにも、属性の並びのすぐ後ろに出る
-        // （読み上げは「名前未登録の性格診断」）。暮らしの様子のリンクは出ず、性格診断の行で欄が終わる
+        // 名前未登録・結果も案内もない（愛犬アンケートも未回答の）トレーニーにも、属性の並びのすぐ後ろに出る。
+        // 結果がないのでラベルはリンクにしない（2026-10-19 変更：その前はいつもリンク）
+        $afterNotIssued = substr($html, strpos($html, '<a href="'.route('trainees.show', $notIssued).'"'));
         $this->assertMatchesRegularExpression(
             '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
-            .'<a href="'.preg_quote(route('trainees.show', $notIssued), '/').'#personality-diagnosis" style="word-break: keep-all; overflow-wrap: normal;"\s*aria-label="名前未登録の愛犬性格診断">愛犬<wbr>性格診断<\/a>/u',
-            $html
+            .preg_quote('<span class="text-muted" style="word-break: keep-all; overflow-wrap: normal;">愛犬<wbr>性格診断</span>', '/').'/u',
+            $afterNotIssued
         );
-        $afterNotIssued = substr($html, strpos($html, 'aria-label="名前未登録の愛犬性格診断">愛犬<wbr>性格診断</a>'));
+        $this->assertStringNotContainsString(route('trainees.show', $notIssued).'#personality-diagnosis', $html);
         // 回答のないトレーニーは、暮らしの様子のラベルをリンクにせず「入力なし」（2026-10-19 変更：その前は行ごと出さなかった）
         $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary">入力なし</span>'));
         // 行のボタンのまとまりはない（2026-10-19 変更：トレーニーの欄の［案内を発行］と「案内中」の行にまとめた）。
@@ -1304,7 +1307,8 @@ class ClientCountRenderingTest extends TestCase
             '愛犬性格診断の行のあと、最終計測の行でトレーニーの欄が閉じる'
         );
         $this->assertSame(1, substr_count($html, '>暮らしの<wbr>様子</a>'));
-        $this->assertSame(2, substr_count($html, '>愛犬<wbr>性格診断</a>'));
+        $this->assertSame(1, substr_count($html, '>愛犬<wbr>性格診断</a>'));
+        $this->assertSame(1, substr_count($html, '<span class="text-muted" style="word-break: keep-all; overflow-wrap: normal;">愛犬<wbr>性格診断</span>'));
     }
 
     public function test_性格診断の取消の確認M07の見出しと本文と確定ボタン(): void
@@ -1366,11 +1370,13 @@ class ClientCountRenderingTest extends TestCase
         DB::table('trainee_personality_diagnosis_results')->insert($row);
     }
 
-    /** トレーニー 1 頭分の「性格診断」の行（行の始まりから、ボタンのまとまりの手前まで）の HTML */
+    /** トレーニー 1 頭分の「性格診断」の行（行の始まりから、日付〔または「診断なし」〕の span の終わりまで）の HTML */
     private function personalityLatest(string $html, int $traineeId): string
     {
-        $link = route('trainees.show', $traineeId).'#personality-diagnosis';
-        $start = strpos($html, '<a href="'.$link.'"');
+        // 2026-10-19 変更：診断なしのときはラベルがリンクでないので、トレーニーの名前のリンクのあとの性格診断の行から取る
+        $name = strpos($html, '<a href="'.route('trainees.show', $traineeId).'"');
+        $this->assertNotFalse($name);
+        $start = strpos($html, 'data-personality-diagnosis-row', $name);
         $this->assertNotFalse($start);
         // 日付の span の終わりまで（2026-10-19 変更：行のボタンのまとまりをなくした）
         $end = strpos($html, '</span>', strpos($html, 'data-personality-diagnosis-latest', $start)) + strlen('</span>');
@@ -1536,7 +1542,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('aria-label="ポチの愛犬性格診断">愛犬<wbr>性格診断</a>', $html);
+        // 結果がないのでラベルはリンクでない（2026-10-19 変更）
+        $this->assertStringContainsString('<span class="text-muted" style="word-break: keep-all; overflow-wrap: normal;">愛犬<wbr>性格診断</span>', $html);
         // 「案内中」の行（2026-10-19 変更：その前は行のボタンのまとまり）
         $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', $this->inProgressRow($html, 'ポチ'));
         // 取消の確認（M07）
@@ -1549,7 +1556,8 @@ class ClientCountRenderingTest extends TestCase
         $this->fakeMediaDisk();
         $this->overridePersonalityDiagnosisName('テスト診断');
         $client = $this->makeClient('0001', '山田');
-        $this->trainee($client, 'ポチ');
+        // ラベルがリンクになるよう、結果のあるトレーニーにする（2026-10-19 変更：診断なしのときはリンクにしない）
+        $this->personalityResult($this->trainee($client, 'ポチ'), '2026-10-15 10:30:00');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
@@ -1563,7 +1571,8 @@ class ClientCountRenderingTest extends TestCase
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
-        $this->trainee($client, 'ポチ');
+        // ラベルがリンクになるよう、結果のあるトレーニーにする（2026-10-19 変更：診断なしのときはリンクにしない）
+        $this->personalityResult($this->trainee($client, 'ポチ'), '2026-10-15 10:30:00');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
@@ -1586,7 +1595,8 @@ class ClientCountRenderingTest extends TestCase
             'messages.personality_diagnosis_name_parts' => ['テスト', '診断'],
         ], 'ja');
         $client = $this->makeClient('0001', '山田');
-        $this->trainee($client, 'ポチ');
+        // ラベルがリンクになるよう、結果のあるトレーニーにする（2026-10-19 変更：診断なしのときはリンクにしない）
+        $this->personalityResult($this->trainee($client, 'ポチ'), '2026-10-15 10:30:00');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
@@ -1606,7 +1616,8 @@ class ClientCountRenderingTest extends TestCase
             'messages.personality_diagnosis_name_parts' => ['<b>愛犬</b>', '性格診断'],
         ], 'ja');
         $client = $this->makeClient('0001', '山田');
-        $this->trainee($client, 'ポチ');
+        // ラベルがリンクになるよう、結果のあるトレーニーにする（2026-10-19 変更：診断なしのときはリンクにしない）
+        $this->personalityResult($this->trainee($client, 'ポチ'), '2026-10-15 10:30:00');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
@@ -2467,5 +2478,49 @@ class ClientCountRenderingTest extends TestCase
         }
 
         $this->assertSame($one, $count());
+    }
+
+    // ---- 愛犬性格診断のラベルは診断の結果があるときだけリンク（2026-10-19 変更。設計書 S-0305「名前の下の項目の並びと出し方」） ----
+
+    public function test_愛犬性格診断のラベルは診断なしならリンクでなく診断ありならリンクで日付を出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $none = $this->trainee($client, 'ポチ');
+        $with = $this->trainee($client, 'タマ');
+        $this->personalityResult($with, '2026-10-15 10:30:00');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 診断なし：ラベルはほかの項目のラベルと同じ灰色の文字（リンクでない）。右に「診断なし」
+        $row = $this->personalityLatest($html, $none);
+        $this->assertStringContainsString('<div class="col-4">', $row);
+        $this->assertStringContainsString('<span class="text-muted" style="word-break: keep-all; overflow-wrap: normal;">愛犬<wbr>性格診断</span>', $row);
+        $this->assertStringNotContainsString('<a ', $row);
+        $this->assertStringContainsString('<span class="text-muted" data-personality-diagnosis-latest>診断なし</span>', $row);
+        // 診断あり：ラベルは今と同じリンク（トレーニー詳細の愛犬性格診断の欄）。右に日付
+        $row = $this->personalityLatest($html, $with);
+        $this->assertStringContainsString(
+            '<a href="'.route('trainees.show', $with).'#personality-diagnosis" style="word-break: keep-all; overflow-wrap: normal;"',
+            $row
+        );
+        $this->assertMatchesRegularExpression('/aria-label="タマの愛犬性格診断">愛犬<wbr>性格診断<\/a>/u', $row);
+        $this->assertStringContainsString('<span data-personality-diagnosis-latest>2026/10/15</span>', $row);
+    }
+
+    public function test_愛犬性格診断のラベルを変えても暮らしの様子のラベルの扱いは変わらない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $answered = $this->trainee($client, 'ポチ');
+        $this->intakeResponse($answered, null);
+        $this->trainee($client, 'タマ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 入力あり：リンク。入力なし：リンクでない（今のまま）
+        $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
+        $this->assertSame(1, substr_count($html, '>暮らしの<wbr>様子</a>'));
+        $this->assertSame(1, substr_count($html, '<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">暮らしの<wbr>様子</dt>'));
     }
 }
