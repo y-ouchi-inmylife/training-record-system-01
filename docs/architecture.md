@@ -211,6 +211,7 @@ flowchart TD
 - 自由記述の質問の答えには、お客様が名前・住所などを書いている恐れがある（伏せ字の処理はしない。トレーナーが下書きを読んで直す）
 - **会社を差し替える作り**：コントローラーはインターフェイス `App\Services\EvaluationDraft\EvaluationDraftGenerator` だけを使う。会社ごとの実装を 1 つずつ持ち（今は Claude の `ClaudeEvaluationDraftGenerator`）、設定 `config('services.evaluation_draft.driver')`（`EVALUATION_DRAFT_DRIVER`。既定 `anthropic`）で `AppServiceProvider` が選ぶ。Gemini にするときは実装を 1 つ足して切り替える
 - 呼び出し：その場で呼ぶ（キューは使わない）。待ち時間の上限 60 秒（SDK 0.6.0 の timeout の指定は HTTP の呼び出しに使われないので、時間切れを付けた Guzzle を transporter として渡す）。再試行しない（SDK の既定は 2 回まで再試行する）。出す長さの上限 3000 トークン
+- **AI に渡すもの**（**2026-10-19 追加**：2026-10-19 のユーザーレビューで、AI が見出しや太字を Markdown の記号（`#`・`**`・`---` など）で書いて返し、アドバイスの欄に記号がそのまま入り、公開すると会員様の画面（S-1418）にも記号が出てしまうため）：書式の決まり（Markdown の記号を使わず普通の文章で書く。要件定義書 6-16-19）を **system（システムプロンプト）**に、指示文（データを差し込んだもの）を今までどおり**ユーザーの発言**に入れる。決まりの文は AI の会社に依らない `PersonalityEvaluationPrompt::FORMAT_RULES` の 1 か所に持ち、会社ごとの実装はそれを渡すだけにする（Gemini を足すときも同じ決まりを使う）。返事は `EvaluationDraft::fromResponse()` で「#####」で分けたあと、`EvaluationDraft::stripMarkdown()` で念のため Markdown の記号を外す
 - ログ：結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけ（送った文・返ってきた文・名前は残さない）。アクセスログには記録しない
 - **未決事項**：本番で使い始める前に、プライバシーポリシーに外部の AI で分析することを書き足す必要がある
 
