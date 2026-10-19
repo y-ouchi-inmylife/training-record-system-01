@@ -37,6 +37,15 @@ class PersonalityEvaluationPrompt
         TEXT;
 
     /**
+     * AI が出す長さの上限（トークン。2026-10-20 追加）。Claude の maxTokens・OpenAI の max_completion_tokens・Gemini の
+     * generationConfig.maxOutputTokens に、3 社とも同じ値を渡す（比べるときの条件をそろえる。ここ 1 か所で決める）。
+     * Gemini 2.5 や OpenAI の推論するモデルは、考えた分も上限に含まれる。2026-10-20 の実際の AI での確かめで、gemini-2.5-pro は
+     * 答えと考えた分を合わせて 2722 トークンを使い、3000 では切れるおそれがあったため、8192 に上げた（その前は各実装に 3000）。
+     * 答えの長さは指示文（800 字・300 字程度）で決まり、料金は使った分だけなので、上限を上げても費用は増えない
+     */
+    public const MAX_OUTPUT_TOKENS = 8192;
+
+    /**
      * 書式の決まり（2026-10-19 追加：AI が Markdown の記号で書き、会員様の画面に記号が出てしまうため）。
      * 指示文（ひな形）とは別に、毎回 AI に渡す（Claude では system に入れる）。設定画面で指示文を書き換えても必ず付く。
      * AI の会社に依らないよう、ここ 1 か所に持つ（Gemini を足すときも同じ決まりを使う）。設定画面（S-0602）に読むだけで出す。

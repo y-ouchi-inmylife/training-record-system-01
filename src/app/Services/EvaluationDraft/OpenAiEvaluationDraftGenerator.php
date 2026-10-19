@@ -15,7 +15,7 @@ use Psr\Http\Client\ClientInterface;
  * - 書式の決まり（PersonalityEvaluationPrompt::FORMAT_RULES）を system の発言、指示文（データを差し込んだもの）を user の発言で渡す
  * - 待ち時間の上限は 60 秒（時間切れを付けた Guzzle を HTTP クライアントとして渡す。文字起こしの OPENAI_REQUEST_TIMEOUT には左右されない）。
  *   再試行しない（openai-php は再試行しない）
- * - 出す長さの上限は max_completion_tokens 3000（Claude の MAX_TOKENS と同じ）
+ * - 出す長さの上限は max_completion_tokens に PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS（3 社で同じ値。2026-10-20 変更：その前はここに 3000）
  * - ログ（laravel.log）には、結果の id・AI の名前・モデル・入力と出力のトークン数・かかった時間・止まった理由だけを残す。
  *   送った文・返ってきた文・名前・API キーは残さない。失敗のときはエラーの内容を API キーを伏せて残す
  *
@@ -26,9 +26,6 @@ class OpenAiEvaluationDraftGenerator implements EvaluationDraftGenerator
 {
     /** AI の名前（ログ・EvaluationDraftProviders） */
     public const NAME = 'openai';
-
-    /** 出す長さの上限（トークン。Claude と同じ） */
-    public const MAX_TOKENS = 3000;
 
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
@@ -72,7 +69,7 @@ class OpenAiEvaluationDraftGenerator implements EvaluationDraftGenerator
                     ['role' => 'system', 'content' => PersonalityEvaluationPrompt::FORMAT_RULES],
                     ['role' => 'user', 'content' => $prompt],
                 ],
-                'max_completion_tokens' => self::MAX_TOKENS,
+                'max_completion_tokens' => PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS,
             ]);
         } catch (\Throwable $e) {
             Log::error('アドバイスのAI自動生成：呼び出しに失敗しました', [

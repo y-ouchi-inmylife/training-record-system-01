@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Log;
  * - 書式の決まり（PersonalityEvaluationPrompt::FORMAT_RULES）を systemInstruction、指示文（データを差し込んだもの）を contents（role: user）で渡す
  * - API キーは URL に入れず、ヘッダー x-goog-api-key で送る（URL がログに残っても漏れないように）
  * - 待ち時間の上限は 60 秒。再試行しない（Laravel の HTTP クライアントの retry を付けない）
- * - 出す長さの上限は generationConfig.maxOutputTokens 3000（Claude の MAX_TOKENS と同じ）
+ * - 出す長さの上限は generationConfig.maxOutputTokens に PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS（3 社で同じ値。考えた分も含まれる。
+ *   2026-10-20 変更：その前はここに 3000）
  * - ログ（laravel.log）には、結果の id・AI の名前・モデル・入力と出力のトークン数・かかった時間・止まった理由だけを残す。
  *   送った文・返ってきた文・名前・API キーは残さない。失敗のときはエラーの内容を API キーを伏せて残す
  *
@@ -23,9 +24,6 @@ class GeminiEvaluationDraftGenerator implements EvaluationDraftGenerator
 {
     /** AI の名前（ログ・EvaluationDraftProviders） */
     public const NAME = 'gemini';
-
-    /** 出す長さの上限（トークン。Claude と同じ） */
-    public const MAX_TOKENS = 3000;
 
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
@@ -58,7 +56,7 @@ class GeminiEvaluationDraftGenerator implements EvaluationDraftGenerator
                 ->post(self::ENDPOINT_BASE.rawurlencode($model).':generateContent', [
                     'systemInstruction' => ['parts' => [['text' => PersonalityEvaluationPrompt::FORMAT_RULES]]],
                     'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                    'generationConfig' => ['maxOutputTokens' => self::MAX_TOKENS],
+                    'generationConfig' => ['maxOutputTokens' => PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS],
                 ])
                 ->throw();
         } catch (\Throwable $e) {

@@ -406,8 +406,9 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->assertStringStartsWith('ドッグトレーナーとして、', $body['messages'][0]['content']);
         $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $body['messages'][0]['content']);
         $this->assertStringNotContainsString('プレーンテキスト', $body['messages'][0]['content']);
-        // 長さの上限は今のまま
-        $this->assertSame(3000, $body['max_tokens']);
+        // 長さの上限は 3 社で同じ 1 か所の定数（2026-10-20 変更：3000 から 8192 に上げた）
+        $this->assertSame(8192, PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS);
+        $this->assertSame(PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS, $body['max_tokens']);
         // 返事は分けてから後始末される
         $this->assertSame("見出し\nお客様用", $draft->evaluation);
         $this->assertSame('・スタッフ用', $draft->staffMemo);
@@ -608,7 +609,10 @@ class PersonalityEvaluationDraftTest extends TestCase
             ['role' => 'system', 'content' => PersonalityEvaluationPrompt::FORMAT_RULES],
             ['role' => 'user', 'content' => PersonalityEvaluationPrompt::render($result)],
         ], $body['messages']);
-        $this->assertSame(3000, $body['max_completion_tokens']);
+        $this->assertSame(PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS, $body['max_completion_tokens']);
+        $this->assertSame(8192, $body['max_completion_tokens']);
+        // 考える量を抑える設定は足さない
+        $this->assertArrayNotHasKey('reasoning_effort', $body);
         $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $body['messages'][1]['content']);
         // キーは Authorization ヘッダー（URL には入れない）
         $this->assertSame('Bearer test-openai-key', $request->getHeaderLine('Authorization'));
@@ -656,7 +660,10 @@ class PersonalityEvaluationDraftTest extends TestCase
             $this->assertSame([], $request->header('Authorization'));
             $this->assertSame(['parts' => [['text' => PersonalityEvaluationPrompt::FORMAT_RULES]]], $request['systemInstruction']);
             $this->assertSame([['role' => 'user', 'parts' => [['text' => PersonalityEvaluationPrompt::render($result)]]]], $request['contents']);
-            $this->assertSame(3000, $request['generationConfig']['maxOutputTokens']);
+            $this->assertSame(PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS, $request['generationConfig']['maxOutputTokens']);
+            $this->assertSame(8192, $request['generationConfig']['maxOutputTokens']);
+            // 考える量を抑える設定は足さない
+            $this->assertArrayNotHasKey('thinkingConfig', $request['generationConfig']);
 
             return true;
         });

@@ -16,7 +16,7 @@ use Psr\Http\Client\ClientInterface;
  * - 待ち時間の上限は 60 秒（その場で呼んで画面で待つため）。SDK 0.6.0 の timeout の指定は HTTP の呼び出しに使われないので、
  *   時間切れを付けた Guzzle を transporter として渡す
  * - 再試行しない（maxRetries 0。費用のため。SDK の既定は 2 回まで再試行する）
- * - 出す長さの上限（maxTokens）は 3000（お客様用 800 字＋スタッフ用 300 字の日本語が切れずに収まる量）
+ * - 出す長さの上限（maxTokens）は PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS（3 社で同じ値。2026-10-20 変更：その前はここに 3000）
  * - 書式の決まり（PersonalityEvaluationPrompt::FORMAT_RULES。Markdown の記号を使わない）を system に入れ、指示文はユーザーの発言で渡す
  *   （2026-10-19 追加：AI が Markdown の記号で書き、会員様の画面に記号が出てしまうため）
  * - ログ（laravel.log）には、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけを残す。
@@ -26,9 +26,6 @@ use Psr\Http\Client\ClientInterface;
  */
 class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
 {
-    /** 出す長さの上限（トークン） */
-    public const MAX_TOKENS = 3000;
-
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
 
@@ -62,7 +59,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
                 'transporter' => $this->transporter ?? new GuzzleClient(['timeout' => self::TIMEOUT_SECONDS, 'connect_timeout' => 10]),
             ]);
             $response = $client->messages->create(
-                maxTokens: self::MAX_TOKENS,
+                maxTokens: PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS,
                 messages: [['role' => 'user', 'content' => $prompt]],
                 model: $model,
                 system: PersonalityEvaluationPrompt::FORMAT_RULES,
