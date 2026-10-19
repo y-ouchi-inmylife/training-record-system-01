@@ -2589,7 +2589,7 @@ POST /training-records に以下を追加する。
 - `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果は 404）。権限はアドバイスの保存と同じ（一般・管理者）
 - `provider` から実装を選ぶ（`App\Services\EvaluationDraft\EvaluationDraftProviders`。AI の名前 → 実装の対応表の 1 か所）。決まった 3 つ以外・キーかモデルの設定が空の AI のときは、AI を呼ばずに 422 で今の失敗のときと同じ文を返す（**2026-10-20 追加**）
 - 指示文（`system_settings` の `evaluation_prompt_current`。なければ既定の文）の差し込みの印を、愛犬の名前・タイプ・点数・自由記述の質問 4 問に置き換える（`App\Services\EvaluationDraft\PersonalityEvaluationPrompt`）。暮らしの様子は**その診断の結果に保存した 4 問**（`trainee_personality_diagnosis_results` の `wish` など。**2026-10-19 変更**：その前は、愛犬アンケートの回答のうち診断の日以前でいちばん新しいもの〔なければいちばん新しいもの〕を探して使っていた）
-- 選んだ AI を 1 回呼ぶ（`App\Services\EvaluationDraft\EvaluationDraftGenerator` の実装。**2026-10-20 変更**：3 社の実装にした。その前は Claude の `ClaudeEvaluationDraftGenerator` だけ）。3 社とも、出す長さの上限 3000 トークン、待ち時間の上限 60 秒、再試行しない。会社ごとの呼び方は architecture.md 2-5-1
+- 選んだ AI を 1 回呼ぶ（`App\Services\EvaluationDraft\EvaluationDraftGenerator` の実装。**2026-10-20 変更**：3 社の実装にした。その前は Claude の `ClaudeEvaluationDraftGenerator` だけ）。3 社とも、出す長さの上限 8192 トークン（`PersonalityEvaluationPrompt::MAX_OUTPUT_TOKENS` の 1 か所で決める。**2026-10-20 変更**：2026-10-20 の実際の AI での確かめで、Gemini〔gemini-2.5-pro〕は答えと考えた分を合わせて 2722 トークンを使い、3000 では答えが途中で切れたり空になったりするおそれがあったため。Gemini 2.5 や OpenAI の推論するモデルは、考えた分も上限に含まれる。その前は 3000）、待ち時間の上限 60 秒、再試行しない。会社ごとの呼び方は architecture.md 2-5-1
   - `claude`：`ClaudeEvaluationDraftGenerator`（Messages API。モデルは `config('services.anthropic.model')`。今のまま）
   - `openai`：`OpenAiEvaluationDraftGenerator`（Chat Completions。モデルは `config('services.openai.evaluation_model')`）
   - `gemini`：`GeminiEvaluationDraftGenerator`（generateContent。モデルは `config('services.gemini.model')`）
