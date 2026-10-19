@@ -2593,6 +2593,7 @@ POST /training-records に以下を追加する。
   - `claude`：`ClaudeEvaluationDraftGenerator`（Messages API。モデルは `config('services.anthropic.model')`。今のまま）
   - `openai`：`OpenAiEvaluationDraftGenerator`（Chat Completions。モデルは `config('services.openai.evaluation_model')`）
   - `gemini`：`GeminiEvaluationDraftGenerator`（generateContent。モデルは `config('services.gemini.model')`）
+- **最後まで書き終えたかを確かめる**（**2026-10-20 追加**：2026-10-20 のユーザーレビューで、アドバイスは会員様に見せる文なので、長さの上限などで途中で切れた文が欄に入り、そのまま公開してしまうのを防ぐため。経緯：その前は、止まった理由を見ず、答えが少しでもあれば成功として欄に入れていた（答えが空のときだけ失敗））：返事の止まった理由が「最後まで書き終えた」（Claude は `end_turn`・`stop_sequence`、OpenAI は `stop`、Gemini は `STOP`。各実装の `COMPLETED_STOP_REASONS`）でなければ、答えを「#####」で分ける前に失敗にする（下の 502。長さの上限〔`max_tokens`・`length`・`MAX_TOKENS`〕、Claude の `refusal`・`pause_turn`、OpenAI の `content_filter`、Gemini の `SAFETY`・`RECITATION`・`CONTINUATION` などの止まり方、止まった理由がないとき）。判定と失敗のログは `EvaluationDraft::ensureCompleted()` の 1 か所
 - 返事を最初の「#####」で分ける（前をアドバイス、後ろをスタッフ用メモ。前後の空白・改行は取る。「#####」がなければ全部をアドバイスにし、`staff_memo_missing` を true）。返事が空なら失敗
 - 書式の決まり（`PersonalityEvaluationPrompt::FORMAT_RULES`。Markdown の記号を使わず普通の文章で書く）を、その AI のシステム側の指示（Claude は `system`、OpenAI は `system` の発言、Gemini は `systemInstruction`。**2026-10-20 変更**：3 社とも同じ決まりを渡す）に入れて渡す。指示文はユーザーの発言（**2026-10-19 追加**：2026-10-19 のユーザーレビューで、AI が見出しや太字を Markdown の記号（`#`・`**`・`---` など）で書いて返し、アドバイスの欄に記号がそのまま入り、公開すると会員様の画面（S-1418）にも記号が出てしまうため。要件定義書 6-16-19）
 - 分けたあと、アドバイス・スタッフ用メモのそれぞれに念のための後始末をする（`EvaluationDraft::stripMarkdown()`。行の頭の `#`〜`######`＋空白（見出しの記号）を外す／`**` の組を外す（中の文字は残す）／`---`・`***`・`___` だけの行を外す／行の頭の `- `・`* `（箇条書きの記号）を `・` に置き換える。文の中の普通の記号（「3*4」・文中の「-」など）は変えない（行の頭と `**` の組だけを対象にする））。**区切りで分けるのは後始末の前**（区切りを消さないように）。後始末のあとに前後の空白・改行を取る（**2026-10-19 追加**。理由は上と同じ）
@@ -2603,7 +2604,7 @@ POST /training-records に以下を追加する。
 **レスポンス**（JSON）:
 - 成功（200）：`{ "evaluation": "…", "staff_memo": "…", "staff_memo_missing": false }`
 - 決まった 3 つ以外・設定が空の AI（422）：`{ "message": "AIで自動生成できませんでした。時間をおいてもう一度お試しください。" }`（AI は呼ばない。**2026-10-20 追加**）
-- AI の失敗・時間切れ・返事が空（502）：`{ "message": "AIで自動生成できませんでした。時間をおいてもう一度お試しください。" }`（**2026-10-19 変更**：その前は「AIの下書きを作れませんでした。…」）
+- AI の失敗・時間切れ・返事が空・最後まで書き終えなかった（502。**2026-10-20 変更**：最後まで書き終えなかったときを足した）：`{ "message": "AIで自動生成できませんでした。時間をおいてもう一度お試しください。" }`（**2026-10-19 変更**：その前は「AIの下書きを作れませんでした。…」）
 - 別のトレーニーの結果・存在しない結果：404。ログインしていない：ログインの画面へ（JSON の要求なら 401）
 
 ###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish
