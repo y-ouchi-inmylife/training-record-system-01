@@ -14,7 +14,7 @@
      - 発行の確認のモーダルはもともとないので、このモーダルが確認を兼ねる。押したらボタンを押せなくして二重送信を防ぐ
      - ［キャンセル］はほかの確認のモーダルと同じグレーの白抜き
      - 「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18）：会員に有効なマイページ登録の案内がない
-       「未登録」「登録待ち（期限切れ）」のときだけ、選択肢の下に出す（2026-10-19 変更：発行済みの「登録待ち」にも出ていて、
+       「未登録」「登録待ち（期限切れ）」のときだけ、選択肢の下に出す。最初はオン（2026-10-19 変更）（2026-10-19 変更：発行済みの「登録待ち」にも出ていて、
        もう 1 件発行されるように見えて分かりにくかったため）（$client は会員詳細の会員。状態は ClientController::show で読み込み済み）。開くたびにオフに戻す。
        オンで発行すると、マイページ登録の案内も発行する（お客様が回答を終えた完了の画面で、有効な案内があればマイページの登録へ誘導する）。3 つの種類のどれでも使える --}}
 <div class="modal fade" id="surveyIssueModal" tabindex="-1"
@@ -32,7 +32,10 @@
                         <legend class="visually-hidden">案内の種類</legend>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindIntake" value="intake">
-                            <label class="form-check-label" for="surveyIssueKindIntake">{{ __('messages.intake_survey_name') }}</label>
+                            {{-- 愛犬アンケートだけ、何を聞くかの補足を付ける（2026-10-19 追加。lang の survey_issue_intake_note。名前そのものは変えない）。
+                                 補足はチェックボックスの下の説明と同じ form-text の大きさ・色。label の中に入れて、文字を押しても選べるようにする。
+                                 form-check は padding-left でラジオボタンの横に文字を置くので、折り返しても 2 行目は文字の頭にそろう --}}
+                            <label class="form-check-label" for="surveyIssueKindIntake">{{ __('messages.intake_survey_name') }}<span class="form-text d-inline ms-1 mt-0" data-survey-issue-intake-note>{{ __('messages.survey_issue_intake_note') }}</span></label>
                         </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindPersonality" value="personality">
@@ -45,8 +48,13 @@
                     </fieldset>
                     @if(\App\Services\SurveyMypageRegistrationService::canIssue($client))
                         <div class="form-check mt-3 pt-3 border-top" data-survey-issue-mypage>
+                            {{-- 最初はオン（2026-10-19 変更：マイページの登録に進んでもらうのが基本なので。その前は最初はオフ）。
+                                 前の送信の入力が戻ってきたとき（old()）は直前の状態を残す。開くたびに、この最初の状態（data-default-checked）に戻す --}}
+                            @php
+                                $mypageChecked = session()->hasOldInput() ? (bool) old('with_mypage_registration') : true;
+                            @endphp
                             <input class="form-check-input" type="checkbox" name="with_mypage_registration" value="1" id="surveyIssueWithMypage"
-                                   aria-describedby="surveyIssueWithMypageHelp">
+                                   aria-describedby="surveyIssueWithMypageHelp" data-default-checked="{{ $mypageChecked ? '1' : '0' }}" @checked($mypageChecked)>
                             <label class="form-check-label" for="surveyIssueWithMypage">マイページ登録の案内も発行する</label>
                             <div class="form-text" id="surveyIssueWithMypageHelp">回答のあと、マイページの登録をご案内します。</div>
                         </div>
@@ -92,11 +100,12 @@
         const button = event.relatedTarget;
         traineeId = button ? button.getAttribute('data-survey-issue-trainee-id') : null;
         nameEl.textContent = button ? button.getAttribute('data-survey-issue-trainee-name') : '';
-        // 開くたびにどちらも選ばない状態に戻す（マイページ登録の案内のチェックもオフに戻す。2026-10-19 追加）
+        // 開くたびにどちらも選ばない状態に戻す。マイページ登録の案内のチェックは最初の状態（ふつうはオン）に戻す
+        // （2026-10-19 変更：その前はオフに戻していた）
         radios.forEach(function (radio) { radio.checked = false; });
         const mypageEl = formEl.querySelector('input[name="with_mypage_registration"]');
         if (mypageEl) {
-            mypageEl.checked = false;
+            mypageEl.checked = mypageEl.getAttribute('data-default-checked') === '1';
         }
         updateAction();
     });

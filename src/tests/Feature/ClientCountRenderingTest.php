@@ -874,7 +874,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('暮らしの様子', $html);
+        // 発行のモーダルの愛犬アンケートの補足（「…暮らしの様子など」。2026-10-19 追加）は除いて確かめる
+        $this->assertStringNotContainsString('暮らしの様子', str_replace('（名前・犬種・暮らしの様子など）', '', $html));
         $this->assertStringNotContainsString('#intake-survey', $html);
         // 未発行は［案内を発行］、回答待ちは「案内中」の行（2026-10-19 変更）
         $this->assertMatchesRegularExpression($this->issueButtonPattern($notIssued, 'ポチ'), $html);
@@ -1865,7 +1866,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, substr_count($html, 'id="surveyIssueModal"'));
         $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="surveyIssueModalLabel"><span data-survey-issue-name><\/span>の案内を発行<\/h5>/u', $html);
         // 種類は 2 つのラジオボタン。開いたときはどちらも選ばない
-        $this->assertMatchesRegularExpression('/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindIntake" value="intake">\s*<label class="form-check-label" for="surveyIssueKindIntake">愛犬アンケート<\/label>/u', $html);
+        $this->assertMatchesRegularExpression('/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindIntake" value="intake">\s*<label class="form-check-label" for="surveyIssueKindIntake">愛犬アンケート'.preg_quote('<span class="form-text d-inline ms-1 mt-0" data-survey-issue-intake-note>（名前・犬種・暮らしの様子など）</span>', '/').'<\/label>/u', $html);
         $this->assertMatchesRegularExpression('/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindPersonality" value="personality">\s*<label class="form-check-label" for="surveyIssueKindPersonality">愛犬性格診断<\/label>/u', $html);
         $this->assertStringNotContainsString('name="survey_kind" id="surveyIssueKindIntake" value="intake" checked', $html);
         // ［キャンセル］（グレーの白抜き）と［発行する］（塗り。選ぶまで押せない）
@@ -1892,7 +1893,8 @@ class ClientCountRenderingTest extends TestCase
 
         $this->overrideIntakeSurveyName('テストアンケート');
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
-        $this->assertStringContainsString('for="surveyIssueKindIntake">テストアンケート</label>', $html);
+        // 補足は名前のあとに付く（名前そのものは差し替えた名前のまま）
+        $this->assertStringContainsString('for="surveyIssueKindIntake">テストアンケート<span class="form-text d-inline ms-1 mt-0" data-survey-issue-intake-note>（名前・犬種・暮らしの様子など）</span></label>', $html);
         $this->assertStringContainsString('<span class="trainee-survey-line">テストアンケート</span>', (string) $this->inProgressRow($html, 'タマ'));
         $this->assertStringContainsString('発行済みのテストアンケートの案内が使えなくなります。', $html);
         $this->assertStringNotContainsString('愛犬アンケート', $html);
@@ -2375,10 +2377,10 @@ class ClientCountRenderingTest extends TestCase
         $html = fn () => $this->get(route('clients.show', $client))->assertOk()->getContent();
         $checkbox = '<input class="form-check-input" type="checkbox" name="with_mypage_registration" value="1" id="surveyIssueWithMypage"';
 
-        // 未登録（メールアドレスなし・案内なし）：最初はオフで、説明の一言を添える
+        // 未登録（メールアドレスなし・案内なし）：最初はオン（2026-10-19 変更：その前はオフ）で、説明の一言を添える
         $page = $html();
         $this->assertStringContainsString($checkbox, $page);
-        $this->assertDoesNotMatchRegularExpression('/id="surveyIssueWithMypage"[^>]*checked/u', $page);
+        $this->assertMatchesRegularExpression('/id="surveyIssueWithMypage"\s*aria-describedby="surveyIssueWithMypageHelp" data-default-checked="1" checked>/u', $page);
         $this->assertStringContainsString('<label class="form-check-label" for="surveyIssueWithMypage">マイページ登録の案内も発行する</label>', $page);
         $this->assertStringContainsString('回答のあと、マイページの登録をご案内します。', $page);
 
@@ -2387,7 +2389,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('with_mypage_registration" value', $html());
         // 登録待ち（期限切れ）：有効な案内がないので出す
         DB::table('client_email_registration_tokens')->where('id', $tokenId)->update(['expires_at' => '2026-10-18 23:59:59']);
-        $this->assertStringContainsString($checkbox, $html());
+        $this->assertMatchesRegularExpression('/id="surveyIssueWithMypage"\s*aria-describedby="surveyIssueWithMypageHelp" data-default-checked="1" checked>/u', $html());
 
         // 登録待ち（初回設定）：メールアドレスを入れて登録の途中
         DB::table('clients')->where('id', $client->id)->update(['email' => 'a@example.com']);
@@ -2591,5 +2593,44 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('fw-bold text-nowrap">案内中', $html);
         $this->assertStringNotContainsString('text-danger text-nowrap">期限切れ', $html);
         $this->assertSame(['class' => 'bg-warning text-dark'], array_intersect_key((new Client(['email' => null]))->forceFill(['latest_email_reg_expires_at' => '2026-11-02 23:59:59', 'has_active_email_reg_token' => 1])->statusBadge(), ['class' => 1]));
+    }
+
+    // ---- 案内の発行のモーダル：マイページ登録を最初からオン・愛犬アンケートの補足（2026-10-19 変更。設計書 S-0305-M08） ----
+
+    public function test_前の送信の入力が戻ってきたときはマイページ登録のチェックの直前の状態を残す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+        $pattern = fn (bool $on) => '/id="surveyIssueWithMypage"\s*aria-describedby="surveyIssueWithMypageHelp" data-default-checked="'.($on ? '1' : '0').'"'.($on ? ' checked' : '\s*').'>/u';
+
+        // オフで送っていた（チェックボックスの値が送られていない）：オフのまま
+        $html = $this->withSession(['_old_input' => ['survey_kind' => 'intake']])->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression($pattern(false), $html);
+
+        // オンで送っていた：オンのまま
+        $html = $this->withSession(['_old_input' => ['survey_kind' => 'intake', 'with_mypage_registration' => '1']])->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression($pattern(true), $html);
+
+        // 開くたびに最初の状態（data-default-checked）に戻す
+        $this->assertStringContainsString("mypageEl.checked = mypageEl.getAttribute('data-default-checked') === '1';", $html);
+    }
+
+    public function test_愛犬アンケートの補足は発行のモーダルの愛犬アンケートの選択肢だけに付く(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 補足は 1 か所（愛犬アンケートの選択肢のラベルの中）だけ。ほかの 2 つの選択肢には付かない
+        $this->assertSame(1, substr_count($html, '（名前・犬種・暮らしの様子など）'));
+        $this->assertStringContainsString('for="surveyIssueKindPersonality">愛犬性格診断</label>', $html);
+        $this->assertStringContainsString('for="surveyIssueKindCombined">愛犬アンケート＆愛犬性格診断</label>', $html);
+        // ほかの所の愛犬アンケートの名前（案内中の行・取消の確認）には付かない
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', (string) $this->inProgressRow($html, 'ポチ'));
+        $this->assertStringContainsString('発行済みの愛犬アンケートの案内が使えなくなります。', $html);
     }
 }
