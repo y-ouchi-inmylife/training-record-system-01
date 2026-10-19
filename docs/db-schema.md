@@ -888,10 +888,10 @@ erDiagram
 | evaluation_published_at | TIMESTAMP | YES | NULL | 評価文を公開した日時（**2026-10-18 追加**。要件定義書 6-16-16）。NULL でなければ公開済み。会員様の記録の一覧・会員詳細のトレーニング記録の欄では、この日時を評価文の日付・時刻として並べる。公開を取り消すと NULL に戻す。もう一度公開すると、そのときの日時になる |
 | evaluation_published_by | BIGINT UNSIGNED | YES | NULL | 評価文を公開したトレーナーのID（外部キー。**2026-10-18 追加**）。会員様の画面では「担当」として出す。公開を取り消すと NULL に戻す |
 | personality_type | VARCHAR(30) | YES | NULL | タイプ（5-24. の値）。**丸める前の**平均から判定する（要件定義書 6-16「愛犬性格診断の採点とタイプの判定」）。点数なし（NULL）のカテゴリは判定から外し、全カテゴリが点数なしなら **NULL**＝判定なし（**2026-10-18 変更**：その前は NOT NULL で、全問「未経験」は calm）。表示名はコードに持つ |
-| wish | TEXT | YES | NULL | 暮らしの様子「こうなったらいいな」の答え（**2026-10-19 追加**。マイグレーション `2026_10_19_000006`。設問文は要件定義書 D-1200「暮らしの様子の 4 問」）。回答の画面（S-1415）で 50 問のあとに答える。任意・2,000 文字以内（改行は LF にそろえる）。空・空白だけで送られたときは NULL |
-| recent_events | TEXT | YES | NULL | 暮らしの様子「最近の様子」の答え（**2026-10-19 追加**。同上） |
-| ideal_days | TEXT | YES | NULL | 暮らしの様子「理想の毎日」の答え（**2026-10-19 追加**。同上） |
-| health_concerns | TEXT | YES | NULL | 暮らしの様子「体のこと」の答え（**2026-10-19 追加**。同上） |
+| wish | TEXT | YES | NULL | 自由記述の質問「こうなったらいいな」の答え（**2026-10-19 追加**。マイグレーション `2026_10_19_000006`。設問文は要件定義書 D-1200「自由記述の質問（4 問）」。DB の列コメントは当時の呼び名「暮らしの様子「…」」のまま〔変えるには新しいマイグレーションが要るため〕）。回答の画面（S-1415）で 50 問のあとに答える。任意・2,000 文字以内（改行は LF にそろえる）。空・空白だけで送られたときは NULL |
+| recent_events | TEXT | YES | NULL | 自由記述の質問「最近の様子」の答え（**2026-10-19 追加**。同上） |
+| ideal_days | TEXT | YES | NULL | 自由記述の質問「理想の毎日」の答え（**2026-10-19 追加**。同上） |
+| health_concerns | TEXT | YES | NULL | 自由記述の質問「体のこと」の答え（**2026-10-19 追加**。同上） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
 
@@ -1620,7 +1620,7 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（愛犬アンケート�
 **列の追加・削除（2026-10-19。要件定義書 6-16-13・6-16-19）**：今あるマイグレーションは書き換えず、新しいマイグレーションで次の順に行う
 
 1. `2026_10_19_000005_add_staff_memo_to_trainee_personality_diagnosis_results_table`：D-1200 に `staff_memo`
-2. `2026_10_19_000006_add_life_answers_to_trainee_personality_diagnosis_results_table`：D-1200 に暮らしの様子の 4 列（`wish`・`recent_events`・`ideal_days`・`health_concerns`。どれも TEXT・NULL 可）。`down()` は 4 列を外す
+2. `2026_10_19_000006_add_life_answers_to_trainee_personality_diagnosis_results_table`：D-1200 に自由記述の質問の 4 列（当時の呼び名は「暮らしの様子」）（`wish`・`recent_events`・`ideal_days`・`health_concerns`。どれも TEXT・NULL 可）。`down()` は 4 列を外す
 3. `2026_10_19_000007_drop_life_answers_from_trainee_intake_survey_responses_table`：D-1100 から同じ 4 列を外す（今あった答えは移さずに消す）。`down()` は 4 列を足し直す（値は戻らない）
 
 - 2. と 3. は別のファイルにし、この順（足す → 外す）で流す
