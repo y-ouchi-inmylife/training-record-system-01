@@ -682,7 +682,7 @@ class ClientCountRenderingTest extends TestCase
             $url = preg_quote(route('trainees.show', $id), '/');
             $this->assertMatchesRegularExpression(
                 '/<div class="d-flex align-items-start gap-3">\s*<a href="'.$url.'" class="flex-shrink-0 text-decoration-none"[^>]*>.*?<\/a>\s*'
-                .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
+                .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
                 $html,
                 $name
             );
@@ -705,13 +705,13 @@ class ClientCountRenderingTest extends TestCase
         $pattern = '/<div class="d-flex align-items-start gap-3">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'" class="flex-shrink-0 text-decoration-none"\s*>.*?<\/a>\s*'
             .'<div class="flex-grow-1" style="min-width: 0;">\s*'
-            .'<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
+            .'<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
         $this->assertMatchesRegularExpression($pattern, $html);
 
         // 写真がないまとまりも、左に「写真なし」の枠のリンク、右に名前・項目の列（位置がそろう）
         $this->assertMatchesRegularExpression(
             '/<div class="d-flex align-items-start gap-3">\s*<a href="[^"]+" class="flex-shrink-0 text-decoration-none"\s*aria-label="たまの写真なし。トレーニー詳細へ"\s*>.*?写真なし<\/span>\s*<\/div>\s*<\/a>\s*'
-            .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break"><a href="[^"]+">たま<\/a><\/h6>/su',
+            .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="[^"]+">たま<\/a><\/h6>/su',
             $html
         );
 
@@ -798,7 +798,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $url = preg_quote(route('trainees.show', $id), '/');
-        $this->assertMatchesRegularExpression('/<h6 class="mb-0 text-break"><a href="'.$url.'" class="text-muted">名前未登録<\/a><\/h6>/u', $html);
+        $this->assertMatchesRegularExpression('/<h6 class="mb-0 text-break trainee-survey-line"><a href="'.$url.'" class="text-muted">名前未登録<\/a><\/h6>/u', $html);
         $this->assertStringContainsString('aria-label="名前未登録の写真なし。トレーニー詳細へ"', $html);
         // リンクの文字が空にならない
         $this->assertDoesNotMatchRegularExpression('/<a href="'.$url.'"[^>]*><\/a>/u', $html);
@@ -812,7 +812,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<h6 class="mb-0 text-break"><a href="'.route('trainees.show', $id).'">ポチ</a></h6>', $html);
+        $this->assertStringContainsString('<h6 class="mb-0 text-break trainee-survey-line"><a href="'.route('trainees.show', $id).'">ポチ</a></h6>', $html);
     }
 
     // ---- 愛犬アンケートの行（2026-10 追加。設計書 S-0305 セクション3「愛犬アンケート」） ----
@@ -1638,10 +1638,17 @@ class ClientCountRenderingTest extends TestCase
             .'aria-label="'.preg_quote($name, '/').'の案内を発行">案内を発行<\/button>/u';
     }
 
-    /** トレーニー 1 頭分の「案内中」の行の HTML（なければ null） */
+    /** 名前の行の右のまとまり（案内中でないとき：期限切れの表示と［案内を発行］の段）の始まりの正規表現の一部 */
+    private function rightOfNamePrefix(): string
+    {
+        return '<div class="d-flex flex-column align-items-end gap-1 ms-auto small">\s*<div class="d-flex flex-wrap align-items-center justify-content-end gap-2">\s*';
+    }
+
+    /** トレーニー 1 頭分の「案内中」の表示（名前の行の右のまとまり）の HTML（なければ null） */
     private function inProgressRow(string $html, string $name): ?string
     {
-        $pattern = '/aria-label="'.preg_quote($name, '/').'の案内中の案内" data-survey-in-progress>(.*?)<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/su';
+        // まとまりの中の最後の段の［取消］とボタンのまとまりの閉じから、段・まとまり・右の入れ物・名前の行の閉じまで
+        $pattern = '/aria-label="'.preg_quote($name, '/').'の案内中の案内" data-survey-in-progress>(.*?<\/button>\s*<\/div>)\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/su';
 
         return preg_match($pattern, $html, $m) === 1 ? $m[1] : null;
     }
@@ -1657,7 +1664,8 @@ class ClientCountRenderingTest extends TestCase
 
         // 名前の行の右に［案内を発行］（塗り。読み上げ用に「{表示名}の案内を発行」）
         $this->assertMatchesRegularExpression(
-            '/<h6 class="mb-0 text-break"><a href="'.preg_quote(route('trainees.show', $id), '/').'">ポチ<\/a><\/h6>\s*'.trim($this->issueButtonPattern($id, 'ポチ'), '/u').'/u',
+            '/<h6 class="mb-0 text-break trainee-survey-line"><a href="'.preg_quote(route('trainees.show', $id), '/').'">ポチ<\/a><\/h6>\s*'
+            .$this->rightOfNamePrefix().trim($this->issueButtonPattern($id, 'ポチ'), '/u').'\s*<\/div>\s*<\/div>\s*<\/div>/u',
             $html
         );
         $this->assertMatchesRegularExpression($this->issueButtonPattern($unnamed, '名前未登録'), $html);
@@ -1706,13 +1714,18 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
         $row = $this->inProgressRow($html, 'ポチ');
         $this->assertNotNull($row);
-        // 名前の行のすぐ下（犬種の行の上）に、ラベルの列に「案内中」、値の列に種類の名前と［表示］［取消］。区切り線は引かず、
-        // 属性の並びとの間に少しの余白（mb-2）（2026-10-19 変更：その前は欄のいちばん下に区切り線〔border-top〕つきで出していた）。
+        // 名前の行の右（2026-10-19 変更：その前は名前の行のすぐ下の別の行。さらにその前は欄のいちばん下に区切り線つき）に、
+        // 「案内中」（太字）・種類の名前・［表示］［取消］。名前の下の別の行はない。
         // 期限つきの案内でも期限の日は出さない（2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）
         $this->assertMatchesRegularExpression(
-            '/>ポチ<\/a><\/h6>\s*<\/div>\s*<div class="row small mb-2" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*<div class="col-4 fw-bold"><div class="trainee-survey-line">案内中<\/div><\/div>/u',
+            '/>ポチ<\/a><\/h6>\s*<div class="d-flex flex-column align-items-end gap-1 ms-auto small">\s*'
+            .'<div class="d-flex flex-column align-items-end gap-1" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*'
+            .'<div class="d-flex flex-wrap align-items-center justify-content-end gap-2" data-survey-in-progress-item>\s*'
+            .'<div class="d-flex align-items-center gap-2">\s*<span class="trainee-survey-line fw-bold text-nowrap">案内中<\/span>\s*<span class="trainee-survey-line">愛犬アンケート<\/span>/u',
             $html
         );
+        $this->assertStringNotContainsString('class="row small mb-2"', $html);
+        $this->assertStringNotContainsString('<div class="col-4 fw-bold">', $html);
         $this->assertStringNotContainsString('border-top', substr($html, strpos($html, 'data-survey-in-progress'), 2000));
         $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', $row);
         $this->assertStringNotContainsString('まで）', $row);
@@ -1861,11 +1874,11 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 「期限切れ」の行と上下のそろえ（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」） ----
 
-    /** トレーニー 1 頭分の「期限切れ」の行の HTML（なければ null） */
+    /** トレーニー 1 頭分の「期限切れ」の表示（名前の行の右）の HTML（なければ null） */
     private function expiredRow(string $html, string $name): ?string
     {
-        // ラベルの列から、値（種類の名前）の span と値の列の閉じまで
-        $pattern = '/aria-label="'.preg_quote($name, '/').'の期限切れの案内" data-survey-expired>(.*?<\/span><\/div>)/su';
+        // ラベル「期限切れ」から、値（種類の名前）の span とまとまりの閉じまで（［案内を発行］はまとまりの外）
+        $pattern = '/aria-label="'.preg_quote($name, '/').'の期限切れの案内" data-survey-expired>(.*?<\/span>\s*<\/div>)/su';
 
         return preg_match($pattern, $html, $m) === 1 ? $m[1] : null;
     }
@@ -1883,14 +1896,17 @@ class ClientCountRenderingTest extends TestCase
 
         $row = $this->expiredRow($html, 'ポチ');
         $this->assertNotNull($row);
-        // 名前の行のすぐ下（犬種の上）、ラベルは太字の赤、値は種類の名前（日付なし）。ラベル・値とも上下をそろえる箱の中
+        // 名前の行の右（2026-10-19 変更：その前は名前の行のすぐ下の別の行）に、「期限切れ」（太字の赤）・種類の名前（日付なし）、
+        // その右に［案内を発行］。ラベル・値とも上下をそろえる箱の中。名前の下の別の行はない
         $this->assertMatchesRegularExpression(
-            '/>ポチ<\/a><\/h6>\s*'.trim($this->issueButtonPattern($id, 'ポチ'), '/u').'\s*<\/div>\s*'
-            .'<div class="row small mb-2" role="group"\s*aria-label="ポチの期限切れの案内" data-survey-expired>\s*'
-            .'<div class="col-4 fw-bold text-danger"><div class="trainee-survey-line text-nowrap">期限切れ<\/div><\/div>\s*'
-            .'<div class="col-8"><span class="trainee-survey-line">愛犬性格診断<\/span><\/div>/u',
+            '/>ポチ<\/a><\/h6>\s*'.$this->rightOfNamePrefix()
+            .'<div class="d-flex align-items-center gap-2" role="group"\s*aria-label="ポチの期限切れの案内" data-survey-expired>\s*'
+            .'<span class="trainee-survey-line fw-bold text-danger text-nowrap">期限切れ<\/span>\s*'
+            .'<span class="trainee-survey-line">愛犬性格診断<\/span>\s*<\/div>\s*'
+            .trim($this->issueButtonPattern($id, 'ポチ'), '/u').'\s*<\/div>\s*<\/div>\s*<\/div>/u',
             $html
         );
+        $this->assertStringNotContainsString('class="row small mb-2"', $html);
         $this->assertLessThan(strpos($html, '<dt class="col-4 fw-normal text-muted">犬種</dt>'), strpos($html, 'data-survey-expired'));
         $this->assertStringNotContainsString('<a', $row);
         $this->assertStringNotContainsString('<button', $row);
@@ -1992,8 +2008,91 @@ class ClientCountRenderingTest extends TestCase
 
         $row = (string) $this->inProgressRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
 
-        // ラベルの列（1 つ）と、2 つの値がどれも .trainee-survey-line（小さいボタンと同じ高さで縦の中央に置く）
-        $this->assertStringContainsString('<div class="col-4 fw-bold"><div class="trainee-survey-line">案内中</div></div>', $row);
+        // 段ごとのラベル「案内中」（2 つ）と 2 つの値がどれも .trainee-survey-line（小さいボタンと同じ高さで縦の中央に置く。
+        // 名前の h6 も同じ箱なので、名前と 1 段目の中央がそろう）
+        $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line fw-bold text-nowrap">案内中</span>'));
         $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line">'));
+    }
+
+    // ---- 案内中・期限切れの表示を名前の行の右に（2026-10-19 変更。設計書 S-0305 セクション3「案内の操作」） ----
+
+    /** トレーニー 1 頭分の、名前の h6 から属性の並び（犬種の dl）の手前までの HTML */
+    private function nameRowToBreed(string $html, string $name): string
+    {
+        $start = strpos($html, '>'.$name.'</a></h6>');
+        $this->assertNotFalse($start);
+        $end = strpos($html, '<dl class="row mb-0 small">', $start);
+        $this->assertNotFalse($end);
+
+        return substr($html, $start, $end - $start);
+    }
+
+    public function test_案内中と期限切れの表示は名前の行の中にあり名前の下の別の行はない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $active = $this->trainee($client, 'ポチ');
+        $expired = $this->trainee($client, 'タマ');
+        $this->intakeToken($active);
+        $this->personalityToken($expired);
+        DB::table('trainee_personality_diagnosis_tokens')->where('trainee_id', $expired)
+            ->update(['expires_at' => '2026-10-26 23:59:59', 'created_at' => '2026-10-19 10:00:00']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        foreach (['ポチ' => 'data-survey-in-progress', 'タマ' => 'data-survey-expired'] as $name => $marker) {
+            $segment = $this->nameRowToBreed($html, $name);
+            // 名前より後、犬種より前にあり、名前の行の閉じ（</div>）より前で終わる：名前の行の閉じの後は属性の並びまで空白だけ
+            $this->assertStringContainsString($marker, $segment);
+            $this->assertMatchesRegularExpression('/<\/div>\s*<\/div>\s*<\/div>\s*(\{\{--.*?--\}\})?\s*$/su', $segment);
+            $this->assertStringNotContainsString('class="row', $segment);
+        }
+    }
+
+    public function test_期限切れは名前の行に期限切れの表示と案内を発行を出し案内中は案内を発行を出さない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $active = $this->trainee($client, 'ポチ');
+        $expired = $this->trainee($client, 'タマ');
+        $this->intakeToken($active);
+        $this->personalityToken($expired);
+        DB::table('trainee_personality_diagnosis_tokens')->where('trainee_id', $expired)
+            ->update(['expires_at' => '2026-10-26 23:59:59', 'created_at' => '2026-10-19 10:00:00']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $expiredSegment = $this->nameRowToBreed($html, 'タマ');
+        $this->assertStringContainsString('>期限切れ</span>', $expiredSegment);
+        $this->assertMatchesRegularExpression($this->issueButtonPattern($expired, 'タマ'), $expiredSegment);
+        // 期限切れの表示は［案内を発行］の左
+        $this->assertLessThan(strpos($expiredSegment, 'data-survey-issue-trainee-id'), strpos($expiredSegment, 'data-survey-expired'));
+
+        $activeSegment = $this->nameRowToBreed($html, 'ポチ');
+        $this->assertStringContainsString('>案内中</span>', $activeSegment);
+        $this->assertStringNotContainsString('data-survey-issue-trainee-id', $activeSegment);
+        $this->assertStringNotContainsString('data-survey-expired', $activeSegment);
+    }
+
+    public function test_案内中が2つのときは2つとも名前の行の中に縦に並べる(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id);
+        $this->personalityToken($id);
+
+        $segment = $this->nameRowToBreed($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
+
+        // 縦に並べるまとまり（flex-column）の中に 2 段
+        $this->assertStringContainsString('<div class="d-flex flex-column align-items-end gap-1" role="group"', $segment);
+        $this->assertSame(2, substr_count($segment, 'data-survey-in-progress-item'));
+        $this->assertSame(2, substr_count($segment, '>案内中</span>'));
+        // ［表示］［取消］は段ごとに 1 つのまとまり（狭い幅でも 2 つ一緒に折り返す）
+        $this->assertSame(2, substr_count($segment, '<div class="d-flex gap-2">'));
+        $this->assertStringContainsString('>愛犬アンケート</span>', $segment);
+        $this->assertStringContainsString('>愛犬性格診断</span>', $segment);
     }
 }

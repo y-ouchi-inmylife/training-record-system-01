@@ -619,66 +619,62 @@
                                         default => null,
                                     };
                                 @endphp
-                                {{-- 名前の行。右に［案内を発行］（回答待ちの案内がないときだけ。いつも使う操作なので塗り。4-4）。
-                                     幅が足りないときは flex-wrap でボタンが名前の下の行に回り、ms-auto で右寄せのまま。名前は text-break で
-                                     長くてもはみ出さない。ボタンの文字は短いので、読み上げ用に「{表示名}の案内を発行」の名前を付ける。
+                                {{-- 名前の行。右に案内の表示と操作をまとめて右寄せで置く（2026-10-19 変更：設計書 S-0305 セクション3「案内の操作」。
+                                     ユーザーレビューで、名前の下に 1 行を足すより名前の行の右にまとめた方が欄が短く見やすいため。その前は、名前の行の
+                                     すぐ下・犬種の行の上に「案内中」「期限切れ」の行を出していた）。名前の行のすぐ下に犬種が来る。
+                                     - 案内中：「案内中」（太字）＋種類の名前＋［表示］（白抜きの青。ご案内の画面を同じタブで開く）［取消］（白抜きの赤。
+                                       今の取消の確認 M06・M07 を開く）。期限の日は出さない。2 つあれば縦に 2 段（名前は 1 段目と同じ高さ）
+                                     - 期限切れ：「期限切れ」（太字の赤）＋種類の名前＋［案内を発行］（期限切れの案内の［表示］［取消］は出さない）
+                                     - どちらもない：［案内を発行］だけ（いつも使う操作なので塗り。4-4）
+                                     上下のそろえ：名前・ラベル・種類の名前は、ボタン（btn-sm）と同じ高さの箱（.trainee-survey-line）の中で縦の中央に置き、
+                                     名前の行は上詰め（align-items-start）にする。これで名前と 1 段目の中央がそろい、2 段目は名前の下に入る。
+                                     幅が足りないときは flex-wrap で右のまとまりが名前の下の行に回り、ms-auto で右寄せのまま。名前は text-break で
+                                     長くてもはみ出さない。ボタンの文字は短いので、読み上げ用に「{表示名}の案内を発行」などの名前を付ける。
                                      名前のリンク：名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
-                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                                    <h6 class="mb-0 text-break"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
-                                    @if($activeSurveys === [])
-                                        <button type="button" class="btn btn-sm btn-primary text-nowrap ms-auto"
-                                                data-bs-toggle="modal" data-bs-target="#surveyIssueModal"
-                                                data-survey-issue-trainee-id="{{ $trainee->id }}"
-                                                data-survey-issue-trainee-name="{{ $trainee->display_name }}"
-                                                aria-label="{{ $trainee->display_name }}の案内を発行">案内を発行</button>
-                                    @endif
-                                </div>
-                                {{-- 「案内中」の行（2026-10-19 追加。回答待ちの案内があるときだけ）。名前の行のすぐ下、犬種の行の上に出す
-                                     （2026-10-19 変更：ユーザーレビューで、案内の状況を名前のすぐ下で見られるようにした。その前は欄のいちばん下に、
-                                     上に区切り線を引いて出していた）。区切り線は引かず、属性の並びとの間に少しの余白（mb-2）を空ける
-                                     （ラベル「案内中」は太字で、ボタンも並ぶので、線がなくても属性の行と見分けがつく）。
-                                     属性の並び（dl.row）と同じ col-4／col-8 で組み、ラベルの列に小見出し「案内中」、値の列に種類の名前
-                                     （期限の日は出さない。2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）と、右に［表示］（白抜きの青。ご案内の画面を
-                                     同じタブで開く）［取消］（白抜きの赤。今の取消の確認 M06・M07 を開く）。2 つあれば値の列に 2 段で出す。
-                                     ボタンのまとまりは、幅が足りれば種類の名前と同じ行の右、足りないときは次の行に回って右寄せ（flex-wrap・ms-auto） --}}
-                                @if($activeSurveys !== [])
-                                    <div class="row small mb-2" role="group"
-                                         aria-label="{{ $trainee->display_name }}の案内中の案内" data-survey-in-progress>
-                                        {{-- ラベルと値は、ボタン（btn-sm）と同じ高さの箱（.trainee-survey-line）の中で縦の中央に置く
-                                             （2026-10-19 変更：ラベルの列が上詰めで、値だけがボタンの高さに合わせて下がり、ラベルが少し上に出ていたため）。
-                                             375px でボタンが次の行に回っても、ラベルと値は同じ高さにそろう --}}
-                                        <div class="col-4 fw-bold"><div class="trainee-survey-line">案内中</div></div>
-                                        <div class="col-8">
-                                            @foreach($activeSurveys as $survey)
-                                                <div class="d-flex flex-wrap align-items-center gap-2 @if(! $loop->first) mt-1 @endif" data-survey-in-progress-item>
-                                                    <span class="trainee-survey-line">{{ $survey['name'] }}</span>
-                                                    <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto">
-                                                        <a href="{{ $survey['printUrl'] }}" class="btn btn-sm btn-outline-primary text-nowrap"
-                                                           aria-label="{{ $survey['name'] }}の案内を表示">表示</a>
-                                                        <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
-                                                                data-bs-toggle="modal" data-bs-target="{{ $survey['cancelModal'] }}"
-                                                                {{ $survey['cancelAttribute'] }}="{{ $trainee->id }}"
-                                                                aria-label="{{ $survey['name'] }}の案内を取消">取消</button>
+                                <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                    <h6 class="mb-0 text-break trainee-survey-line"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
+                                    <div class="d-flex flex-column align-items-end gap-1 ms-auto small">
+                                        @if($activeSurveys !== [])
+                                            <div class="d-flex flex-column align-items-end gap-1" role="group"
+                                                 aria-label="{{ $trainee->display_name }}の案内中の案内" data-survey-in-progress>
+                                                @foreach($activeSurveys as $survey)
+                                                    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2" data-survey-in-progress-item>
+                                                        {{-- ラベルと種類の名前は離さない（1 つのまとまり） --}}
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="trainee-survey-line fw-bold text-nowrap">案内中</span>
+                                                            <span class="trainee-survey-line">{{ $survey['name'] }}</span>
+                                                        </div>
+                                                        {{-- ［表示］［取消］は 1 つのまとまりにして、狭い幅でも 2 つ一緒に次の行へ回す（［取消］だけが落ちないように） --}}
+                                                        <div class="d-flex gap-2">
+                                                            <a href="{{ $survey['printUrl'] }}" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                               aria-label="{{ $survey['name'] }}の案内を表示">表示</a>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
+                                                                    data-bs-toggle="modal" data-bs-target="{{ $survey['cancelModal'] }}"
+                                                                    {{ $survey['cancelAttribute'] }}="{{ $trainee->id }}"
+                                                                    aria-label="{{ $survey['name'] }}の案内を取消">取消</button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+                                                @if($expiredSurveyName !== null)
+                                                    <div class="d-flex align-items-center gap-2" role="group"
+                                                         aria-label="{{ $trainee->display_name }}の期限切れの案内" data-survey-expired>
+                                                        <span class="trainee-survey-line fw-bold text-danger text-nowrap">期限切れ</span>
+                                                        <span class="trainee-survey-line">{{ $expiredSurveyName }}</span>
+                                                    </div>
+                                                @endif
+                                                <button type="button" class="btn btn-sm btn-primary text-nowrap ms-auto"
+                                                        data-bs-toggle="modal" data-bs-target="#surveyIssueModal"
+                                                        data-survey-issue-trainee-id="{{ $trainee->id }}"
+                                                        data-survey-issue-trainee-name="{{ $trainee->display_name }}"
+                                                        aria-label="{{ $trainee->display_name }}の案内を発行">案内を発行</button>
+                                            </div>
+                                        @endif
                                     </div>
-                                @endif
-                                {{-- 「期限切れ」の行（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」）。案内の期限が切れたことにトレーナーが
-                                     気づけるように、いちばん新しく発行した案内が未回答で期限切れのとき、「案内中」の行と同じ所・同じ列・同じそろえで出す。
-                                     ラベルは太字の赤（text-danger。注意が向くが、ボタンのような強い色の面は使わない）、値は種類の名前（日付は出さない）。
-                                     ボタンは出さない（期限切れの案内の［表示］［取消］は要らない。名前の行の右の［案内を発行］ですぐ発行し直せる） --}}
-                                @if($expiredSurveyName !== null)
-                                    <div class="row small mb-2" role="group"
-                                         aria-label="{{ $trainee->display_name }}の期限切れの案内" data-survey-expired>
-                                        {{-- ラベルは折り返さない（text-nowrap）：375px ではラベルの列の中が約 52px しかなく、太字の「期限切れ」（4 文字。約 56px）が
-                                             2 行に折れて値と上下がずれていたため。列の右の余白（12px）の中に約 4px はみ出すだけで、値には重ならない --}}
-                                        <div class="col-4 fw-bold text-danger"><div class="trainee-survey-line text-nowrap">期限切れ</div></div>
-                                        <div class="col-8"><span class="trainee-survey-line">{{ $expiredSurveyName }}</span></div>
-                                    </div>
-                                @endif
+                                </div>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。
                                      x-detail-cell は使わない（3 列グリッド前提のコンポーネントで
