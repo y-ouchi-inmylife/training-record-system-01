@@ -53,9 +53,13 @@
     </div>
 
     {{-- 結果（タイプ・この結果の時点のレーダーチャート・7 項目の点数）。並びは S-0309 の欄と同じ：xl 以上はグラフが左、それより狭いときはグラフが上 --}}
+    {{-- 見出しの右端に「50問の回答」のリンク（2026-10-19 追加：いちばん下の 50問の回答の欄が遠く、スクロールしないと見られなかったため）。
+         同じ画面の下の欄（#personality-diagnosis-answers）へ移る。見た目は会員詳細の「性格診断」のリンクと同じふつうの文字のリンク（小さい文字）。
+         狭い幅で 1 行に収まらないときは次の行へ折り返して右に寄せる（アドバイスとスタッフ用メモのカードの見出しの行と同じ） --}}
     <div class="card mb-3">
-        <div class="card-header">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h6 class="mb-0">結果</h6>
+            <a href="#personality-diagnosis-answers" class="small ms-auto" data-personality-diagnosis-answers-link>50問の回答</a>
         </div>
         <div class="card-body">
             <div class="row gy-3 align-items-start" data-personality-diagnosis-layout>
@@ -204,8 +208,10 @@
     </div>
 
     {{-- 50問の回答（2026-10-18 変更：当初は S-0309 の表の行の［回答］からモーダルで出していた。中身は同じ）。
-         設問は結果の設問の版に合った文（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は設問の ID） --}}
-    <div class="card mb-3" data-personality-diagnosis-answers>
+         設問は結果の設問の版に合った文（PersonalityDiagnosisQuestions::questionsFor()。定義のない版は設問の ID）。
+         id と scroll-margin-top は、「結果」の欄の見出しの右の「50問の回答」のリンクの移り先にするため（2026-10-19 追加。
+         上の固定のメニューに見出しが隠れないよう、トレーニー詳細の愛犬性格診断の欄〔#personality-diagnosis〕と同じ値） --}}
+    <div class="card mb-3" id="personality-diagnosis-answers" style="scroll-margin-top: 4.5rem;" data-personality-diagnosis-answers>
         <div class="card-header">
             <h6 class="mb-0">50問の回答</h6>
         </div>

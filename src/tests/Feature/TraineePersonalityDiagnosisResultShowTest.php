@@ -481,7 +481,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('最終更新', $card);
         $this->assertSame('最終更新: 2026/10/18 14:30 佐藤', $this->updatedLine($html));
         $this->assertStringContainsString('<div class="text-end text-muted small mb-3" data-evaluation-updated>', $html);
-        $this->assertGreaterThan(strpos($html, 'data-personality-diagnosis-answers'), strpos($html, 'data-evaluation-updated'));
+        $this->assertGreaterThan(strpos($html, 'data-personality-diagnosis-answers>'), strpos($html, 'data-evaluation-updated'));
     }
 
     public function test_表示しただけでは操作の記録を残さない(): void
@@ -1340,5 +1340,27 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame(2, substr_count($html, 'notice.replaceChildren();'));
         // 文は textContent で入れる（innerHTML は使わない）
         $this->assertStringContainsString('alertEl.appendChild(document.createTextNode(message));', $html);
+    }
+
+    public function test_結果の欄の見出しの右に50問の回答の欄へのページ内のリンクがある(): void
+    {
+        $html = $this->page($this->addResult('past-1', '2026-10-15 10:30:00'));
+
+        // 結果の欄の見出しの行に、見出しとリンクが並ぶ（上下の真ん中をそろえ、狭いときは右に寄せて折り返す）
+        $this->assertMatchesRegularExpression(
+            '/<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">\s*<h6 class="mb-0">結果<\/h6>\s*'
+            .'<a href="#personality-diagnosis-answers" class="small ms-auto" data-personality-diagnosis-answers-link>50問の回答<\/a>\s*<\/div>/u',
+            $html
+        );
+        $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-answers-link'));
+        // 移り先の欄：id があり、固定のメニューに隠れないよう scroll-margin-top（トレーニー詳細の #personality-diagnosis と同じ値）
+        $this->assertSame(1, substr_count($html, 'id="personality-diagnosis-answers"'));
+        $this->assertMatchesRegularExpression(
+            '/<div class="card mb-3" id="personality-diagnosis-answers" style="scroll-margin-top: 4\.5rem;" data-personality-diagnosis-answers>\s*<div class="card-header">\s*<h6 class="mb-0">50問の回答<\/h6>/u',
+            $html
+        );
+        // リンクは結果の欄の中、移り先は下
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-answers>'), strpos($html, 'data-personality-diagnosis-answers-link'));
+        $this->assertLessThan(strpos($html, 'id="personality-diagnosis-radar"'), strpos($html, 'data-personality-diagnosis-answers-link'));
     }
 }
