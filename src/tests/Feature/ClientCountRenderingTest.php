@@ -1337,8 +1337,9 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        $this->assertSame(1, $count($one));
-        $this->assertSame(1, $count($three));
+        // 有効な案内と、いちばん新しい案内（「期限切れ」の行。2026-10-19 追加）の 2 本。トレーニーの数では増えない
+        $this->assertSame(2, $count($one));
+        $this->assertSame(2, $count($three));
     }
 
     // ---- 性格診断の行の最新の診断の日付（2026-10 追加。設計書 S-0305「性格診断の行」の「最新の診断の日付」） ----
@@ -1528,7 +1529,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringContainsString('aria-label="ポチの愛犬性格診断">愛犬<wbr>性格診断</a>', $html);
         // 「案内中」の行（2026-10-19 変更：その前は行のボタンのまとまり）
-        $this->assertStringContainsString('<span>愛犬性格診断</span>', $this->inProgressRow($html, 'ポチ'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', $this->inProgressRow($html, 'ポチ'));
         // 取消の確認（M07）
         $this->assertStringContainsString('愛犬性格診断の案内の取消', $html);
         $this->assertOnlyFullPersonalityDiagnosisName($html);
@@ -1709,11 +1710,11 @@ class ClientCountRenderingTest extends TestCase
         // 属性の並びとの間に少しの余白（mb-2）（2026-10-19 変更：その前は欄のいちばん下に区切り線〔border-top〕つきで出していた）。
         // 期限つきの案内でも期限の日は出さない（2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）
         $this->assertMatchesRegularExpression(
-            '/>ポチ<\/a><\/h6>\s*<\/div>\s*<div class="row small mb-2" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*<div class="col-4 fw-bold">案内中<\/div>/u',
+            '/>ポチ<\/a><\/h6>\s*<\/div>\s*<div class="row small mb-2" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*<div class="col-4 fw-bold"><div class="trainee-survey-line">案内中<\/div><\/div>/u',
             $html
         );
         $this->assertStringNotContainsString('border-top', substr($html, strpos($html, 'data-survey-in-progress'), 2000));
-        $this->assertStringContainsString('<span>愛犬アンケート</span>', $row);
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', $row);
         $this->assertStringNotContainsString('まで）', $row);
         $this->assertStringNotContainsString('10/26', $row);
         $this->assertMatchesRegularExpression(
@@ -1739,7 +1740,7 @@ class ClientCountRenderingTest extends TestCase
         $row = $this->inProgressRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
 
         $this->assertNotNull($row);
-        $this->assertStringContainsString('<span>愛犬性格診断</span>', $row);
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', $row);
         $this->assertStringNotContainsString('まで）', $row);
         $this->assertStringContainsString('data-bs-target="#personalityDiagnosisCancelModal"', $row);
         $this->assertStringContainsString('data-personality-diagnosis-trainee-id="'.$id.'"', $row);
@@ -1762,7 +1763,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(2, substr_count($row, 'data-survey-in-progress-item'));
         // 愛犬アンケート → 愛犬性格診断の順
-        $this->assertLessThan(strpos($row, '<span>愛犬性格診断</span>'), strpos($row, '<span>愛犬アンケート</span>'));
+        $this->assertLessThan(strpos($row, '<span class="trainee-survey-line">愛犬性格診断</span>'), strpos($row, '<span class="trainee-survey-line">愛犬アンケート</span>'));
         $this->assertStringNotContainsString('まで）', $row);
         $this->assertSame(2, substr_count($row, '>表示</a>'));
         $this->assertSame(2, substr_count($row, '>取消</button>'));
@@ -1807,7 +1808,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<span>愛犬アンケート</span>', (string) $this->inProgressRow($html, 'ポチ'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', (string) $this->inProgressRow($html, 'ポチ'));
         $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
         // 答え直しの案内を出している間も、前回の答え（暮らしの様子）を見られる
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($id, 'ポチ'), $html);
@@ -1853,8 +1854,146 @@ class ClientCountRenderingTest extends TestCase
         $this->overrideIntakeSurveyName('テストアンケート');
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
         $this->assertStringContainsString('for="surveyIssueKindIntake">テストアンケート</label>', $html);
-        $this->assertStringContainsString('<span>テストアンケート</span>', (string) $this->inProgressRow($html, 'タマ'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">テストアンケート</span>', (string) $this->inProgressRow($html, 'タマ'));
         $this->assertStringContainsString('発行済みのテストアンケートの案内が使えなくなります。', $html);
         $this->assertStringNotContainsString('愛犬アンケート', $html);
+    }
+
+    // ---- 「期限切れ」の行と上下のそろえ（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」） ----
+
+    /** トレーニー 1 頭分の「期限切れ」の行の HTML（なければ null） */
+    private function expiredRow(string $html, string $name): ?string
+    {
+        // ラベルの列から、値（種類の名前）の span と値の列の閉じまで
+        $pattern = '/aria-label="'.preg_quote($name, '/').'の期限切れの案内" data-survey-expired>(.*?<\/span><\/div>)/su';
+
+        return preg_match($pattern, $html, $m) === 1 ? $m[1] : null;
+    }
+
+    public function test_いちばん新しい案内が未回答で期限切れなら期限切れの行を出しボタンはなく案内を発行は出す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->personalityToken($id);
+        DB::table('trainee_personality_diagnosis_tokens')->update(['expires_at' => '2026-10-26 23:59:59', 'created_at' => '2026-10-19 10:00:00']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $row = $this->expiredRow($html, 'ポチ');
+        $this->assertNotNull($row);
+        // 名前の行のすぐ下（犬種の上）、ラベルは太字の赤、値は種類の名前（日付なし）。ラベル・値とも上下をそろえる箱の中
+        $this->assertMatchesRegularExpression(
+            '/>ポチ<\/a><\/h6>\s*'.trim($this->issueButtonPattern($id, 'ポチ'), '/u').'\s*<\/div>\s*'
+            .'<div class="row small mb-2" role="group"\s*aria-label="ポチの期限切れの案内" data-survey-expired>\s*'
+            .'<div class="col-4 fw-bold text-danger"><div class="trainee-survey-line text-nowrap">期限切れ<\/div><\/div>\s*'
+            .'<div class="col-8"><span class="trainee-survey-line">愛犬性格診断<\/span><\/div>/u',
+            $html
+        );
+        $this->assertLessThan(strpos($html, '<dt class="col-4 fw-normal text-muted">犬種</dt>'), strpos($html, 'data-survey-expired'));
+        $this->assertStringNotContainsString('<a', $row);
+        $this->assertStringNotContainsString('<button', $row);
+        $this->assertStringNotContainsString('10/26', $row);
+        $this->assertNull($this->inProgressRow($html, 'ポチ'));
+    }
+
+    public function test_新しく発行すると期限切れの行は消え案内中の行になる(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 10:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id, null, '2026-10-19 10:00:00');
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+        $this->assertNotNull($this->expiredRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ'));
+
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $id))->assertSessionHas('success');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertNull($this->expiredRow($html, 'ポチ'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', (string) $this->inProgressRow($html, 'ポチ'));
+    }
+
+    public function test_いちばん新しい案内が回答済みや期限が空なら期限切れの行を出さない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        // 前に期限切れの愛犬アンケートがあっても、いちばん新しい愛犬性格診断が回答済みなら出さない
+        $answered = $this->trainee($client, 'ポチ');
+        $this->intakeToken($answered, null, '2026-10-10 10:00:00');
+        DB::table('trainee_intake_survey_tokens')->where('trainee_id', $answered)->update(['expires_at' => '2026-10-17 23:59:59']);
+        $pdId = $this->personalityToken($answered, '2026-10-20 10:00:00');
+        DB::table('trainee_personality_diagnosis_tokens')->where('id', $pdId)->update(['created_at' => '2026-10-19 10:00:00', 'expires_at' => '2026-10-26 23:59:59']);
+        // 期限が空の案内（前に発行した期限なしのもの）は期限切れにならない：回答待ち（案内中）
+        $noExpiry = $this->trainee($client, 'たま');
+        $this->intakeToken($noExpiry, null, '2026-09-01 10:00:00');
+        // 案内がない
+        $this->trainee($client, 'ハル');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('data-survey-expired', $html);
+        $this->assertNotNull($this->inProgressRow($html, 'たま'));
+    }
+
+    public function test_2つの種類のうち新しく発行した方で期限切れの種類が決まる(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id, '2026-10-12 10:00:00', '2026-10-10 10:00:00');
+        $pdId = $this->personalityToken($id);
+        DB::table('trainee_personality_diagnosis_tokens')->where('id', $pdId)->update(['created_at' => '2026-10-19 10:00:00', 'expires_at' => '2026-10-26 23:59:59']);
+
+        $row = $this->expiredRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
+
+        $this->assertStringContainsString('>愛犬性格診断</span>', (string) $row);
+        $this->assertStringNotContainsString('愛犬アンケート', (string) $row);
+    }
+
+    public function test_いちばん新しい案内の読み込みはトレーニーの数で増えない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $one = $this->makeClient('0001', '山田');
+        $this->intakeToken($this->trainee($one, 'ポチ'), null, '2026-10-19 10:00:00');
+        $three = $this->makeClient('0002', '佐藤');
+        foreach (['ハル', 'ナツ', 'アキ'] as $name) {
+            $this->intakeToken($this->trainee($three, $name), null, '2026-10-19 10:00:00');
+        }
+        DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
+
+        $count = function (Client $client): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+            $queries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'trainee_intake_survey_tokens'));
+            DB::disableQueryLog();
+            $this->assertStringContainsString('data-survey-expired', $html);
+
+            return $queries->count();
+        };
+
+        // 有効な案内といちばん新しい案内の 2 本。トレーニーの数では増えない
+        $this->assertSame(2, $count($one));
+        $this->assertSame(2, $count($three));
+    }
+
+    public function test_案内中の行はラベルと値を上下をそろえる箱に入れる(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id);
+        $this->personalityToken($id);
+
+        $row = (string) $this->inProgressRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
+
+        // ラベルの列（1 つ）と、2 つの値がどれも .trainee-survey-line（小さいボタンと同じ高さで縦の中央に置く）
+        $this->assertStringContainsString('<div class="col-4 fw-bold"><div class="trainee-survey-line">案内中</div></div>', $row);
+        $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line">'));
     }
 }

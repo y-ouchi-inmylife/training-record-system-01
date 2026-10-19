@@ -196,12 +196,14 @@ class ClientController extends Controller
         // （設計書 S-0305 セクション3「最終計測」参照）。
         // audioRecords は削除ボタンの JS 判定（音声記録があれば削除を拒否）で件数だけ使うため
         // id のみ取り、他列は読み込まない（詳細は requirements.md 6-3-5 / S-0305 削除条件参照）。
+        // trainees.latestIntakeSurveyToken・latestPersonalityDiagnosisToken はいちばん新しい案内（回答済み・期限切れを含む）。
+        // 「期限切れ」の行（Trainee::expired_survey_kind）に使う（2026-10-19 追加）
         $client->load(['primaryTrainer', 'trainingRecords' => function ($query) {
             $query->with(['trainer1', 'trainer2'])
                 ->withCount('mediaRecords')
                 ->orderBy('training_date', 'desc')
                 ->orderBy('training_time', 'desc');
-        }, 'trainees.measurements', 'trainees.latestIntakeSurveyResponse', 'trainees.activeIntakeSurveyToken', 'trainees.activePersonalityDiagnosisToken', 'trainees.latestPersonalityDiagnosisResult', 'audioRecords' => function ($query) {
+        }, 'trainees.measurements', 'trainees.latestIntakeSurveyResponse', 'trainees.activeIntakeSurveyToken', 'trainees.activePersonalityDiagnosisToken', 'trainees.latestPersonalityDiagnosisResult', 'trainees.latestIntakeSurveyToken', 'trainees.latestPersonalityDiagnosisToken', 'audioRecords' => function ($query) {
             $query->select(['id', 'client_id']);
         }, 'contracts', 'usages']);
 

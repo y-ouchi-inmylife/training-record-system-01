@@ -25,7 +25,8 @@ class TraineePersonalityDiagnosisTokenController extends Controller
     /**
      * 性格診断の案内を発行する（POST /trainees/{trainee}/personality-diagnosis-tokens）。
      * 発行のあとは会員詳細に戻り、完了メッセージ「{表示名}の性格診断の案内を発行しました。」を出す（2026-10-17 変更）。
-     * 有効な案内がすでにある（二重送信・古い画面から押し直したなど）ときは、新しく作らず、完了メッセージも載せずに戻る
+     * 有効な案内がすでにある（愛犬アンケートの回答待ちも含む。二重送信・古い画面から押し直したなど）ときは、新しく作らず、
+     * 会員詳細に戻ってエラーの知らせ「{表示名}には、すでに案内中の案内があります。」を出す（2026-10-19 変更：その前は知らせなし）
      */
     public function store(Request $request, Trainee $trainee, TraineePersonalityDiagnosisTokenService $service): RedirectResponse
     {
@@ -33,7 +34,13 @@ class TraineePersonalityDiagnosisTokenController extends Controller
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
 
-        return $token ? $redirect->with('success', $trainee->display_name.'の'.__('messages.personality_diagnosis_name').'の案内を発行しました。') : $redirect;
+        if ($token === null) {
+            // 回答待ちの案内（同じ種類・もう一方の種類とも）があって発行しなかったときは、エラーの知らせを出す
+            // （2026-10-19 変更：何も言わずに戻ると、発行できなかったことが分からないため。その前は知らせなしで戻った）
+            return $redirect->with('error', $trainee->display_name.'には、すでに案内中の案内があります。');
+        }
+
+        return $redirect->with('success', $trainee->display_name.'の'.__('messages.personality_diagnosis_name').'の案内を発行しました。');
     }
 
     /**

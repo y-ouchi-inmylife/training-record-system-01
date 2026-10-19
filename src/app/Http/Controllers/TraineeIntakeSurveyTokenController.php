@@ -40,8 +40,8 @@ class TraineeIntakeSurveyTokenController extends Controller
      * 戻る位置はページの上（完了メッセージがページの上に出るため、トレーニーの欄の位置には移さない）。
      *
      * 発行できなかったとき：
-     * - 有効な案内がすでにある（回答待ち。二重送信・古い画面から押し直したなど）：新しく発行せず、
-     *   完了メッセージも載せずに会員詳細に戻る
+     * - 有効な案内がすでにある（回答待ち。愛犬性格診断の回答待ちも含む。二重送信・古い画面から押し直したなど）：新しく発行せず、
+     *   会員詳細に戻ってエラーの知らせ「{表示名}には、すでに案内中の案内があります。」を出す（2026-10-19 変更：その前は知らせなし）
      * 回答済みのトレーニーにも発行する（答え直してもらうため。2026-10-19 変更：その前は 409）
      *
      * 設計書: requirements.md 6-16-8、6-3-6 備考「発行のあとの戻り先」
@@ -52,7 +52,13 @@ class TraineeIntakeSurveyTokenController extends Controller
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
 
-        return $token ? $redirect->with('success', $trainee->display_name.'の'.__('messages.intake_survey_name').'の案内を発行しました。') : $redirect;
+        if ($token === null) {
+            // 回答待ちの案内（同じ種類・もう一方の種類とも）があって発行しなかったときは、エラーの知らせを出す
+            // （2026-10-19 変更：何も言わずに戻ると、発行できなかったことが分からないため。その前は知らせなしで戻った）
+            return $redirect->with('error', $trainee->display_name.'には、すでに案内中の案内があります。');
+        }
+
+        return $redirect->with('success', $trainee->display_name.'の'.__('messages.intake_survey_name').'の案内を発行しました。');
     }
 
     /**

@@ -182,6 +182,23 @@ class Trainee extends Model
     }
 
     /**
+     * いちばん新しく発行した愛犬アンケート用 URL のトークン（回答済み・期限切れを含む。2026-10-19 追加）。
+     * 会員詳細の「期限切れ」の行（expired_survey_kind）に使う。発行日時が同じなら id の大きい方
+     */
+    public function latestIntakeSurveyToken(): HasOne
+    {
+        return $this->hasOne(TraineeIntakeSurveyToken::class)->latestOfMany(['created_at', 'id']);
+    }
+
+    /**
+     * いちばん新しく発行した愛犬性格診断用 URL のトークン（回答済み・期限切れを含む。2026-10-19 追加）
+     */
+    public function latestPersonalityDiagnosisToken(): HasOne
+    {
+        return $this->hasOne(TraineePersonalityDiagnosisToken::class)->latestOfMany(['created_at', 'id']);
+    }
+
+    /**
      * 有効な（まだ回答されていない）性格診断用 URL のトークン。同じトレーニーに 1 つまで
      * （発行のときに守る）。会員詳細（S-0305）でトレーニーをまとめて読むときは
      * `trainees.activePersonalityDiagnosisToken` を eager load しておく（N+1 にしないため）
@@ -392,6 +409,39 @@ class Trainee extends Model
         }
 
         return $lines;
+    }
+
+    /**
+     * 会員詳細の「期限切れ」の行に出す案内の種類（'intake'／'personality'。出さないなら null。2026-10-19 追加。
+     * 設計書 S-0305 セクション3「案内の操作」）。
+     *
+     * そのトレーニーのいちばん新しく発行した案内（2 つの種類を合わせて、発行日時がいちばん新しいもの。同じなら愛犬性格診断）が、
+     * 未回答で期限が切れているときだけ、その種類を返す。
+     * - 回答待ち（未回答で期限内）の案内があれば null（「案内中」の行を出すため）
+     * - いちばん新しい案内が回答済みなら null（その前に期限切れの案内があっても）。新しく発行すると、いちばん新しい案内が変わるので消える
+     * - 期限が空の案内（期限を付ける前に発行したもの）は期限切れにならないので null
+     *
+     * 呼び出し側は activeIntakeSurveyToken・activePersonalityDiagnosisToken・latestIntakeSurveyToken・
+     * latestPersonalityDiagnosisToken を eager load しておくこと（会員詳細でトレーニーごとに問い合わせを出さないため）
+     */
+    public function getExpiredSurveyKindAttribute(): ?string
+    {
+        if ($this->activeIntakeSurveyToken !== null || $this->activePersonalityDiagnosisToken !== null) {
+            return null;
+        }
+        $intake = $this->latestIntakeSurveyToken;
+        $personality = $this->latestPersonalityDiagnosisToken;
+        if ($intake === null && $personality === null) {
+            return null;
+        }
+        [$kind, $latest] = match (true) {
+            $intake === null => ['personality', $personality],
+            $personality === null => ['intake', $intake],
+            $intake->created_at->gt($personality->created_at) => ['intake', $intake],
+            default => ['personality', $personality],
+        };
+
+        return $latest->answered_at === null && $latest->isExpired() ? $kind : null;
     }
 
     /**

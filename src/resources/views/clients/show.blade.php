@@ -611,6 +611,13 @@
                                             'cancelAttribute' => 'data-personality-diagnosis-trainee-id',
                                         ];
                                     }
+                                    // 「期限切れ」の行に出す種類の名前（2026-10-19 追加）。いちばん新しく発行した案内が未回答で期限切れのときだけ
+                                    // （Trainee::expired_survey_kind。回答待ちがあれば null）
+                                    $expiredSurveyName = match ($trainee->expired_survey_kind) {
+                                        'intake' => __('messages.intake_survey_name'),
+                                        'personality' => __('messages.personality_diagnosis_name'),
+                                        default => null,
+                                    };
                                 @endphp
                                 {{-- 名前の行。右に［案内を発行］（回答待ちの案内がないときだけ。いつも使う操作なので塗り。4-4）。
                                      幅が足りないときは flex-wrap でボタンが名前の下の行に回り、ms-auto で右寄せのまま。名前は text-break で
@@ -638,11 +645,14 @@
                                 @if($activeSurveys !== [])
                                     <div class="row small mb-2" role="group"
                                          aria-label="{{ $trainee->display_name }}の案内中の案内" data-survey-in-progress>
-                                        <div class="col-4 fw-bold">案内中</div>
+                                        {{-- ラベルと値は、ボタン（btn-sm）と同じ高さの箱（.trainee-survey-line）の中で縦の中央に置く
+                                             （2026-10-19 変更：ラベルの列が上詰めで、値だけがボタンの高さに合わせて下がり、ラベルが少し上に出ていたため）。
+                                             375px でボタンが次の行に回っても、ラベルと値は同じ高さにそろう --}}
+                                        <div class="col-4 fw-bold"><div class="trainee-survey-line">案内中</div></div>
                                         <div class="col-8">
                                             @foreach($activeSurveys as $survey)
                                                 <div class="d-flex flex-wrap align-items-center gap-2 @if(! $loop->first) mt-1 @endif" data-survey-in-progress-item>
-                                                    <span>{{ $survey['name'] }}</span>
+                                                    <span class="trainee-survey-line">{{ $survey['name'] }}</span>
                                                     <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto">
                                                         <a href="{{ $survey['printUrl'] }}" class="btn btn-sm btn-outline-primary text-nowrap"
                                                            aria-label="{{ $survey['name'] }}の案内を表示">表示</a>
@@ -654,6 +664,19 @@
                                                 </div>
                                             @endforeach
                                         </div>
+                                    </div>
+                                @endif
+                                {{-- 「期限切れ」の行（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」）。案内の期限が切れたことにトレーナーが
+                                     気づけるように、いちばん新しく発行した案内が未回答で期限切れのとき、「案内中」の行と同じ所・同じ列・同じそろえで出す。
+                                     ラベルは太字の赤（text-danger。注意が向くが、ボタンのような強い色の面は使わない）、値は種類の名前（日付は出さない）。
+                                     ボタンは出さない（期限切れの案内の［表示］［取消］は要らない。名前の行の右の［案内を発行］ですぐ発行し直せる） --}}
+                                @if($expiredSurveyName !== null)
+                                    <div class="row small mb-2" role="group"
+                                         aria-label="{{ $trainee->display_name }}の期限切れの案内" data-survey-expired>
+                                        {{-- ラベルは折り返さない（text-nowrap）：375px ではラベルの列の中が約 52px しかなく、太字の「期限切れ」（4 文字。約 56px）が
+                                             2 行に折れて値と上下がずれていたため。列の右の余白（12px）の中に約 4px はみ出すだけで、値には重ならない --}}
+                                        <div class="col-4 fw-bold text-danger"><div class="trainee-survey-line text-nowrap">期限切れ</div></div>
+                                        <div class="col-8"><span class="trainee-survey-line">{{ $expiredSurveyName }}</span></div>
                                     </div>
                                 @endif
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して

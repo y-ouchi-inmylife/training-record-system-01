@@ -369,7 +369,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
     // ---- 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（2026-10-19 変更） ----
 
-    public function test_愛犬性格診断が回答待ちなら発行せず完了メッセージも出さずに会員詳細に戻る(): void
+    public function test_愛犬性格診断が回答待ちなら発行せず会員詳細に戻ってエラーの知らせを出す(): void
     {
         $this->travelTo(Carbon::parse('2026-10-20 10:00:00'));
         DB::table('trainee_personality_diagnosis_tokens')->insert([
@@ -380,7 +380,9 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         // 画面からではなく直接送られても、今の「有効な案内がすでにある」ときと同じ返し方
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
             ->assertRedirect(route('clients.show', $this->trainee->client_id))
-            ->assertSessionMissing('success');
+            ->assertSessionMissing('success')
+            // 何も言わずに戻らず、エラーの知らせを出す（2026-10-19 変更）
+            ->assertSessionHas('error', 'モモには、すでに案内中の案内があります。');
 
         $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
     }
@@ -397,6 +399,16 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
 
         $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertSessionHas('success');
 
+        $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
+    }
+
+    public function test_同じ種類の回答待ちがあって発行しなかったときもエラーの知らせを出し会員詳細に出る(): void
+    {
+        $this->insertToken();
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', 7))
+            ->assertSessionHas('error', 'モモには、すでに案内中の案内があります。');
         $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
     }
 }
