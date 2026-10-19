@@ -891,17 +891,19 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $card = substr($card, 0, strpos($card, 'data-personality-diagnosis-answers'));
         $this->assertStringContainsString('<h6 class="mb-0">スタッフ用メモ</h6>', $card);
         $this->assertStringContainsString('<button type="submit" form="staff-memo-form" class="btn btn-success">更新</button>', $card);
-        // 「会員様には表示されません。」は見出しのすぐ右（見出しの行の中）。本文には出さない（2026-10-19 変更：その前は本文の上）。
+        // 「（会員様には表示されません）」は見出しのすぐ右（見出しの行の中）。本文には出さない（2026-10-19 変更：その前は本文の上）。
         // 見た目はアドバイスの欄の「YYYY/MM/DD 公開」と同じ text-muted small
         $header = substr($card, 0, strpos($card, '<div class="card-body">'));
         $body = substr($card, strpos($card, '<div class="card-body">'));
         $this->assertMatchesRegularExpression(
             '/<div class="d-flex flex-wrap align-items-center gap-2">\s*<h6 class="mb-0">スタッフ用メモ<\/h6>\s*'
-            .'<span class="text-muted small" id="staff-memo-note" data-staff-memo-note>会員様には表示されません。<\/span>\s*<\/div>/u',
+            .'<span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）<\/span>\s*<\/div>/u',
             $header
         );
-        $this->assertStringNotContainsString('会員様には表示されません。', $body);
-        $this->assertSame(1, substr_count($card, '会員様には表示されません。'));
+        $this->assertStringNotContainsString('会員様には表示されません', $body);
+        $this->assertSame(1, substr_count($card, '（会員様には表示されません）'));
+        // 全角の括弧で括り、文の終わりの「。」は付けない（2026-10-19 変更：その前は「会員様には表示されません。」）
+        $this->assertStringNotContainsString('会員様には表示されません。', $card);
         $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.staff-memo.update', [$this->trainee, $result]).'"', $card);
         // 入力欄の説明として、見出しの右の文を読み上げで結び付ける（aria-describedby）
         $this->assertMatchesRegularExpression('/<textarea class="form-control " id="staff_memo" name="staff_memo" aria-describedby="staff-memo-note"\s*rows="6" maxlength="10000">メモの文<\/textarea>/u', $card);

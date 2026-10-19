@@ -189,14 +189,15 @@
          アドバイスの［更新］とは別のフォーム・別のルート（PUT …/staff-memo）で、スタッフ用メモだけを保存する（アドバイスの［更新］ではスタッフ用メモは変わらない）。
          ［AIで下書き］で、AI のスタッフ用の下書きが入る --}}
     <div class="card mb-3" data-personality-diagnosis-staff-memo>
-        {{-- 見出しの行：左に「スタッフ用メモ」とすぐ右に「会員様には表示されません。」、右に［更新］。作りはアドバイスの欄の見出しの行と同じ
+        {{-- 見出しの行：左に「スタッフ用メモ」とすぐ右に「（会員様には表示されません）」、右に［更新］。作りはアドバイスの欄の見出しの行と同じ
              （上下の真ん中をそろえ〔align-items-center〕、狭い幅で 1 行に収まらないときは［更新］を次の行へ折り返して右に寄せる〔flex-wrap と ms-auto〕）。
              説明の文は、アドバイスの欄の見出しの右の「YYYY/MM/DD 公開」と同じ小さい薄い灰色（text-muted small）。読み上げでは入力欄の説明として
-             結び付ける（textarea の aria-describedby）。2026-10-19 変更：ユーザーレビューで見出しの右に移した。その前は本文の上（入力欄の上）に出していた --}}
+             結び付ける（textarea の aria-describedby）。2026-10-19 変更：ユーザーレビューで見出しの右に移した。その前は本文の上（入力欄の上）に出していた。
+             同じ日に、全角の括弧で括り、文の終わりの「。」をなくした（その前は「会員様には表示されません。」） --}}
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <h6 class="mb-0">スタッフ用メモ</h6>
-                <span class="text-muted small" id="staff-memo-note" data-staff-memo-note>会員様には表示されません。</span>
+                <span class="text-muted small" id="staff-memo-note" data-staff-memo-note>（会員様には表示されません）</span>
             </div>
             <div class="d-flex flex-wrap gap-2 ms-auto">
                 <button type="submit" form="staff-memo-form" class="btn btn-success">更新</button>
