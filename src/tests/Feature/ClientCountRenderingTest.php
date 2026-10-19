@@ -683,7 +683,7 @@ class ClientCountRenderingTest extends TestCase
             $url = preg_quote(route('trainees.show', $id), '/');
             $this->assertMatchesRegularExpression(
                 '/<div class="d-flex align-items-start gap-3">\s*<a href="'.$url.'" class="flex-shrink-0 text-decoration-none"[^>]*>.*?<\/a>\s*'
-                .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
+                .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="'.$url.'">'.$name.'<\/a><\/h6>/su',
                 $html,
                 $name
             );
@@ -706,13 +706,13 @@ class ClientCountRenderingTest extends TestCase
         $pattern = '/<div class="d-flex align-items-start gap-3">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'" class="flex-shrink-0 text-decoration-none"\s*>.*?<\/a>\s*'
             .'<div class="flex-grow-1" style="min-width: 0;">\s*'
-            .'<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
+            .'<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="'.preg_quote(route('trainees.show', $withPhoto), '/').'">ポチ<\/a><\/h6>/su';
         $this->assertMatchesRegularExpression($pattern, $html);
 
         // 写真がないまとまりも、左に「写真なし」の枠のリンク、右に名前・項目の列（位置がそろう）
         $this->assertMatchesRegularExpression(
             '/<div class="d-flex align-items-start gap-3">\s*<a href="[^"]+" class="flex-shrink-0 text-decoration-none"\s*aria-label="たまの写真なし。トレーニー詳細へ"\s*>.*?写真なし<\/span>\s*<\/div>\s*<\/a>\s*'
-            .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="[^"]+">たま<\/a><\/h6>/su',
+            .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="[^"]+">たま<\/a><\/h6>/su',
             $html
         );
 
@@ -1573,6 +1573,9 @@ class ClientCountRenderingTest extends TestCase
     public function test_名前と分けた部分を差し替えるとラベルもその位置で折り返す(): void
     {
         $this->fakeMediaDisk();
+        // 先に文のファイル（messages）を読み込んでおく（読み込む前に addLines すると、ファイルのほかの文が読まれなくなる。
+        // 2026-10-19 追加：組み合わせの名前のひな形〔配列〕が読めずに止まるため）
+        app('translator')->load('*', 'messages', 'ja');
         app('translator')->addLines([
             'messages.personality_diagnosis_name' => 'テスト診断',
             'messages.personality_diagnosis_name_parts' => ['テスト', '診断'],
@@ -1590,6 +1593,9 @@ class ClientCountRenderingTest extends TestCase
     {
         // 文のファイルの決まった文字だけを出す作りだが、もし HTML の記号が入っても、そのまま出さずに逃がす
         $this->fakeMediaDisk();
+        // 先に文のファイル（messages）を読み込んでおく（読み込む前に addLines すると、ファイルのほかの文が読まれなくなる。
+        // 2026-10-19 追加：組み合わせの名前のひな形〔配列〕が読めずに止まるため）
+        app('translator')->load('*', 'messages', 'ja');
         app('translator')->addLines([
             'messages.personality_diagnosis_name' => '<b>愛犬</b>性格診断',
             'messages.personality_diagnosis_name_parts' => ['<b>愛犬</b>', '性格診断'],
@@ -2173,6 +2179,12 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」） ----
 
+    /**
+     * 組み合わせの名前の 2 行の出し方（2026-10-19 追加）：見た目は「愛犬アンケート＆」「愛犬性格診断」の 2 行（別の要素。読み上げない）、
+     * 読み上げは隠した文字の 1 つの名前
+     */
+    private const COMBINED_NAME_LINES = '<span class="trainee-survey-line" data-survey-name-lines><span class="visually-hidden">愛犬アンケート＆愛犬性格診断</span><span class="d-flex flex-column text-nowrap" aria-hidden="true"><span>愛犬アンケート＆</span><span>愛犬性格診断</span></span></span>';
+
     /** 組み合わせの案内（2 つの案内を作って結び付ける）。期限は 2 つとも同じ。[愛犬アンケートの案内の id, 愛犬性格診断の案内の id] */
     private function combinedTokens(int $traineeId, string $expiresAt = '2026-10-26 23:59:59', string $createdAt = '2026-10-19 10:00:00'): array
     {
@@ -2194,10 +2206,11 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 2 つとも回答待ち：「案内中　愛犬アンケート＆愛犬性格診断　［表示］［取消］」の 1 段
+        // 2 つとも回答待ち：「案内中　愛犬アンケート＆愛犬性格診断　［表示］［取消］」の 1 段。種類の名前は「＆」のあとで改行した 2 行
+        // （2026-10-19 変更：その前は 1 行）
         $row = (string) $this->inProgressRow($html, 'ポチ');
         $this->assertSame(1, substr_count($row, 'data-survey-in-progress-item'));
-        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート＆愛犬性格診断</span>', $row);
+        $this->assertStringContainsString(self::COMBINED_NAME_LINES, $row);
         $this->assertMatchesRegularExpression(
             '/<a href="'.preg_quote(route('trainee-combined-survey-tokens.print', $id), '/').'" class="btn btn-sm btn-outline-primary text-nowrap"\s*aria-label="愛犬アンケート＆愛犬性格診断の案内を表示">表示<\/a>\s*'
             .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#combinedSurveyCancelModal"\s*'
@@ -2250,7 +2263,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート＆愛犬性格診断</span>', (string) $this->expiredRow($html, 'ポチ'));
+        $this->assertStringContainsString(self::COMBINED_NAME_LINES, (string) $this->expiredRow($html, 'ポチ'));
         $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', (string) $this->expiredRow($html, 'タマ'));
         $this->assertStringNotContainsString('＆', (string) $this->expiredRow($html, 'タマ'));
         // どちらも［案内を発行］を出す
@@ -2273,5 +2286,65 @@ class ClientCountRenderingTest extends TestCase
             $html
         );
         $this->assertStringContainsString('combined: '.json_encode(route('trainee-combined-survey-tokens.store', ['trainee' => '__ID__'])), $html);
+    }
+
+    // ---- 組み合わせの名前を 2 行にして名前の行に収める（2026-10-19 変更。設計書 S-0305「愛犬アンケート＆愛犬性格診断の案内」） ----
+
+    public function test_組み合わせの案内中と期限切れは2つの名前を別の行にして名前の行の中に出す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $active = $this->trainee($client, 'ポチ');
+        $this->combinedTokens($active, '2026-11-02 23:59:59', '2026-10-26 10:00:00');
+        $expired = $this->trainee($client, 'タマ');
+        $this->combinedTokens($expired);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        foreach (['ポチ' => 'data-survey-in-progress', 'タマ' => 'data-survey-expired'] as $name => $marker) {
+            // 名前の行の中（名前より後、犬種より前）に、2 つの名前を別の要素で
+            $segment = $this->nameRowToBreed($html, $name);
+            $this->assertStringContainsString($marker, $segment);
+            $this->assertSame(1, substr_count($segment, self::COMBINED_NAME_LINES), $name);
+            $this->assertMatchesRegularExpression('/aria-hidden="true"><span>愛犬アンケート＆<\/span><span>愛犬性格診断<\/span><\/span>/u', $segment);
+            // 1 行の名前の要素は出さない（見た目の文字はいつも 2 行）
+            $this->assertStringNotContainsString('<span class="trainee-survey-line">愛犬アンケート＆愛犬性格診断</span>', $segment);
+        }
+    }
+
+    public function test_組み合わせの読み上げの名前は1つの名前のまま(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->combinedTokens($id);
+
+        $segment = $this->nameRowToBreed($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
+
+        // 隠した文字で 1 つの名前を読み、行に分けた見た目の文字は読まない。ボタンの読み上げの名前も 1 つの名前
+        $this->assertStringContainsString('<span class="visually-hidden">愛犬アンケート＆愛犬性格診断</span>', $segment);
+        $this->assertStringContainsString('aria-label="愛犬アンケート＆愛犬性格診断の案内を表示"', $segment);
+        $this->assertStringContainsString('aria-label="愛犬アンケート＆愛犬性格診断の案内を取消"', $segment);
+    }
+
+    public function test_単独の案内中は今のまま1行で名前の行は縦の真ん中そろえ(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeToken($id);
+        $two = $this->trainee($client, 'タマ');
+        $this->intakeToken($two);
+        $this->personalityToken($two);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('data-survey-name-lines', $html);
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', (string) $this->inProgressRow($html, 'ポチ'));
+        // 名前の行：1 段なら縦の真ん中、2 段（前の決まりの案内が 2 つ）なら上詰め（名前は 1 段目の高さ）
+        $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6[^>]*><a[^>]*>ポチ<\/a>/u', $html);
+        $this->assertMatchesRegularExpression('/<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">\s*<h6[^>]*><a[^>]*>タマ<\/a>/u', $html);
     }
 }

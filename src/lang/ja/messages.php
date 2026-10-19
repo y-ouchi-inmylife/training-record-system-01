@@ -47,8 +47,9 @@ return [
     'intake_survey_name_parts' => $intakeSurveyNameParts,
 
     // 「愛犬アンケート＆愛犬性格診断」の案内の名前のひな形（2026-10-19 追加）。:intake・:personality に上の 2 つの名前を入れる
-    // （名前は直書きしない）。組み立ては App\Support\CombinedSurveyName::name()（画面・コントローラーはそこから読む）
-    'combined_survey_name' => ':intake＆:personality',
+    // （名前は直書きしない）。組み立ては App\Support\CombinedSurveyName（画面・コントローラーはそこから読む）。
+    // 行ごとに分けて持つ（2026-10-19 変更：会員詳細では「＆」のあとで改行して 2 行で出すため）。1 行の名前は、この 2 行をつないだもの
+    'combined_survey_name_lines' => [':intake＆', ':personality'],
 
     // 会員のマイページ（S-1402）の愛犬のカードに出す、回答待ちの案内のお知らせ（2026-10 追加）。
     // 名称（「愛犬アンケート」「愛犬性格診断」）は文をここだけで変える（上の $intakeSurveyName・$personalityDiagnosisName）。

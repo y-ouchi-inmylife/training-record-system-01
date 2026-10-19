@@ -279,6 +279,8 @@ class TraineeCombinedSurveyTokenControllerTest extends TestCase
         app('translator')->addLines(['messages.intake_survey_name' => 'テストアンケート', 'messages.personality_diagnosis_name' => 'テスト診断'], 'ja');
 
         $this->assertSame('テストアンケート＆テスト診断', CombinedSurveyName::name());
+        // 会員詳細で 2 行に分けて出すときの行も、差し替えた名前から作る（2026-10-19 追加）
+        $this->assertSame(['テストアンケート＆', 'テスト診断'], CombinedSurveyName::lines());
         $this->assertSame('テストアンケート＆テスト診断案内発行', AccessLog::actionLabels()['create_trainee_combined_survey_token']);
         $this->assertSame('テストアンケート＆テスト診断案内取消', AccessLog::actionLabels()['delete_trainee_combined_survey_token']);
 

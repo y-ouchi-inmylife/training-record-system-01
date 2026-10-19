@@ -601,6 +601,8 @@
                                     if ($trainee->has_active_combined_survey) {
                                         $activeSurveys[] = [
                                             'name' => \App\Support\CombinedSurveyName::name(),
+                                            // 「＆」のあとで改行して 2 行で出す（2026-10-19 変更。下の clients._survey-name）
+                                            'nameLines' => \App\Support\CombinedSurveyName::lines(),
                                             'printUrl' => route('trainee-combined-survey-tokens.print', $trainee),
                                             'cancelModal' => '#combinedSurveyCancelModal',
                                             'cancelAttribute' => 'data-combined-survey-trainee-id',
@@ -631,6 +633,8 @@
                                         'combined' => \App\Support\CombinedSurveyName::name(),
                                         default => null,
                                     };
+                                    // 組み合わせの期限切れは、案内中と同じく 2 行で出す（2026-10-19 変更）
+                                    $expiredSurveyNameLines = $trainee->expired_survey_kind === 'combined' ? \App\Support\CombinedSurveyName::lines() : null;
                                 @endphp
                                 {{-- 名前の行。右に案内の表示と操作をまとめて右寄せで置く（2026-10-19 変更：設計書 S-0305 セクション3「案内の操作」。
                                      ユーザーレビューで、名前の下に 1 行を足すより名前の行の右にまとめた方が欄が短く見やすいため。その前は、名前の行の
@@ -640,12 +644,15 @@
                                      - 期限切れ：「期限切れ」（太字の赤）＋種類の名前＋［案内を発行］（期限切れの案内の［表示］［取消］は出さない）
                                      - どちらもない：［案内を発行］だけ（いつも使う操作なので塗り。4-4）
                                      上下のそろえ：名前・ラベル・種類の名前は、ボタン（btn-sm）と同じ高さの箱（.trainee-survey-line）の中で縦の中央に置き、
-                                     名前の行は上詰め（align-items-start）にする。これで名前と 1 段目の中央がそろい、2 段目は名前の下に入る。
+                                     名前の行は、案内中が 2 段のとき（前の決まりの案内）だけ上詰め（align-items-start）にする。これで名前と 1 段目の中央がそろい、
+                                     2 段目は名前の下に入る。それ以外は縦の真ん中（align-items-center）：組み合わせの名前は「＆」のあとで改行した 2 行で出し
+                                     （2026-10-19 変更。1 行だと 1400px でも名前の右に収まらず、名前の下に回ってほかのトレーニーと形が違ってしまうため）、
+                                     名前は 2 行のまとまりの真ん中の高さにそろえる（ラベル・ボタンもまとまりの真ん中。1 段のときは高さが同じなので今までどおり）。
                                      幅が足りないときは flex-wrap で右のまとまりが名前の下の行に回り、ms-auto で右寄せのまま。名前は text-break で
                                      長くてもはみ出さない。ボタンの文字は短いので、読み上げ用に「{表示名}の案内を発行」などの名前を付ける。
                                      名前のリンク：名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
-                                <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                <div class="d-flex flex-wrap {{ count($activeSurveys) > 1 ? 'align-items-start' : 'align-items-center' }} justify-content-between gap-2 mb-2">
                                     <h6 class="mb-0 text-break trainee-survey-line"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
                                     <div class="d-flex flex-column align-items-end gap-1 ms-auto small">
                                         @if($activeSurveys !== [])
@@ -656,7 +663,7 @@
                                                         {{-- ラベルと種類の名前は離さない（1 つのまとまり） --}}
                                                         <div class="d-flex align-items-center gap-2">
                                                             <span class="trainee-survey-line fw-bold text-nowrap">案内中</span>
-                                                            <span class="trainee-survey-line">{{ $survey['name'] }}</span>
+                                                            @include('clients._survey-name', ['name' => $survey['name'], 'lines' => $survey['nameLines'] ?? null])
                                                         </div>
                                                         {{-- ［表示］［取消］は 1 つのまとまりにして、狭い幅でも 2 つ一緒に次の行へ回す（［取消］だけが落ちないように） --}}
                                                         <div class="d-flex gap-2">
@@ -676,7 +683,7 @@
                                                     <div class="d-flex align-items-center gap-2" role="group"
                                                          aria-label="{{ $trainee->display_name }}の期限切れの案内" data-survey-expired>
                                                         <span class="trainee-survey-line fw-bold text-danger text-nowrap">期限切れ</span>
-                                                        <span class="trainee-survey-line">{{ $expiredSurveyName }}</span>
+                                                        @include('clients._survey-name', ['name' => $expiredSurveyName, 'lines' => $expiredSurveyNameLines])
                                                     </div>
                                                 @endif
                                                 <button type="button" class="btn btn-sm btn-primary text-nowrap ms-auto"
