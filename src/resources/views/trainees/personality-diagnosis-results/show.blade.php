@@ -297,7 +297,8 @@
     @endif
 
     {{-- 公開取消確認モーダル（S-0313-M03。2026-10-18 追加）。公開済みのときだけ置く。見せ方は S-0305-M06（愛犬アンケート案内の取消）と
-         同じ形（説明文・実行ボタン btn-danger・キャンセル）。欄に保存していない直しがあっても送らない（アドバイスは最後に保存した文のまま）。
+         同じ形（説明文・実行ボタン btn-danger・キャンセル）。［取り消す］で 2 つの欄の今の文も送り、保存してから公開を取り消す
+         （2026-10-19 変更：［公開する］とそろえた。その前は、欄に保存していない直しがあっても送らず、アドバイスは最後に保存した文のままだった）。
          二重に押されないよう、送ったらボタンを押せなくする（下のスクリプト）。
          2026-10-18 変更：ユーザーレビューで、［公開をやめる］を［公開取消］にし、見出し「{名前}の公開を取り消す」・文「会員のマイページから{名前}の公開を
          取り消しますか？」・実行ボタン［取り消す］（ほかの取消の確認 S-0305-M03・M06・M07 と同じ）にした。名前は $pdName（M01 と同じ）。
@@ -313,11 +314,16 @@
                     </div>
                     <div class="modal-body">
                         <p class="mb-0">会員のマイページから{{ $pdName }}の公開を取り消しますか？</p>
+                        {{-- 2026-10-19 追加：［取り消す］で 2 つの欄の今の文を保存してから公開を取り消すことを伝える（M01 の 2 行目と同じ見た目） --}}
+                        <p class="mb-0 mt-2" data-evaluation-unpublish-saves>現在の編集内容は保存されます。</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                         <form method="POST" action="{{ route('trainee-personality-diagnosis-results.unpublish', [$trainee, $result]) }}" class="d-inline m-0" data-evaluation-unpublish-form>
                             @csrf
+                            {{-- 2026-10-19 追加：アドバイスとスタッフ用メモの欄の今の文も送り、保存してから公開を取り消す（下のスクリプトで入れる） --}}
+                            <input type="hidden" name="evaluation_text" value="">
+                            <input type="hidden" name="staff_memo" value="">
                             <button type="submit" class="btn btn-danger">取り消す</button>
                         </form>
                     </div>
@@ -402,7 +408,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (unpublishForm) {
         unpublishForm.addEventListener('submit', function () {
+            // 2 つの欄の今の文を送り、保存してから公開を取り消す（2026-10-19 追加。［公開する］と同じ）
+            unpublishForm.querySelector('input[name="evaluation_text"]').value = textarea.value;
+            unpublishForm.querySelector('input[name="staff_memo"]').value = document.querySelector('[data-evaluation-form] textarea[name="staff_memo"]').value;
             unpublishForm.querySelector('button[type="submit"]').disabled = true;
+            // 保存してから公開を取り消すので、画面を離れるときの警告は出さない（2026-10-19 追加。確認が 2 つ重なって出ないように）
+            unsavedGuard.hasChanges = false;
         });
     }
 

@@ -744,14 +744,145 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertNull($saved->evaluation_published_by);
     }
 
-    public function test_公開を取り消すときは欄の直しを保存しない(): void
+    // ---- 公開取消でも欄の今の文を保存してから取り消す（2026-10-19 変更：その前は欄の直しを保存しなかった） ----
+
+    private function unpublishWith(TraineePersonalityDiagnosisResult $result, mixed $text, mixed $memo)
+    {
+        return $this->from($this->url($result))
+            ->post(route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, $result]), ['evaluation_text' => $text, 'staff_memo' => $memo]);
+    }
+
+    public function test_直したまま公開を取り消すと2つの文を保存してから取り消し変わった方の編集と公開取消の記録を残す(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+        $result->update(['staff_memo' => '前のメモ', 'evaluation_updated_by' => 200, 'evaluation_updated_at' => '2026-10-18 10:00:00']);
+        Carbon::setTestNow('2026-10-19 11:00:00');
+
+        $response = $this->unpublishWith($result, "直した文\r\n2 行目", '直したメモ');
+
+        $response->assertRedirect($this->url($result));
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success', '愛犬性格診断の公開を取り消しました。');
+        $saved = $result->fresh();
+        $this->assertSame('下書き', $saved->evaluation_status_label);
+        $this->assertNull($saved->evaluation_published_at);
+        $this->assertNull($saved->evaluation_published_by);
+        $this->assertSame("直した文\n2 行目", $saved->evaluation_text);
+        $this->assertSame('直したメモ', $saved->staff_memo);
+        // アドバイスが変わったので最終更新も変わる
+        $this->assertSame((int) auth()->id(), (int) $saved->evaluation_updated_by);
+        $this->assertSame('2026-10-19 11:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+        // 記録は［公開］と同じ並び：変わった方の編集 → 公開取消
+        $this->assertSame([
+            'edit_trainee_personality_diagnosis_evaluation',
+            'edit_trainee_personality_diagnosis_staff_memo',
+            'unpublish_trainee_personality_diagnosis_evaluation',
+        ], AccessLog::query()->orderBy('id')->pluck('action')->all());
+
+        // スタッフ用メモだけ直したときは、スタッフ用メモの編集と公開取消だけ。最終更新は変わらない
+        AccessLog::query()->delete();
+        $this->markPublished($saved, "直した文\n2 行目");
+        Carbon::setTestNow('2026-10-19 12:00:00');
+        $this->unpublishWith($saved, "直した文\n2 行目", 'もう一度直したメモ')->assertSessionHasNoErrors();
+        $this->assertSame('もう一度直したメモ', $saved->fresh()->staff_memo);
+        $this->assertSame('2026-10-19 11:00:00', $saved->fresh()->evaluation_updated_at->format('Y-m-d H:i:s'));
+        $this->assertSame(['edit_trainee_personality_diagnosis_staff_memo', 'unpublish_trainee_personality_diagnosis_evaluation'], AccessLog::query()->orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_アドバイスを空にして公開を取り消すと取り消せて空で保存される(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+        $result->update(['staff_memo' => 'メモ']);
+
+        $response = $this->unpublishWith($result, " \r\n ", '');
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success', '愛犬性格診断の公開を取り消しました。');
+        $saved = $result->fresh();
+        $this->assertNull($saved->evaluation_published_at);
+        $this->assertNull($saved->evaluation_text);
+        $this->assertNull($saved->staff_memo);
+        $this->assertSame('なし', $saved->evaluation_status_label);
+    }
+
+    public function test_何も直さずに公開を取り消すと公開取消の記録だけで最終更新は変わらない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+        $result->update(['staff_memo' => 'メモ', 'evaluation_updated_by' => 200, 'evaluation_updated_at' => '2026-10-18 10:00:00']);
+        Carbon::setTestNow('2026-10-19 11:00:00');
+
+        $this->unpublishWith($result, '公開した文', 'メモ')->assertSessionHasNoErrors();
+
+        $saved = $result->fresh();
+        $this->assertNull($saved->evaluation_published_at);
+        $this->assertSame('公開した文', $saved->evaluation_text);
+        $this->assertSame('メモ', $saved->staff_memo);
+        $this->assertSame('2026-10-18 10:00:00', $saved->evaluation_updated_at->format('Y-m-d H:i:s'));
+        $this->assertSame(200, (int) $saved->evaluation_updated_by);
+        $this->assertSame(['unpublish_trainee_personality_diagnosis_evaluation'], AccessLog::query()->orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_公開取消で欄の文が送られてこなければ変えない(): void
+    {
+        // 古い画面から送られたときなどに、アドバイス・スタッフ用メモを消さない
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+        $result->update(['staff_memo' => 'メモ']);
+
+        $this->unpublish($result)->assertSessionHasNoErrors();
+
+        $saved = $result->fresh();
+        $this->assertNull($saved->evaluation_published_at);
+        $this->assertSame('公開した文', $saved->evaluation_text);
+        $this->assertSame('メモ', $saved->staff_memo);
+    }
+
+    public function test_10001文字のときは公開を取り消さずにエラーでどちらも変えない(): void
+    {
+        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
+        $this->markPublished($result);
+        $result->update(['staff_memo' => 'メモ']);
+
+        $this->unpublishWith($result, str_repeat('う', 10001), '直したメモ')
+            ->assertRedirect($this->url($result))
+            ->assertSessionHasErrors(['evaluation_text' => 'アドバイスは10000文字以内で入力してください。']);
+        $this->unpublishWith($result, '直した文', str_repeat('あ', 10001))
+            ->assertSessionHasErrors('staff_memo');
+
+        $saved = $result->fresh();
+        $this->assertNotNull($saved->evaluation_published_at);
+        $this->assertSame('公開済み', $saved->evaluation_status_label);
+        $this->assertSame('公開した文', $saved->evaluation_text);
+        $this->assertSame('メモ', $saved->staff_memo);
+    }
+
+    public function test_公開取消のM03に保存の一言を出し欄の文を送り画面を離れる警告を出さない(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         $this->markPublished($result);
 
-        $this->from($this->url($result))->post(route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, $result]), ['evaluation_text' => '保存していない直し']);
+        $html = $this->page($result);
 
-        $this->assertSame('公開した文', $result->fresh()->evaluation_text);
+        // M03 の文は 2 行（2 行目は M01 の 2 行目と同じ見た目）
+        $this->assertMatchesRegularExpression(
+            '/<div class="modal-body">\s*<p class="mb-0">会員のマイページから愛犬性格診断の公開を取り消しますか？<\/p>\s*'
+            .'<p class="mb-0 mt-2" data-evaluation-unpublish-saves>現在の編集内容は保存されます。<\/p>\s*<\/div>/u',
+            $html
+        );
+        // フォームで 2 つの欄の今の文を送る
+        $form = substr($html, strpos($html, 'data-evaluation-unpublish-form>'));
+        $form = substr($form, 0, strpos($form, '</form>'));
+        $this->assertStringContainsString('<input type="hidden" name="evaluation_text" value="">', $form);
+        $this->assertStringContainsString('<input type="hidden" name="staff_memo" value="">', $form);
+        // 送るときに欄の文を入れ、画面を離れるときの警告の「変わっている」を消す（［公開する］と同じ確かめ方）
+        $script = substr($html, strpos($html, "unpublishForm.addEventListener('submit'"));
+        $script = substr($script, 0, strpos($script, '});'));
+        $this->assertStringContainsString("unpublishForm.querySelector('input[name=\"evaluation_text\"]').value = textarea.value;", $script);
+        $this->assertStringContainsString("unpublishForm.querySelector('input[name=\"staff_memo\"]').value = document.querySelector('[data-evaluation-form] textarea[name=\"staff_memo\"]').value;", $script);
+        $this->assertStringContainsString('unsavedGuard.hasChanges = false;', $script);
     }
 
     public function test_公開していないのに公開取消を送ってもエラーにしない(): void
@@ -1212,26 +1343,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString("publishForm.querySelector('input[name=\"staff_memo\"]').value = memoField.value;", $html);
     }
 
-    public function test_公開取消は直しかけの文を保存しない(): void
-    {
-        $result = $this->addResult('past-1', '2026-06-01 09:00:00');
-        $this->markPublished($result, '公開した文');
-        $result->update(['staff_memo' => '保存したメモ']);
-
-        $this->post(route('trainee-personality-diagnosis-results.unpublish', [$this->trainee, $result]), [
-            'evaluation_text' => '直しかけ', 'staff_memo' => '直しかけのメモ',
-        ])->assertSessionHas('success', '愛犬性格診断の公開を取り消しました。');
-
-        $saved = $result->fresh();
-        $this->assertSame('公開した文', $saved->evaluation_text);
-        $this->assertSame('保存したメモ', $saved->staff_memo);
-        $this->assertNull($saved->evaluation_published_at);
-        $this->assertSame(['unpublish_trainee_personality_diagnosis_evaluation'], $this->logActions());
-    }
-
     // ---- 公開の確認の 2 行目と、公開のときの最終更新（2026-10-19 変更。設計書 S-0313-M01） ----
 
-    public function test_公開の確認のモーダルに現在の編集内容が保存されることを書きほかのモーダルは今のまま(): void
+    public function test_公開の確認のモーダルに現在の編集内容が保存されることを書きM04とM02は今のまま(): void
     {
         $result = $this->addResult('past-1', '2026-06-01 09:00:00');
         $result->update(['evaluation_text' => '下書き']);
@@ -1257,8 +1371,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $html = $this->page($result);
         $unpublish = substr($html, strpos($html, 'data-personality-diagnosis-unpublish>'));
         $unpublish = substr($unpublish, 0, strpos($unpublish, 'modal-footer'));
-        $this->assertMatchesRegularExpression('/<div class="modal-body">\s*<p class="mb-0">会員のマイページから愛犬性格診断の公開を取り消しますか？<\/p>\s*<\/div>/u', $unpublish);
-        $this->assertStringNotContainsString('現在の編集内容', $html);
+        // 公開取消（M03）にも同じ 2 行目を出す（2026-10-19 変更：公開取消でも保存してから取り消す。その前は 1 行だけ）。
+        // 公開済みのときは M01 を置かないので、この 1 か所だけ
+        $this->assertStringContainsString('<p class="mb-0 mt-2" data-evaluation-unpublish-saves>現在の編集内容は保存されます。</p>', $unpublish);
+        $this->assertSame(1, substr_count($html, '現在の編集内容は保存されます。'));
     }
 
     public function test_文を変えずに公開すると最終更新は変えず公開した日は入る(): void

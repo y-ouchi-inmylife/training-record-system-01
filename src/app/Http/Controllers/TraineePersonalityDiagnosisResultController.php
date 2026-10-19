@@ -143,22 +143,46 @@ class TraineePersonalityDiagnosisResultController extends Controller
     /**
      * アドバイスの公開取消（POST …/{personalityDiagnosisResult}/unpublish。S-0313-M03。2026-10-18 追加）。
      *
-     * 結果の行を排他ロックして取り直し、公開済みなら公開した日時・公開したトレーナーを NULL に戻す（アドバイスは残す。状態は下書き）。
-     * 公開していなければ何もせず S-0313 に戻す。欄に保存していない直しがあっても保存しない（リクエストのアドバイスは使わない）。
+     * 公開していなければ（2 回目の送信を含む）、入力のチェックより先に見て、何もせず S-0313 に戻す。そうでなければ、
+     * 1 つのトランザクションで結果の行を排他ロックして取り直し、公開した日時・公開したトレーナーを NULL に戻し（状態は下書き）、
+     * あわせて欄のアドバイスとスタッフ用メモを保存する（［公開］と同じ考え。公開を取り消したうえで保存するので、アドバイスは空でもよい）。
+     * アドバイス・スタッフ用メモは、送られてこなければ変えない（古い画面から送られたときに消さないため）。
+     * アドバイスの最終更新は、アドバイスの文が変わったときだけ変える。保存で変わった方の編集の記録を残す（公開取消の記録は LogAccess ミドルウェア）。
+     * 2026-10-19 変更：直しかけのまま公開取消すると、ブラウザの離れる確認が M03 に重なって出て、進むと直した文が元に戻ってしまい
+     * 分かりにくかったため。その前は、欄に保存していない直しがあっても保存しなかった（リクエストのアドバイスは使わなかった）。
      * 完了メッセージは「{名前}の公開を取り消しました。」（ほかの取消の「〜の案内を取り消しました。」にそろえる。2026-10-18 変更：その前は「評価文の公開をやめました。」）
      */
-    public function unpublish(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
+    public function unpublish(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
     {
-        $unpublished = DB::transaction(function () use ($personalityDiagnosisResult) {
+        if ($personalityDiagnosisResult->evaluation_published_at === null) {
+            return $this->backToShow($trainee, $personalityDiagnosisResult, 'このアドバイスは公開していません。');
+        }
+
+        [$text, $memo, $hasMemo] = $this->validateTexts($request, evaluationRequired: false);
+        $hasText = $request->exists('evaluation_text');
+
+        $changes = DB::transaction(function () use ($personalityDiagnosisResult, $text, $hasText, $memo, $hasMemo) {
             $result = TraineePersonalityDiagnosisResult::query()->whereKey($personalityDiagnosisResult->id)->lockForUpdate()->firstOrFail();
             if ($result->evaluation_published_at === null) {
-                return false;
+                return null;
             }
 
-            $result->update(['evaluation_published_at' => null, 'evaluation_published_by' => null]);
+            $evaluationChanged = $hasText && $result->evaluation_text !== $text;
+            $memoChanged = $hasMemo && $result->staff_memo !== $memo;
+            // 公開を取り消し、そのうえで（下書きとして）2 つの欄を保存する。アドバイスの最終更新は文が変わったときだけ
+            $result->update([
+                'evaluation_published_at' => null,
+                'evaluation_published_by' => null,
+                ...($evaluationChanged ? ['evaluation_text' => $text, 'evaluation_updated_by' => auth()->id(), 'evaluation_updated_at' => now()] : []),
+                ...($memoChanged ? ['staff_memo' => $memo] : []),
+            ]);
 
-            return true;
+            return [$evaluationChanged, $memoChanged];
         });
+        $unpublished = $changes !== null;
+        if ($unpublished) {
+            $this->logEdits($request, $trainee, ...$changes);
+        }
 
         return $this->backToShow($trainee, $personalityDiagnosisResult, $unpublished ? __('messages.personality_diagnosis_name').'の公開を取り消しました。' : 'このアドバイスは公開していません。');
     }
