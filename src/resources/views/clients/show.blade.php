@@ -720,14 +720,15 @@
                                     {{-- 暮らしの様子（2026-10-19 変更。設計書 S-0305 セクション3「名前の下の項目の並びと出し方」）。去勢・避妊の下、
                                          愛犬性格診断の上に、ほかの項目と同じ「ラベル・値」の行で、いつも出す（その前は回答があるときだけ、欄のいちばん下に
                                          リンクだけの行を出していた）。
-                                         - 値はバッジ：愛犬アンケートの回答があれば「入力あり」（bg-success）、なければ「入力なし」（bg-secondary）。
+                                         - 値はバッジ：暮らしの様子に文字が入っていれば「入力あり」（bg-success）、なければ「入力なし」（bg-secondary）。
                                            色は評価文の状態のバッジ（公開済み＝bg-success、なし＝bg-secondary）に合わせる
-                                         - 回答があるかどうかは最新の回答の有無で決める（答えの中身が空かどうかは見ない。答え直しの案内を出している間も、
-                                           前回の答えがあれば入力あり）。latestIntakeSurveyResponse は ClientController::show で先読み済み
+                                         - 「入力あり」は、最新の回答の暮らしの様子の自由記述のどれかに文字が入っているとき（Trainee::has_intake_life_answers。
+                                           空白・改行だけは空。2026-10-19 変更：その前は最新の回答の有無で決め、答えの中身は見ていなかった）。
+                                           latestIntakeSurveyResponse は ClientController::show で先読み済み（トレーニーごとに問い合わせは増えない）
                                          - ラベルは入力ありのときだけリンク（トレーニー詳細 S-0309 の暮らしの様子の欄 #intake-survey、同じタブ。
                                            読み上げ用の名前は「{表示名}の暮らしの様子」）。入力なしのときはほかのラベルと同じ灰色の文字
                                          - ラベルは「暮らしの」と「様子」の間でだけ折り返す（狭い幅でラベルの列に収まらないため。去勢・避妊と同じやり方） --}}
-                                    @if($trainee->latestIntakeSurveyResponse !== null)
+                                    @if($trainee->has_intake_life_answers)
                                         <dt class="col-4 fw-normal" style="word-break: keep-all; overflow-wrap: normal;"><a href="{{ route('trainees.show', $trainee) }}#intake-survey"
                                            aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの<wbr>様子</a></dt>
                                         <dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-success">入力あり</span></dd>

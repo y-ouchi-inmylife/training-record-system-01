@@ -456,6 +456,18 @@ class Trainee extends Model
     }
 
     /**
+     * 暮らしの様子に文字が入っているか（2026-10-19 追加。会員詳細 S-0305 の暮らしの様子の「入力あり」／「入力なし」）。
+     * 最新の愛犬アンケートの回答のうち、暮らしの様子の自由記述のどれか 1 つにでも文字が入っているとき true
+     * （TraineeIntakeSurveyResponse::hasLifeAnswers()）。回答がないとき・すべて空のときは false。前の回答は見ない。
+     * 2026-10-19 変更：ユーザーレビューで、すべて空でも「入力あり」になっていたため。その前は最新の回答があるかで決めていた。
+     * 呼び出し側は latestIntakeSurveyResponse を eager load しておくこと（会員詳細でトレーニーごとに問い合わせを出さないため）
+     */
+    public function getHasIntakeLifeAnswersAttribute(): bool
+    {
+        return $this->latestIntakeSurveyResponse?->hasLifeAnswers() ?? false;
+    }
+
+    /**
      * 「愛犬アンケート＆愛犬性格診断」の案内が、2 つとも回答待ち（未回答で期限内）か（2026-10-19 追加）。
      * 会員詳細の「案内中」・マイページのお知らせで、2 つを 1 つの案内として出すときに使う。
      * 愛犬アンケートだけ答えたあとは false（残っている愛犬性格診断の案内は、単独の案内と同じに出す）。

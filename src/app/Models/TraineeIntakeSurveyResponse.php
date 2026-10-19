@@ -39,6 +39,22 @@ class TraineeIntakeSurveyResponse extends Model
     */
 
     /**
+     * 暮らしの様子の自由記述（questions() の 4 問）のどれか 1 つにでも文字が入っているか（2026-10-19 追加。会員詳細 S-0305 の
+     * 暮らしの様子の「入力あり」）。null・空文字・空白や改行だけ（全角の空白「　」も含む）の答えは空とみなす。
+     * 「愛犬のこと」（名前・犬種などの基本情報）の項目は見ない
+     */
+    public function hasLifeAnswers(): bool
+    {
+        foreach (array_keys(self::questions()) as $column) {
+            if (preg_replace('/[\s\x{3000}]+/u', '', (string) $this->{$column}) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * 自由記述 4 欄（カラム名 → 短い呼び名・設問文）。この並びで画面に出す
      *
      * @return array<string, array{label: string, question: string}>

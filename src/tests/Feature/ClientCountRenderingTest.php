@@ -827,11 +827,16 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    private function intakeResponse(int $traineeId, ?int $tokenId, string $answeredAt = '2026-10-16 14:32:00'): void
+    /**
+     * 愛犬アンケートの回答。$answers は暮らしの様子などの列の値（2026-10-19 変更：「入力あり」は暮らしの様子に文字が入っているかで
+     * 決めるので、既定は「こうなったらいいな」に文字が入った回答にする）
+     */
+    private function intakeResponse(int $traineeId, ?int $tokenId, string $answeredAt = '2026-10-16 14:32:00', array $answers = ['wish' => 'お留守番が上手になってほしい']): void
     {
         DB::table('trainee_intake_survey_responses')->insert([
             'trainee_id' => $traineeId, 'trainee_intake_survey_token_id' => $tokenId,
             'answered_at' => $answeredAt, 'created_at' => $answeredAt, 'updated_at' => $answeredAt,
+            ...$answers,
         ]);
     }
 
@@ -2380,5 +2385,87 @@ class ClientCountRenderingTest extends TestCase
         // 利用中
         DB::table('clients')->where('id', $client->id)->update(['password' => 'x']);
         $this->assertStringNotContainsString('with_mypage_registration" value', $html());
+    }
+
+    // ---- 暮らしの様子の「入力あり」は文字が入っているかで決める（2026-10-19 変更。設計書 S-0305「名前の下の項目の並びと出し方」） ----
+
+    /** トレーニー 1 頭分の暮らしの様子の行（ラベルとバッジ）。入力あり：['入力あり', リンクあり]、入力なし：['入力なし', リンクなし] */
+    private function lifeStatus(string $html, int $traineeId): array
+    {
+        $linked = str_contains($html, 'href="'.route('trainees.show', $traineeId).'#intake-survey"');
+        $segment = substr($html, strpos($html, 'href="'.route('trainees.show', $traineeId).'"'));
+        $this->assertSame(1, preg_match('/data-intake-survey-status><span class="badge (bg-success|bg-secondary)">(入力あり|入力なし)<\/span>/u', $segment, $m));
+
+        return [$m[2], $m[1], $linked];
+    }
+
+    public function test_暮らしの様子は自由記述のどれかに文字があれば入力ありで空や空白だけなら入力なし(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $cases = [
+            // [名前, 回答（null なら回答なし）, 期待]
+            ['ナシ', null, '入力なし'],
+            ['カラ', ['wish' => null, 'recent_events' => '', 'ideal_days' => null, 'health_concerns' => ''], '入力なし'],
+            ['クウハク', ['wish' => "  \n\t", 'recent_events' => '　　', 'ideal_days' => "\r\n　\n", 'health_concerns' => ' '], '入力なし'],
+            ['ヒトツ', ['wish' => null, 'recent_events' => '', 'ideal_days' => null, 'health_concerns' => '　膝が弱い　'], '入力あり'],
+            // 「愛犬のこと」（基本情報）の項目だけ入っていて、暮らしの様子は空
+            ['キホン', ['name' => 'キホン', 'breed' => '柴犬', 'sex' => 'male', 'birth_year' => 2020, 'neuter_status' => 'yes'], '入力なし'],
+        ];
+        $ids = [];
+        foreach ($cases as [$name, $answers]) {
+            $ids[$name] = $this->trainee($client, $name);
+            if ($answers !== null) {
+                $this->intakeResponse($ids[$name], null, '2026-10-16 14:32:00', $answers);
+            }
+        }
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        foreach ($cases as [$name, , $expected]) {
+            [$label, $class, $linked] = $this->lifeStatus($html, $ids[$name]);
+            $this->assertSame($expected, $label, $name);
+            $this->assertSame($expected === '入力あり' ? 'bg-success' : 'bg-secondary', $class, $name);
+            // ラベルのリンクは入力ありのときだけ
+            $this->assertSame($expected === '入力あり', $linked, $name);
+        }
+    }
+
+    public function test_前の回答に文字があっても最新の回答がすべて空なら入力なし(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeResponse($id, null, '2026-10-10 10:00:00', ['wish' => 'お留守番が上手になってほしい']);
+        $this->intakeResponse($id, null, '2026-10-16 14:32:00', ['wish' => '', 'recent_events' => null]);
+
+        [$label, , $linked] = $this->lifeStatus($this->get(route('clients.show', $client))->assertOk()->getContent(), $id);
+
+        $this->assertSame('入力なし', $label);
+        $this->assertFalse($linked);
+    }
+
+    public function test_暮らしの様子の判定でトレーニーごとに問い合わせは増えない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $count = function () use ($client) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->get(route('clients.show', $client))->assertOk();
+            $n = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'trainee_intake_survey_responses'))->count();
+            DB::disableQueryLog();
+
+            return $n;
+        };
+        $this->intakeResponse($this->trainee($client, 'ポチ'), null);
+        $one = $count();
+        foreach (['タマ', 'ハナ'] as $name) {
+            $this->intakeResponse($this->trainee($client, $name), null);
+        }
+
+        $this->assertSame($one, $count());
     }
 }
