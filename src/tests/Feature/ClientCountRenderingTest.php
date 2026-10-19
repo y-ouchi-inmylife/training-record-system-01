@@ -847,9 +847,9 @@ class ClientCountRenderingTest extends TestCase
 
         // 去勢・避妊の行のすぐ後ろに、ラベルがリンクの「暮らしの様子」と「入力あり」のバッジ（2026-10-19 変更：その前は性格診断の行の
         // すぐ後ろに、リンクだけの行〔div.small.mt-1〕を出していた）
-        return '/<dd class="col-8 mb-1">[^<]*<\/dd>\s*'
+        return '/<dd class="col-8 mb-1">(?:(?!<\/dd>).)*<\/dd>\s*'
             .'<dt class="col-4 fw-normal" style="word-break: keep-all; overflow-wrap: normal;"><a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの<wbr>様子<\/a><\/dt>\s*'
-            .'<dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-success">入力あり<\/span><\/dd>\s*<\/dl>/us';
+            .'<dd class="col-8 mb-0" data-intake-survey-status>入力あり<\/dd>\s*<\/dl>/us';
     }
 
     public function test_回答済みの暮らしの様子のリンクの読み上げ用の名前は名前が未登録なら名前未登録(): void
@@ -1297,7 +1297,7 @@ class ClientCountRenderingTest extends TestCase
         );
         $this->assertStringNotContainsString(route('trainees.show', $notIssued).'#personality-diagnosis', $html);
         // 回答のないトレーニーは、暮らしの様子のラベルをリンクにせず「入力なし」（2026-10-19 変更：その前は行ごと出さなかった）
-        $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary">入力なし</span>'));
+        $this->assertSame(1, substr_count($html, '<dd class="col-8 mb-0 text-muted" data-intake-survey-status>入力なし</dd>'));
         // 行のボタンのまとまりはない（2026-10-19 変更：トレーニーの欄の［案内を発行］と「案内中」の行にまとめた）。
         // 性格診断の行（リンク・診断なし）のあと、最終計測の行（2026-10-19 変更：いちばん下）で、トレーニーの欄が閉じる
         $this->assertStringNotContainsString('role="group" aria-label="名前未登録の愛犬性格診断"', $html);
@@ -1747,7 +1747,7 @@ class ClientCountRenderingTest extends TestCase
             '/>ポチ<\/a><\/h6>\s*<div class="d-flex flex-column align-items-end gap-1 ms-auto small">\s*'
             .'<div class="d-flex flex-column align-items-end gap-1" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*'
             .'<div class="d-flex flex-wrap align-items-center justify-content-end gap-2" data-survey-in-progress-item>\s*'
-            .'<div class="d-flex align-items-center gap-2">\s*<span class="trainee-survey-line fw-bold text-nowrap">案内中<\/span>\s*<span class="trainee-survey-line">愛犬アンケート<\/span>/u',
+            .'<div class="d-flex align-items-center gap-2">\s*<span class="trainee-survey-line"><span class="badge bg-warning text-dark">案内中<\/span><\/span>\s*<span class="trainee-survey-line">愛犬アンケート<\/span>/u',
             $html
         );
         $this->assertStringNotContainsString('class="row small mb-2"', $html);
@@ -1927,7 +1927,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression(
             '/>ポチ<\/a><\/h6>\s*'.$this->rightOfNamePrefix()
             .'<div class="d-flex align-items-center gap-2" role="group"\s*aria-label="ポチの期限切れの案内" data-survey-expired>\s*'
-            .'<span class="trainee-survey-line fw-bold text-danger text-nowrap">期限切れ<\/span>\s*'
+            .'<span class="trainee-survey-line"><span class="badge bg-danger">期限切れ<\/span><\/span>\s*'
             .'<span class="trainee-survey-line">愛犬性格診断<\/span>\s*<\/div>\s*'
             .trim($this->issueButtonPattern($id, 'ポチ'), '/u').'\s*<\/div>\s*<\/div>\s*<\/div>/u',
             $html
@@ -2036,8 +2036,8 @@ class ClientCountRenderingTest extends TestCase
 
         // 段ごとのラベル「案内中」（2 つ）と 2 つの値がどれも .trainee-survey-line（小さいボタンと同じ高さで縦の中央に置く。
         // 名前の h6 も同じ箱なので、名前と 1 段目の中央がそろう）
-        $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line fw-bold text-nowrap">案内中</span>'));
-        $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line">'));
+        $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line"><span class="badge bg-warning text-dark">案内中</span></span>'));
+        $this->assertSame(2, substr_count($row, '<span class="trainee-survey-line">愛犬'));
     }
 
     // ---- 案内中・期限切れの表示を名前の行の右に（2026-10-19 変更。設計書 S-0305 セクション3「案内の操作」） ----
@@ -2166,7 +2166,7 @@ class ClientCountRenderingTest extends TestCase
         // 回答なし：ラベルはほかのラベルと同じ灰色の文字（リンクなし）、値は「入力なし」（bg-secondary）。行はいつも出す
         $this->assertSame(1, preg_match_all(
             '/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">暮らしの<wbr>様子<\/dt>\s*'
-            .'<dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-secondary">入力なし<\/span><\/dd>/u',
+            .'<dd class="col-8 mb-0 text-muted" data-intake-survey-status>入力なし<\/dd>/u',
             $html
         ));
         $this->assertStringNotContainsString(route('trainees.show', $none).'#intake-survey', $html);
@@ -2405,9 +2405,10 @@ class ClientCountRenderingTest extends TestCase
     {
         $linked = str_contains($html, 'href="'.route('trainees.show', $traineeId).'#intake-survey"');
         $segment = substr($html, strpos($html, 'href="'.route('trainees.show', $traineeId).'"'));
-        $this->assertSame(1, preg_match('/data-intake-survey-status><span class="badge (bg-success|bg-secondary)">(入力あり|入力なし)<\/span>/u', $segment, $m));
+        // 2026-10-19 変更：バッジではなくふつうの文字。入力なしは「診断なし」と同じ text-muted
+        $this->assertSame(1, preg_match('/<dd class="col-8 mb-0( text-muted)?" data-intake-survey-status>(入力あり|入力なし)<\/dd>/u', $segment, $m));
 
-        return [$m[2], $m[1], $linked];
+        return [$m[2], $m[1] === ' text-muted' ? 'text-muted' : 'plain', $linked];
     }
 
     public function test_暮らしの様子は自由記述のどれかに文字があれば入力ありで空や空白だけなら入力なし(): void
@@ -2437,7 +2438,7 @@ class ClientCountRenderingTest extends TestCase
         foreach ($cases as [$name, , $expected]) {
             [$label, $class, $linked] = $this->lifeStatus($html, $ids[$name]);
             $this->assertSame($expected, $label, $name);
-            $this->assertSame($expected === '入力あり' ? 'bg-success' : 'bg-secondary', $class, $name);
+            $this->assertSame($expected === '入力あり' ? 'plain' : 'text-muted', $class, $name);
             // ラベルのリンクは入力ありのときだけ
             $this->assertSame($expected === '入力あり', $linked, $name);
         }
@@ -2522,5 +2523,73 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
         $this->assertSame(1, substr_count($html, '>暮らしの<wbr>様子</a>'));
         $this->assertSame(1, substr_count($html, '<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">暮らしの<wbr>様子</dt>'));
+    }
+
+    // ---- 空の値の「—」・暮らしの様子の文字・案内の状態のバッジ（2026-10-19 変更。設計書 S-0305「名前の下の項目の並びと出し方」） ----
+
+    private const EMPTY_VALUE = '<span class="text-muted" data-trainee-value-empty><span aria-hidden="true">—</span><span class="visually-hidden">未入力</span></span>';
+
+    public function test_空の値の項目には読み上げが未入力の印を出し値があれば出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        // 犬種は空白だけ（全角の空白を含む）、性別・誕生日・去勢・避妊は空
+        $empty = $this->trainee($client, 'カラ');
+        DB::table('trainees')->where('id', $empty)->update(['breed' => ' 　 ']);
+        $filled = $this->trainee($client, 'ミチ');
+        DB::table('trainees')->where('id', $filled)->update(['breed' => '柴犬', 'sex' => 'male', 'birth_year' => 2020, 'neuter_status' => 'yes']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $emptyBlock = substr($html, strpos($html, '<dl class="row mb-0 small">', strpos($html, '<a href="'.route('trainees.show', $empty).'"')));
+        $emptyBlock = substr($emptyBlock, 0, strpos($emptyBlock, '</dl>'));
+        // 犬種（空白だけ）・性別・誕生日・去勢・避妊（空）の 4 つに印
+        $this->assertSame(4, substr_count($emptyBlock, self::EMPTY_VALUE));
+        $filledBlock = substr($html, strpos($html, '<dl class="row mb-0 small">', strpos($html, '<a href="'.route('trainees.show', $filled).'"')));
+        $filledBlock = substr($filledBlock, 0, strpos($filledBlock, '</dl>'));
+        $this->assertStringNotContainsString('data-trainee-value-empty', $filledBlock);
+        $this->assertStringContainsString('柴犬', $filledBlock);
+        // 暮らしの様子・愛犬性格診断・最終計測には印を使わない（「入力なし」「診断なし」「計測なし」のまま）
+        $this->assertStringContainsString('<dd class="col-8 mb-0 text-muted" data-intake-survey-status>入力なし</dd>', $emptyBlock);
+    }
+
+    public function test_暮らしの様子はバッジでなく文字でリンクの決まりは今のまま(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $with = $this->trainee($client, 'ポチ');
+        $this->intakeResponse($with, null);
+        $without = $this->trainee($client, 'タマ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('<span class="badge bg-success">入力あり</span>', $html);
+        $this->assertStringNotContainsString('<span class="badge bg-secondary">入力なし</span>', $html);
+        $this->assertSame(['入力あり', 'plain', true], $this->lifeStatus($html, $with));
+        $this->assertSame(['入力なし', 'text-muted', false], $this->lifeStatus($html, $without));
+    }
+
+    public function test_案内中と期限切れは会員の状態のバッジと同じ色のバッジで出す(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $single = $this->trainee($client, 'ポチ');
+        DB::table('trainee_intake_survey_tokens')->insert(['token' => bin2hex(random_bytes(16)), 'trainee_id' => $single, 'expires_at' => '2026-11-02 23:59:59', 'created_at' => '2026-10-26 10:00:00', 'updated_at' => '2026-10-26 10:00:00']);
+        $combined = $this->trainee($client, 'タマ');
+        $this->combinedTokens($combined, '2026-11-02 23:59:59', '2026-10-26 10:00:00');
+        $expired = $this->trainee($client, 'ハナ');
+        $this->combinedTokens($expired);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 案内中は「登録待ち」と同じ bg-warning text-dark、期限切れは「登録待ち（期限切れ）」と同じ bg-danger（Client::statusBadge）
+        $inProgress = '<span class="trainee-survey-line"><span class="badge bg-warning text-dark">案内中</span></span>';
+        $this->assertStringContainsString($inProgress, (string) $this->inProgressRow($html, 'ポチ'));
+        $this->assertStringContainsString($inProgress, (string) $this->inProgressRow($html, 'タマ'));
+        $this->assertStringContainsString('<span class="trainee-survey-line"><span class="badge bg-danger">期限切れ</span></span>', (string) $this->expiredRow($html, 'ハナ'));
+        $this->assertStringNotContainsString('fw-bold text-nowrap">案内中', $html);
+        $this->assertStringNotContainsString('text-danger text-nowrap">期限切れ', $html);
+        $this->assertSame(['class' => 'bg-warning text-dark'], array_intersect_key((new Client(['email' => null]))->forceFill(['latest_email_reg_expires_at' => '2026-11-02 23:59:59', 'has_active_email_reg_token' => 1])->statusBadge(), ['class' => 1]));
     }
 }

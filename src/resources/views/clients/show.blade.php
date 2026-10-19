@@ -639,6 +639,9 @@
                                 {{-- 名前の行。右に案内の表示と操作をまとめて右寄せで置く（2026-10-19 変更：設計書 S-0305 セクション3「案内の操作」。
                                      ユーザーレビューで、名前の下に 1 行を足すより名前の行の右にまとめた方が欄が短く見やすいため。その前は、名前の行の
                                      すぐ下・犬種の行の上に「案内中」「期限切れ」の行を出していた）。名前の行のすぐ下に犬種が来る。
+                                     - 「案内中」「期限切れ」はバッジ（2026-10-19 変更：その前は太字の文字。色は会員のマイページの状態のバッジにそろえる：
+                                       案内中は「登録待ち」と同じ bg-warning text-dark、期限切れは「登録待ち（期限切れ）」と同じ bg-danger）。
+                                       バッジはボタンと同じ高さの箱（.trainee-survey-line）の中で縦の真ん中に置く
                                      - 案内中：「案内中」（太字）＋種類の名前＋［表示］（白抜きの青。ご案内の画面を同じタブで開く）［取消］（白抜きの赤。
                                        今の取消の確認 M06・M07 を開く）。期限の日は出さない。2 つあれば縦に 2 段（名前は 1 段目と同じ高さ）
                                      - 期限切れ：「期限切れ」（太字の赤）＋種類の名前＋［案内を発行］（期限切れの案内の［表示］［取消］は出さない）
@@ -662,7 +665,7 @@
                                                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2" data-survey-in-progress-item>
                                                         {{-- ラベルと種類の名前は離さない（1 つのまとまり） --}}
                                                         <div class="d-flex align-items-center gap-2">
-                                                            <span class="trainee-survey-line fw-bold text-nowrap">案内中</span>
+                                                            <span class="trainee-survey-line"><span class="badge bg-warning text-dark">案内中</span></span>
                                                             @include('clients._survey-name', ['name' => $survey['name'], 'lines' => $survey['nameLines'] ?? null])
                                                         </div>
                                                         {{-- ［表示］［取消］は 1 つのまとまりにして、狭い幅でも 2 つ一緒に次の行へ回す（［取消］だけが落ちないように） --}}
@@ -682,7 +685,7 @@
                                                 @if($expiredSurveyName !== null)
                                                     <div class="d-flex align-items-center gap-2" role="group"
                                                          aria-label="{{ $trainee->display_name }}の期限切れの案内" data-survey-expired>
-                                                        <span class="trainee-survey-line fw-bold text-danger text-nowrap">期限切れ</span>
+                                                        <span class="trainee-survey-line"><span class="badge bg-danger">期限切れ</span></span>
                                                         @include('clients._survey-name', ['name' => $expiredSurveyName, 'lines' => $expiredSurveyNameLines])
                                                     </div>
                                                 @endif
@@ -700,15 +703,17 @@
                                      x-detail-cell は使わない（3 列グリッド前提のコンポーネントで
                                      右カラム col-lg-5 の中の縦並び表示には合わないため）。 --}}
                                 <dl class="row mb-0 small">
+                                    {{-- 犬種・性別・誕生日・去勢・避妊の値が空（null・空文字・空白だけ）なら「—」を出す（clients._trainee-value。2026-10-19 変更：
+                                         空の行は高さがなく詰まり、ほかの行とそろわなかったため。その前は空欄〔§2-4〕） --}}
                                     <dt class="col-4 fw-normal text-muted">犬種</dt>
-                                    <dd class="col-8 mb-1">{{ $trainee->breed }}</dd>
+                                    <dd class="col-8 mb-1">@include('clients._trainee-value', ['value' => $trainee->breed])</dd>
                                     <dt class="col-4 fw-normal text-muted">性別</dt>
-                                    <dd class="col-8 mb-1">{{ $trainee->sex_label }}</dd>
+                                    <dd class="col-8 mb-1">@include('clients._trainee-value', ['value' => $trainee->sex_label])</dd>
                                     <dt class="col-4 fw-normal text-muted">誕生日</dt>
                                     {{-- 誕生日と年齢（要件定義書 6-16「年齢の表示規則」。組み立ては Trainee の
                                          birthday_with_age_label アクセサ。未登録は空欄）。2026-10 変更：以前は
                                          birth_date と age アクセサで「Y/m/d（N歳）」に組み立てていた --}}
-                                    <dd class="col-8 mb-1">{{ $trainee->birthday_with_age_label }}</dd>
+                                    <dd class="col-8 mb-1">@include('clients._trainee-value', ['value' => $trainee->birthday_with_age_label])</dd>
                                     {{-- 去勢・避妊（2026-10 追加）。誕生日の下・最終計測の上。未登録は空欄（§2-4）。
                                          2026-10 にトレーニーの備考（この下の行）をなくした --}}
                                     {{-- ラベルは言葉の途中で折り返さない（2026-10-18 追加。狭い幅〔992px でラベルの列 約 86px、375px で約 76px〕で
@@ -716,11 +721,12 @@
                                          「去勢・／避妊」「最終／計測」の位置でだけ折り返し、overflow-wrap: normal で受け継ぐ break-word を止める。
                                          2〜3 文字のラベル（犬種・性別・誕生日）は狭い幅でも 1 行に収まるので付けない --}}
                                     <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">去勢・<wbr>避妊</dt>
-                                    <dd class="col-8 mb-1">{{ $trainee->neuter_status_label }}</dd>
+                                    <dd class="col-8 mb-1">@include('clients._trainee-value', ['value' => $trainee->neuter_status_label])</dd>
                                     {{-- 暮らしの様子（2026-10-19 変更。設計書 S-0305 セクション3「名前の下の項目の並びと出し方」）。去勢・避妊の下、
                                          愛犬性格診断の上に、ほかの項目と同じ「ラベル・値」の行で、いつも出す（その前は回答があるときだけ、欄のいちばん下に
                                          リンクだけの行を出していた）。
-                                         - 値はバッジ：暮らしの様子に文字が入っていれば「入力あり」（bg-success）、なければ「入力なし」（bg-secondary）。
+                                         - 値はふつうの文字：暮らしの様子に文字が入っていれば「入力あり」（ほかの値と同じ色）、なければ「入力なし」（「診断なし」と
+                                           同じ text-muted）。2026-10-19 変更：状態はバッジ、値は文字にそろえた。その前はバッジ（入力あり bg-success・入力なし bg-secondary）。
                                            色は評価文の状態のバッジ（公開済み＝bg-success、なし＝bg-secondary）に合わせる
                                          - 「入力あり」は、最新の回答の暮らしの様子の自由記述のどれかに文字が入っているとき（Trainee::has_intake_life_answers。
                                            空白・改行だけは空。2026-10-19 変更：その前は最新の回答の有無で決め、答えの中身は見ていなかった）。
@@ -731,10 +737,10 @@
                                     @if($trainee->has_intake_life_answers)
                                         <dt class="col-4 fw-normal" style="word-break: keep-all; overflow-wrap: normal;"><a href="{{ route('trainees.show', $trainee) }}#intake-survey"
                                            aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの<wbr>様子</a></dt>
-                                        <dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-success">入力あり</span></dd>
+                                        <dd class="col-8 mb-0" data-intake-survey-status>入力あり</dd>
                                     @else
                                         <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">暮らしの<wbr>様子</dt>
-                                        <dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-secondary">入力なし</span></dd>
+                                        <dd class="col-8 mb-0 text-muted" data-intake-survey-status>入力なし</dd>
                                     @endif
                                 </dl>
                                 {{-- 性格診断の行（2026-10 追加。要件定義書 6-16-11〜6-16-13、設計書 S-0305 セクション3「性格診断の行」）。

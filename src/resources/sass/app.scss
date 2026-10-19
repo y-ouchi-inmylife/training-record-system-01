@@ -184,6 +184,12 @@ h2 {
     align-items: center;
     min-height: calc(#{$btn-font-size-sm} * #{$btn-line-height} + 2 * #{$btn-padding-y-sm} + 2 * #{$btn-border-width});
 }
+
+// 案内中・期限切れのバッジ（2026-10-19 追加。会員詳細のトレーニーの欄）。欄は .small の中なので、バッジの文字の大きさ（.75em）が
+// ほかのバッジ（会員の欄のマイページの状態のバッジ：12px）より小さくなる。rem で指定して、この画面のほかのバッジと同じ大きさにそろえる
+.trainee-survey-line .badge {
+    font-size: 0.75rem; // Bootstrap の $badge-font-size（.75em）を rem にしたもの
+}
 .invitation-message {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
