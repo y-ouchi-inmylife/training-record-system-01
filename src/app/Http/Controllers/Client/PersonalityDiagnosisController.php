@@ -117,9 +117,9 @@ class PersonalityDiagnosisController extends Controller
 
         return redirect()->route('client-portal.personality-diagnosis.thanks')
             ->with('showMypageLink', ClientMypageLink::shouldShow($tokenRecord?->trainee_id))
-            // マイページ登録へのお誘い（2026-10-19 追加。結び付けたマイページ登録の案内がまだ使えるときだけ。
+            // マイページ登録へのお誘い（2026-10-19 追加。会員に有効なマイページ登録の案内があるときだけ。
             // 愛犬アンケート＆愛犬性格診断は、最後のこの画面だけに出す）
-            ->with('mypageRegistrationUrl', MypageRegistrationInvite::url($tokenRecord));
+            ->with('mypageRegistrationUrl', MypageRegistrationInvite::url($tokenRecord?->trainee_id));
     }
 
     /**

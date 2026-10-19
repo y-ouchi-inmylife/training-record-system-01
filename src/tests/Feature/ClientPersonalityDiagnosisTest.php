@@ -48,6 +48,8 @@ class ClientPersonalityDiagnosisTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineePersonalityDiagnosisTokensTable();
+        // 完了の画面のマイページ登録のお誘いで、会員に有効なマイページ登録の案内があるかを見る（2026-10-19 追加）
+        $this->createClientEmailRegistrationTokensTable();
         // 愛犬アンケート＆愛犬性格診断の案内か（進み具合 2/2 を出すか）を、愛犬アンケートの案内の表で確かめる（2026-10-19 追加）
         $this->createTraineeIntakeSurveyTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();

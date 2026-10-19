@@ -51,6 +51,8 @@ class ClientIntakeSurveySubmitTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineeIntakeSurveyTokensTable();
+        // 完了の画面のマイページ登録のお誘いで、会員に有効なマイページ登録の案内があるかを見る（2026-10-19 追加）
+        $this->createClientEmailRegistrationTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
     }
 

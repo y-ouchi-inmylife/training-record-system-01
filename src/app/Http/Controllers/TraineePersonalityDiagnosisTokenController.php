@@ -32,15 +32,14 @@ class TraineePersonalityDiagnosisTokenController extends Controller
      */
     public function store(Request $request, Trainee $trainee, TraineePersonalityDiagnosisTokenService $service, SurveyMypageRegistrationService $mypage): RedirectResponse
     {
-        // 「マイページ登録の案内も発行する」がオンなら、同じトランザクションでマイページ登録の案内も用意して結び付ける
-        // （2026-10-19 追加。要件定義書 6-16-18。付けられない会員〔利用中・登録待ち（初回設定）〕なら何もしない）
-        [$token, $mypageResult] = DB::transaction(function () use ($request, $trainee, $service, $mypage) {
+        // 「マイページ登録の案内も発行する」がオンなら、同じトランザクションでマイページ登録の案内も発行する（2026-10-19 追加。
+        // 要件定義書 6-16-18。有効な案内がある会員〔登録待ち〕・登録待ち（初回設定）・利用中なら何もしない）
+        [$token, $mypageIssued] = DB::transaction(function () use ($request, $trainee, $service, $mypage) {
             $token = $service->issue($trainee, $request->user());
-            $mypageResult = $token !== null && $request->boolean('with_mypage_registration')
-                ? $mypage->attach($token, $trainee, $request->user())
-                : null;
+            $mypageIssued = $token !== null && $request->boolean('with_mypage_registration')
+                && $mypage->issueFor($trainee, $request->user());
 
-            return [$token, $mypageResult];
+            return [$token, $mypageIssued];
         });
 
         $redirect = redirect()->route('clients.show', $trainee->client_id);
@@ -51,7 +50,7 @@ class TraineePersonalityDiagnosisTokenController extends Controller
             return $redirect->with('error', $trainee->display_name.'には、すでに案内中の案内があります。');
         }
 
-        return $redirect->with('success', $trainee->display_name.'の'.__('messages.personality_diagnosis_name').'の案内を発行しました。'.SurveyMypageRegistrationService::completionNote($mypageResult));
+        return $redirect->with('success', $trainee->display_name.'の'.__('messages.personality_diagnosis_name').'の案内を発行しました。'.SurveyMypageRegistrationService::completionNote($mypageIssued));
     }
 
     /**

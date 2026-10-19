@@ -16,10 +16,10 @@ use Tests\TestCase;
 /**
  * 愛犬アンケート・愛犬性格診断の案内に、マイページ登録の案内を付ける（2026-10-19 追加。要件定義書 6-16-18）。
  *
- * - 発行：「マイページ登録の案内も発行する」（with_mypage_registration）がオンなら、同じトランザクションでマイページ登録の案内を用意し、
- *   お客様が最後に答える案内に結び付ける（単独はその案内、組み合わせは愛犬性格診断の案内）。期限内の案内があればそれを使う
- * - 付けられるのは、マイページが「未登録」「登録待ち」（期限切れも）の会員だけ
- * - 完了の画面：結び付けたマイページ登録の案内がまだ使えるときだけ、お誘いと［マイページに登録する］
+ * - 発行：「マイページ登録の案内も発行する」（with_mypage_registration）がオンなら、同じトランザクションでマイページ登録の案内を作る
+ * - 作れるのは、有効なマイページ登録の案内がない会員（「未登録」「登録待ち（期限切れ）」）だけ（2026-10-19 変更）
+ * - 完了の画面：答えた会員に有効なマイページ登録の案内があれば、お誘いと［マイページに登録する］（2026-10-19 変更：その前は、
+ *   案内に結び付けたマイページ登録の案内があるときだけ）
  *
  * 「今日」は 2026-10-19 に固定する（マイページ登録の案内の期限は 7 日後の日の終わり＝2026-10-26 23:59:59）。
  */
@@ -122,15 +122,10 @@ class SurveyMypageRegistrationTest extends TestCase
 
     // ---- 発行 ----
 
-    public function test_オンで発行するとマイページ登録の案内ができて最後に答える案内に結び付く(): void
+    public function test_オンで発行するとマイページ登録の案内ができる3つの種類とも(): void
     {
-        $expected = [
-            'intake' => ['trainee_intake_survey_tokens', '愛犬アンケート'],
-            'personality' => ['trainee_personality_diagnosis_tokens', '愛犬性格診断'],
-            // 組み合わせは、お客様が最後に答える愛犬性格診断の案内に持たせる
-            'combined' => ['trainee_personality_diagnosis_tokens', '愛犬アンケート＆愛犬性格診断'],
-        ];
-        foreach ($expected as $kind => [$table, $name]) {
+        $names = ['intake' => '愛犬アンケート', 'personality' => '愛犬性格診断', 'combined' => '愛犬アンケート＆愛犬性格診断'];
+        foreach ($names as $kind => $name) {
             DB::table('trainee_intake_survey_tokens')->delete();
             DB::table('trainee_personality_diagnosis_tokens')->delete();
             DB::table('client_email_registration_tokens')->delete();
@@ -143,25 +138,13 @@ class SurveyMypageRegistrationTest extends TestCase
             $this->assertCount(1, $registrations, $kind);
             $this->assertSame('2026-10-26 23:59:59', $registrations[0]->expires_at);
             $this->assertSame(200, (int) $registrations[0]->created_by);
-            $this->assertSame($registrations[0]->id, (int) DB::table($table)->value('client_email_registration_token_id'), $kind);
-            if ($kind === 'combined') {
-                $this->assertNull(DB::table('trainee_intake_survey_tokens')->value('client_email_registration_token_id'));
-            }
         }
+        // 案内の表に結び付けの列はない（2026-10-19 変更：2026_10_19_000004 で外した）
+        $this->assertFalse(Schema::hasColumn('trainee_intake_survey_tokens', 'client_email_registration_token_id'));
+        $this->assertFalse(Schema::hasColumn('trainee_personality_diagnosis_tokens', 'client_email_registration_token_id'));
     }
 
-    public function test_期限内のマイページ登録の案内があればそれを使い増やさない(): void
-    {
-        $existing = $this->registrationToken();
-
-        $this->issue('intake')
-            ->assertSessionHas('success', 'モモの愛犬アンケートの案内を発行しました。マイページ登録の案内は、発行済みのものを使います。');
-
-        $this->assertCount(1, $this->registrationRows());
-        $this->assertSame($existing, (int) DB::table('trainee_intake_survey_tokens')->value('client_email_registration_token_id'));
-    }
-
-    public function test_期限切れのマイページ登録の案内しかなければ作り直して結び付ける(): void
+    public function test_期限切れのマイページ登録の案内しかなければ作り直す(): void
     {
         $this->registrationToken('expiredexpiredexpiredexpiredexpi', '2026-10-18 23:59:59');
 
@@ -171,10 +154,22 @@ class SurveyMypageRegistrationTest extends TestCase
         $rows = $this->registrationRows();
         $this->assertCount(1, $rows);
         $this->assertNotSame('expiredexpiredexpiredexpiredexpi', $rows[0]->token);
-        $this->assertSame($rows[0]->id, (int) DB::table('trainee_personality_diagnosis_tokens')->value('client_email_registration_token_id'));
+        $this->assertSame('2026-10-26 23:59:59', $rows[0]->expires_at);
     }
 
-    public function test_オフならマイページ登録の案内を作らず結び付けない(): void
+    public function test_登録待ちの会員にオンで送られても新しく作らない(): void
+    {
+        $existing = $this->registrationToken();
+
+        // 完了メッセージに一言は付けない（2026-10-19 変更：その前は「発行済みのものを使います」）
+        $this->issue('intake')->assertSessionHas('success', 'モモの愛犬アンケートの案内を発行しました。');
+
+        $rows = $this->registrationRows();
+        $this->assertCount(1, $rows);
+        $this->assertSame($existing, $rows[0]->id);
+    }
+
+    public function test_オフならマイページ登録の案内を作らない(): void
     {
         foreach (array_keys(self::STORE_ROUTES) as $kind) {
             DB::table('trainee_intake_survey_tokens')->delete();
@@ -184,11 +179,9 @@ class SurveyMypageRegistrationTest extends TestCase
         }
 
         $this->assertCount(0, $this->registrationRows());
-        $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->whereNotNull('client_email_registration_token_id')->count());
-        $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->whereNotNull('client_email_registration_token_id')->count());
     }
 
-    public function test_利用中と登録待ち初回設定の会員にはオンで送られても付けない(): void
+    public function test_利用中と登録待ち初回設定の会員にはオンで送られても作らない(): void
     {
         foreach ([['email' => 'a@example.com', 'password' => 'x'], ['email' => 'a@example.com', 'password' => null]] as $state) {
             DB::table('clients')->where('id', $this->client->id)->update($state);
@@ -198,13 +191,11 @@ class SurveyMypageRegistrationTest extends TestCase
         }
 
         $this->assertCount(0, $this->registrationRows());
-        $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->whereNotNull('client_email_registration_token_id')->count());
     }
 
     public function test_回答待ちがあって発行しなかったときはマイページ登録の案内も作らない(): void
     {
-        $this->issue('intake');
-        DB::table('client_email_registration_tokens')->delete();
+        $this->issue('intake', withMypage: false);
 
         $this->issue('personality')->assertSessionHas('error');
 
@@ -225,18 +216,20 @@ class SurveyMypageRegistrationTest extends TestCase
 
     private const PERSONALITY = 'personalitytokenpersonalitytoken';
 
-    private function surveyTokens(?int $registrationId, bool $combined = false): void
+    private function surveyTokens(bool $combined = false): void
     {
         $row = ['trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59', 'created_at' => now(), 'updated_at' => now()];
-        $personalityId = DB::table('trainee_personality_diagnosis_tokens')->insertGetId([
-            'token' => self::PERSONALITY, 'client_email_registration_token_id' => $registrationId, ...$row,
-        ]);
+        $personalityId = DB::table('trainee_personality_diagnosis_tokens')->insertGetId(['token' => self::PERSONALITY, ...$row]);
         DB::table('trainee_intake_survey_tokens')->insert([
-            'token' => self::INTAKE,
-            'trainee_personality_diagnosis_token_id' => $combined ? $personalityId : null,
-            'client_email_registration_token_id' => $combined ? null : $registrationId,
-            ...$row,
+            'token' => self::INTAKE, 'trainee_personality_diagnosis_token_id' => $combined ? $personalityId : null, ...$row,
         ]);
+    }
+
+    private function resetTokens(): void
+    {
+        DB::table('trainee_intake_survey_tokens')->delete();
+        DB::table('trainee_personality_diagnosis_tokens')->delete();
+        DB::table('client_email_registration_tokens')->delete();
     }
 
     private function answerIntake()
@@ -257,19 +250,21 @@ class SurveyMypageRegistrationTest extends TestCase
         return $this->get(route($route))->assertOk()->getContent();
     }
 
-    private function assertInvite(string $html): void
+    private function assertInvite(string $html, string $token = 'regtokenregtokenregtokenregtoken'): void
     {
         $this->assertStringContainsString('data-mypage-registration-invite', $html);
         $this->assertStringContainsString('マイページにご登録いただくと、トレーニングの記録や愛犬の診断結果をいつでもご覧いただけます。', $html);
         $this->assertStringContainsString(
-            '<a href="'.route('client-portal.email-registration.show', ['token' => 'regtokenregtokenregtokenregtoken']).'" class="btn btn-primary">マイページに登録する</a>',
+            '<a href="'.route('client-portal.email-registration.show', ['token' => $token]).'" class="btn btn-primary">マイページに登録する</a>',
             $html
         );
     }
 
-    public function test_結び付いていれば単独の案内の完了の画面にお誘いとマイページに登録するを出す(): void
+    public function test_会員詳細から別に発行した有効な案内があれば単独の案内の完了の画面にお誘いを出す(): void
     {
-        $this->surveyTokens($this->registrationToken());
+        // チェックボックスを使わずに発行した案内（結び付けなし）でも、会員に有効なマイページ登録の案内があれば出す
+        $this->registrationToken();
+        $this->surveyTokens();
 
         $this->answerIntake()->assertRedirect(route('client-portal.intake-survey.thanks'));
         $this->assertInvite($this->thanksPage('client-portal.intake-survey.thanks'));
@@ -278,9 +273,22 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->assertInvite($this->thanksPage('client-portal.personality-diagnosis.thanks'));
     }
 
+    public function test_チェックで発行した案内に答えるとお誘いのリンクはその会員の有効な案内(): void
+    {
+        $this->issue('intake');
+        $registration = $this->registrationRows()[0]->token;
+        $intake = DB::table('trainee_intake_survey_tokens')->value('token');
+        auth('web')->logout();
+
+        $this->post(route('client-portal.intake-survey.store', ['token' => $intake]), ['name' => 'モモ'])
+            ->assertRedirect(route('client-portal.intake-survey.thanks'));
+        $this->assertInvite($this->thanksPage('client-portal.intake-survey.thanks'), $registration);
+    }
+
     public function test_組み合わせは最後の完了の画面だけに出し途中には出さない(): void
     {
-        $this->surveyTokens($this->registrationToken(), combined: true);
+        $this->registrationToken();
+        $this->surveyTokens(combined: true);
 
         // 愛犬アンケートのあと：愛犬性格診断へ進む（お誘いは出さない）
         $this->answerIntake()->assertRedirect(route('client-portal.personality-diagnosis.show', ['token' => self::PERSONALITY]));
@@ -292,24 +300,17 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->assertInvite($this->thanksPage('client-portal.personality-diagnosis.thanks'));
     }
 
-    public function test_結び付いていない期限切れ使用済み取消済みなら出さない(): void
+    public function test_有効な案内がない期限切れ使用済みなら出さない(): void
     {
         $cases = [
             'none' => fn () => null,
             'expired' => fn () => $this->registrationToken(expiresAt: '2026-10-18 23:59:59'),
             'used' => fn () => $this->registrationToken(used: true),
-            'deleted' => function () {
-                $id = $this->registrationToken();
-                DB::table('client_email_registration_tokens')->delete();
-
-                return $id;
-            },
         ];
         foreach ($cases as $case => $make) {
-            DB::table('trainee_intake_survey_tokens')->delete();
-            DB::table('trainee_personality_diagnosis_tokens')->delete();
-            DB::table('client_email_registration_tokens')->delete();
-            $this->surveyTokens($make());
+            $this->resetTokens();
+            $make();
+            $this->surveyTokens();
 
             $this->answerIntake()->assertRedirect(route('client-portal.intake-survey.thanks'));
             $this->assertStringNotContainsString('data-mypage-registration-invite', $this->thanksPage('client-portal.intake-survey.thanks'), $case);
@@ -319,11 +320,10 @@ class SurveyMypageRegistrationTest extends TestCase
     public function test_会員がもう利用中か登録の途中かログインして答えたなら出さない(): void
     {
         foreach (['in_use' => ['email' => 'a@example.com', 'password' => 'x'], 'setup' => ['email' => 'a@example.com', 'password' => null]] as $case => $state) {
-            DB::table('trainee_intake_survey_tokens')->delete();
-            DB::table('trainee_personality_diagnosis_tokens')->delete();
-            DB::table('client_email_registration_tokens')->delete();
+            $this->resetTokens();
             DB::table('clients')->where('id', $this->client->id)->update($state);
-            $this->surveyTokens($this->registrationToken());
+            $this->registrationToken();
+            $this->surveyTokens();
 
             $this->answerIntake();
             $this->assertStringNotContainsString('data-mypage-registration-invite', $this->thanksPage('client-portal.intake-survey.thanks'), $case);
@@ -331,10 +331,9 @@ class SurveyMypageRegistrationTest extends TestCase
 
         // ログインして答えた（マイページから開いた）：今の［マイページへ戻る］のまま
         DB::table('clients')->where('id', $this->client->id)->update(['email' => null, 'password' => null]);
-        DB::table('trainee_intake_survey_tokens')->delete();
-        DB::table('trainee_personality_diagnosis_tokens')->delete();
-        DB::table('client_email_registration_tokens')->delete();
-        $this->surveyTokens($this->registrationToken());
+        $this->resetTokens();
+        $this->registrationToken();
+        $this->surveyTokens();
         $this->actingAs($this->client->fresh(), 'client');
         $this->answerIntake();
         $html = $this->thanksPage('client-portal.intake-survey.thanks');

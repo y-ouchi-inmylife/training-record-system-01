@@ -92,10 +92,25 @@ trait CreatesClientCountTables
             // 続けて答える愛犬性格診断の案内（2026-10-19 追加。愛犬アンケート＆愛犬性格診断の案内。NULL は単独の案内）。
             // 愛犬性格診断の案内の表を作らないテストもあるので、外部キーは付けない
             $table->unsignedBigInteger('trainee_personality_diagnosis_token_id')->nullable();
-            // 回答を終えた完了の画面で誘導するマイページ登録の案内（2026-10-19 追加。NULL は誘導しない）。外部キーは付けない
-            $table->unsignedBigInteger('client_email_registration_token_id')->nullable();
             $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
+            $table->timestamps();
+            $table->unsignedBigInteger('created_by')->nullable();
+        });
+    }
+
+    /**
+     * マイページ登録の案内（メールアドレス登録用 URL のトークン。DS-0700）。回答を終えた完了の画面のお誘いで、
+     * 会員に有効な案内があるかを見るため（2026-10-19 追加）
+     */
+    protected function createClientEmailRegistrationTokensTable(): void
+    {
+        Schema::create('client_email_registration_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->string('token', 64)->unique();
+            $table->unsignedBigInteger('client_id');
+            $table->timestamp('expires_at');
+            $table->boolean('is_used')->default(false);
             $table->timestamps();
             $table->unsignedBigInteger('created_by')->nullable();
         });
@@ -138,8 +153,6 @@ trait CreatesClientCountTables
             $table->string('token', 64)->unique();
             $table->unsignedBigInteger('trainee_id');
             $table->foreign('trainee_id')->references('id')->on('trainees')->cascadeOnDelete();
-            // 回答を終えた完了の画面で誘導するマイページ登録の案内（2026-10-19 追加。NULL は誘導しない）。外部キーは付けない
-            $table->unsignedBigInteger('client_email_registration_token_id')->nullable();
             $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
             $table->timestamps();

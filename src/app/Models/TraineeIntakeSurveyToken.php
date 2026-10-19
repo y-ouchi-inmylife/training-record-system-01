@@ -29,7 +29,6 @@ class TraineeIntakeSurveyToken extends Model
         'token',
         'trainee_id',
         'trainee_personality_diagnosis_token_id',
-        'client_email_registration_token_id',
         'expires_at',
         'answered_at',
         'created_by',
@@ -61,15 +60,6 @@ class TraineeIntakeSurveyToken extends Model
     public function personalityDiagnosisToken(): BelongsTo
     {
         return $this->belongsTo(TraineePersonalityDiagnosisToken::class, 'trainee_personality_diagnosis_token_id');
-    }
-
-    /**
-     * 回答を終えた完了の画面で誘導するマイページ登録の案内（2026-10-19 追加。要件定義書 6-16-18。付けずに発行したなら null。
-     * 相手が消えたら列は NULL になる）。結び付けは App\Services\SurveyMypageRegistrationService
-     */
-    public function emailRegistrationToken(): BelongsTo
-    {
-        return $this->belongsTo(ClientEmailRegistrationToken::class, 'client_email_registration_token_id');
     }
 
     /** 「愛犬アンケート＆愛犬性格診断」の案内として発行したか（2026-10-19 追加。愛犬性格診断の案内と結び付いているか） */

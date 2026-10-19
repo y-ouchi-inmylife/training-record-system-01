@@ -13,9 +13,10 @@
        もう一方を出せない）。選ぶまで［発行する］は押せない。種類を選ぶと送信先を、選んだ種類の今の発行のルートに切り替える
      - 発行の確認のモーダルはもともとないので、このモーダルが確認を兼ねる。押したらボタンを押せなくして二重送信を防ぐ
      - ［キャンセル］はほかの確認のモーダルと同じグレーの白抜き
-     - 「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18）：会員のマイページが「未登録」「登録待ち」（期限切れも）の
-       ときだけ、選択肢の下に出す（$client は会員詳細の会員。状態は ClientController::show で読み込み済み）。開くたびにオフに戻す。
-       オンで発行すると、マイページ登録の案内も用意し、お客様が回答を終えた完了の画面でマイページの登録へ誘導する。3 つの種類のどれでも使える --}}
+     - 「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18）：会員に有効なマイページ登録の案内がない
+       「未登録」「登録待ち（期限切れ）」のときだけ、選択肢の下に出す（2026-10-19 変更：発行済みの「登録待ち」にも出ていて、
+       もう 1 件発行されるように見えて分かりにくかったため）（$client は会員詳細の会員。状態は ClientController::show で読み込み済み）。開くたびにオフに戻す。
+       オンで発行すると、マイページ登録の案内も発行する（お客様が回答を終えた完了の画面で、有効な案内があればマイページの登録へ誘導する）。3 つの種類のどれでも使える --}}
 <div class="modal fade" id="surveyIssueModal" tabindex="-1"
      aria-labelledby="surveyIssueModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -42,7 +43,7 @@
                             <label class="form-check-label" for="surveyIssueKindCombined">{{ \App\Support\CombinedSurveyName::name() }}</label>
                         </div>
                     </fieldset>
-                    @if(\App\Services\SurveyMypageRegistrationService::canAttach($client))
+                    @if(\App\Services\SurveyMypageRegistrationService::canIssue($client))
                         <div class="form-check mt-3 pt-3 border-top" data-survey-issue-mypage>
                             <input class="form-check-input" type="checkbox" name="with_mypage_registration" value="1" id="surveyIssueWithMypage"
                                    aria-describedby="surveyIssueWithMypageHelp">

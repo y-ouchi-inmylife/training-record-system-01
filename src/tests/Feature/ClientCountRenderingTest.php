@@ -2350,7 +2350,7 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 案内の発行のモーダルの「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18） ----
 
-    public function test_マイページが未登録か登録待ちならチェックボックスを出し利用中と登録待ち初回設定なら出さない(): void
+    public function test_マイページが未登録か登録待ち期限切れならチェックボックスを出し登録待ちと登録待ち初回設定と利用中なら出さない(): void
     {
         $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
         $this->fakeMediaDisk();
@@ -2366,9 +2366,10 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<label class="form-check-label" for="surveyIssueWithMypage">マイページ登録の案内も発行する</label>', $page);
         $this->assertStringContainsString('回答のあと、マイページの登録をご案内します。', $page);
 
-        // 登録待ち（期限内）・登録待ち（期限切れ）
+        // 登録待ち（期限内の案内がある）：出さない（2026-10-19 変更：その前は出していた。もう 1 件発行されるように見えて分かりにくいため）
         $tokenId = DB::table('client_email_registration_tokens')->insertGetId(['client_id' => $client->id, 'is_used' => false, 'expires_at' => '2026-10-26 23:59:59']);
-        $this->assertStringContainsString($checkbox, $html());
+        $this->assertStringNotContainsString('with_mypage_registration" value', $html());
+        // 登録待ち（期限切れ）：有効な案内がないので出す
         DB::table('client_email_registration_tokens')->where('id', $tokenId)->update(['expires_at' => '2026-10-18 23:59:59']);
         $this->assertStringContainsString($checkbox, $html());
 
