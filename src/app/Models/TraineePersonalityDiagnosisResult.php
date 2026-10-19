@@ -236,6 +236,15 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
+     * アドバイスを公開していない（状態が「なし」「下書き」の）結果だけに絞る（2026-10-20 追加。トレーナー側のダッシュボード S-0201 の
+     * 「（未公開 n件）」）。状態の判定（getEvaluationStatusAttribute：公開した日時があれば公開済み）と同じ基準で、evaluationPublished の反対
+     */
+    public function scopeEvaluationNotPublished(Builder $query): Builder
+    {
+        return $query->whereNull('evaluation_published_at');
+    }
+
+    /**
      * 会員のトレーニーの公開済みのアドバイス（2026-10-18 追加。要件定義書 6-3-3・6-15-6）。
      * 会員詳細（S-0305）とマイページ（S-1402）で、トレーニング記録の一覧に混ぜるのに使う。
      * トレーニー（名前・呼び名）と公開したトレーナー（担当）も読み込む。並べ替えは混ぜるときに行う（RecordTimeline）

@@ -10,6 +10,9 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    /** 最近の愛犬性格診断の 1 ページの件数（ほかの一覧と同じ 20 件。2026-10-20 追加） */
+    private const DIAGNOSES_PER_PAGE = 20;
+
     /**
      * ダッシュボード画面を表示
      */
@@ -43,19 +46,19 @@ class DashboardController extends Controller
             ->orderBy('training_time', 'desc')
             ->get();
 
-        // 過去 30 日の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
-        // 期間は最近のトレーニング記録と同じ決め方（今日を含む 30 日間。今日の 29 日前の 0:00 から今日の終わりまで）。
-        // 公開済みも含めてすべて。見せる範囲も最近のトレーニング記録と同じ（役割で変えない。recent の絞り込みは効かない）。
-        // ページングなし。トレーニーと会員はまとめて読み込む
+        // 最近の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
+        // すべての診断を回答日時の新しい順に、20 件ずつのページ送りで出す（2026-10-20 変更：30 日より前の未公開も見落とさないように。
+        // その前は過去 30 日のものだけを、ページングなしで出していた）。公開済みも含める。見せる範囲は最近のトレーニング記録と同じ
+        // （役割で変えない。recent の絞り込みは効かない）。ページの番号は diagnoses_page（ほかのページ送りとぶつからないように）で、
+        // withQueryString でページを送っても recent が外れない。トレーニーと会員はまとめて読み込む
         $recentDiagnoses = TraineePersonalityDiagnosisResult::with('trainee.client')
-            ->whereBetween('answered_at', [now()->startOfDay()->subDays(29), now()->endOfDay()])
             ->orderBy('answered_at', 'desc')
             ->orderBy('id', 'desc')
-            ->get();
-        // 未公開（なし・下書き）の件数。状態は S-0313 のバッジと同じ判定（evaluation_status）で数える
-        $unpublishedDiagnosisCount = $recentDiagnoses
-            ->filter(fn (TraineePersonalityDiagnosisResult $result) => $result->evaluation_status !== TraineePersonalityDiagnosisResult::EVALUATION_PUBLISHED)
-            ->count();
+            ->paginate(self::DIAGNOSES_PER_PAGE, ['*'], 'diagnoses_page')
+            ->withQueryString();
+        // 未公開（なし・下書き）の件数は、今のページの分だけでなく、すべての診断を数える。
+        // 判定はモデルの evaluationNotPublished（公開した日時がないもの。状態の判定 evaluation_status と同じ基準）
+        $unpublishedDiagnosisCount = TraineePersonalityDiagnosisResult::query()->evaluationNotPublished()->count();
 
         return view('dashboard', compact('recentRecords', 'recentFilter', 'recentDiagnoses', 'unpublishedDiagnosisCount'));
     }

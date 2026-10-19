@@ -8,19 +8,22 @@
         （権限: {{ Auth::user()->role_display_name }}）
     </div>
 
-    {{-- 過去 30 日の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
-         最近のトレーニング記録の上。見た目・期間の決め方・行のリンク・0 件の出し方・狭い幅（横スクロール）は最近のトレーニング記録に合わせる。
-         公開済みも含めてすべて出し、状態は S-0313 と同じバッジ。未公開（なし・下書き）があれば見出しのあとに件数。
+    {{-- 最近の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
+         最近のトレーニング記録の上。見た目・行のリンク・0 件の出し方・狭い幅（横スクロール）は最近のトレーニング記録に合わせる。
+         すべての診断を公開済みも含めて出し（20 件ずつのページ送り。ほかの一覧と同じ）、アドバイスの状態は S-0313 と同じバッジ。
+         未公開（なし・下書き）があれば見出しのあとに件数（すべての診断の中の数）。
+         2026-10-20 変更：見出しを「最近の愛犬性格診断」、列「状態」を「アドバイス」にし、期間で絞るのをやめた。
+         その前は「過去30日の愛犬性格診断」で、過去 30 日のものだけを出していた。
          会員の列のリンクを押したときは、行のリンク（S-0313）を動かさない。
          狭い幅では、列の見出しと回答日・会員・トレーニー・状態の列を折り返さず（text-nowrap）、表を横にスクロールする
          （1 文字ずつに押しつぶされないように）。タイプは「・」のあとでだけ折り返す。見出しの「（未公開 n件）」は途中で折り返さない --}}
     <div class="d-flex align-items-baseline mb-2">
-        <h4 class="mb-0" data-recent-diagnoses-heading>過去30日の愛犬性格診断@if($unpublishedDiagnosisCount > 0)<span class="text-nowrap" data-unpublished-diagnosis-count>（未公開 {{ $unpublishedDiagnosisCount }}件）</span>@endif</h4>
+        <h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断@if($unpublishedDiagnosisCount > 0)<span class="text-nowrap" data-unpublished-diagnosis-count>（未公開 {{ $unpublishedDiagnosisCount }}件）</span>@endif</h4>
     </div>
 
     @if($recentDiagnoses->isEmpty())
         <div class="alert alert-secondary mb-4" data-recent-diagnoses-empty>
-            過去30日の愛犬性格診断はありません。
+            愛犬性格診断はありません。
         </div>
     @else
         <div class="table-responsive mb-4">
@@ -31,7 +34,7 @@
                         <th class="text-nowrap">会員</th>
                         <th class="text-nowrap">トレーニー</th>
                         <th class="text-nowrap">タイプ</th>
-                        <th class="text-nowrap">状態</th>
+                        <th class="text-nowrap">アドバイス</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -48,6 +51,12 @@
                 </tbody>
             </table>
         </div>
+        {{-- ページ送り（ほかの一覧と同じ。20 件以下なら出さない） --}}
+        @if($recentDiagnoses->hasPages())
+            <div class="d-flex justify-content-center mb-4" data-recent-diagnoses-pagination>
+                {{ $recentDiagnoses->links() }}
+            </div>
+        @endif
     @endif
 
     {{-- 最近のトレーニング記録（S-0201 セクション「最近のトレーニング記録」、2026-09 追加）。
@@ -61,13 +70,18 @@
             <a href="{{ route('training-records.index') }}" class="text-decoration-none">すべて表示</a>
         </div>
         {{-- 絞り込みセレクト：onchange で自動送信。ボタンは持たない（参考画面と同じ流儀）。
-             現状ダッシュボードには他のクエリパラメータは無いため、素直に recent だけを送る。 --}}
+             recent と、最近の愛犬性格診断の表のページ（diagnoses_page。2 ページ目以降のときだけ）を送る
+             （2026-10-20 変更：その前はダッシュボードにほかのクエリパラメータがなく、recent だけを送っていた）。 --}}
         <form method="GET" action="{{ route('dashboard') }}" class="mb-0">
             <select name="recent" class="form-select form-select-sm" style="width: auto;"
                     onchange="this.form.submit()">
                 <option value="all" {{ $recentFilter === 'all' ? 'selected' : '' }}>すべて</option>
                 <option value="primary" {{ $recentFilter === 'primary' ? 'selected' : '' }}>主担当のみ</option>
             </select>
+            {{-- 絞り込みを変えても、最近の愛犬性格診断の表のページは戻らないようにする（2026-10-20 追加） --}}
+            @if($recentDiagnoses->currentPage() > 1)
+                <input type="hidden" name="diagnoses_page" value="{{ $recentDiagnoses->currentPage() }}">
+            @endif
         </form>
     </div>
 
