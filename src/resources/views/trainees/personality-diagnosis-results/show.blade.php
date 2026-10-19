@@ -96,31 +96,30 @@
                             </tbody>
                         </table>
                     </div>
+
+                    {{-- 暮らしの様子（2026-10-19 追加。要件定義書 6-16-15、設計書 S-0313「暮らしの様子」）。右の列の点数の表の下
+                         （2026-10-19 変更：ユーザーレビューで、結果の欄の右下が空いていたため、診断の答えとして結果と一緒に見られるようにした。
+                         その前は「結果」と「評価文」のあいだの別のカード）。1200px より狭いときは、グラフ → タイプ → 点数の表 のあとに続く。
+                         - 見出しは「タイプ」のラベルと同じ見た目（text-muted small）。呼び名はまだ仮（トレーナーさんに確かめてから決める）
+                         - 点数の表とのあいだは、タイプと点数の表のあいだ（タイプの mb-3）と同じ 1rem（mt-3）
+                         - この診断で答えた 4 問（PersonalityDiagnosisQuestions::lifeQuestions()。回答の画面 S-1415 と共用）を、設問文と答えの対で出す。
+                           設問文の先頭の「●」は読み上げでは読まず（aria-hidden）、d-flex で折り返したときに 2 行目を「●」の右から始める。
+                           答えは改行を保持（pre-wrap）、空の問は「（未回答）」（text-muted）。見るだけ（編集・削除の操作は置かない） --}}
+                    <div class="mt-3" data-personality-diagnosis-life>
+                        <div class="text-muted small mb-1" id="personality-diagnosis-life-label">暮らしの様子</div>
+                        <dl class="mb-0" aria-labelledby="personality-diagnosis-life-label">
+                            @foreach(\App\Support\PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question)
+                                <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
+                                @if(blank($result->{$column}))
+                                    <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted" data-life-answer="{{ $column }}">（未回答）</dd>
+                                @else
+                                    <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }}" style="white-space: pre-wrap;" data-life-answer="{{ $column }}">{{ $result->{$column} }}</dd>
+                                @endif
+                            @endforeach
+                        </dl>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    {{-- 暮らしの様子（2026-10-19 追加。要件定義書 6-16-13、設計書 S-0313「暮らしの様子の欄」）。「結果」の欄と「評価文」の欄のあいだ。
-         この診断で答えた 4 問（PersonalityDiagnosisQuestions::lifeQuestions()。回答の画面 S-1415 と共用）を、設問文と答えの対で出す。
-         作りは、その前のトレーニー詳細（S-0309）の暮らしの様子の欄と同じ：設問文の先頭の「●」は読み上げでは読まず（aria-hidden）、
-         d-flex で折り返したときに 2 行目を「●」の右から始める。答えは改行を保持（pre-wrap）、空の問は「（未回答）」（text-muted）。
-         見るだけ（編集・削除の操作は置かない） --}}
-    <div class="card mb-3" data-personality-diagnosis-life>
-        <div class="card-header">
-            <h6 class="mb-0">暮らしの様子</h6>
-        </div>
-        <div class="card-body">
-            <dl class="mb-0">
-                @foreach(\App\Support\PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question)
-                    <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
-                    @if(blank($result->{$column}))
-                        <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted" data-life-answer="{{ $column }}">（未回答）</dd>
-                    @else
-                        <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }}" style="white-space: pre-wrap;" data-life-answer="{{ $column }}">{{ $result->{$column} }}</dd>
-                    @endif
-                @endforeach
-            </dl>
         </div>
     </div>
 

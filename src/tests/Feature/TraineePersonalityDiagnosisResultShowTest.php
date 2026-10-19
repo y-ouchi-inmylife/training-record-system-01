@@ -933,9 +933,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame(array_fill(0, count($m[1]), 'btn btn-secondary'), $m[1]);
     }
 
-    // ---- 暮らしの様子の欄（2026-10-19 追加。要件定義書 6-16-13、設計書 S-0313「暮らしの様子の欄」） ----
+    // ---- 暮らしの様子（2026-10-19 追加。要件定義書 6-16-15、設計書 S-0313「暮らしの様子」。2026-10-19 変更：別のカードから、
+    //      結果の欄の右の列の点数の表の下へ移した） ----
 
-    /** 暮らしの様子の欄（カードの始まりから、評価文のお知らせの手前まで） */
+    /** 暮らしの様子（data-personality-diagnosis-life の始まりから、結果の欄の閉じ〔評価文のお知らせ〕の手前まで） */
     private function lifeCard(string $html): string
     {
         $start = strpos($html, 'data-personality-diagnosis-life');
@@ -945,7 +946,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         return substr($card, 0, strpos($card, 'data-evaluation-draft-notice'));
     }
 
-    public function test_暮らしの様子の欄は結果の欄と評価文の欄のあいだにその診断の4問を出し空は未回答(): void
+    public function test_暮らしの様子は結果の欄の右の列の点数の表の下にその診断の4問を出し空は未回答(): void
     {
         $other = $this->addResult('past-2', '2026-10-01 10:30:00');
         $other->update(['recent_events' => '別の診断の答え', 'wish' => '別の診断の悩み']);
@@ -954,14 +955,22 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $html = $this->page($result);
 
-        // 並び：結果 → 暮らしの様子 → 評価文（AI の下書きのお知らせを含む）→ スタッフ用メモ
+        // 結果の欄の右の列（col-xl-8）の中、点数の表のあと。見出しは「タイプ」のラベルと同じ見た目で、別のカードの見出しにはしない
+        $this->assertSame(1, preg_match(
+            '/<div class="col-12 col-xl-8">\s*<div class="text-muted small">タイプ<\/div>.*?data-personality-diagnosis-scores.*?<\/table>\s*<\/div>\s*'
+            .'(?:\{\{--.*?--\}\}\s*)?<div class="mt-3" data-personality-diagnosis-life>\s*'
+            .'<div class="text-muted small mb-1" id="personality-diagnosis-life-label">暮らしの様子<\/div>\s*<dl class="mb-0" aria-labelledby="personality-diagnosis-life-label">/su',
+            $html
+        ));
+        $this->assertStringNotContainsString('<h6 class="mb-0">暮らしの様子</h6>', $html);
+        $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-life'));
+        // 結果のカードの中（評価文のお知らせ・評価文・スタッフ用メモの前）。評価文とスタッフ用メモの欄は今のまま
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-life'), strpos($html, '<h6 class="mb-0">結果</h6>'));
         $this->assertLessThan(strpos($html, 'data-evaluation-draft-notice'), strpos($html, 'data-personality-diagnosis-life'));
-        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-evaluation'), strpos($html, 'data-personality-diagnosis-life'));
-        $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-life'));
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-staff-memo'), strpos($html, 'data-personality-diagnosis-evaluation'));
+        $this->assertStringContainsString('<h6 class="mb-0">スタッフ用メモ</h6>', $html);
 
         $card = $this->lifeCard($html);
-        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">暮らしの様子<\/h6>\s*<\/div>/u', $card);
         $questions = PersonalityDiagnosisQuestions::lifeQuestions();
         $dt = fn (string $column) => '<dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●<\/span><span>'.preg_quote($questions[$column]['question'], '/').'<\/span><\/dt>';
         $this->assertMatchesRegularExpression('/'.$dt('wish').'\s*<dd class="mb-3" style="white-space: pre-wrap;" data-life-answer="wish">引っ張らずに歩きたい\n吠えないでほしい<\/dd>/u', $card);
