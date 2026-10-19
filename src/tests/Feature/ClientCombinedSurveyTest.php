@@ -131,9 +131,12 @@ class ClientCombinedSurveyTest extends TestCase
         $this->assertStringContainsString('<p class="c-survey-progress" data-survey-progress="2/2">', $html);
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち2つ目：</span>', $html);
         $this->assertStringContainsString('愛犬アンケートを受け付けました。続けて愛犬性格診断にお答えください。', $html);
-        // 2/2 の愛犬性格診断は 50 問のあとに暮らしの様子の 4 問（2026-10-19 追加）
+        // 2/2 の愛犬性格診断は 50 問のあとに、区切りの線・「以下の質問にお答えください。」と暮らしの様子の 4 問（2026-10-19 追加・変更）
         $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
-        $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, '>暮らしの様子<'));
+        $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, 'data-life-divider'));
+        $this->assertGreaterThan(strpos($html, 'data-life-divider'), strpos($html, '<legend class="fs-6 mb-3">以下の質問にお答えください。</legend>'));
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('思いつくことをご自由にお書きください。', $html);
         $this->assertSame(4, substr_count($html, '<textarea'));
 
         // 送信すると、今の愛犬性格診断の完了の画面。暮らしの様子の答えは愛犬性格診断の結果に保存する

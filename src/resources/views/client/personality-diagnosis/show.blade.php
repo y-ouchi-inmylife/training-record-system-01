@@ -81,19 +81,28 @@
                 @endforeach
 
                 {{-- 暮らしの様子の 4 問（2026-10-19 追加。設計書 S-1415「暮らしの様子」）。50 問のあとに置く（トレーナーさんの元の Google フォームと
-                     同じ順。その前は愛犬アンケート S-1413 で聞いていた）。作りは愛犬アンケートにあったときと同じ：小見出し「暮らしの様子」と控えめな
-                     カッコ書き、設問の先頭の「●」は読み上げない、textarea（rows="4"・2,000 文字以内）、どれも任意。設問文は
-                     PersonalityDiagnosisQuestions::lifeQuestions() の 1 か所から。初期値は空（50 問と同じく、答え直しでも前回の答えは入れない）。
-                     入力エラーで戻ったときは入力した値、時間切れ（419）で出し直したときは送られてきた答え（$restoredAnswers）を戻す --}}
-                <h2 class="fs-6 fw-bold mb-3 mt-4">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>
-                @foreach($lifeQuestions as $column => $question)
-                    <div class="mb-3" data-life-question="{{ $column }}">
-                        <label for="{{ $column }}" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></label>
-                        <textarea class="form-control @error($column) is-invalid @enderror"
-                                  id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="{{ \App\Support\PersonalityDiagnosisQuestions::LIFE_ANSWER_MAX_LENGTH }}">{{ old($column, $restoredAnswers[$column] ?? null) }}</textarea>
-                        <x-form-error :field="$column" />
-                    </div>
-                @endforeach
+                     同じ順。その前は愛犬アンケート S-1413 で聞いていた）。設問の先頭の「●」は読み上げない、textarea（rows="4"・2,000 文字以内）、
+                     どれも任意。設問文は PersonalityDiagnosisQuestions::lifeQuestions() の 1 か所から。初期値は空（50 問と同じく、答え直しでも
+                     前回の答えは入れない）。入力エラーで戻ったときは入力した値、時間切れ（419）で出し直したときは送られてきた答え（$restoredAnswers）を戻す。
+                     4 問の前は区切りの線と「以下の質問にお答えください。」の 1 文（2026-10-19 変更：ユーザーレビューで、「暮らしの様子」はトレーナーさんの
+                     元のフォームにない言葉だったため、会員様には見出しではなく答えてほしいことを文で伝える。その前は小見出し「暮らしの様子」と
+                     カッコ書き「（思いつくことをご自由にお書きください。）」）。
+                     - 区切りの線：.border-bottom（.c-login--wide の中なので ink 20%。前に愛犬アンケートで基本情報との境目に引いていた線と同じ書き方）。
+                       線の上は最後の問いの mb-3 の空き、線の下も mb-3 で、問いの間と同じ空きにする
+                     - 文：4 問を fieldset で囲み、文を legend にする（50 問の各問いと同じ作り。読み上げで 4 問のまとまりが分かる）。
+                       legend は本文と同じ大きさ・太さ・色（fs-6。見出しの太字・色は付けない）。文は lang/ja/messages.php の 1 か所から --}}
+                <div class="border-bottom mb-3" aria-hidden="true" data-life-divider></div>
+                <fieldset data-life-questions>
+                    <legend class="fs-6 mb-3">{{ __('messages.personality_diagnosis_life_lead') }}</legend>
+                    @foreach($lifeQuestions as $column => $question)
+                        <div class="mb-3" data-life-question="{{ $column }}">
+                            <label for="{{ $column }}" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></label>
+                            <textarea class="form-control @error($column) is-invalid @enderror"
+                                      id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="{{ \App\Support\PersonalityDiagnosisQuestions::LIFE_ANSWER_MAX_LENGTH }}">{{ old($column, $restoredAnswers[$column] ?? null) }}</textarea>
+                            <x-form-error :field="$column" />
+                        </div>
+                    @endforeach
+                </fieldset>
 
                 @include('layouts.partials.privacy-consent')
 

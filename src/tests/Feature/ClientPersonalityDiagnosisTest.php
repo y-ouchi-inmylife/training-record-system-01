@@ -261,14 +261,37 @@ class ClientPersonalityDiagnosisTest extends TestCase
 
     // ---- 暮らしの様子の 4 問（2026-10-19 追加。愛犬アンケートから移した。設計書 S-1415「暮らしの様子」） ----
 
-    public function test_50問のあとに小見出し暮らしの様子と4問を出しプライバシーと送信の前に置く(): void
+    /**
+     * 50 問のあと・4 問の前の区切りの線と文（2026-10-19 変更：小見出し「暮らしの様子（思いつくことをご自由にお書きください。）」を、
+     * 区切りの線と「以下の質問にお答えください。」の文〔4 問の fieldset の legend〕にした）
+     */
+    private function assertLifeLead(string $html): void
+    {
+        $this->assertSame(1, preg_match(
+            '/<div class="border-bottom mb-3" aria-hidden="true" data-life-divider><\/div>\s*<fieldset data-life-questions>\s*'
+            .'<legend class="fs-6 mb-3">以下の質問にお答えください。<\/legend>\s*<div class="mb-3" data-life-question="wish">/u',
+            $html
+        ));
+        // 線は最後の問い（Q50）のあと
+        $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, 'data-life-divider'));
+        // 見出しの「暮らしの様子」とカッコ書きは出さない。文は太字・見出しにしない
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('思いつくことをご自由にお書きください。', $html);
+        $this->assertStringNotContainsString('<h2 class="fs-6 fw-bold mb-3 mt-4">', $html);
+        // 4 問はこの fieldset の中（送信の前に閉じる）
+        $fieldset = substr($html, strpos($html, '<fieldset data-life-questions>'));
+        $fieldset = substr($fieldset, 0, strpos($fieldset, '</fieldset>'));
+        $this->assertSame(4, substr_count($fieldset, '<textarea'));
+    }
+
+    public function test_50問のあとに区切りの線と文と4問を出しプライバシーと送信の前に置く(): void
     {
         $this->issueToken();
 
         $html = $this->showPage();
 
-        $heading = '<h2 class="fs-6 fw-bold mb-3 mt-4">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>';
-        $this->assertSame(1, substr_count($html, $heading));
+        $this->assertLifeLead($html);
+        $heading = '<legend class="fs-6 mb-3">以下の質問にお答えください。</legend>';
         // 50 問（最後の Q50）のあと、送信の前
         $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, $heading));
         $positions = [];
@@ -286,6 +309,22 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $this->assertSame(4, substr_count($html, '●'));
         $this->assertStringNotContainsString(' required', substr($html, strpos($html, $heading)));
         $this->assertStringNotContainsString('例：', $html);
+    }
+
+    public function test_ログインして答えるときも4問の前は区切りの線と文(): void
+    {
+        $this->issueToken();
+        $this->actingAs($this->trainee->client, 'client');
+
+        $this->assertLifeLead($this->showPage());
+    }
+
+    public function test_文は文のファイルの1か所から読む(): void
+    {
+        $this->issueToken();
+        app('translator')->addLines(['messages.personality_diagnosis_life_lead' => 'テストの文。'], 'ja');
+
+        $this->assertStringContainsString('<legend class="fs-6 mb-3">テストの文。</legend>', $this->showPage());
     }
 
     public function test_答え直しでも暮らしの様子の初期値は空(): void

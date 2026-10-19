@@ -41,6 +41,10 @@ return [
     // 名前を折り返してよい位置で分けたもの（上の $personalityDiagnosisNameParts。ラベル用の形を作るときに使う）
     'personality_diagnosis_name_parts' => $personalityDiagnosisNameParts,
 
+    // 愛犬性格診断の回答の画面（S-1415）で、50 問のあと・暮らしの様子の 4 問の前に出す文（4 問の fieldset の legend。2026-10-19 追加。
+    // ユーザーレビューで、トレーナーさんの元のフォームにない「暮らしの様子」の小見出しをやめ、答えてほしいことを文で伝えることにした）
+    'personality_diagnosis_life_lead' => '以下の質問にお答えください。',
+
     // 愛犬アンケートの名前（上の $intakeSurveyName。画面に出すときはこのキーから読む。2026-10-19 追加）
     'intake_survey_name' => $intakeSurveyName,
     // 名前を折り返してよい位置で分けたもの（上の $intakeSurveyNameParts）
