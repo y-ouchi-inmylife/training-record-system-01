@@ -406,7 +406,9 @@ class ClientIntakeSurveyShowTest extends TestCase
         $html = $this->get(route('client-portal.intake-survey.thanks'))->assertOk()->getContent();
 
         $this->assertStringContainsString('<h1 class="mb-4">ご回答ありがとうございました</h1>', $html);
-        $this->assertStringContainsString('いただいた内容は、トレーニングの参考にさせていただきます。', $html);
+        // 1 文目は契約前のお客様にもそぐう文（2026-10-19 変更：その前は「いただいた内容は、トレーニングの参考にさせていただきます。」）
+        $this->assertStringContainsString('<p>いただいた内容は、愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('トレーニングの参考に', $html);
         $this->assertStringContainsString('このページは閉じていただいて構いません。', $html);
         $this->assertStringNotContainsString('モモ', $html);
         $this->assertStringNotContainsString('client-portal/login', $html);

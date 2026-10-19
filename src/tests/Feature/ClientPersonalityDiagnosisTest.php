@@ -264,7 +264,9 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $html = $this->followRedirects($response)->getContent();
         // 愛犬アンケートの回答完了（S-1414）と同じ作り・同じ文言（2026-10 変更）
         $this->assertStringContainsString('<h1 class="mb-4">ご回答ありがとうございました</h1>', $html);
-        $this->assertStringContainsString('<p>いただいた内容は、トレーニングの参考にさせていただきます。</p>', $html);
+        // 1 文目は契約前のお客様にもそぐう文（2026-10-19 変更：その前は「いただいた内容は、トレーニングの参考にさせていただきます。」）
+        $this->assertStringContainsString('<p>いただいた内容は、愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('トレーニングの参考に', $html);
         $this->assertStringContainsString('<p class="mb-0">このページは閉じていただいて構いません。</p>', $html);
         // 結果も名前も出さない
         $this->assertStringNotContainsString('タイプ', $html);

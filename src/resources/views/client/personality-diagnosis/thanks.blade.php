@@ -20,7 +20,8 @@
 
     <div class="card c-login-card">
         <div class="card-body p-4">
-            <p>いただいた内容は、トレーニングの参考にさせていただきます。</p>
+            {{-- 1 文目は lang/ja/messages.php の client_survey_thanks.body（S-1414・S-1416 で共通。2026-10-19 変更） --}}
+            <p>{{ __('messages.client_survey_thanks.body') }}</p>
             <p class="mb-0">このページは閉じていただいて構いません。</p>
         </div>
     </div>

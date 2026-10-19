@@ -126,6 +126,11 @@ class ClientCombinedSurveyTest extends TestCase
         // 送信すると、今の愛犬性格診断の完了の画面
         $this->submitPersonality()->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
         $this->assertSame(1, DB::table('trainee_personality_diagnosis_results')->count());
+
+        // 最後の完了の画面の 1 文目も契約前のお客様にもそぐう文（2026-10-19 変更）
+        $html = $this->get(route('client-portal.personality-diagnosis.thanks'))->assertOk()->getContent();
+        $this->assertStringContainsString('<p>いただいた内容は、愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringNotContainsString('トレーニングの参考に', $html);
     }
 
     public function test_受け付けた一言は送信して進んだときだけで開き直したときは出さない(): void
