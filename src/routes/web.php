@@ -245,7 +245,7 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 要約プロンプト設定
             Route::get('settings/summary-prompts', [SummaryPromptController::class, 'edit'])->name('settings.summary-prompts.edit');
             Route::put('settings/summary-prompts', [SummaryPromptController::class, 'update'])->name('settings.summary-prompts.update');
-            // 愛犬性格診断のアドバイスのプロンプト（S-0602。S-0313 の［AIで下書き］の指示文。2026-10-19 追加）
+            // 愛犬性格診断のプロンプト（S-0602。S-0313 の［AIで下書き］の指示文。2026-10-19 追加）
             Route::get('settings/evaluation-prompts', [EvaluationPromptController::class, 'edit'])->name('settings.evaluation-prompts.edit');
             Route::put('settings/evaluation-prompts', [EvaluationPromptController::class, 'update'])->name('settings.evaluation-prompts.update');
 

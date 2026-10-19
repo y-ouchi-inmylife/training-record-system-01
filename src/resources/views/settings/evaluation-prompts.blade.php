@@ -1,22 +1,26 @@
 @extends('layouts.app')
 
 @php
-    $screenName = __('messages.personality_diagnosis_name').'のアドバイスのプロンプト';
+    // 2026-10-19 変更：アドバイスだけでなくスタッフ用メモも作るため「…のプロンプト」にした（その前は「…のアドバイスのプロンプト」）
+    $screenName = __('messages.personality_diagnosis_name').'のプロンプト';
 @endphp
 
 @section('title', $screenName)
 
 @section('content')
-{{-- 愛犬性格診断のアドバイスのプロンプト（S-0602。2026-10-19 追加。管理者のみ）。要約プロンプト（S-0601。settings/summary-prompts）と同じ作り：
+{{-- 愛犬性格診断のプロンプト（S-0602。2026-10-19 追加。管理者のみ）。要約プロンプト（S-0601。settings/summary-prompts）と同じ作り：
      見出しの右に［更新］、上に使い方の案内、指示文の入力欄（5000 文字以内。文字数カウンタは上限を超えると赤。入力は止めない）、
      未保存の直しがあるときの離脱の確認。違うところ：使える差し込みの印の一覧と、「#####」で分けて出すよう頼む説明を出す --}}
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-4" style="max-width: 700px;">
-                <h2 class="mb-0">{{ $screenName }}</h2>
+                {{-- 見出しは言葉の途中で折り返さない（2026-10-19 変更：375px で「…プロン／プト」〔その前は「…アドバイ／ス」〕と折れていたため）。
+                     会員詳細のラベルと同じく keep-all で途中では折り返さず、<wbr> の位置（愛犬／性格診断の／プロンプト）でだけ折り返す。
+                     ［更新］も「更／新」と縦に割れないよう text-nowrap --}}
+                <h2 class="mb-0" style="word-break: keep-all; overflow-wrap: normal;">{{ \App\Support\PersonalityDiagnosisName::labelHtml() }}の<wbr>プロンプト</h2>
                 <div class="d-flex gap-2">
-                    <button type="submit" form="evaluationPromptForm" class="btn btn-success">更新</button>
+                    <button type="submit" form="evaluationPromptForm" class="btn btn-success text-nowrap">更新</button>
                 </div>
             </div>
 

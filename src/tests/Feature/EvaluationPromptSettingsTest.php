@@ -11,7 +11,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 愛犬性格診断のアドバイスのプロンプト（S-0602。2026-10-19 追加）。要約プロンプト（S-0601）と同じく管理者だけが開け、5000 字まで
+ * 愛犬性格診断のプロンプト（S-0602。2026-10-19 追加。同じ日に名前を「愛犬性格診断のアドバイスのプロンプト」から変えた）。要約プロンプト（S-0601）と同じく管理者だけが開け、5000 字まで
  */
 class EvaluationPromptSettingsTest extends TestCase
 {
@@ -44,7 +44,9 @@ class EvaluationPromptSettingsTest extends TestCase
 
         $html = $this->get(route('settings.evaluation-prompts.edit'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<h2 class="mb-0">愛犬性格診断のアドバイスのプロンプト</h2>', $html);
+        // 見出しは言葉の途中で折り返さない（2026-10-19 変更：keep-all と <wbr>。［更新］は text-nowrap）
+        $this->assertStringContainsString('<h2 class="mb-0" style="word-break: keep-all; overflow-wrap: normal;">愛犬<wbr>性格診断の<wbr>プロンプト</h2>', $html);
+        $this->assertStringContainsString('<button type="submit" form="evaluationPromptForm" class="btn btn-success text-nowrap">更新</button>', $html);
         $this->assertStringContainsString('ドッグトレーナーとして、以下のデータから「お客様用レポート」と「スタッフ用指示書」を作成してください。', $html);
         foreach (['{{犬の名前}}', '{{タイプ}}', '{{スコア}}', '{{悩み}}', '{{背景}}', '{{理想}}', '{{健康}}'] as $placeholder) {
             $this->assertStringContainsString('<code>'.$placeholder.'</code>', $html, $placeholder);
@@ -58,7 +60,10 @@ class EvaluationPromptSettingsTest extends TestCase
         $this->assertStringContainsString('<p class="mb-2" data-evaluation-prompt-mapping>既定の指示文の「お客様用レポート」がアドバイスの欄、「スタッフ用メモ」がスタッフ用メモの欄に入ります。</p>', $html);
         // 「評価文」とは呼ばない（2026-10-19 変更：アドバイスと呼ぶことにした。画面の題・メニュー・案内とも）
         $this->assertStringNotContainsString('評価文', $html);
-        $this->assertStringContainsString('<title>愛犬性格診断のアドバイスのプロンプト', $html);
+        $this->assertStringContainsString('<title>愛犬性格診断のプロンプト', $html);
+        // 名前は「愛犬性格診断のプロンプト」（2026-10-19 変更：アドバイスだけでなくスタッフ用メモも作るため）。前の名前は画面に出ない
+        $this->assertStringNotContainsString('アドバイスのプロンプト', $html);
+        $this->assertSame(1, substr_count($html, '>愛犬性格診断のプロンプト</a></li>'));
         // 書式の決まりを読むだけで出す（2026-10-19 追加。フォームの外。入力欄にしない）
         $this->assertStringContainsString('<p class="fw-bold mb-1" id="evaluation-format-rules-heading">書式の決まり</p>', $html);
         $this->assertStringContainsString('<p class="small text-muted mb-2">次の書式の決まりは、指示文とは別に毎回 AI に渡します。ここでは変更できません。</p>', $html);
@@ -71,7 +76,7 @@ class EvaluationPromptSettingsTest extends TestCase
         $this->assertSame(1, substr_count($html, '<textarea'));
         $this->assertGreaterThan(strpos($html, '</form>'), strpos($html, 'data-evaluation-format-rules'));
         // メニューの要約プロンプトのすぐ下
-        $this->assertMatchesRegularExpression('/>要約プロンプト<\\/a><\\/li>\\s*<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断のアドバイスのプロンプト<\\/a><\\/li>/u', $html);
+        $this->assertMatchesRegularExpression('/>要約プロンプト<\\/a><\\/li>\\s*<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断のプロンプト<\\/a><\\/li>/u', $html);
     }
 
     public function test_一般のトレーナーとシステム管理者は開けない(): void
@@ -90,11 +95,14 @@ class EvaluationPromptSettingsTest extends TestCase
 
         $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => str_repeat('あ', 5000)])
             ->assertRedirect(route('settings.evaluation-prompts.edit'))
-            ->assertSessionHas('success', '愛犬性格診断のアドバイスのプロンプト設定を保存しました。');
+            ->assertSessionHas('success', '愛犬性格診断のプロンプト設定を保存しました。');
         $this->assertSame(5000, mb_strlen(SystemSetting::query()->where('key', 'evaluation_prompt_current')->value('value')));
 
-        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => str_repeat('あ', 5001)])->assertSessionHasErrors('evaluation_prompt');
-        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => ''])->assertSessionHasErrors('evaluation_prompt');
+        // 入力エラーの項目名は「愛犬性格診断のプロンプト」（2026-10-19 変更：その前は「アドバイスのプロンプト」）
+        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => str_repeat('あ', 5001)])
+            ->assertSessionHasErrors(['evaluation_prompt' => '愛犬性格診断のプロンプトは5000文字以内で入力してください。']);
+        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => ''])
+            ->assertSessionHasErrors(['evaluation_prompt' => '愛犬性格診断のプロンプトを入力してください。']);
         $this->assertSame(5000, mb_strlen(SystemSetting::query()->where('key', 'evaluation_prompt_current')->value('value')));
     }
 }
