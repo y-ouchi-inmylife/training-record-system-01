@@ -16,13 +16,13 @@ use Tests\TestCase;
 
 /**
  * トレーナー側のダッシュボード（S-0201）の「最近の愛犬性格診断」（2026-10-20 追加。要件定義書 6-2-1）。
- * アドバイスの公開し忘れがひと目で分かるように、最近のトレーニング記録の上に、すべての診断の結果を出す。
+ * アドバイスの公開し忘れがひと目で分かるように、最近のトレーニング記録の上に、診断の結果を出す。
  *
+ * - 絞り込み（すべて／未公開のみ。既定は未公開のみ。パラメータは diagnoses）。2026-10-20 変更：見出しの「（未公開 n件）」を外し、絞り込みを足した
  * - 期間で絞らない。5 件ずつ（DashboardController::DIAGNOSES_PER_PAGE）のページ送り（ページの番号は diagnoses_page。見た目は S-0402 と同じ）。
  *   2026-10-20 変更：その前は過去 30 日のものだけ。同じ日に、ページ送りを 20 件ずつから 5 件ずつにした
- * - 並びは回答日時の新しい順。アドバイスの状態は S-0313 と同じバッジ（列の名前は「アドバイス」）。
- *   未公開（なし・下書き）があれば、すべての診断の中の件数を見出しに出す
- * - 見せる範囲は最近のトレーニング記録と同じ（役割で変えない。「主担当のみ」は効かない）
+ * - 並びは回答日時の新しい順。アドバイスの状態は S-0313 と同じバッジ（列の名前は「アドバイス」）
+ * - 見せる範囲は最近のトレーニング記録と同じ（役割で変えない。「主担当のみ」は効かない）。2 つの絞り込みは互いに外れない
  * 「今日」は 2026-10-20 12:00 に固定する。
  */
 class DashboardRecentDiagnosesTest extends TestCase
@@ -139,6 +139,133 @@ class DashboardRecentDiagnosesTest extends TestCase
         return $rows[0];
     }
 
+    private function showUrl(TraineePersonalityDiagnosisResult $result): string
+    {
+        return route('trainee-personality-diagnosis-results.show', [$result->trainee_id, $result->id]);
+    }
+
+    /** $count 件を入れる（いちばん新しいものから 1 日ずつ古くする） */
+    private function addMany(int $count, string $status = 'none'): array
+    {
+        $results = [];
+        for ($i = 0; $i < $count; $i++) {
+            $results[] = $this->addResult(Carbon::parse('2026-10-20 09:00:00')->subDays($i)->format('Y-m-d H:i:s'), $status);
+        }
+
+        return $results;
+    }
+
+    /** 診断の絞り込みのフォーム（data-recent-diagnoses-filter）の HTML */
+    private function diagnosesForm(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<form [^>]*data-recent-diagnoses-filter>.*?<\/form>/s', $html, $m));
+
+        return $m[0];
+    }
+
+    /** 最近のトレーニング記録の絞り込みのフォーム（select name="recent" を含むフォーム）の HTML */
+    private function recentForm(string $html): string
+    {
+        $this->assertSame(1, preg_match('/<form method="GET" action="[^"]*" class="mb-0">\s*<select name="recent".*?<\/form>/s', $html, $m));
+
+        return $m[0];
+    }
+
+    // ---- 絞り込み（2026-10-20 追加：やることの一覧として未公開だけを見たい） ----
+
+    public function test_既定は未公開のみでなしと下書きだけを出し公開済みは出さない(): void
+    {
+        $none = $this->addResult('2026-10-19 09:00:00', 'none');
+        $draft = $this->addResult('2026-10-18 09:00:00', 'draft');
+        $published = $this->addResult('2026-10-17 09:00:00', 'published');
+        $this->actingAsRole();
+
+        $html = $this->dashboard();
+        $rows = $this->rows($html);
+
+        $this->assertCount(2, $rows);
+        $this->assertStringContainsString($this->showUrl($none), $rows[0]);
+        $this->assertStringContainsString($this->showUrl($draft), $rows[1]);
+        $this->assertStringNotContainsString($this->showUrl($published), $html);
+        $this->assertStringNotContainsString('公開済み</span>', $html);
+        // セレクトは「すべて」「未公開のみ」の順で、未公開のみが選ばれている
+        $this->assertMatchesRegularExpression('/<option value="all" >すべて<\/option>\s*<option value="unpublished" selected>未公開のみ<\/option>/u', $this->diagnosesForm($html));
+        // 不正な値も未公開のみ
+        $this->assertCount(2, $this->rows($this->dashboard('?diagnoses=xyz')));
+        $this->assertCount(2, $this->rows($this->dashboard('?diagnoses=unpublished')));
+    }
+
+    public function test_すべてにすると公開済みも出る(): void
+    {
+        $this->addResult('2026-10-19 09:00:00', 'none');
+        $this->addResult('2026-10-18 09:00:00', 'draft');
+        $published = $this->addResult('2026-10-17 09:00:00', 'published');
+        $this->actingAsRole();
+
+        $html = $this->dashboard('?diagnoses=all');
+        $rows = $this->rows($html);
+
+        $this->assertCount(3, $rows);
+        $this->assertStringContainsString($this->showUrl($published), $rows[2]);
+        $this->assertMatchesRegularExpression('/<option value="all" selected>すべて<\/option>\s*<option value="unpublished" >未公開のみ<\/option>/u', $this->diagnosesForm($html));
+    }
+
+    public function test_見出しは最近の愛犬性格診断だけで未公開の件数は出さない(): void
+    {
+        // 2026-10-20 変更：その前は「最近の愛犬性格診断（未公開 n件）」
+        $this->addResult('2026-10-19 09:00:00', 'none');
+        $this->addResult('2026-10-18 09:00:00', 'draft');
+        $this->actingAsRole();
+
+        foreach (['', '?diagnoses=all'] as $query) {
+            $html = $this->dashboard($query);
+            $this->assertStringContainsString('<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断</h4>', $html);
+            $this->assertStringNotContainsString('（未公開', $html);
+            $this->assertStringNotContainsString('data-unpublished-diagnosis-count', $html);
+        }
+    }
+
+    public function test_0件の文は未公開のみとすべてで違う(): void
+    {
+        $this->addResult('2026-10-17 09:00:00', 'published');
+        $this->actingAsRole();
+
+        // 未公開のみ：公開済みしかないので 0 件
+        $html = $this->dashboard();
+        $this->assertMatchesRegularExpression('/<div class="alert alert-secondary mb-4" data-recent-diagnoses-empty>\s*未公開の愛犬性格診断はありません。\s*<\/div>/u', $html);
+        $this->assertStringNotContainsString('data-recent-diagnoses>', $html);
+        $this->assertStringNotContainsString('data-recent-diagnoses-pagination', $html);
+        // 0 件でも絞り込みのセレクトは出す（すべてに切り替えられるように）
+        $this->assertStringContainsString('data-recent-diagnoses-filter', $html);
+        $this->assertCount(1, $this->rows($this->dashboard('?diagnoses=all')));
+
+        // すべて：診断がひとつもないとき
+        TraineePersonalityDiagnosisResult::query()->delete();
+        $html = $this->dashboard('?diagnoses=all');
+        $this->assertMatchesRegularExpression('/<div class="alert alert-secondary mb-4" data-recent-diagnoses-empty>\s*愛犬性格診断はありません。\s*<\/div>/u', $html);
+    }
+
+    public function test_セレクトは最近のトレーニング記録のセレクトと同じ作り(): void
+    {
+        $this->addResult('2026-10-19 09:00:00');
+        $this->actingAsRole();
+
+        $html = $this->dashboard();
+
+        // 見出しの行：見出しを左、セレクトのフォームを右（最近のトレーニング記録の見出しの行と同じ並べ方）
+        $this->assertMatchesRegularExpression(
+            '/<div class="d-flex justify-content-between align-items-baseline mb-2">\s*<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断<\/h4>\s*(?:\{\{--.*?--\}\}\s*)?<form method="GET" action="'.preg_quote(route('dashboard'), '/').'" class="mb-0" data-recent-diagnoses-filter>/su',
+            $html
+        );
+        $this->assertMatchesRegularExpression('/<div class="d-flex justify-content-between align-items-baseline mb-2">\s*<div class="d-flex align-items-baseline gap-3">\s*<h4 class="mb-0">最近のトレーニング記録<\/h4>/u', $html);
+        // セレクトの作り（クラス・幅・選ぶとすぐ送る）が同じ
+        $selectOpen = fn (string $name) => '<select name="'.$name.'" class="form-select form-select-sm" style="width: auto;"'."\n".'                    onchange="this.form.submit()">';
+        $this->assertStringContainsString($selectOpen('diagnoses'), $this->diagnosesForm($html));
+        $this->assertStringContainsString($selectOpen('recent'), $this->recentForm($html));
+        // 送るボタンは持たない
+        $this->assertStringNotContainsString('type="submit"', $this->diagnosesForm($html));
+    }
+
     public function test_期間で絞らず31日以上前の診断も出す(): void
     {
         // 2026-10-20 変更：その前は今日を含む 30 日間（今日の 29 日前の 0:00 から）のものだけを出していた
@@ -156,20 +283,10 @@ class DashboardRecentDiagnosesTest extends TestCase
         }
     }
 
-    /** 21 件以上を入れる（$count 件。いちばん新しいものから 1 日ずつ古くする） */
-    private function addMany(int $count, string $status = 'published'): array
-    {
-        $results = [];
-        for ($i = 0; $i < $count; $i++) {
-            $results[] = $this->addResult(Carbon::parse('2026-10-20 09:00:00')->subDays($i)->format('Y-m-d H:i:s'), $status);
-        }
-
-        return $results;
-    }
+    // ---- ページ送り（5 件ずつ。見た目は S-0402 と同じ） ----
 
     public function test_1ページの件数より1件多ければ2ページ目に1件(): void
     {
-        // 5 件ずつ（2026-10-20 変更：その前は 20 件ずつ）。件数はコントローラーの定数 1 か所で決める
         $perPage = DashboardController::DIAGNOSES_PER_PAGE;
         $this->assertSame(5, $perPage);
         $results = $this->addMany($perPage + 1);
@@ -181,7 +298,6 @@ class DashboardRecentDiagnosesTest extends TestCase
         $this->assertStringContainsString($this->showUrl($results[0]), $rows[0]);
         $this->assertStringContainsString($this->showUrl($results[$perPage - 1]), $rows[$perPage - 1]);
         // ページの番号は diagnoses_page
-        $this->assertStringContainsString('data-recent-diagnoses-pagination', $html);
         $this->assertStringContainsString('全6件中 1〜5件', $html);
         $this->assertStringContainsString(route('dashboard').'?diagnoses_page=2', $html);
         $this->assertStringNotContainsString('?page=2', $html);
@@ -209,7 +325,6 @@ class DashboardRecentDiagnosesTest extends TestCase
             '/<div class="mb-4" data-recent-diagnoses-pagination>\s*'.preg_quote(trim((string) $paginator->links()), '/').'\s*<\/div>/u',
             $html
         );
-        $this->assertStringContainsString('<nav class="d-flex flex-wrap justify-content-center align-items-center column-gap-3 row-gap-2 w-100 mb-3" aria-label="ページ送り">', $html);
         // 表とページ送りのあいだは S-0402 と同じ（表の囲みに mb-4 を付けない）
         $this->assertMatchesRegularExpression('/<div class="table-responsive ">\s*<table class="table table-hover" data-recent-diagnoses>/u', $html);
     }
@@ -217,6 +332,8 @@ class DashboardRecentDiagnosesTest extends TestCase
     public function test_1ページの件数以下ならページ送りを出さない(): void
     {
         $this->addMany(DashboardController::DIAGNOSES_PER_PAGE);
+        // 公開済みは未公開のみの件数に入らない
+        $this->addResult('2026-01-01 09:00:00', 'published');
         $this->actingAsRole();
 
         $html = $this->dashboard();
@@ -224,47 +341,52 @@ class DashboardRecentDiagnosesTest extends TestCase
         $this->assertCount(DashboardController::DIAGNOSES_PER_PAGE, $this->rows($html));
         $this->assertStringNotContainsString('data-recent-diagnoses-pagination', $html);
         $this->assertStringNotContainsString('aria-label="ページ送り"', $html);
-        // ページ送りがないときは、表の下に次の欄との空き（mb-4）
         $this->assertMatchesRegularExpression('/<div class="table-responsive mb-4">\s*<table class="table table-hover" data-recent-diagnoses>/u', $html);
+        // すべてにすると 6 件なのでページ送りが出る
+        $this->assertStringContainsString('全6件中 1〜5件', $this->dashboard('?diagnoses=all'));
     }
 
-    public function test_ページを送ってもトレーニング記録の絞り込みは外れず絞り込みを変えてもページは戻らない(): void
+    public function test_絞り込みを変えると1ページ目に戻りページ送りのリンクに絞り込みが付く(): void
     {
-        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1);
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1, 'published');
         $this->actingAsRole();
 
-        // 絞り込み（主担当のみ）のままページを送る：ページ送りのリンクに recent が付き、絞り込みは「主担当のみ」のまま
-        $html = $this->dashboard('?recent=primary');
-        $this->assertStringContainsString(route('dashboard').'?recent=primary&amp;diagnoses_page=2', $html);
-        $page2 = $this->dashboard('?recent=primary&diagnoses_page=2');
+        // すべての 2 ページ目：ページ送りのリンクに diagnoses=all が付く
+        $page2 = $this->dashboard('?diagnoses=all&diagnoses_page=2');
         $this->assertCount(1, $this->rows($page2));
-        $this->assertStringContainsString('<option value="primary" selected>', $page2);
-        // 2 ページ目で絞り込みを変えるとき、フォームは今のページも送る（絞り込みのセレクトの隣の hidden）
-        $this->assertMatchesRegularExpression('/<select name="recent".*?<\/select>\s*(?:\{\{--.*?--\}\}\s*)?<input type="hidden" name="diagnoses_page" value="2">\s*<\/form>/su', $page2);
-        // 1 ページ目では送らない
-        $this->assertStringNotContainsString('name="diagnoses_page"', $html);
+        $this->assertStringContainsString(route('dashboard').'?diagnoses=all&amp;diagnoses_page=1', $page2);
+        // 診断の絞り込みのフォームはページを送らない（絞り込みを変えたら 1 ページ目に戻る）
+        $this->assertStringNotContainsString('diagnoses_page', $this->diagnosesForm($page2));
+        // 未公開のみに変えると 1 ページ目（公開済みしかないので 0 件の文）
+        $this->assertStringContainsString('未公開の愛犬性格診断はありません。', $this->dashboard('?diagnoses=unpublished'));
     }
 
-    public function test_見出しの未公開の件数はほかのページにある分も数える(): void
+    public function test_診断の絞り込みとトレーニング記録の絞り込みは互いに外れない(): void
     {
-        // 1 ページ目の分は公開済み、2 ページ目の 1 件だけ下書き
-        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE, 'published');
-        $this->addResult('2026-01-01 09:00:00', 'draft');
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1, 'published');
         $this->actingAsRole();
 
-        $html = $this->dashboard();
+        // トレーニング記録が主担当のみ・診断がすべての 2 ページ目
+        $html = $this->dashboard('?recent=primary&diagnoses=all&diagnoses_page=2');
+        $this->assertCount(1, $this->rows($html));
+        $this->assertStringContainsString('<option value="primary" selected>', $html);
+        // 診断の絞り込みのフォームは recent を持つ（診断の絞り込みを変えても、トレーニング記録の絞り込みは外れない）
+        $this->assertStringContainsString('<input type="hidden" name="recent" value="primary">', $this->diagnosesForm($html));
+        // トレーニング記録の絞り込みのフォームは diagnoses と diagnoses_page を持つ（逆も外れない）
+        $recentForm = $this->recentForm($html);
+        $this->assertStringContainsString('<input type="hidden" name="diagnoses" value="all">', $recentForm);
+        $this->assertStringContainsString('<input type="hidden" name="diagnoses_page" value="2">', $recentForm);
+        // ページ送りのリンクにも両方が付く
+        $this->assertStringContainsString(route('dashboard').'?recent=primary&amp;diagnoses=all&amp;diagnoses_page=1', $html);
 
-        $this->assertCount(DashboardController::DIAGNOSES_PER_PAGE, $this->rows($html));
-        $this->assertStringNotContainsString('下書き</span>', implode('', $this->rows($html)));
-        $this->assertStringContainsString('<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断<span class="text-nowrap" data-unpublished-diagnosis-count>（未公開 1件）</span></h4>', $html);
-        // 2 ページ目でも同じ（すべての診断の中の件数）
-        $this->assertStringContainsString('（未公開 1件）', $this->dashboard('?diagnoses_page=2'));
+        // 既定（未公開のみ・1 ページ目・トレーニング記録はすべて）なら、どちらのフォームも余計なものを持たない
+        $plain = $this->dashboard('?diagnoses=all');
+        $this->assertStringNotContainsString('name="recent" value', $this->diagnosesForm($plain));
+        $this->assertStringNotContainsString('diagnoses_page', $this->recentForm($plain));
+        $this->assertStringNotContainsString('name="diagnoses" value', $this->recentForm($this->dashboard()));
     }
 
-    private function showUrl(TraineePersonalityDiagnosisResult $result): string
-    {
-        return route('trainee-personality-diagnosis-results.show', [$result->trainee_id, $result->id]);
-    }
+    // ---- 列・行・バッジ ----
 
     public function test_並びは回答日時の新しい順で列は回答日と会員のリンクとトレーニーとタイプとアドバイス(): void
     {
@@ -275,15 +397,12 @@ class DashboardRecentDiagnosesTest extends TestCase
         $middle = $this->addResult('2026-10-18 09:00:00');
         $this->actingAsRole();
 
-        $html = $this->dashboard();
+        $html = $this->dashboard('?diagnoses=all');
         $rows = $this->rows($html);
 
-        // 列の見出し
         // 列の見出し（狭い幅でも折り返さず、表を横にスクロールする）
         $this->assertMatchesRegularExpression('/<thead class="table-light">\s*<tr>\s*<th class="text-nowrap">回答日<\/th>\s*<th class="text-nowrap">会員<\/th>\s*<th class="text-nowrap">トレーニー<\/th>\s*<th class="text-nowrap">タイプ<\/th>\s*<th class="text-nowrap">アドバイス<\/th>\s*<\/tr>\s*<\/thead>/u', $html);
-        // 列の名前は「アドバイス」（2026-10-20 変更：その前は「状態」）
         $this->assertStringNotContainsString('>状態</th>', $html);
-        $this->assertStringContainsString('<div class="table-responsive mb-4">'."\n".'            <table class="table table-hover" data-recent-diagnoses>', $html);
         // 新しい順
         $this->assertCount(3, $rows);
         foreach ([$newer, $middle, $older] as $i => $result) {
@@ -305,14 +424,14 @@ class DashboardRecentDiagnosesTest extends TestCase
         $this->assertStringContainsString('<td style="word-break: keep-all;">'.str_replace('・', '・<wbr>', e($type)).'</td>', $rows[1]);
     }
 
-    public function test_状態のバッジはS_0313と同じ文と色(): void
+    public function test_アドバイスのバッジはS_0313と同じ文と色(): void
     {
         $none = $this->addResult('2026-10-19 09:00:00', 'none');
         $draft = $this->addResult('2026-10-18 09:00:00', 'draft');
         $published = $this->addResult('2026-10-17 09:00:00', 'published');
         $this->actingAsRole();
 
-        $rows = $this->rows($this->dashboard());
+        $rows = $this->rows($this->dashboard('?diagnoses=all'));
 
         $expected = [
             [$none, 'bg-secondary', 'なし'],
@@ -328,36 +447,6 @@ class DashboardRecentDiagnosesTest extends TestCase
             // S-0313 の画面に出るバッジと同じ
             $this->assertStringContainsString('<span class="badge '.$class.'" data-evaluation-status>'.$label.'</span>', $this->get($this->showUrl($result))->assertOk()->getContent());
         }
-    }
-
-    public function test_見出しは未公開があれば件数を出し0件なら出さない(): void
-    {
-        $this->addResult('2026-10-19 09:00:00', 'none');
-        $this->addResult('2026-10-18 09:00:00', 'draft');
-        $this->addResult('2026-10-17 09:00:00', 'published');
-        $this->addResult('2025-09-01 09:00:00', 'draft'); // 古い診断も数える（2026-10-20 変更：その前は過去 30 日の外は数えなかった）
-        $this->actingAsRole();
-
-        // 「（未公開 n件）」は途中で折り返さない
-        $this->assertStringContainsString('<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断<span class="text-nowrap" data-unpublished-diagnosis-count>（未公開 3件）</span></h4>', $this->dashboard());
-
-        TraineePersonalityDiagnosisResult::query()->update(['evaluation_text' => '公開した文', 'evaluation_published_at' => '2026-10-19 10:00:00']);
-        $html = $this->dashboard();
-        $this->assertStringContainsString('<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断</h4>', $html);
-        $this->assertStringNotContainsString('未公開', $html);
-    }
-
-    public function test_0件のときは表の代わりにありませんの文(): void
-    {
-        $this->actingAsRole();
-
-        $html = $this->dashboard();
-
-        // 2026-10-20 変更：その前は「過去30日の愛犬性格診断はありません。」
-        $this->assertMatchesRegularExpression('/<div class="alert alert-secondary mb-4" data-recent-diagnoses-empty>\s*愛犬性格診断はありません。\s*<\/div>/u', $html);
-        $this->assertStringNotContainsString('data-recent-diagnoses>', $html);
-        $this->assertStringNotContainsString('data-recent-diagnoses-pagination', $html);
-        $this->assertStringContainsString('<h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断</h4>', $html);
     }
 
     public function test_見せる範囲は最近のトレーニング記録と同じで役割で変えず主担当のみの絞り込みは効かない(): void
@@ -380,10 +469,10 @@ class DashboardRecentDiagnosesTest extends TestCase
     public function test_問い合わせの数は行の数で増えない(): void
     {
         $this->actingAsRole();
-        $count = function (): int {
+        $count = function (string $query): int {
             DB::flushQueryLog();
             DB::enableQueryLog();
-            $this->dashboard();
+            $this->dashboard($query);
             $queries = collect(DB::getQueryLog())->pluck('query')
                 ->filter(fn (string $sql) => str_contains($sql, 'trainee_personality_diagnosis_results') || str_contains($sql, '"trainees"') || str_contains($sql, '"clients"'));
             DB::disableQueryLog();
@@ -392,15 +481,15 @@ class DashboardRecentDiagnosesTest extends TestCase
         };
 
         $this->addResult('2026-10-19 09:00:00');
-        $one = $count();
+        $one = [$count(''), $count('?diagnoses=all')];
         foreach (['0002', '0003', '0004', '0005'] as $i => $internalId) {
             $this->addResult('2026-10-1'.$i.' 09:00:00', 'draft', $this->trainee($this->makeClient($internalId, '会員'.$i), '犬'.$i));
         }
-        $five = $count();
+        $five = [$count(''), $count('?diagnoses=all')];
 
         $this->assertCount(5, $this->rows($this->dashboard()));
         // 結果・トレーニー・会員の 3 つを、行の数によらず 1 回ずつ（ほかの欄の問い合わせも同じ数え方で数える）
-        $this->assertGreaterThanOrEqual(3, $one);
+        $this->assertGreaterThanOrEqual(3, $one[0]);
         $this->assertSame($one, $five);
     }
 

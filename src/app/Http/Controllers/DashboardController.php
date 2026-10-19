@@ -50,19 +50,22 @@ class DashboardController extends Controller
             ->get();
 
         // 最近の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
-        // すべての診断を回答日時の新しい順に、5 件ずつ（DIAGNOSES_PER_PAGE）のページ送りで出す（2026-10-20 変更：30 日より前の未公開も見落とさないように。
-        // その前は過去 30 日のものだけを、ページングなしで出していた）。公開済みも含める。見せる範囲は最近のトレーニング記録と同じ
-        // （役割で変えない。recent の絞り込みは効かない）。ページの番号は diagnoses_page（ほかのページ送りとぶつからないように）で、
-        // withQueryString でページを送っても recent が外れない。トレーニーと会員はまとめて読み込む
+        // 回答日時の新しい順に、5 件ずつ（DIAGNOSES_PER_PAGE）のページ送りで出す。期間では絞らない（2026-10-20 変更：
+        // 30 日より前の未公開も見落とさないように。その前は過去 30 日のものだけを、ページングなしで出していた）。
+        // 絞り込み（2026-10-20 追加：やることの一覧として未公開だけを見たい）：クエリパラメータ diagnoses=all のときはすべて、
+        // それ以外（ない・unpublished・不正な値）は未公開（なし・下書き）だけ。未公開の判定はモデルの evaluationNotPublished
+        // （公開した日時がないもの。状態の判定 evaluation_status と同じ基準）。recent とは別のパラメータ（ぶつからないように）。
+        // 見せる範囲は最近のトレーニング記録と同じ（役割で変えない。recent の絞り込みは効かない）。ページの番号は diagnoses_page で、
+        // withQueryString でページを送っても diagnoses と recent が外れない。トレーニーと会員はまとめて読み込む。
+        // 2026-10-20 変更：見出しの「（未公開 n件）」を外したので、未公開の件数は数えない
+        $diagnosesFilter = $request->query('diagnoses') === 'all' ? 'all' : 'unpublished';
         $recentDiagnoses = TraineePersonalityDiagnosisResult::with('trainee.client')
+            ->when($diagnosesFilter === 'unpublished', fn ($query) => $query->evaluationNotPublished())
             ->orderBy('answered_at', 'desc')
             ->orderBy('id', 'desc')
             ->paginate(self::DIAGNOSES_PER_PAGE, ['*'], 'diagnoses_page')
             ->withQueryString();
-        // 未公開（なし・下書き）の件数は、今のページの分だけでなく、すべての診断を数える。
-        // 判定はモデルの evaluationNotPublished（公開した日時がないもの。状態の判定 evaluation_status と同じ基準）
-        $unpublishedDiagnosisCount = TraineePersonalityDiagnosisResult::query()->evaluationNotPublished()->count();
 
-        return view('dashboard', compact('recentRecords', 'recentFilter', 'recentDiagnoses', 'unpublishedDiagnosisCount'));
+        return view('dashboard', compact('recentRecords', 'recentFilter', 'recentDiagnoses', 'diagnosesFilter'));
     }
 }
