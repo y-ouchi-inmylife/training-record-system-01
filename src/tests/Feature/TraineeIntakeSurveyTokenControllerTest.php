@@ -48,6 +48,8 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineeIntakeSurveyTokensTable();
+        // 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬性格診断の案内も確かめる（2026-10-19 追加）
+        $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
 
         $this->trainee = Trainee::query()->create(['client_id' => 7, 'name' => 'モモ']);
@@ -363,5 +365,38 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertSame([$old], TraineeIntakeSurveyToken::query()->pluck('id')->all());
         $this->delete(route('trainee-intake-survey-tokens.destroy', $this->trainee))->assertSessionHas('success');
         $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
+    }
+
+    // ---- 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（2026-10-19 変更） ----
+
+    public function test_愛犬性格診断が回答待ちなら発行せず完了メッセージも出さずに会員詳細に戻る(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-20 10:00:00'));
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => str_repeat('o', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // 画面からではなく直接送られても、今の「有効な案内がすでにある」ときと同じ返し方
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', $this->trainee->client_id))
+            ->assertSessionMissing('success');
+
+        $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
+    }
+
+    public function test_愛犬性格診断の期限が切れた案内や回答済みの案内なら発行できる(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            ['token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59', 'answered_at' => null,
+                'created_at' => now(), 'updated_at' => now()],
+            ['token' => str_repeat('a', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => null, 'answered_at' => '2026-10-21 10:00:00',
+                'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->post(route('trainee-intake-survey-tokens.store', $this->trainee))->assertSessionHas('success');
+
+        $this->assertSame(1, TraineeIntakeSurveyToken::query()->count());
     }
 }

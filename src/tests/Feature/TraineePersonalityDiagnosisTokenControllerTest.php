@@ -50,6 +50,8 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineePersonalityDiagnosisTokensTable();
+        // 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬アンケートの案内も確かめる（2026-10-19 追加）
+        $this->createTraineeIntakeSurveyTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();
 
         $this->actingAsRole('staff');
@@ -535,5 +537,38 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         ]);
 
         $this->assertStringContainsString('<strong>有効な愛犬性格診断の案内がありません。</strong>', $this->printPage());
+    }
+
+    // ---- 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（2026-10-19 変更） ----
+
+    public function test_愛犬アンケートが回答待ちなら発行せず完了メッセージも出さずに会員詳細に戻る(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-20 10:00:00'));
+        DB::table('trainee_intake_survey_tokens')->insert([
+            'token' => str_repeat('o', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // 画面からではなく直接送られても、今の「有効な案内がすでにある」ときと同じ返し方
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', $this->trainee->client_id))
+            ->assertSessionMissing('success');
+
+        $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->count());
+    }
+
+    public function test_愛犬アンケートの期限が切れた案内や回答済みの案内なら発行できる(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        DB::table('trainee_intake_survey_tokens')->insert([
+            ['token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59', 'answered_at' => null,
+                'created_at' => now(), 'updated_at' => now()],
+            ['token' => str_repeat('a', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => null, 'answered_at' => '2026-10-21 10:00:00',
+                'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('success');
+
+        $this->assertSame(1, TraineePersonalityDiagnosisToken::query()->count());
     }
 }

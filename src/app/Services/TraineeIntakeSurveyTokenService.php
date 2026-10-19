@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyToken;
+use App\Models\TraineePersonalityDiagnosisToken;
 use App\Models\Trainer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -44,10 +45,16 @@ class TraineeIntakeSurveyTokenService
 
             // 有効な案内＝未回答で期限内のもの（2026-10-19 変更：期限が切れた案内は数えないので、期限が切れたら
             // すぐ発行し直せる。期限が切れた行は消さずに残す）
+            // 1 頭に出しておける案内は、愛犬アンケートと愛犬性格診断を合わせて 1 つまで（2026-10-19 変更：ユーザーレビューで、
+            // 1 頭に 1 つずつ順に答えてもらうことにした。その前は種類ごとに 1 つまで）。愛犬性格診断の有効な案内があっても発行しない
             $hasActive = TraineeIntakeSurveyToken::query()
                 ->where('trainee_id', $trainee->id)
                 ->active()
-                ->exists();
+                ->exists()
+                || TraineePersonalityDiagnosisToken::query()
+                    ->where('trainee_id', $trainee->id)
+                    ->active()
+                    ->exists();
             if ($hasActive) {
                 return null;
             }

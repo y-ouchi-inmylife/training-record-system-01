@@ -583,57 +583,51 @@
                                         </div>
                                     </a>
                                     <div class="flex-grow-1" style="min-width: 0;">
-                                {{-- 名前の行。未発行・回答待ちのときは、右端に愛犬アンケートのまとまり（「愛犬アンケート」の文字と
-                                     ボタン）を右寄せで置く（2026-10 変更。要件定義書 6-16-8、設計書 S-0305 セクション3「愛犬アンケート」）。
-                                     回答済みのときはまとまりごと出さず、属性の並びの最後（最終計測の下）に「暮らしの様子」の
-                                     リンクを置く（下の dl の後ろ。回答済みになると案内の操作は終わり、あとは回答を読むだけになるため）。
-                                     - 名前とまとまりは縦の中央でそろえる（align-items-center）。幅が足りないとき（スマホの幅、
-                                       名前が長いとき、回答待ちでボタンが 2 つのとき）は、flex-wrap でまとまりごと名前の下の行に
-                                       折り返し、ms-auto で右寄せのままにする。名前は text-break で長くてもはみ出さない
-                                     - ラベル（col-4）と値（col-8）の表には入れない：ラベル列は写真の枠と並ぶため lg〜xl で狭く
-                                       「愛犬アンケート」が折り返し、回答待ちではボタンが並ぶため。名前の行の右の空いたところに
-                                       置けば、カードの下に行を足さずに済む（経緯：当初はカードの下端に区切り線つきの全幅の行で
-                                       置いていた）
-                                     - まとまりはボタンだけ（左に「愛犬アンケート」の文字は置かない。2026-10 変更）：発行と表示のボタンを
-                                       「愛犬アンケートの案内を…」として、何の案内かをボタンの文字だけで分かるようにした（マイページ
-                                       登録案内のボタンと見分けるため）。状態はボタンで分かるため、状態の文字・発行日・回答日時も
-                                       出さない。状態はバッジにしない（「回答待ち」はお客様の対応を待つ状態で、トレーナーが対応する
-                                       状態ではないため）
-                                     - 状態は Trainee::intake_survey_status（ClientController::show で
-                                       trainees.latestIntakeSurveyResponse・trainees.activeIntakeSurveyToken を先読み済み）
-                                     - 「愛犬アンケートの案内を表示」は S-0311 愛犬アンケート案内画面を別タブで開く（マイページ登録案内の
-                                       「マイページ登録の案内を表示」と同じ）。取消のボタンの文字は「取消」だけ（2026-10 変更。隣の「愛犬アンケートの
-                                       案内を表示」で対象が伝わり、何を取り消すかは確認〔M06〕の文言で示すため。ボタンに別の aria-label は
-                                       付けない）
-                                     - ボタンの文字は text-nowrap で途中で折り返さない（幅が足りないときは、ボタンごと次の行に移る）
-                                     - 読み上げでどのトレーニーの操作かが分かるよう、まとまりを role="group" にして
-                                       「{表示名}の愛犬アンケート」の名前を付ける（ボタンの文字は変えない）。読み上げの順は
-                                       名前 → 愛犬アンケートのまとまり → 属性
+                                {{-- 案内（愛犬アンケート・愛犬性格診断）の操作（2026-10-19 変更。設計書 S-0305 セクション3「案内の操作」、要件定義書 6-16-8・6-16-11）。
+                                     ユーザーレビューで、愛犬アンケートと愛犬性格診断の［…を発行］［…を表示］［取消］がばらばらに並び分かりにくかったため、
+                                     名前の行の右の［案内を発行］1 つ（モーダル S-0305-M08 で種類を選ぶ）と、欄のいちばん下の「案内中」の行
+                                     （［表示］［取消］）にまとめた。1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで。
+                                     - $activeSurveys：回答待ちの案内（未回答で期限内）。前の決まりで出した案内が残っていると 2 つあることがあり、
+                                       そのときは「案内中」の行を 2 つ出す（愛犬アンケート → 愛犬性格診断の順）。1 つでもあれば［案内を発行］は出さない
+                                     - 期限の日は expires_at から n/j。期限が空（期限を付ける前に発行した案内）なら日を出さない
+                                     - activeIntakeSurveyToken・activePersonalityDiagnosisToken は ClientController::show で先読み済み
+                                     経緯：その前は、名前の行の右に［愛犬アンケートの案内を発行］（回答済みのときは白抜き）または
+                                     ［愛犬アンケートの案内を表示］［取消］、愛犬性格診断の行の右に［案内を発行］または［案内を表示］［取消］を置いていた --}}
+                                @php
+                                    $activeSurveys = [];
+                                    if ($trainee->activeIntakeSurveyToken !== null) {
+                                        $activeSurveys[] = [
+                                            'name' => __('messages.intake_survey_name'),
+                                            'expiresAt' => $trainee->activeIntakeSurveyToken->expires_at,
+                                            'printUrl' => route('trainee-intake-survey-tokens.print', $trainee),
+                                            'cancelModal' => '#intakeSurveyCancelModal',
+                                            'cancelAttribute' => 'data-intake-survey-trainee-id',
+                                        ];
+                                    }
+                                    if ($trainee->activePersonalityDiagnosisToken !== null) {
+                                        $activeSurveys[] = [
+                                            'name' => __('messages.personality_diagnosis_name'),
+                                            'expiresAt' => $trainee->activePersonalityDiagnosisToken->expires_at,
+                                            'printUrl' => route('trainee-personality-diagnosis-tokens.print', $trainee),
+                                            'cancelModal' => '#personalityDiagnosisCancelModal',
+                                            'cancelAttribute' => 'data-personality-diagnosis-trainee-id',
+                                        ];
+                                    }
+                                @endphp
+                                {{-- 名前の行。右に［案内を発行］（回答待ちの案内がないときだけ。いつも使う操作なので塗り。4-4）。
+                                     幅が足りないときは flex-wrap でボタンが名前の下の行に回り、ms-auto で右寄せのまま。名前は text-break で
+                                     長くてもはみ出さない。ボタンの文字は短いので、読み上げ用に「{表示名}の案内を発行」の名前を付ける。
                                      名前のリンク：名前が未登録なら「名前未登録」を薄い文字で出し、リンクは張ったまま
                                      （§2-4 の例外。空にするとリンクの文字がなくなり押せなくなるため。2026-10 追加） --}}
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                                     <h6 class="mb-0 text-break"><a href="{{ route('trainees.show', $trainee) }}"@if(! $trainee->has_name) class="text-muted"@endif>{{ $trainee->display_name }}</a></h6>
-                                    {{-- 2026-10-19 変更：回答済みでも［愛犬アンケートの案内を発行］を出す（答え直してもらうため。要件定義書 6-16-8）。
-                                         回答済みのときは任意の操作なので白抜き（4-4）、未発行のときは今までどおり塗り。
-                                         その前は、回答済みではまとまりごと出さなかった --}}
-                                    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto small"
-                                         role="group" aria-label="{{ $trainee->display_name }}の{{ __('messages.intake_survey_name') }}">
-                                        <div class="d-flex flex-wrap justify-content-end gap-2">
-                                            @if($trainee->intake_survey_status !== \App\Models\Trainee::INTAKE_AWAITING)
-                                                {{-- マイページ登録の案内を発行と同じく、発行のあとは会員詳細に戻って完了メッセージを出す（2026-10-17 変更） --}}
-                                                <form method="POST" action="{{ route('trainee-intake-survey-tokens.store', $trainee) }}" class="d-inline m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm {{ $trainee->intake_survey_status === \App\Models\Trainee::INTAKE_ANSWERED ? 'btn-outline-primary' : 'btn-primary' }} text-nowrap">{{ __('messages.intake_survey_name') }}の案内を発行</button>
-                                                </form>
-                                            @elseif($trainee->intake_survey_status === \App\Models\Trainee::INTAKE_AWAITING)
-                                                <a href="{{ route('trainee-intake-survey-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-outline-primary text-nowrap">{{ __('messages.intake_survey_name') }}の案内を表示</a>
-                                                <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
-                                                        data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
-                                                        data-intake-survey-trainee-id="{{ $trainee->id }}">取消</button>
-                                            @endif
-                                        </div>
-                                    </div>
+                                    @if($activeSurveys === [])
+                                        <button type="button" class="btn btn-sm btn-primary text-nowrap ms-auto"
+                                                data-bs-toggle="modal" data-bs-target="#surveyIssueModal"
+                                                data-survey-issue-trainee-id="{{ $trainee->id }}"
+                                                data-survey-issue-trainee-name="{{ $trainee->display_name }}"
+                                                aria-label="{{ $trainee->display_name }}の案内を発行">案内を発行</button>
+                                    @endif
                                 </div>
                                 {{-- ラベル＋値の並び。dl.row でラベル幅を col-4 に固定して
                                      値を右側に揃える。
@@ -673,14 +667,8 @@
                                      - 左は「性格診断」の文字のリンク。いつもトレーニー詳細（S-0309）の性格診断の欄（#personality-diagnosis、
                                        同じタブ）へ。結果がなくても飛ぶ（欄に「（未回答）」が出る）。左の位置・文字の大きさ・上の間隔は
                                        「暮らしの様子」のリンクにそろえる（small mt-1）
-                                     - 右はボタンのまとまり（role="group"、「{表示名}の性格診断」）。有効な案内がないとき（未発行、または前の
-                                       案内に回答済み・取消済み）は［案内を発行］、回答待ちのときは［案内を表示］［取消］。ボタンの文字は短い
-                                       （行の左に「性格診断」の文字があるため。愛犬アンケートのボタンは左に文字を置かないので長い）
-                                     - 幅が足りないときは、愛犬アンケートの名前の行と同じく、まとまりごと次の行に折り返して右寄せ（flex-wrap・ms-auto）
-                                     - 状態は Trainee::activePersonalityDiagnosisToken（ClientController::show で先読み済み）
-                                     - ［案内を発行］は愛犬アンケート・マイページ登録と同じく、発行のあとは会員詳細に戻って完了メッセージを出す。
-                                       ［案内を表示］は同じタブで案内の画面（S-0312）を開く（2026-10-17 変更。当初はどちらも別のタブ）
-                                     - ［取消］は確認（S-0305-M07。trainees/_personality-diagnosis-cancel-modal.blade.php）を開く
+                                     - 行のボタン（［案内を発行］［案内を表示］［取消］）は置かない（2026-10-19 変更：名前の行の［案内を発行］と、
+                                       欄の下の「案内中」の行にまとめた。その前は値の列の右にボタンのまとまりを置いていた）
                                      - 最新の診断の日付（2026-10 追加）：リンクとボタンの間に、最新の結果の回答日（Y/m/d）を出す。
                                        結果がないときは「診断なし」（text-muted）。回答待ちの案内があっても、出すのは結果の日付。
                                        最新は Trainee::latestPersonalityDiagnosisResult（ClientController::show で先読み済み。
@@ -704,21 +692,6 @@
                                         @else
                                             <span class="text-muted" data-personality-diagnosis-latest>診断なし</span>
                                         @endif
-                                        <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto"
-                                             role="group" aria-label="{{ $trainee->display_name }}の{{ __('messages.personality_diagnosis_name') }}">
-                                            @if($trainee->activePersonalityDiagnosisToken === null)
-                                                <form method="POST" action="{{ route('trainee-personality-diagnosis-tokens.store', $trainee) }}" class="d-inline m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">案内を発行</button>
-                                                </form>
-                                            @else
-                                                <a href="{{ route('trainee-personality-diagnosis-tokens.print', $trainee) }}"
-                                                   class="btn btn-sm btn-outline-primary text-nowrap">案内を表示</a>
-                                                <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
-                                                        data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"
-                                                        data-personality-diagnosis-trainee-id="{{ $trainee->id }}">取消</button>
-                                            @endif
-                                        </div>
                                     </div>
                                 </div>
                                 {{-- 暮らしの様子（愛犬アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。
@@ -733,6 +706,32 @@
                                     <div class="small mt-1">
                                         <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
                                            aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>
+                                    </div>
+                                @endif
+                                {{-- 「案内中」の行（2026-10-19 追加。回答待ちの案内があるときだけ）。欄のいちばん下に、上に区切り線を引いて出す。
+                                     属性の並び（dl.row）と同じ col-4／col-8 で組み、ラベルの列に小見出し「案内中」、値の列に種類と期限の日
+                                     （「愛犬アンケート（10/26まで）」。期限が空なら日を出さない）と、右に［表示］（白抜きの青。ご案内の画面を同じタブで
+                                     開く）［取消］（白抜きの赤。今の取消の確認 M06・M07 を開く）。2 つあれば値の列に 2 段で出す。
+                                     幅が足りないときは、ボタンのまとまりが次の行に回って右寄せ（flex-wrap・ms-auto） --}}
+                                @if($activeSurveys !== [])
+                                    <div class="row small mt-2 pt-2 border-top" role="group"
+                                         aria-label="{{ $trainee->display_name }}の案内中の案内" data-survey-in-progress>
+                                        <div class="col-4 fw-bold">案内中</div>
+                                        <div class="col-8">
+                                            @foreach($activeSurveys as $survey)
+                                                <div class="d-flex flex-wrap align-items-center gap-2 @if(! $loop->first) mt-1 @endif" data-survey-in-progress-item>
+                                                    <span>{{ $survey['name'] }}@if($survey['expiresAt'])（{{ $survey['expiresAt']->format('n/j') }}まで）@endif</span>
+                                                    <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto">
+                                                        <a href="{{ $survey['printUrl'] }}" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                           aria-label="{{ $survey['name'] }}の案内を表示">表示</a>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
+                                                                data-bs-toggle="modal" data-bs-target="{{ $survey['cancelModal'] }}"
+                                                                {{ $survey['cancelAttribute'] }}="{{ $trainee->id }}"
+                                                                aria-label="{{ $survey['name'] }}の案内を取消">取消</button>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 @endif
                                     </div>
@@ -846,6 +845,8 @@
         @include('trainees._intake-survey-cancel-modal')
         {{-- 性格診断の案内の取消確認モーダル（S-0305-M07。2026-10 追加） --}}
         @include('trainees._personality-diagnosis-cancel-modal')
+        {{-- 案内の発行モーダル（S-0305-M08。2026-10-19 追加）。トレーニーが何頭いても 1 つ --}}
+        @include('trainees._survey-issue-modal')
     @endif
 
     {{-- マイページ登録案内取消確認モーダル（S-0305-M03）--}}
