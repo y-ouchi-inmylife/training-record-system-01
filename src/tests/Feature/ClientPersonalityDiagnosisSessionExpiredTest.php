@@ -131,8 +131,11 @@ class ClientPersonalityDiagnosisSessionExpiredTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'checked>'));
         $this->assertMatchesRegularExpression('/id="answer-Q04-1" value="1" autocomplete="off"\s*checked>/u', $html);
-        $this->assertStringNotContainsString('Q51', $html);
-        $this->assertStringNotContainsString('abc', $html);
+        // 設問にないキー（Q51）と正しくない値（abc）は、どこにも戻さない。前後が英数字でないところだけを探す
+        // （2026-10-20 変更：その前は文字列として探していたため、毎回でたらめに作られる CSRF のトークン〔40 文字の英数字〕に
+        // たまたま含まれると落ちることがあった。トークンの中では前後が英数字なので当たらない）
+        $this->assertDoesNotMatchRegularExpression('/\bQ51\b/u', $html);
+        $this->assertDoesNotMatchRegularExpression('/\babc\b/u', $html);
     }
 
     public function test_出し直した画面の新しいCSRFトークンでそのまま送り直せる(): void

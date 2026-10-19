@@ -153,7 +153,10 @@ class ClientEmailRegistrationTokenPrintTest extends TestCase
 
         $html = $this->printPage();
 
-        foreach (['@page', 'A4', 'd-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'print-lead', 'ご登録の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
+        // 印刷用の作り（2026-10-18 に外した layouts/print の @page { size: A4 portrait; } とそのコメント「A4 縦・…」）が出ないことは、
+        // 外したものそのもの（size: A4・A4 縦）で確かめる（2026-10-20 変更：その前は 'A4' だけで探していたため、毎回でたらめに作られる
+        // CSRF のトークン〔meta の csrf-token・フォームの _token〕にたまたま「A4」が入ると落ちていた）
+        foreach (['@page', 'size: A4', 'A4 縦', 'd-print-none', 'print-actions', 'print-qr', 'print-url', 'print-steps', 'print-lead', 'ご登録の手順', '上の QR コードを読み取ります', '上の QR コードを読み取るか'] as $text) {
             $this->assertStringNotContainsString($text, $html, $text);
         }
         // トレーナー側のふつうの画面（ナビゲーションあり）
