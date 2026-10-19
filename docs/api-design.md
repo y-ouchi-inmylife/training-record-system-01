@@ -95,6 +95,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish` | 評価文を保存して公開する（公開した日時・トレーナーを入れる。トレーニング記録は作らない。ルート名 `trainee-personality-diagnosis-results.publish`。**2026-10-18 追加**。**2026-10-18 変更**：その前は評価文を本文にしたトレーニング記録を作っていた） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish` | 評価文の公開取消（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果を 1 件削除する（物理削除。公開済みの評価文も一緒に消え、会員様の画面からも消える。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**。**2026-10-18 変更**：送信元を S-0309 から S-0313 に移した） | auth | 管理者 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo` | スタッフ用メモを保存する（ルート名 `trainee-personality-diagnosis-results.staff-memo.update`。**2026-10-19 追加**） | auth | 一般・管理者 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft` | 評価文とスタッフ用メモの下書きを AI で作り JSON で返す（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**） | auth | 一般・管理者 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -124,6 +126,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 音声記録管理 | S-0505 音声記録一覧画面 | GET | `/audio-records/{id}/play` | 音声ファイルを再生する（ストリーミング） | auth | 管理者、一般 |
 | 要約 | S-0601 要約プロンプト画面 | GET | `/settings/summary-prompts` | 要約プロンプト画面を表示する | auth | 管理者 |
 | 要約 | S-0601 要約プロンプト画面 | PUT | `/settings/summary-prompts` | 要約プロンプトを更新する | auth | 管理者 |
+| 愛犬性格診断 | S-0602 愛犬性格診断の評価文プロンプト画面 | GET | `/settings/evaluation-prompts` | 評価文プロンプト画面を表示する（**2026-10-19 追加**） | auth | 管理者 |
+| 愛犬性格診断 | S-0602 愛犬性格診断の評価文プロンプト画面 | PUT | `/settings/evaluation-prompts` | 評価文プロンプトを更新する（**2026-10-19 追加**） | auth | 管理者 |
 | 音声ファイル容量管理 | S-0701 音声ファイル一覧画面 | GET | `/usage-stats` | 音声ファイル一覧画面を表示する（サーバー容量管理用） | auth | システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | GET | `/trainers/create` | トレーナー登録画面を表示する | auth | 管理者、システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | POST | `/trainers` | トレーナーを登録する | auth | 管理者、システム管理者 |
@@ -1030,6 +1034,22 @@ POST /training-records に以下を追加する。
 
 ---
 
+
+###### GET /settings/evaluation-prompts
+
+**概要**: 愛犬性格診断の評価文プロンプト画面（S-0602）を表示する（**2026-10-19 追加**）。管理者のみ。
+
+**レスポンス**: view `settings.evaluation-prompts`（`system_settings` の `evaluation_prompt_current`。なければ既定の指示文。差し込みの印の一覧）
+
+###### PUT /settings/evaluation-prompts
+
+**概要**: 評価文プロンプトを更新する（**2026-10-19 追加**）。管理者のみ。
+
+**リクエスト**: `evaluation_prompt`（必須。5000 字まで）
+
+**処理**: `system_settings` の `evaluation_prompt_current` を作る・更新する
+
+**レスポンス**: `redirect('/settings/evaluation-prompts')`。フラッシュ `success` に「愛犬性格診断の評価文プロンプト設定を保存しました。」
 
 #### 4-1-7. 音声ファイル容量管理
 
@@ -2517,6 +2537,38 @@ POST /training-records に以下を追加する。
 - すでに公開済み：同じ S-0313 へ。フラッシュ `success` に「この評価文は、すでに公開しています。」（エラーにしない）
 - バリデーション失敗（評価文が空など）：`back()`
 - 押下時に確認モーダルを挟む（screen-design.md S-0313-M01）
+
+###### PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo
+
+**概要**: スタッフ用メモを保存する（ルート名 `trainee-personality-diagnosis-results.staff-memo.update`。**2026-10-19 追加**。requirements.md 6-16-19）。
+
+**リクエスト**: `staff_memo`（任意。10,000 字まで。改行は LF にそろえてから数える）
+
+**処理**:
+- `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果は 404）
+- `staff_memo` だけを保存する（空・空白だけなら NULL）。評価文・公開の状態・評価文の最終更新（`evaluation_updated_*`）は変えない。逆に評価文の保存（`PUT …/{personalityDiagnosisResult}`）では `staff_memo` を変えない
+- アクセスログに記録する（`edit_trainee_personality_diagnosis_staff_memo`。対象はトレーニー）
+
+**レスポンス**:
+- 成功：S-0313 へリダイレクト、フラッシュ `success` に「スタッフ用メモを更新しました。」
+- 10,000 字を超える：入力エラーで S-0313 に戻る
+
+###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft
+
+**概要**: 評価文とスタッフ用メモの下書きを AI で作る（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**。requirements.md 6-16-19）。S-0313 の［AIで下書き］から JS で呼ぶ。**何も保存しない**。
+
+**処理**:
+- `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果は 404）。権限は評価文の保存と同じ（一般・管理者）
+- 指示文（`system_settings` の `evaluation_prompt_current`。なければ既定の文）の差し込みの印を、愛犬の名前・タイプ・点数・暮らしの様子の 4 問に置き換える（`App\Services\EvaluationDraft\PersonalityEvaluationPrompt`）
+- AI を 1 回呼ぶ（`App\Services\EvaluationDraft\EvaluationDraftGenerator`。今の実装は Claude の `ClaudeEvaluationDraftGenerator`：モデルは `config('services.anthropic.model')`、出す長さの上限 3000 トークン、待ち時間の上限 60 秒、再試行しない）
+- 返事を最初の「#####」で分ける（前を評価文、後ろをスタッフ用メモ。前後の空白・改行は取る。「#####」がなければ全部を評価文にし、`staff_memo_missing` を true）。返事が空なら失敗
+- ログ（laravel.log）に、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由を残す。送った文・返ってきた文・名前は残さない。失敗のときはエラーの内容を残す
+- アクセスログには記録しない
+
+**レスポンス**（JSON）:
+- 成功（200）：`{ "evaluation": "…", "staff_memo": "…", "staff_memo_missing": false }`
+- AI の失敗・時間切れ・返事が空（502）：`{ "message": "AIの下書きを作れませんでした。時間をおいてもう一度お試しください。" }`
+- 別のトレーニーの結果・存在しない結果：404。ログインしていない：ログインの画面へ（JSON の要求なら 401）
 
 ###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish
 

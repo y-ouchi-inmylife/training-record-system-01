@@ -99,7 +99,7 @@ flowchart TD
 **外部サービス**
 
 - **OpenAI API**：音声ファイルの文字起こしに使用（Whisper）
-- **Anthropic API**：文字起こしの要約に使用（Claude）
+- **Anthropic API**：文字起こしの要約に使用（Claude）。愛犬性格診断の評価文とスタッフ用メモの下書き（S-0313 の［AIで下書き］）にも使用（**2026-10-19 追加**。下の「外部の AI に送るデータ」）
 - **メール送信**：さくらのレンタルサーバー SMTP（招待メール等の送信）
 
 **運用**
@@ -201,6 +201,18 @@ flowchart TD
 | リンター（PHP） | Laravel Pint 1.24 | コードスタイルの統一 |
 | REPL | laravel/tinker 2.10.1 | 対話型シェル（Laravel標準同梱） |
 | 並列実行 | concurrently 9.0.1 | 複数プロセスの並列起動（npm script用） |
+
+### 2-5-1. 外部の AI に送るデータ（愛犬性格診断の評価文の下書き。2026-10-19 追加）
+
+2026-10-19 のユーザーレビューで、トレーナーさんの今の仕組み（Google スプレッドシート＋GAS＋Gemini）と同じ作りで始めることにした。AI はまず Claude（今の要約で使っているもの）で試し、Gemini にするかはあとでトレーナーさんと相談して決める（要件定義書 6-16-19）。
+
+- **送るデータ**：愛犬の名前・タイプ・点数（7 つのカテゴリ）・愛犬アンケートの暮らしの様子の 4 問（自由記述）。指示文（`system_settings` の `evaluation_prompt_current`）に差し込んで送る
+- **送らないデータ**：会員様（飼い主様）の名前・住所・電話番号・メールアドレス、犬種・年齢・性別。組み立ては `App\Services\EvaluationDraft\PersonalityEvaluationPrompt::data()` の 1 か所で、ここに入れたものだけが送られる
+- 暮らしの様子の自由記述には、お客様が名前・住所などを書いている恐れがある（伏せ字の処理はしない。トレーナーが下書きを読んで直す）
+- **会社を差し替える作り**：コントローラーはインターフェイス `App\Services\EvaluationDraft\EvaluationDraftGenerator` だけを使う。会社ごとの実装を 1 つずつ持ち（今は Claude の `ClaudeEvaluationDraftGenerator`）、設定 `config('services.evaluation_draft.driver')`（`EVALUATION_DRAFT_DRIVER`。既定 `anthropic`）で `AppServiceProvider` が選ぶ。Gemini にするときは実装を 1 つ足して切り替える
+- 呼び出し：その場で呼ぶ（キューは使わない）。待ち時間の上限 60 秒（SDK 0.6.0 の timeout の指定は HTTP の呼び出しに使われないので、時間切れを付けた Guzzle を transporter として渡す）。再試行しない（SDK の既定は 2 回まで再試行する）。出す長さの上限 3000 トークン
+- ログ：結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけ（送った文・返ってきた文・名前は残さない）。アクセスログには記録しない
+- **未決事項**：本番で使い始める前に、プライバシーポリシーに外部の AI で分析することを書き足す必要がある
 
 ### 2-6. ログと個人情報の扱い
 
