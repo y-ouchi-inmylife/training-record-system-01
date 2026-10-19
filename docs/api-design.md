@@ -2540,7 +2540,7 @@ POST /training-records に以下を追加する。
 **処理**（1 つのトランザクション）:
 1. 結果の行を排他ロックして取り直す（`lockForUpdate`。同時に 2 回押されたときに困らないため）
 2. すでに公開済み（`evaluation_published_at` が NULL でない）なら何もしない（下のレスポンス）。入力のチェックより先に見る
-3. アドバイスを保存する（PUT と同じ。`evaluation_updated_by`・`evaluation_updated_at` も）
+3. アドバイスを保存する（PUT と同じ。`evaluation_updated_by`・`evaluation_updated_at` は、**アドバイスの文が変わったときだけ**変える。**2026-10-19 変更**：2026-10-19 のユーザーレビューで、最終更新は「文を直した日」にそろえるため〔［更新］と同じ〕。その前は公開するたびに入れていた。公開した日時〔`evaluation_published_at`〕は今までどおり公開するたびに入れる）
 4. `evaluation_published_at`＝今、`evaluation_published_by`＝ログイン中のトレーナー を入れる
 - アクセスログに記録する（`publish_trainee_personality_diagnosis_evaluation`。`target_type='Trainee'`、`target_id` はトレーニーの id。**2026-10-18 変更**：その前は `create_training_record`）
 
