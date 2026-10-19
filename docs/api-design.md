@@ -86,6 +86,10 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | （発行の URL を GET で開いたとき） | GET | `/trainees/{trainee}/personality-diagnosis-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（405 にしない。**2026-10-17 追加**。下の「発行の URL を GET で開いたとき」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-tokens` | 愛犬性格診断の案内を取り消す（未回答のトークンを物理削除する。ルート名 `trainee-personality-diagnosis-tokens.destroy`。**2026-10 追加**）。成功後は S-0305 に戻す | auth | 管理者、一般 |
 | トレーニー管理 | S-0312 愛犬性格診断案内画面 | GET | `/trainees/{trainee}/personality-diagnosis-tokens/print` | 愛犬性格診断案内画面を表示する（ルート名 `trainee-personality-diagnosis-tokens.print`。**2026-10 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0305 会員詳細画面 | POST | `/trainees/{trainee}/combined-survey-tokens` | 愛犬アンケート＆愛犬性格診断の案内を発行する（2 つのトークンを作って結び付ける。ルート名 `trainee-combined-survey-tokens.store`。**2026-10-19 追加**） |
+| トレーニー管理 | （発行の URL を GET で開いたとき） | GET | `/trainees/{trainee}/combined-survey-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（**2026-10-19 追加**） |
+| トレーニー管理 | S-0305 会員詳細画面 | DELETE | `/trainees/{trainee}/combined-survey-tokens` | 愛犬アンケート＆愛犬性格診断の案内を取り消す（まだ答えていない分をまとめて物理削除。ルート名 `trainee-combined-survey-tokens.destroy`。**2026-10-19 追加**） |
+| トレーニー管理 | S-0314 愛犬アンケート＆愛犬性格診断案内画面 | GET | `/trainees/{trainee}/combined-survey-tokens/print` | 愛犬アンケート＆愛犬性格診断のご案内を表示する（ルート名 `trainee-combined-survey-tokens.print`。**2026-10-19 追加**） |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | GET | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果 1 件の詳細（タイプ・レーダーチャート・点数・50問の回答・評価文）を表示する（ルート名 `trainee-personality-diagnosis-results.show`。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 評価文を保存する（ルート名 `trainee-personality-diagnosis-results.update`。公開済みでも保存できる〔空にはできない〕。**2026-10-18 変更**：その前は公開済みなら 409。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish` | 評価文を保存して公開する（公開した日時・トレーナーを入れる。トレーニング記録は作らない。ルート名 `trainee-personality-diagnosis-results.publish`。**2026-10-18 追加**。**2026-10-18 変更**：その前は評価文を本文にしたトレーニング記録を作っていた） | auth | 管理者、一般 |
@@ -471,6 +475,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 | `/clients/{client}/email-registration-tokens` | `redirect()->route('clients.show', $client)` |
 | `/trainees/{trainee}/intake-survey-tokens` | `redirect()->route('clients.show', $trainee->client_id)` |
 | `/trainees/{trainee}/personality-diagnosis-tokens` | `redirect()->route('clients.show', $trainee->client_id)` |
+| `/trainees/{trainee}/combined-survey-tokens` | `redirect()->route('clients.show', $trainee->client_id)`（**2026-10-19 追加**） |
 
 **概要**: 発行の URL（POST）が GET で開かれたとき（古いタブ・ブラウザの読み込み直し・履歴など）に、405 のエラー画面を出さず、**発行もせずに**その会員の S-0305 会員詳細画面にリダイレクトする。
 
@@ -2387,6 +2392,57 @@ POST /training-records に以下を追加する。
 - 有効なトークンあり：view（`layouts.print` を使う。S-0311 と同じ構え）
 - 有効なトークンなし（未発行・取消済み・前の案内に回答済みのいずれでも）：同じ view で「有効な愛犬性格診断の案内がありません。」を出す。QR・URL・コピー文面は出さない
 
+
+###### POST /trainees/{trainee}/combined-survey-tokens
+
+**概要**: 愛犬アンケート＆愛犬性格診断の案内を発行する（requirements.md 6-16-17。**2026-10-19 追加**：運用上、2 つを同時に送りたいことがあるため。1 つのリンクで続けて答えてもらう）。愛犬アンケート用 URL のトークン（DS-1000）と愛犬性格診断用 URL のトークン（DS-1100）を 1 件ずつ作り、愛犬アンケートのトークンの `trainee_personality_diagnosis_token_id` で結び付ける。
+
+**リクエスト**: パラメータなし
+
+**処理**:
+- 以下を 1 つのトランザクションで実行する（`App\Services\TraineeCombinedSurveyTokenService`）
+  - 対象トレーニーの行を**排他ロック**する（単独の発行と同じ）
+  - 有効な案内（未回答で期限内のトークン）が、愛犬アンケート・愛犬性格診断のどちらにもないことを確かめる。あれば発行しない（組み合わせも 1 つの案内として数える「1 頭に 1 つまで」）
+  - 愛犬アンケートのトークン → 愛犬性格診断のトークンの順に作り、愛犬アンケートのトークンに愛犬性格診断のトークンの id を入れる（愛犬性格診断の方を後に作るのは、会員詳細の「期限切れ」の行をいちばん新しい案内で決めるため。screen-design.md S-0305）。`expires_at` は 2 つとも同じ値（発行した日から 7 日後の日の終わり）、`created_by` は操作したトレーナー
+- アクセスログに 1 件記録する（`create_trainee_combined_survey_token`。`target_type='Trainee'`、`target_id` はトレーニーの id。単独の 2 つの種類としては記録しない）
+
+**レスポンス**:
+- 成功：`redirect()->route('clients.show', $trainee->client_id)`。フラッシュ `success` に「{表示名}の愛犬アンケート＆愛犬性格診断の案内を発行しました。」
+- 有効な案内がすでにある：発行せずに S-0305 へリダイレクトし、フラッシュ `error` に「{表示名}には、すでに案内中の案内があります。」（単独の発行と同じ）
+
+**単独の発行への影響**：`POST …/intake-survey-tokens`・`POST …/personality-diagnosis-tokens` は今までどおり、両方の種類の有効な案内を確かめるので、組み合わせの回答待ちがあれば発行しない（変更なし）
+
+###### DELETE /trainees/{trainee}/combined-survey-tokens
+
+**概要**: 愛犬アンケート＆愛犬性格診断の案内を取り消す（requirements.md 6-16-17。**2026-10-19 追加**）。まだ答えていない分をまとめて物理削除する。
+
+**処理**:
+- 1 つのトランザクションで、対象トレーニーの有効な（未回答で期限内の）愛犬アンケートのトークンのうち、愛犬性格診断のトークンと結び付いたものを探す。なければ 409
+- 結び付いた愛犬性格診断のトークンが有効なら物理削除し、愛犬アンケートのトークンも物理削除する。**回答済み・期限切れのトークンと、回答・結果には触らない**
+- 愛犬アンケートだけ答えたあと（組み合わせの有効な愛犬アンケートのトークンがない）は 409。残っている愛犬性格診断は `DELETE …/personality-diagnosis-tokens` で取り消す（会員詳細の［取消］もそちらを使う）
+- アクセスログに 1 件記録する（`delete_trainee_combined_survey_token`）
+
+**レスポンス**:
+- 成功：S-0305 へリダイレクトし、フラッシュ `success` に「愛犬アンケート＆愛犬性格診断の案内を取り消しました。」
+- 取り消す案内がない：409
+- 押下時に確認モーダルを挟む（screen-design.md S-0305-M09）
+
+###### GET /trainees/{trainee}/combined-survey-tokens/print
+
+**概要**: 愛犬アンケート＆愛犬性格診断のご案内（S-0314）を表示する（**2026-10-19 追加**）。
+
+**処理**:
+- 2 つとも回答待ち（有効な愛犬アンケートのトークンと、それに結び付いた有効な愛犬性格診断のトークンがある）なら、渡すリンク（愛犬アンケートのトークンの URL `/client-portal/intake-survey/{token}`）・QR コード用データ・LINE・メールで送る文面（`InvitationMessage::combined()`）を出す
+- 表示はアクセスログに記録しない
+
+**レスポンス**:
+- 2 つとも回答待ち：view（S-0311・S-0312 と同じ構え）
+- そうでなければ（未発行・取消済み・回答済み・愛犬アンケートだけ答えたあと）：同じ view で「有効な愛犬アンケート＆愛犬性格診断の案内がありません。」
+
+**会員側の回答のエンドポイントの変更**（**2026-10-19 追加**。screen-design.md S-1413・S-1415）:
+- `GET /client-portal/intake-survey/{token}`：トークンが組み合わせのもので、結び付いた愛犬性格診断のトークンがまだ答えられる（未回答で期限内）なら、画面に進み具合（1/2）を出す。トークンが回答済みでも、結び付いた愛犬性格診断がまだ答えられるなら、`GET /client-portal/personality-diagnosis/{token}` へリダイレクトする（途中でやめた続き）
+- `POST /client-portal/intake-survey/{token}`：成功したとき、結び付いた愛犬性格診断がまだ答えられるなら、完了の画面ではなく `GET /client-portal/personality-diagnosis/{token}` へリダイレクトする（フラッシュで「受け付けました」の一言を出す印を渡す）
+- `GET /client-portal/personality-diagnosis/{token}`：トークンが組み合わせのもの（愛犬アンケートのトークンから結び付けられている）なら、画面に進み具合（2/2）を出す
 ---
 
 ##### S-0313 愛犬性格診断詳細画面

@@ -1264,6 +1264,7 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | token | VARCHAR(64) | NO | — | `Str::random(32)` で生成された 32 文字のランダム英数字（URLに埋め込む）。カラム型 VARCHAR(64) は将来の長さ拡張に備えた余裕。重複不可。既存のトークン（DS-0600〜DS-0900）と同じく平文で持つ |
 | trainee_id | BIGINT UNSIGNED | NO | — | 愛犬アンケートの対象のトレーニーのID（外部キー）。発行時から特定のトレーニーに紐づく |
+| trainee_personality_diagnosis_token_id | BIGINT UNSIGNED | YES | NULL | 続けて答える愛犬性格診断の案内（DS-1100）のID（外部キー。**2026-10-19 追加**。マイグレーション `2026_10_19_000002`）。「愛犬アンケート＆愛犬性格診断」の案内（要件定義書 6-16-17）として発行したときに入る。NULL は単独の愛犬アンケートの案内（追加より前の案内も NULL のまま） |
 | expires_at | TIMESTAMP | YES | NULL | 有効期限（**2026-10-19 追加**。マイグレーション `2026_10_19_000001`）。発行した日から 7 日後の日の終わり（23:59:59）。NULL は期限なし（期限を付ける前に発行した案内。答えるまで使える）。期限が切れた未回答の案内は「回答待ち」に数えない（行は残す）。architecture.md §3-1 |
 | answered_at | TIMESTAMP | YES | NULL | 回答日時。NULL: 未回答（回答待ち） / 値あり: 回答済み（使用済み）。回答の送信を受け付けた時点で設定する。**使用済みかどうかはこのカラムで判定する**（`is_used` は持たない） |
 | created_at | TIMESTAMP | YES | NULL | 発行日時（状態「回答待ち」に添える発行日に使う） |
@@ -1278,6 +1279,7 @@ erDiagram
 | trainee_intake_survey_tokens_token_unique | token | UNIQUE | トークン文字列の重複を防ぐ。URLアクセス時の検索にも使用 |
 | trainee_intake_survey_tokens_trainee_id_idx | trainee_id | INDEX | トレーニーによる検索・逆引き（有効な案内の有無の判定） |
 | trainee_intake_survey_tokens_created_by_idx | created_by | INDEX | 発行者による検索・絞り込み |
+| trainee_intake_survey_tokens_pd_token_id_idx | trainee_personality_diagnosis_token_id | INDEX | 愛犬性格診断の案内からの逆引き（回答の画面の進み具合 2/2 を出すか。**2026-10-19 追加**。名前は自動で付く名前が MySQL の上限 64 文字を超えるため短くした） |
 
 ##### 制約
 
@@ -1285,8 +1287,10 @@ erDiagram
 |--------|------|------|-----------|------|
 | trainee_intake_survey_tokens_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時はトークンも削除する（特定トレーニー専用のトークンのため。削除後にその URL を開くと「ご利用いただけません」の画面になる。要件定義書 6-15-17） |
 | trainee_intake_survey_tokens_created_by_foreign | FOREIGN KEY | created_by → trainers(id) | SET NULL | 発行者トレーナー削除時は NULL にする |
+| trainee_intake_survey_tokens_pd_token_id_foreign | FOREIGN KEY | trainee_personality_diagnosis_token_id → trainee_personality_diagnosis_tokens(id) | SET NULL | 結び付いた愛犬性格診断の案内が消えたら（取消・トレーニーの削除）NULL にする（**2026-10-19 追加**） |
 
 **備考**:
+- **愛犬アンケート＆愛犬性格診断の案内**（**2026-10-19 追加**。要件定義書 6-16-17）：2026-10-19 のユーザーレビューで、運用上 2 つを同時に送りたいことがあるため、今の 2 つの案内（DS-1000・DS-1100）をそのまま使い、発行のときに両方を同時に作って `trainee_personality_diagnosis_token_id` で結び付ける。期限は 2 つとも同じ。お客様に渡すリンクは愛犬アンケートの案内のリンク 1 つ（愛犬性格診断の案内も自分のリンクを持ち、マイページのお知らせから続きを開ける）。「同じトレーニーに有効な案内は 1 つまで」は、組み合わせを 1 つの案内として数える（どちらかの種類の有効な案内があれば発行しない）。取消は、まだ答えていない分をまとめて物理削除する
 - **有効期限（`expires_at`）は持たない**（要件定義書 6-15-17 備考）。愛犬アンケートの URL は回答を受け付けるだけで、画面に個人情報を出さず、送信すれば使い切りになるため、マイページ登録案内（DS-0700）の URL と危険の大きさが違う。放置された案内はトレーナーが取り消す。したがって `architecture.md` §3-1 の有効期限の設定値も持たない
 - **`is_used` は持たない**：使用済みかどうかは `answered_at` の有無で判定する（使用済みになった日時を状態の表示にも使うため、真偽値と日時を二重に持たない）
 - **`token` 以外の一意制約は付けない**。**同じトレーニーに有効な（`answered_at` が NULL で期限内の。2026-10-19 変更：期限が切れた未回答の案内は数えない）案内は1つまで**という制約は、MySQL では条件付きのユニーク制約（部分インデックス）を書けないため、アプリ側で担保する：発行時に、トランザクション内で**対象のトレーニーの行を排他ロック**（`SELECT ... FOR UPDATE`）してから、有効な案内も回答（D-1100）もないことを確かめて発行する（同じトレーニーへの同時の発行で、有効な案内が2つできないようにするため。回答済みのトレーニーには発行できない〔第1段階〕）
@@ -1409,6 +1413,8 @@ erDiagram
 | create_trainee_intake_survey_token | 愛犬アンケート案内の発行 |
 | delete_trainee_intake_survey_token | 愛犬アンケート案内の取消 |
 | create_trainee_personality_diagnosis_token | 愛犬性格診断の案内の発行（**2026-10 追加**） |
+| create_trainee_combined_survey_token | 愛犬アンケート＆愛犬性格診断の案内の発行（**2026-10-19 追加**。2 つの案内を作るが、操作は 1 つなので 1 件） |
+| delete_trainee_combined_survey_token | 愛犬アンケート＆愛犬性格診断の案内の取消（**2026-10-19 追加**） |
 | delete_trainee_personality_diagnosis_token | 愛犬性格診断の案内の取消（**2026-10 追加**） |
 | delete_trainee_personality_diagnosis_result | 愛犬性格診断の結果の削除（**2026-10 追加**） |
 | edit_trainee_personality_diagnosis_evaluation | 愛犬性格診断の評価文の更新（**2026-10-18 追加**。要件定義書 6-16-15）。操作履歴の表示名は「愛犬性格診断評価文編集」（ほかの `edit_*` の「〜編集」にそろえる。**2026-10-18 変更**：その前は「愛犬性格診断評価文保存」。キーは変えない） |
