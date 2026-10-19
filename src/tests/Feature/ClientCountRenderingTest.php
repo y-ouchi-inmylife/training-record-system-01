@@ -1401,27 +1401,34 @@ class ClientCountRenderingTest extends TestCase
 
     public function test_回答待ちの案内があっても出すのは結果の日付(): void
     {
-        $this->fakeMediaDisk();
-        $client = $this->makeClient('0001', '山田');
-        // 結果あり＋回答待ち：結果の日付（案内の発行日は出さない）
-        $withResult = $this->trainee($client, 'ポチ');
-        $this->personalityResult($withResult, '2026-06-01 09:00:00');
-        DB::table('trainee_personality_diagnosis_tokens')->insert([
-            'token' => bin2hex(random_bytes(16)), 'trainee_id' => $withResult, 'answered_at' => null,
-            'created_at' => '2026-10-20 09:00:00', 'updated_at' => '2026-10-20 09:00:00',
-        ]);
-        // 結果なし＋回答待ち：診断なし
-        $noResult = $this->trainee($client, 'たま');
-        $this->personalityToken($noResult);
+        // 「今日」を案内の発行日（2026-10-20）より後に固定する（2026-10-20 変更：固定していなかったため、今日が 2026-10-20 の日に、
+        // 会員詳細の下の「最終更新: {今日}」〔テストで作った会員の更新日時〕が「案内の発行日は出さない」の確かめに当たって落ちていた）
+        Carbon::setTestNow(Carbon::parse('2026-10-22 09:00:00', config('app.timezone')));
+        try {
+            $this->fakeMediaDisk();
+            $client = $this->makeClient('0001', '山田');
+            // 結果あり＋回答待ち：結果の日付（案内の発行日は出さない）
+            $withResult = $this->trainee($client, 'ポチ');
+            $this->personalityResult($withResult, '2026-06-01 09:00:00');
+            DB::table('trainee_personality_diagnosis_tokens')->insert([
+                'token' => bin2hex(random_bytes(16)), 'trainee_id' => $withResult, 'answered_at' => null,
+                'created_at' => '2026-10-20 09:00:00', 'updated_at' => '2026-10-20 09:00:00',
+            ]);
+            // 結果なし＋回答待ち：診断なし
+            $noResult = $this->trainee($client, 'たま');
+            $this->personalityToken($noResult);
 
-        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $row = $this->personalityLatest($html, $withResult);
-        $this->assertStringContainsString('<span data-personality-diagnosis-latest>2026/06/01</span>', $row);
-        $this->assertStringNotContainsString('2026/10/20', $html);
-        $this->assertStringContainsString('<span class="text-muted" data-personality-diagnosis-latest>診断なし</span>', $this->personalityLatest($html, $noResult));
-        // どちらも回答待ち：「案内中」の行（2026-10-19 変更：その前は行の［案内を表示］）
-        $this->assertSame(2, substr_count($html, 'data-survey-in-progress-item'));
+            $row = $this->personalityLatest($html, $withResult);
+            $this->assertStringContainsString('<span data-personality-diagnosis-latest>2026/06/01</span>', $row);
+            $this->assertStringNotContainsString('2026/10/20', $html);
+            $this->assertStringContainsString('<span class="text-muted" data-personality-diagnosis-latest>診断なし</span>', $this->personalityLatest($html, $noResult));
+            // どちらも回答待ち：「案内中」の行（2026-10-19 変更：その前は行の［案内を表示］）
+            $this->assertSame(2, substr_count($html, 'data-survey-in-progress-item'));
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_日付は属性の値の列にそろえリンクと同じ行に置く(): void
