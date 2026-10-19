@@ -1467,12 +1467,29 @@ input[type="tel"] {
         margin-top: 0.5rem;
     }
 }
+.c-invite-list span {
+    // 最後の行に 1〜2 文字だけ残るのを防ぐ（2026-10-19 追加。対応していないブラウザではふつうの折り返し）
+    text-wrap: pretty;
+}
 .c-invite-list-icon {
     flex-shrink: 0;
     width: 1.125rem;
     height: 1.125rem;
     margin-top: 0.1875rem;
     color: $brand-bright;
+}
+
+// 最後の行に 1〜2 文字だけ残るのを防ぐ（2026-10-19 追加。完了の画面のお誘いのリードなど）
+.c-text-pretty {
+    text-wrap: pretty;
+}
+
+// 1 文ずつのまとまり（2026-10-19 追加。愛犬アンケートの回答の画面 S-1413 の説明）。文の区切りで折り返す：幅が足りれば文が 1 行に
+// 並び、足りなければ次の文が次の行に回る。1 文だけで 1 行に入らないときは文の中で折り返し、最後の行が 1〜2 文字にならないようにする。
+// word-break: auto-phrase は iPhone の Safari で効かないので使わない
+.c-sentence {
+    display: inline-block;
+    text-wrap: pretty;
 }
 
 // 愛犬アンケート＆愛犬性格診断の案内の進み具合（2026-10-19 追加。回答の画面 S-1413・S-1415 の見出しの上。client/_survey-progress）。

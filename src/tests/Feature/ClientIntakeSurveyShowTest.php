@@ -75,7 +75,7 @@ class ClientIntakeSurveyShowTest extends TestCase
 
         $html = $this->actingAs($trainee->client, 'client')->get($this->showPath())->assertOk()->getContent();
 
-        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringContainsString('<p class="mb-4"><span class="c-sentence">愛犬のことを教えてください。</span><span class="c-sentence">愛犬に合ったご提案の参考にさせていただきます。</span></p>', $html);
         $this->assertStringNotContainsString('トレーニングの参考に', $html);
     }
 
@@ -117,7 +117,8 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringContainsString('<h1 class="mb-2">愛犬アンケート</h1>', $html);
         // 説明文に愛犬の名前は使わない（2026-10 変更。設計書 S-1413）。契約前のお客様にもそぐう文（2026-10-19 変更：
         // その前は「愛犬のことを教えてください。トレーニングの参考にさせていただきます。」）
-        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        // 1 文ずつのまとまり（別の要素）で、この順に出し、文の区切りで折り返す（2026-10-19 変更：その前は 1 つの文字列）
+        $this->assertStringContainsString('<p class="mb-4"><span class="c-sentence">愛犬のことを教えてください。</span><span class="c-sentence">愛犬に合ったご提案の参考にさせていただきます。</span></p>', $html);
         $this->assertStringNotContainsString('トレーニングの参考に', $html);
         $this->assertStringNotContainsString('モモちゃん', $html);
         // 名前は表示だけの行ではなく、常に必須の入力欄（2026-10 変更）。初期値はトレーニーの名前

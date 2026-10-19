@@ -254,11 +254,14 @@ class SurveyMypageRegistrationTest extends TestCase
     {
         $this->assertStringContainsString('data-mypage-registration-invite', $html);
         // リードの文と、マイページでできることの 3 つの項目をこの順に（2026-10-19 変更：その前は「…トレーニングの記録や愛犬の診断結果を…」の 1 文）
-        $this->assertStringContainsString('<p class="mb-2">マイページにご登録いただくと、次のことができます。</p>', $html);
+        // 「パソコンやスマートフォンで」は項目 1 からリードに移した（2026-10-19 変更）。リードと各項目は text-wrap: pretty
+        $this->assertStringContainsString('<p class="mb-2 c-text-pretty">マイページにご登録いただくと、パソコンやスマートフォンで次のことができます。</p>', $html);
+        $this->assertStringNotContainsString('マイページにご登録いただくと、次のことができます。', $html);
+        $this->assertStringNotContainsString('パソコンやスマートフォンでいつでも', $html);
         $this->assertSame(1, preg_match('/data-mypage-registration-invite-items>(.*?)<\/ul>/su', $html, $m));
         preg_match_all('/<li><svg class="c-invite-list-icon"[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span>([^<]*)<\/span><\/li>/su', $m[1], $items);
         $this->assertSame([
-            '愛犬性格診断の結果を、パソコンやスマートフォンでいつでもご覧いただけます',
+            '愛犬性格診断の結果を、いつでもご覧いただけます',
             '愛犬の写真を登録できます',
             '愛犬のプロフィールをご覧いただけます',
         ], $items[1]);

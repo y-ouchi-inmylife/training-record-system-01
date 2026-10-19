@@ -110,7 +110,7 @@ class ClientCombinedSurveyTest extends TestCase
         $html = $this->get($this->intakeUrl())->assertOk()->getContent();
         $this->assertStringContainsString('<p class="c-survey-progress" data-survey-progress="1/2">', $html);
         // 説明文は単独のリンクと同じ（2026-10-19 変更：契約前のお客様にもそぐう文）
-        $this->assertStringContainsString('<p class="mb-4">愛犬のことを教えてください。愛犬に合ったご提案の参考にさせていただきます。</p>', $html);
+        $this->assertStringContainsString('<p class="mb-4"><span class="c-sentence">愛犬のことを教えてください。</span><span class="c-sentence">愛犬に合ったご提案の参考にさせていただきます。</span></p>', $html);
         $this->assertStringNotContainsString('トレーニングの参考に', $html);
         $this->assertStringContainsString('<span class="c-survey-progress-count" aria-hidden="true">1/2</span>', $html);
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち1つ目：</span>', $html);

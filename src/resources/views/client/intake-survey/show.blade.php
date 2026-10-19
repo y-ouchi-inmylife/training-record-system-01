@@ -36,8 +36,10 @@
         @include('client._survey-progress', ['step' => 1])
     @endif
     <h1 class="mb-2">{{ __('messages.intake_survey_name') }}</h1>
-    {{-- 説明文は lang/ja/messages.php の client_intake_survey.description（2026-10-19 変更：契約前のお客様も答えるため、完了の画面の文とそろえた） --}}
-    <p class="mb-4">{{ __('messages.client_intake_survey.description') }}</p>
+    {{-- 説明文は lang/ja/messages.php の client_intake_survey.description_sentences（2026-10-19 変更：契約前のお客様も答えるため、完了の画面の文とそろえた）。
+         1 文ずつのまとまり（.c-sentence。inline-block）で出し、文の区切りで折り返す（2026-10-19 変更：375px で「ご提案」の途中で折れていたため。
+         パソコンの幅では 2 文が 1 行に並ぶ）。まとまりの間に空白を入れない（日本語の文の間に空きができないように） --}}
+    <p class="mb-4">@foreach(__('messages.client_intake_survey.description_sentences') as $sentence)<span class="c-sentence">{{ $sentence }}</span>@endforeach</p>
 
     <div class="card c-login-card">
         <div class="card-body p-4">
