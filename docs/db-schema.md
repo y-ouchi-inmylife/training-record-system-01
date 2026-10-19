@@ -213,6 +213,10 @@ erDiagram
         timestamp answered_at
         string question_version
         string personality_type
+        text wish
+        text recent_events
+        text ideal_days
+        text health_concerns
         text evaluation_text
         bigint evaluation_updated_by FK
         timestamp evaluation_published_at
@@ -818,12 +822,10 @@ erDiagram
 | birth_month | TINYINT UNSIGNED | YES | NULL | 誕生日の月（1〜12）。入れる場合は `birth_year` が必須 |
 | birth_day | TINYINT UNSIGNED | YES | NULL | 誕生日の日（1〜31）。入れる場合は `birth_year`・`birth_month` が必須 |
 | neuter_status | VARCHAR(20) | YES | NULL | 去勢・避妊。値は 5-21. と同じ（`neutered` / `not_neutered` / `unknown`）。**2026-10 変更**：当初は 5-22. の値（「分からない」を `dont_know` で持ち、トレーニーの「不明」とは別の値）にしていた |
-| wish | TEXT | YES | NULL | 自由記述「こうなったらいいな」の回答（設問文は要件定義書 D-1100） |
-| recent_events | TEXT | YES | NULL | 自由記述「最近の様子」の回答 |
-| ideal_days | TEXT | YES | NULL | 自由記述「理想の毎日」の回答 |
-| health_concerns | TEXT | YES | NULL | 自由記述「体のこと」の回答 |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
+
+**2026-10-19 変更（暮らしの様子の 4 列を外した）**：自由記述 4 欄（`wish`「こうなったらいいな」・`recent_events`「最近の様子」・`ideal_days`「理想の毎日」・`health_concerns`「体のこと」。どれも TEXT・NULL 可）を、D-1200（愛犬性格診断の結果）へ移した。2026-10-19 のユーザーレビューで、トレーナーさんの元の仕組み（Google フォーム）では 4 問は性格診断の一部で、診断のたびに答えてもらっていたことが分かったため（診断した時点の暮らしの様子を残し、AI の下書きの材料を診断ごとにそろえる）。列はマイグレーション `2026_10_19_000007_drop_life_answers_from_trainee_intake_survey_responses_table` で外す（D-1200 に列を足す `2026_10_19_000006` のあと）。**今あった答えは移さずに消す**（ユーザーの判断）。`down()` は 4 列を足し直す（入っていた値は戻らない）。その前（2026-10 〜 2026-10-19）は、本テーブルに 4 列を持ち、愛犬アンケートで聞いていた
 
 ##### インデックス
 
@@ -886,6 +888,10 @@ erDiagram
 | evaluation_published_at | TIMESTAMP | YES | NULL | 評価文を公開した日時（**2026-10-18 追加**。要件定義書 6-16-16）。NULL でなければ公開済み。会員様の記録の一覧・会員詳細のトレーニング記録の欄では、この日時を評価文の日付・時刻として並べる。公開を取り消すと NULL に戻す。もう一度公開すると、そのときの日時になる |
 | evaluation_published_by | BIGINT UNSIGNED | YES | NULL | 評価文を公開したトレーナーのID（外部キー。**2026-10-18 追加**）。会員様の画面では「担当」として出す。公開を取り消すと NULL に戻す |
 | personality_type | VARCHAR(30) | YES | NULL | タイプ（5-24. の値）。**丸める前の**平均から判定する（要件定義書 6-16「愛犬性格診断の採点とタイプの判定」）。点数なし（NULL）のカテゴリは判定から外し、全カテゴリが点数なしなら **NULL**＝判定なし（**2026-10-18 変更**：その前は NOT NULL で、全問「未経験」は calm）。表示名はコードに持つ |
+| wish | TEXT | YES | NULL | 暮らしの様子「こうなったらいいな」の答え（**2026-10-19 追加**。マイグレーション `2026_10_19_000006`。設問文は要件定義書 D-1200「暮らしの様子の 4 問」）。回答の画面（S-1415）で 50 問のあとに答える。任意・2,000 文字以内（改行は LF にそろえる）。空・空白だけで送られたときは NULL |
+| recent_events | TEXT | YES | NULL | 暮らしの様子「最近の様子」の答え（**2026-10-19 追加**。同上） |
+| ideal_days | TEXT | YES | NULL | 暮らしの様子「理想の毎日」の答え（**2026-10-19 追加**。同上） |
+| health_concerns | TEXT | YES | NULL | 暮らしの様子「体のこと」の答え（**2026-10-19 追加**。同上） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
 
@@ -1610,6 +1616,15 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（愛犬アンケート�
 
 - 本番には 1.〜4. をまとめて出す（2026-10-18 の時点で、本番には 1.・2. もまだ出していない）。2. で列を足して 4. で外すことになるが、今あるマイグレーションは書き換えない決まりのため、このまま 4 本を順に流す
 - 4. の前に、公開で作ったトレーニング記録（`trainee_personality_diagnosis_result_id` が NULL でない行）があれば、扱いを決めておく（開発の DB には 1 件ある。本番にはない）
+
+**列の追加・削除（2026-10-19。要件定義書 6-16-13・6-16-19）**：今あるマイグレーションは書き換えず、新しいマイグレーションで次の順に行う
+
+1. `2026_10_19_000005_add_staff_memo_to_trainee_personality_diagnosis_results_table`：D-1200 に `staff_memo`
+2. `2026_10_19_000006_add_life_answers_to_trainee_personality_diagnosis_results_table`：D-1200 に暮らしの様子の 4 列（`wish`・`recent_events`・`ideal_days`・`health_concerns`。どれも TEXT・NULL 可）。`down()` は 4 列を外す
+3. `2026_10_19_000007_drop_life_answers_from_trainee_intake_survey_responses_table`：D-1100 から同じ 4 列を外す（今あった答えは移さずに消す）。`down()` は 4 列を足し直す（値は戻らない）
+
+- 2. と 3. は別のファイルにし、この順（足す → 外す）で流す
+- 3. の前に、D-1100 で 4 列のどれかに文字が入っている回答の件数を数えておく（消えるため。2026-10-19 の時点で、開発の DB は 10 件中 1 件）
 
 ---
 

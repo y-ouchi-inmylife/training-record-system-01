@@ -2049,10 +2049,8 @@ POST /training-records に以下を追加する。
 | birth_month | string | | nullable（同上） | 誕生日（月）。1〜12。入れる場合は年が必須 |
 | birth_day | string | | nullable（同上） | 誕生日（日）。入れる場合は年・月が必須 |
 | neuter_status | string | | nullable, in:neutered,not_neutered,unknown | 去勢・避妊（している／していない／不明。**2026-10 変更**：当初は `dont_know`〔分からない〕） |
-| wish | string | | nullable, string, max:2000 | 自由記述「こうなったらいいな」 |
-| recent_events | string | | nullable, string, max:2000 | 自由記述「最近の様子」 |
-| ideal_days | string | | nullable, string, max:2000 | 自由記述「理想の毎日」 |
-| health_concerns | string | | nullable, string, max:2000 | 自由記述「体のこと」 |
+
+- **2026-10-19 変更**：暮らしの様子の自由記述 4 欄（`wish`・`recent_events`・`ideal_days`・`health_concerns`。どれも nullable, string, max:2000）を、愛犬性格診断の回答（`POST /client-portal/personality-diagnosis/{token}`）へ移した。愛犬アンケートは基本情報だけを受け取る（4 欄が送られてきても検証も保存もしない）。理由は requirements.md 6-15-18 備考（トレーナーさんの元の仕組みでは 4 問は性格診断の一部）
 
 - 選択肢と値はトレーナー側（トレーニー登録・更新）にそろえる（requirements.md 6-15-17 備考。**2026-10 変更**）
 - 誕生日の 3 項目の検証（形式・範囲・組み合わせ・実在する日付・未来でない・30 年前まで）は、トレーナー側のトレーニー登録・更新と同じルール・同じ順で行う（下の 4-1-16 参照）。エラーは 1 つのキーにまとめて返す（キー名は実装で決める。screen-design.md §2-7 の但し書き）
@@ -2121,7 +2119,7 @@ POST /training-records に以下を追加する。
 - **開いただけでは使用済みにしない**
 
 **レスポンス**:
-- 有効：view（回答フォーム。50 問・全問とも初期値なし。入力エラーや時間切れで戻ったときは `old()` で選んだ選択肢を選んだ状態にする）
+- 有効：view（回答フォーム。50 問・全問とも初期値なし。50 問のあとに暮らしの様子の 4 問〔**2026-10-19 追加**〕。4 問も初期値は空で、答え直しでも前回の答えは入れない〔50 問と同じ〕。入力エラーや時間切れで戻ったときは `old()` で選んだ選択肢・入れた文を戻す）
 - 回答済み：愛犬性格診断用の使えない URL の画面に「この愛犬性格診断はすでにご回答いただいています。」
 - 使えない：同じ画面に「この愛犬性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。」
 
@@ -2135,6 +2133,12 @@ POST /training-records に以下を追加する。
 |-----------|-----|------|---------------|------|
 | answers | array | ● | required, array | 50 問の回答。キーは `Q01`〜`Q50` |
 | answers.Q01〜answers.Q50 | string | ● | required, in:0,1,2,3,4,na | 各問の回答（`na` は「未経験」。db-schema.md 5-25.） |
+| wish | string | | nullable, string, max:2000 | 暮らしの様子「こうなったらいいな」（**2026-10-19 追加**。愛犬アンケートから移した） |
+| recent_events | string | | nullable, string, max:2000 | 暮らしの様子「最近の様子」（同上） |
+| ideal_days | string | | nullable, string, max:2000 | 暮らしの様子「理想の毎日」（同上） |
+| health_concerns | string | | nullable, string, max:2000 | 暮らしの様子「体のこと」（同上） |
+
+- 暮らしの様子の 4 問は、検証の前に改行を LF にそろえる（CRLF → LF、残った CR → LF。ブラウザの maxlength は改行を 1 文字と数えるが、送信では CRLF の 2 文字になるため。愛犬アンケートにあったときと同じ）。項目名は設問の短い呼び名（lang/ja/validation.php）
 
 - 50 問より多いキー（`Q51` など、設問にないキー）は使わない（保存しない）
 - 答えていない問があれば、エラーをまとめて返す。上部の案内には未回答の問の数と、最初の未回答の問へのリンクを出す（screen-design.md S-1415「バリデーションチェック」）
@@ -2145,7 +2149,7 @@ POST /training-records に以下を追加する。
   2. `answered_at` が空であることを確かめる。入っていれば「回答済み」画面
   3. 対象のトレーニーが存在することを確かめる。存在しなければ「使えない」画面（トレーニーは書き換えないので、ロックは要らない）
   4. 回答を採点する（requirements.md 6-16「愛犬性格診断の採点とタイプの判定」）：カテゴリごとに「未経験」を除いた平均を出し、**丸める前の値**でタイプを判定してから、平均を小数第2位に丸める
-  5. 結果（`trainee_personality_diagnosis_results`）を 1 件保存する。`answered_at` は現在日時、`question_version` は `v1`、`answers` は送られてきたとおり（`Q01`〜`Q50` の 50 件）
+  5. 結果（`trainee_personality_diagnosis_results`）を 1 件保存する。`answered_at` は現在日時、`question_version` は `v1`、`answers` は送られてきたとおり（`Q01`〜`Q50` の 50 件）。暮らしの様子の 4 問は同じ行の `wish`・`recent_events`・`ideal_days`・`health_concerns` に保存する（空・空白だけは NULL。**2026-10-19 追加**）
   6. トークンの `answered_at` に回答日時を記録する（使い切り）
 - **アクセスログには記録しない**（§2-3）
 - メールは送らない
@@ -2154,7 +2158,7 @@ POST /training-records に以下を追加する。
 **時間切れ（419）の扱い**（**愛犬アンケートと違う**。requirements.md 6-15-18 備考）:
 - この POST がセッション切れ（419。CSRF トークンの不一致）になったときは、`bootstrap/app.php` の例外の扱い（愛犬アンケートの 419 と同じ場所）で、**送られてきた回答を入れたまま S-1415 を出し直す**（ステータスは 419 のままにせず 200 で返す。上部に「時間がたったため送信できませんでした。答えはそのまま残っています。もう一度［送信する］を押してください。」を出す）
   - 出し直すときも GET と同じ順でトークンを確かめる。回答済み・使えないときは、それぞれの画面を出す
-  - 送られてきた回答は検証せずに選んだ状態にだけ使う（保存しない）。設問にない値・キーは無視する
+  - 送られてきた回答は検証せずに選んだ状態にだけ使う（保存しない）。設問にない値・キーは無視する。暮らしの様子の 4 問は、文字列なら上限（2,000 文字）までを入れて戻す（**2026-10-19 追加**）
   - 出し直した画面には新しい CSRF トークンが入るので、お客様はそのまま送り直せる
 - 愛犬アンケートの 419（`client-portal/intake-survey/*`。専用の画面を出し、一から入れ直す）は今のまま変えない
 
@@ -2220,7 +2224,7 @@ POST /training-records に以下を追加する。
 | neuter_status | string | | nullable, in:neutered,not_neutered,unknown | 去勢・避妊（している／していない／不明） |
 
 - **愛犬アンケート（`POST /client-portal/intake-survey/{token}`）の基本情報の 7 項目と同じ規則・同じ文言**（規則は 1 か所にまとめて両方で使う。誕生日の検証とエラーのキー `birth_date` も同じ）
-- 自由記述（暮らしの様子）・写真は受け取らない（送られてきても無視する）
+- 愛犬アンケートの回答・写真は変えない（暮らしの様子の 4 欄などが送られてきても無視する。**2026-10-19**：暮らしの様子は愛犬性格診断へ移した）
 
 **処理**:
 - 7 項目でトレーニーを更新する（空にした項目は NULL にする。愛犬アンケートの「空なら変えない」とは違う）
@@ -2559,7 +2563,7 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果は 404）。権限は評価文の保存と同じ（一般・管理者）
-- 指示文（`system_settings` の `evaluation_prompt_current`。なければ既定の文）の差し込みの印を、愛犬の名前・タイプ・点数・暮らしの様子の 4 問に置き換える（`App\Services\EvaluationDraft\PersonalityEvaluationPrompt`）
+- 指示文（`system_settings` の `evaluation_prompt_current`。なければ既定の文）の差し込みの印を、愛犬の名前・タイプ・点数・暮らしの様子の 4 問に置き換える（`App\Services\EvaluationDraft\PersonalityEvaluationPrompt`）。暮らしの様子は**その診断の結果に保存した 4 問**（`trainee_personality_diagnosis_results` の `wish` など。**2026-10-19 変更**：その前は、愛犬アンケートの回答のうち診断の日以前でいちばん新しいもの〔なければいちばん新しいもの〕を探して使っていた）
 - AI を 1 回呼ぶ（`App\Services\EvaluationDraft\EvaluationDraftGenerator`。今の実装は Claude の `ClaudeEvaluationDraftGenerator`：モデルは `config('services.anthropic.model')`、出す長さの上限 3000 トークン、待ち時間の上限 60 秒、再試行しない）
 - 返事を最初の「#####」で分ける（前を評価文、後ろをスタッフ用メモ。前後の空白・改行は取る。「#####」がなければ全部を評価文にし、`staff_memo_missing` を true）。返事が空なら失敗
 - ログ（laravel.log）に、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由を残す。送った文・返ってきた文・名前は残さない。失敗のときはエラーの内容を残す
