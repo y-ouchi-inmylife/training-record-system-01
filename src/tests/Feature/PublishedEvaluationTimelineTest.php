@@ -291,6 +291,8 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertStringContainsString('<h6 class="mb-0" data-client-records-heading>これまでの記録（0件）</h6>', $html);
         $this->assertSame(['e'.$e->id], $this->clientShowOrder($html));
         $this->assertStringNotContainsString('トレーニング記録はありません', $html);
+        // 記録がないときの文（2026-10-19 変更：「記録はありません」）も、評価文があれば出さない
+        $this->assertStringNotContainsString('記録はありません', $html);
     }
 
     public function test_会員詳細の評価文の札は名前がなければ名前未登録(): void

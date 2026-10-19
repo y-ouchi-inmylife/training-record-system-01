@@ -430,7 +430,8 @@
                     </div>
                 @else
                     <div class="card-body">
-                        <p class="text-muted mb-0">トレーニング記録はありません</p>
+                        {{-- 2026-10-19 変更：欄の見出しが「これまでの記録」なので「トレーニング」は付けない（その前は「トレーニング記録はありません」） --}}
+                        <p class="text-muted mb-0">記録はありません</p>
                     </div>
                 @endif
             </div>
@@ -543,7 +544,8 @@
             </div>
             <div class="card mb-3">
                 <div class="card-header">
-                    <h6 class="mb-0">トレーニー（{{ $client->trainees->count() }}件）</h6>
+                    {{-- 件数は出さない（2026-10-19 変更：見れば分かるため。その前は「トレーニー（N件）」） --}}
+                    <h6 class="mb-0">トレーニー</h6>
                 </div>
                 @if($client->trainees->count() > 0)
                     <div class="list-group list-group-flush">

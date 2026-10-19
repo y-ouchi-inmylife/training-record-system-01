@@ -782,7 +782,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertLessThan(
-            strpos($html, '<h6 class="mb-0">トレーニー（'),
+            strpos($html, '<h6 class="mb-0">トレーニー</h6>'),
             strpos($html, '<h6 class="mb-0">ご利用回数')
         );
     }
@@ -2632,5 +2632,36 @@ class ClientCountRenderingTest extends TestCase
         // ほかの所の愛犬アンケートの名前（案内中の行・取消の確認）には付かない
         $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', (string) $this->inProgressRow($html, 'ポチ'));
         $this->assertStringContainsString('発行済みの愛犬アンケートの案内が使えなくなります。', $html);
+    }
+
+    // ---- 記録がないときの文とトレーニーの見出し（2026-10-19 変更。設計書 S-0305） ----
+
+    public function test_記録がない会員は記録はありませんを出しトレーニング記録はありませんは出さない(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<p class="text-muted mb-0">記録はありません</p>', $html);
+        $this->assertStringNotContainsString('トレーニング記録はありません', $html);
+        // 「これまでの記録（N件）」の件数は今のまま
+        $this->assertStringContainsString('<h6 class="mb-0" data-client-records-heading>これまでの記録（0件）</h6>', $html);
+    }
+
+    public function test_トレーニーの見出しは件数を出さない0頭1頭複数とも(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        foreach ([0, 1, 3] as $count) {
+            while (DB::table('trainees')->where('client_id', $client->id)->count() < $count) {
+                $this->trainee($client, 'ポチ'.DB::table('trainees')->count());
+            }
+
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+            $this->assertSame(1, substr_count($html, '<h6 class="mb-0">トレーニー</h6>'), $count.'頭');
+            $this->assertDoesNotMatchRegularExpression('/トレーニー（\d+件）/u', $html, $count.'頭');
+        }
     }
 }
