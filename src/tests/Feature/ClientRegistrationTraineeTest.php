@@ -210,12 +210,12 @@ class ClientRegistrationTraineeTest extends TestCase
         $this->assertTrue($trainee->client->hasNonBlankTrainees());
     }
 
-    public function test_評価文だけの結果も空でない(): void
+    public function test_アドバイスだけの結果も空でない(): void
     {
         $trainee = $this->blankTrainee();
         DB::table('trainee_personality_diagnosis_results')->insert([
             'trainee_id' => $trainee->id, 'answered_at' => '2026-10-01 10:00:00', 'question_version' => 'v1', 'answers' => '{}',
-            'evaluation_text' => '評価文',
+            'evaluation_text' => 'アドバイス',
         ]);
 
         $this->assertFalse($trainee->isBlank());

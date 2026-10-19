@@ -183,12 +183,12 @@ trait CreatesClientCountTables
             $table->text('recent_events')->nullable();
             $table->text('ideal_days')->nullable();
             $table->text('health_concerns')->nullable();
-            // 評価文と、最後に評価文を保存したトレーナー・日時（2026-10-18 追加。2026_10_18_000003_add_evaluation_to_…）
+            // アドバイスと、最後にアドバイスを保存したトレーナー・日時（2026-10-18 追加。2026_10_18_000003_add_evaluation_to_…）
             $table->text('evaluation_text')->nullable();
             $table->text('staff_memo')->nullable(); // スタッフ用メモ（2026-10-19 追加。2026_10_19_000005）
             $table->unsignedBigInteger('evaluation_updated_by')->nullable();
             $table->timestamp('evaluation_updated_at')->nullable();
-            // 評価文を公開した日時とトレーナー（2026-10-18 追加。2026_10_18_000005_add_evaluation_published_to_…）
+            // アドバイスを公開した日時とトレーナー（2026-10-18 追加。2026_10_18_000005_add_evaluation_published_to_…）
             $table->timestamp('evaluation_published_at')->nullable();
             $table->unsignedBigInteger('evaluation_published_by')->nullable();
             $table->timestamps();
@@ -196,7 +196,7 @@ trait CreatesClientCountTables
     }
 
     /**
-     * 愛犬性格診断のテストで使うトレーニング記録（D-0200。2026-10-18 追加）。評価文の公開でトレーニング記録が増えないこと、
+     * 愛犬性格診断のテストで使うトレーニング記録（D-0200。2026-10-18 追加）。アドバイスの公開でトレーニング記録が増えないこと、
      * 記録の詳細・一覧に愛犬性格診断の欄や印が出ないことを確かめるため。本番の列のうち、ここで使わないもの（メディアなど）は持たない。
      * 2026-10-18 変更：結び付けた結果の列（trainee_personality_diagnosis_result_id）は 2026_10_18_000006 で外したので持たない
      */

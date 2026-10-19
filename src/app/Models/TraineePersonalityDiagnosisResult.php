@@ -19,34 +19,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * - score_*：7 カテゴリの平均（小数第2位に丸めた値）。列名の * はカテゴリの値（db-schema.md 5-23.）。
  *   全問「未経験」のカテゴリは null（点数なし。2026-10-18 変更）
  * - personality_type：タイプ（5-24.）。丸める前の平均から判定した値。全カテゴリが点数なしなら null（判定なし。2026-10-18 変更）
- * - evaluation_text：評価文（会員様向けの文章。2026-10-18 追加。要件定義書 6-16-15）。トレーナーが愛犬性格診断詳細（S-0313）で書く。
- *   evaluation_updated_by・evaluation_updated_at は最後に評価文を保存したトレーナーと日時（結果そのものの更新者ではないので
+ * - evaluation_text：アドバイス（会員様向けの文章。2026-10-18 追加。要件定義書 6-16-15）。トレーナーが愛犬性格診断詳細（S-0313）で書く。
+ *   evaluation_updated_by・evaluation_updated_at は最後にアドバイスを保存したトレーナーと日時（結果そのものの更新者ではないので
  *   updated_by の名前にしない）
  *
- * - evaluation_published_at・evaluation_published_by は評価文を公開した日時とトレーナー（2026-10-18 追加。要件定義書 6-16-16）。
+ * - evaluation_published_at・evaluation_published_by はアドバイスを公開した日時とトレーナー（2026-10-18 追加。要件定義書 6-16-16）。
  *   公開を取り消すと NULL に戻す
  *
- * 評価文の状態（なし・下書き・公開済み）は列に持たず、評価文と公開した日時から決める（evaluation_status）。
- * 2026-10-18 変更：その前は、公開でトレーニング記録を作り、結び付いた記録の有無から決めていた（評価文と記録の本文の二重持ちをやめた）
+ * アドバイスの状態（なし・下書き・公開済み）は列に持たず、アドバイスと公開した日時から決める（evaluation_status）。
+ * 2026-10-18 変更：その前は、公開でトレーニング記録を作り、結び付いた記録の有無から決めていた（アドバイスと記録の本文の二重持ちをやめた）
  */
 class TraineePersonalityDiagnosisResult extends Model
 {
     /** タイプが判定なし（全カテゴリが点数なし）のときの表示（2026-10-18 追加） */
     public const NO_TYPE_LABEL = '判定なし';
 
-    /** 評価文の状態（2026-10-18 追加。要件定義書 6-16-15）：なし（評価文が空・公開していない） */
+    /** アドバイスの状態（2026-10-18 追加。要件定義書 6-16-15）：なし（アドバイスが空・公開していない） */
     public const EVALUATION_NONE = 'none';
 
-    /** 評価文の状態：下書き（評価文あり・公開していない） */
+    /** アドバイスの状態：下書き（アドバイスあり・公開していない） */
     public const EVALUATION_DRAFT = 'draft';
 
-    /** 評価文の状態：公開済み（公開した日時がある） */
+    /** アドバイスの状態：公開済み（公開した日時がある） */
     public const EVALUATION_PUBLISHED = 'published';
 
-    /** 評価文の上限の文字数（改行を含む。設計書 S-0313） */
+    /** アドバイスの上限の文字数（改行を含む。設計書 S-0313） */
     public const EVALUATION_MAX_LENGTH = 10000;
 
-    /** スタッフ用メモの上限の文字数（改行を含む。評価文と同じ。2026-10-19 追加。設計書 S-0313） */
+    /** スタッフ用メモの上限の文字数（改行を含む。アドバイスと同じ。2026-10-19 追加。設計書 S-0313） */
     public const STAFF_MEMO_MAX_LENGTH = 10000;
 
     protected $fillable = [
@@ -162,8 +162,8 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文の状態の表示名（なし／下書き／公開済み。2026-10-18 追加。2026-10-18 変更：ユーザーレビューで「未作成」を「なし」にした）。
-     * S-0309 の結果の表と S-0313 の評価文の欄で使う
+     * アドバイスの状態の表示名（なし／下書き／公開済み。2026-10-18 追加。2026-10-18 変更：ユーザーレビューで「未作成」を「なし」にした）。
+     * S-0309 の結果の表と S-0313 のアドバイスの欄で使う
      *
      * @return array<string, string>
      */
@@ -177,7 +177,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文の状態のバッジの色（Bootstrap の badge に付けるクラス。2026-10-18 追加）。
+     * アドバイスの状態のバッジの色（Bootstrap の badge に付けるクラス。2026-10-18 追加）。
      * トレーナー側の今のバッジ（会員の状態バッジ Client::statusBadge()：利用中＝緑、未登録＝灰、待ち＝黄）の使い方に合わせる：
      * なし＝灰（目立たせない）、下書き＝黄（作業が残っている。文字は黒で読みやすく）、公開済み＝緑（済んだ）。
      * 文字（表示名）はそのまま出す（色だけで区別しない）
@@ -194,7 +194,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文の状態（2026-10-18 追加。要件定義書 6-16-15）。公開した日時があれば公開済み、なければ評価文の有無で下書き・なし。
+     * アドバイスの状態（2026-10-18 追加。要件定義書 6-16-15）。公開した日時があれば公開済み、なければアドバイスの有無で下書き・なし。
      * 列だけで決まるので、関連を読み込まなくてよい（2026-10-18 変更：その前は結び付いたトレーニング記録の有無で決めていた）
      */
     public function getEvaluationStatusAttribute(): string
@@ -207,7 +207,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文の状態の表示名（なし／下書き／公開済み）
+     * アドバイスの状態の表示名（なし／下書き／公開済み）
      */
     public function getEvaluationStatusLabelAttribute(): string
     {
@@ -215,7 +215,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文の状態のバッジの色（evaluationStatusBadgeClasses()）
+     * アドバイスの状態のバッジの色（evaluationStatusBadgeClasses()）
      */
     public function getEvaluationStatusBadgeClassAttribute(): string
     {
@@ -228,7 +228,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文を公開している結果だけに絞る（2026-10-18 追加。要件定義書 6-16-16）
+     * アドバイスを公開している結果だけに絞る（2026-10-18 追加。要件定義書 6-16-16）
      */
     public function scopeEvaluationPublished(Builder $query): Builder
     {
@@ -236,7 +236,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 会員のトレーニーの公開済みの評価文（2026-10-18 追加。要件定義書 6-3-3・6-15-6）。
+     * 会員のトレーニーの公開済みのアドバイス（2026-10-18 追加。要件定義書 6-3-3・6-15-6）。
      * 会員詳細（S-0305）とマイページ（S-1402）で、トレーニング記録の一覧に混ぜるのに使う。
      * トレーニー（名前・呼び名）と公開したトレーナー（担当）も読み込む。並べ替えは混ぜるときに行う（RecordTimeline）
      *
@@ -252,7 +252,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 評価文を公開したトレーナー（2026-10-18 追加）。公開していない・トレーナーが削除されていれば null
+     * アドバイスを公開したトレーナー（2026-10-18 追加）。公開していない・トレーナーが削除されていれば null
      */
     public function evaluationPublishedBy(): BelongsTo
     {
@@ -260,7 +260,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 最後に評価文を保存したトレーナー（2026-10-18 追加）。トレーナーが削除されていれば null
+     * 最後にアドバイスを保存したトレーナー（2026-10-18 追加）。トレーナーが削除されていれば null
      */
     public function evaluationUpdatedBy(): BelongsTo
     {

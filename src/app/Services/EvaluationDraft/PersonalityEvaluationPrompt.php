@@ -7,9 +7,9 @@ use App\Models\TraineePersonalityDiagnosisResult;
 use App\Support\PersonalityDiagnosisQuestions;
 
 /**
- * 愛犬性格診断の評価文の下書きを AI に頼む指示文（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「AIで下書き」）。
+ * 愛犬性格診断のアドバイスの下書きを AI に頼む指示文（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「AIで下書き」）。
  *
- * - 指示文のひな形は system_settings の evaluation_prompt_current（管理者が「愛犬性格診断の評価文プロンプト」の画面で直す）。
+ * - 指示文のひな形は system_settings の evaluation_prompt_current（管理者が「愛犬性格診断のアドバイスのプロンプト」の画面で直す）。
  *   値がなければ DEFAULT_TEMPLATE（トレーナーさんの今の仕組み〔GAS＋Gemini〕の指示文そのまま）
  * - ひな形の中の差し込みの印（{{犬の名前}} など。PLACEHOLDERS）を、診断の結果のデータに置き換える
  * - AI に渡すのは、愛犬の名前・タイプ・点数（7 つ）・自由記述の質問（4 問）だけ。犬種・年齢・性別、会員様（飼い主様）の名前・住所・

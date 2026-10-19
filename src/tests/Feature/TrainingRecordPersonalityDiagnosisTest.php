@@ -14,14 +14,14 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニング記録と愛犬性格診断の評価文（2026-10-18 追加。要件定義書 6-4-3〜6-4-5・6-15-6・6-15-7・6-16-16）。
+ * トレーニング記録と愛犬性格診断のアドバイス（2026-10-18 追加。要件定義書 6-4-3〜6-4-5・6-15-6・6-15-7・6-16-16）。
  *
- * 2026-10-18 変更：評価文の公開でトレーニング記録を作らなくなったため（評価文と記録の本文の二重持ちをやめた）、
+ * 2026-10-18 変更：アドバイスの公開でトレーニング記録を作らなくなったため（アドバイスと記録の本文の二重持ちをやめた）、
  * 段階1 の②で作った「記録の詳細の愛犬性格診断の欄」「一覧の印」を外した。ここでは外したことを確かめる。
- * - 記録の詳細（トレーナー側 S-0403・会員側 S-1404）に愛犬性格診断の欄もレーダーの JS も出さない（公開済みの評価文があっても）
+ * - 記録の詳細（トレーナー側 S-0403・会員側 S-1404）に愛犬性格診断の欄もレーダーの JS も出さない（公開済みのアドバイスがあっても）
  * - 一覧（トレーナー側 S-0402、マイページ）に印を出さない
  * - 記録の更新（S-0404）は会員（client_id）を受け取らない（この直しは残す）
- * 公開済みの評価文をマイページ・会員詳細に混ぜて出すことは PublishedEvaluationTimelineTest で確かめる
+ * 公開済みのアドバイスをマイページ・会員詳細に混ぜて出すことは PublishedEvaluationTimelineTest で確かめる
  */
 class TrainingRecordPersonalityDiagnosisTest extends TestCase
 {
@@ -127,10 +127,10 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         return TrainingRecord::query()->find($id);
     }
 
-    /** 結果の評価文を公開済みにする */
+    /** 結果のアドバイスを公開済みにする */
     private function publishEvaluation(TraineePersonalityDiagnosisResult $result): void
     {
-        $result->update(['evaluation_text' => '公開した評価文', 'evaluation_published_at' => '2026-06-02 10:00:00', 'evaluation_published_by' => 200]);
+        $result->update(['evaluation_text' => '公開したアドバイス', 'evaluation_published_at' => '2026-06-02 10:00:00', 'evaluation_published_by' => 200]);
     }
 
     private function trainerShow(TrainingRecord $record): string
@@ -171,7 +171,7 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         $this->assertStringContainsString('ノート 2026-06-02', $html);
         $this->assertStringNotContainsString('data-record-personality-diagnosis', $html);
         $this->assertStringNotContainsString('personality-radar', $html);
-        $this->assertStringNotContainsString('公開した評価文', $html);
+        $this->assertStringNotContainsString('公開したアドバイス', $html);
     }
 
     public function test_会員はほかの会員の記録を見られない(): void
@@ -203,7 +203,7 @@ class TrainingRecordPersonalityDiagnosisTest extends TestCase
         $html = $this->actingAs($this->client, 'client')->get(route('client-portal.dashboard'))->assertOk()->getContent();
 
         $this->assertStringNotContainsString('data-record-personality-badge', $html);
-        // 札（.c-session-tag）は、混ぜて出す評価文のカードにだけ付く（2026-10-18 変更）。記録のカードには付かない
+        // 札（.c-session-tag）は、混ぜて出すアドバイスのカードにだけ付く（2026-10-18 変更）。記録のカードには付かない
         $this->assertSame(1, substr_count($html, '<p class="c-session-tag'));
         $this->assertSame(1, preg_match('/data-session-evaluation="\d+">.*?<\/article>/s', $html, $m));
         $this->assertStringContainsString('<p class="c-session-tag', $m[0]);

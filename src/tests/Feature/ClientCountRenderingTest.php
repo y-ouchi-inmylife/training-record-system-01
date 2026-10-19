@@ -1469,7 +1469,7 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みの評価文（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない
+        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みのアドバイス（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない
         $this->assertSame(2, $count($one));
         $this->assertSame(2, $count($three));
     }

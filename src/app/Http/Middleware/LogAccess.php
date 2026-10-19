@@ -46,12 +46,12 @@ class LogAccess
         'trainee-combined-survey-tokens.destroy' => 'delete_trainee_combined_survey_token',
         // 性格診断の結果の削除（2026-10 追加）。対象はトレーニー（target_id はルートの {trainee}。結果の id は記録しない）
         'trainee-personality-diagnosis-results.destroy' => 'delete_trainee_personality_diagnosis_result',
-        // 愛犬性格診断の評価文の保存（S-0313。2026-10-18 追加）。対象はトレーニー（結果の削除と同じ。結果の id は記録しない）。
+        // 愛犬性格診断のアドバイスの保存（S-0313。2026-10-18 追加）。対象はトレーニー（結果の削除と同じ。結果の id は記録しない）。
         // 愛犬性格診断詳細の表示は記録しない（トレーニー詳細を見たことと同じ）
         'trainee-personality-diagnosis-results.update' => 'edit_trainee_personality_diagnosis_evaluation',
-        // スタッフ用メモの保存（2026-10-19 追加。評価文の更新と同じく記録する）。AI の下書き（evaluation-draft）は保存しないので記録しない
+        // スタッフ用メモの保存（2026-10-19 追加。アドバイスの更新と同じく記録する）。AI の下書き（evaluation-draft）は保存しないので記録しない
         'trainee-personality-diagnosis-results.staff-memo.update' => 'edit_trainee_personality_diagnosis_staff_memo',
-        // 評価文の公開・公開取消（2026-10-18 追加）。対象はトレーニー（2026-10-18 変更：その前は公開を
+        // アドバイスの公開・公開取消（2026-10-18 追加）。対象はトレーニー（2026-10-18 変更：その前は公開を
         // トレーニング記録の登録〔create_training_record〕として記録していた。公開で記録を作らなくなったため）
         'trainee-personality-diagnosis-results.publish' => 'publish_trainee_personality_diagnosis_evaluation',
         'trainee-personality-diagnosis-results.unpublish' => 'unpublish_trainee_personality_diagnosis_evaluation',

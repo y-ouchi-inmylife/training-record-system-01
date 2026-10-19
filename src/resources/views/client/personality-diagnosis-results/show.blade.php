@@ -1,9 +1,9 @@
 @extends('layouts.client')
 
-{{-- 会員の愛犬性格診断の評価画面（S-1418。2026-10-18 追加。要件定義書 6-15-21、設計書 S-1418）。
-     マイページ（S-1402）の記録の一覧に混ぜた評価文から開く。作りは会員トレーニング記録詳細（S-1404）にそろえる
+{{-- 会員の愛犬性格診断のアドバイス画面（S-1418。2026-10-18 追加。要件定義書 6-15-21、設計書 S-1418）。
+     マイページ（S-1402）の記録の一覧に混ぜたアドバイスから開く。作りは会員トレーニング記録詳細（S-1404）にそろえる
      （HOME への戻り、見出し、見出しの下の小さな文字、.c-detail-section の区切り）。
-     出さないもの：点数の表・50 問の回答・注記（マイページと同じ）、評価文の状態、トレーナー側の画面へのリンク --}}
+     出さないもの：点数の表・50 問の回答・注記（マイページと同じ）、アドバイスの状態、トレーナー側の画面へのリンク --}}
 @php
     $pageTitle = $callName.'の'.__('messages.personality_diagnosis_name');
 @endphp
@@ -44,9 +44,9 @@
         @endif
     </section>
 
-    {{-- 評価文：小見出し「トレーナーからの評価」の下に、改行を保持して出す（S-1404 の「トレーナーからのノート」と同じ見た目） --}}
+    {{-- アドバイス：小見出し「トレーナーからのアドバイス」の下に、改行を保持して出す（S-1404 の「トレーナーからのノート」と同じ見た目） --}}
     <section class="c-detail-section" aria-labelledby="c-evaluation-heading">
-        <p class="eyebrow" id="c-evaluation-heading">トレーナーからの評価</p>
+        <p class="eyebrow" id="c-evaluation-heading">トレーナーからのアドバイス</p>
         <div class="c-detail-body" data-evaluation-text>{{ $evaluationText }}</div>
     </section>
 </div>

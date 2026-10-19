@@ -19,7 +19,7 @@ use Tests\TestCase;
  *
  * - 計測値の下（いちばん下）に、いつも出す（id="personality-diagnosis"・scroll-margin-top。2026-10 変更：当初は自由記述の質問の欄の下。2026-10-19 に自由記述の質問の欄を外した）。結果がなければ「（未回答）」だけ
  * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（新しい順。2026-10 変更：当初は古い順。回答日・タイプ・7 カテゴリ・評価文の状態・［詳細］）
- * - 各行の［詳細］で愛犬性格診断詳細（S-0313）へ。50 問の回答・評価文・削除は S-0313（2026-10-18 変更：当初は各行の［回答］で
+ * - 各行の［詳細］で愛犬性格診断詳細（S-0313）へ。50 問の回答・アドバイス・削除は S-0313（2026-10-18 変更：当初は各行の［回答］で
  *   50 問の回答のモーダルを出し、管理者には各行の［削除］と削除確認モーダル S-0309-M01 を出していた。S-0313 の形は
  *   TraineePersonalityDiagnosisResultShowTest）
  *
@@ -192,12 +192,12 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             '2026/03/10' => $this->expectedRow('past-2'),
             '2025/12/01' => $this->expectedRow('past-3'),
         ], $this->tableRows($card));
-        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・評価文（2026-10-18 追加）・ボタンの列（読み上げ用に「操作」）
+        // 表は 1 つ。列の見出し（th scope="col"）は回答日・タイプ・7 カテゴリ・アドバイス（2026-10-18 追加）・ボタンの列（読み上げ用に「操作」）
         $this->assertSame(1, substr_count($card, '<table'));
         $this->assertStringContainsString('<div class="table-responsive position-relative">', $card);
         preg_match_all('/<th scope="col"[^>]*>(.*?)<\/th>/u', $card, $heads);
         $this->assertSame(
-            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['評価文', '<span class="visually-hidden">操作</span>']),
+            array_merge(['回答日', 'タイプ'], array_values(PersonalityDiagnosisQuestions::categories()), ['アドバイス', '<span class="visually-hidden">操作</span>']),
             $heads[1]
         );
         // 回ごとの開閉はない
@@ -235,7 +235,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertStringNotContainsString('data-bs-toggle="modal"', $card);
     }
 
-    public function test_評価文の列になしと下書きと公開済みを色のバッジで出す(): void
+    public function test_アドバイスの列になしと下書きと公開済みを色のバッジで出す(): void
     {
         $none = $this->addResult('past-3', '2025-12-01 10:00:00');
         $draft = $this->addResult('past-2', '2026-03-10 11:00:00');
@@ -252,9 +252,13 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertSame(['bg-success', 'bg-warning text-dark', 'bg-secondary'], $m[1]);
         $this->assertStringNotContainsString('未作成', $card);
         $this->assertNotNull($none);
+        // 列名は「アドバイス」（2026-10-19 変更：その前は「評価文」）。画面のどこにも「評価文」は出さない
+        // （削除の確認の文は TraineeShowIntakeSurveyTest で確かめる）
+        $this->assertStringContainsString('<th scope="col" class="fw-normal text-muted text-nowrap">アドバイス</th>', $card);
+        $this->assertStringNotContainsString('評価文', $this->page());
     }
 
-    public function test_評価文の状態を出してもクエリの数は結果の数で増えない(): void
+    public function test_アドバイスの状態を出してもクエリの数は結果の数で増えない(): void
     {
         $count = function (): int {
             DB::flushQueryLog();
@@ -451,7 +455,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $this->assertSame(1, substr_count($card, '<th scope="row" class="fw-normal text-nowrap">'));
         // 点数 7 つ＋ボタンの列
         $this->assertSame(8, substr_count($card, '<td class="text-end text-nowrap">'));
-        // 評価文の状態とボタンの列も折り返さない
+        // アドバイスの状態とボタンの列も折り返さない
         $this->assertSame(1, preg_match_all('/<td class="text-nowrap"><span class="badge bg-secondary">なし<\/span><\/td>/u', $card));
         $this->assertMatchesRegularExpression('/<td class="text-end text-nowrap">\s*<a href="[^"]+" class="btn btn-sm btn-outline-primary text-nowrap"/u', $card);
     }

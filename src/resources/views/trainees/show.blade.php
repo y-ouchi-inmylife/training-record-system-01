@@ -203,8 +203,8 @@
          - 点数なし（そのカテゴリの答えがすべて「未経験」）は表で「—」（読み上げは「点数なし」）、タイプの判定なしは「判定なし」。
            グラフでは点を描かない（2026-10-18 追加。要件定義書 6-16）。グラフの下に注記は出さない（表の「—」で分かるため。
            2026-10-18 変更：一度、今回に点数なしがあるときだけ注記を出していた）
-         - 表の各行に評価文の状態（なし・下書き・公開済み）と［詳細］を出す。［詳細］で愛犬性格診断詳細（S-0313）へ移る。
-           50 問の回答・評価文・結果の削除は S-0313 で行う（2026-10-18 変更：当初は各行の［回答］で 50 問の回答をモーダルで出し、
+         - 表の各行にアドバイスの状態（なし・下書き・公開済み）と［詳細］を出す。［詳細］で愛犬性格診断詳細（S-0313）へ移る。
+           50 問の回答・アドバイス・結果の削除は S-0313 で行う（2026-10-18 変更：当初は各行の［回答］で 50 問の回答をモーダルで出し、
            管理者には各行の［削除］と確認モーダル S-0309-M01 を出していた）
          - 操作（発行・表示・取消）は置かない（会員詳細 S-0305 だけで行う）
          - id="personality-diagnosis" と scroll-margin-top は、会員詳細の「性格診断」のリンクの飛び先にするため（2026-10-19 に外した自由記述の質問の欄と同じ値） --}}
@@ -262,7 +262,7 @@
                                         @foreach($pdCategories as $categoryLabel)
                                             <th scope="col" class="fw-normal text-muted text-end text-nowrap">{{ $categoryLabel }}</th>
                                         @endforeach
-                                        <th scope="col" class="fw-normal text-muted text-nowrap">評価文</th>
+                                        <th scope="col" class="fw-normal text-muted text-nowrap">アドバイス</th>
                                         <th scope="col"><span class="visually-hidden">操作</span></th>
                                     </tr>
                                 </thead>
@@ -279,7 +279,7 @@
                                                 {{-- 点数なし（答えがすべて「未経験」）は「—」。読み上げでは「点数なし」（2026-10-18 追加） --}}
                                                 <td class="text-end text-nowrap">@if($display[$category] === null)<span aria-hidden="true">—</span><span class="visually-hidden">点数なし</span>@else{{ $display[$category] }}@endif</td>
                                             @endforeach
-                                            {{-- 評価文の状態（2026-10-18 追加。要件定義書 6-16-15）。バッジで出す（色は TraineePersonalityDiagnosisResult::evaluation_status_badge_class。2026-10-18 変更：その前は文字だけで、「未作成」は薄い文字） --}}
+                                            {{-- アドバイスの状態（2026-10-18 追加。要件定義書 6-16-15）。バッジで出す（色は TraineePersonalityDiagnosisResult::evaluation_status_badge_class。2026-10-18 変更：その前は文字だけで、「未作成」は薄い文字） --}}
                                             <td class="text-nowrap"><span class="badge {{ $result->evaluation_status_badge_class }}">{{ $result->evaluation_status_label }}</span></td>
                                             {{-- ［詳細］：愛犬性格診断詳細（S-0313）へ。任意の操作なので青の白抜き（4-4） --}}
                                             <td class="text-end text-nowrap">

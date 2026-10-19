@@ -19,7 +19,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 愛犬性格診断の評価文とスタッフ用メモの AI の下書き（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「AIで下書き」・S-0602）。
+ * 愛犬性格診断のアドバイスとスタッフ用メモの AI の下書き（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「AIで下書き」・S-0602）。
  *
  * 外部の AI は呼ばない（EvaluationDraftGenerator をテストで差し替える。指示文の組み立て・返事の分け方はそれぞれのクラスだけで確かめる）。
  * 「今日」は 2026-10-19 に固定する。
@@ -239,7 +239,7 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->assertFalse($draft->staffMemoMissing);
     }
 
-    public function test_区切りがなければ全部を評価文にしてスタッフ用メモは空(): void
+    public function test_区切りがなければ全部をアドバイスにしてスタッフ用メモは空(): void
     {
         $draft = EvaluationDraft::fromResponse("お客様用の文だけ\n");
 
@@ -260,7 +260,7 @@ class PersonalityEvaluationDraftTest extends TestCase
     public function test_下書きはJSONで返し何も保存しない(): void
     {
         $result = $this->makeResult();
-        $result->update(['evaluation_text' => '保存してある評価文', 'staff_memo' => '保存してあるメモ']);
+        $result->update(['evaluation_text' => '保存してあるアドバイス', 'staff_memo' => '保存してあるメモ']);
         $this->fakeGenerator(new EvaluationDraft('お客様用の下書き', 'スタッフ用の下書き', false));
 
         $this->postJson($this->draftUrl($result))
@@ -268,7 +268,7 @@ class PersonalityEvaluationDraftTest extends TestCase
             ->assertExactJson(['evaluation' => 'お客様用の下書き', 'staff_memo' => 'スタッフ用の下書き', 'staff_memo_missing' => false]);
 
         $fresh = $result->fresh();
-        $this->assertSame('保存してある評価文', $fresh->evaluation_text);
+        $this->assertSame('保存してあるアドバイス', $fresh->evaluation_text);
         $this->assertSame('保存してあるメモ', $fresh->staff_memo);
         $this->assertNull($fresh->evaluation_updated_at);
         // 操作の記録（アクセスログ）には残さない
@@ -336,10 +336,10 @@ class PersonalityEvaluationDraftTest extends TestCase
         return route('trainee-personality-diagnosis-results.staff-memo.update', [$this->trainee, $result]);
     }
 
-    public function test_スタッフ用メモを保存でき評価文は変わらない(): void
+    public function test_スタッフ用メモを保存できアドバイスは変わらない(): void
     {
         $result = $this->makeResult();
-        $result->update(['evaluation_text' => '評価文', 'evaluation_updated_at' => '2026-10-18 10:00:00', 'evaluation_updated_by' => 200]);
+        $result->update(['evaluation_text' => 'アドバイス', 'evaluation_updated_at' => '2026-10-18 10:00:00', 'evaluation_updated_by' => 200]);
 
         $this->put($this->staffMemoUrl($result), ['staff_memo' => "メモ\r\n2行目"])
             ->assertRedirect(route('trainee-personality-diagnosis-results.show', [$this->trainee, $result]))
@@ -347,7 +347,7 @@ class PersonalityEvaluationDraftTest extends TestCase
 
         $fresh = $result->fresh();
         $this->assertSame("メモ\n2行目", $fresh->staff_memo);
-        $this->assertSame('評価文', $fresh->evaluation_text);
+        $this->assertSame('アドバイス', $fresh->evaluation_text);
         $this->assertSame('2026-10-18 10:00:00', $fresh->evaluation_updated_at->format('Y-m-d H:i:s'));
         $this->assertSame('edit_trainee_personality_diagnosis_staff_memo', DB::table('access_logs')->value('action'));
 
@@ -365,14 +365,14 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->assertSame(10000, mb_strlen($result->fresh()->staff_memo));
     }
 
-    public function test_評価文の更新ではスタッフ用メモが変わらない(): void
+    public function test_アドバイスの更新ではスタッフ用メモが変わらない(): void
     {
         $result = $this->makeResult();
         $result->update(['staff_memo' => 'メモ']);
 
-        $this->put(route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]), ['evaluation_text' => '新しい評価文'])->assertRedirect();
+        $this->put(route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]), ['evaluation_text' => '新しいアドバイス'])->assertRedirect();
 
         $this->assertSame('メモ', $result->fresh()->staff_memo);
-        $this->assertSame('新しい評価文', $result->fresh()->evaluation_text);
+        $this->assertSame('新しいアドバイス', $result->fresh()->evaluation_text);
     }
 }

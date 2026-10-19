@@ -351,11 +351,11 @@ return [
         'recent_events' => '最近の様子',
         'ideal_days' => '理想の毎日',
         'health_concerns' => '体のこと',
-        // 愛犬性格診断の評価文（S-0313。2026-10-18 追加）
-        'evaluation_text' => '評価文',
-        // スタッフ用メモ（S-0313）と評価文プロンプト（S-0602）。2026-10-19 追加
+        // 愛犬性格診断のアドバイス（S-0313。2026-10-18 追加）
+        'evaluation_text' => 'アドバイス',
+        // スタッフ用メモ（S-0313）とアドバイスのプロンプト（S-0602）。2026-10-19 追加
         'staff_memo' => 'スタッフ用メモ',
-        'evaluation_prompt' => '評価文プロンプト',
+        'evaluation_prompt' => 'アドバイスのプロンプト',
         'password' => 'パスワード',
         'password_confirmation' => 'パスワード（確認）',
         'current_password' => '現在のパスワード',

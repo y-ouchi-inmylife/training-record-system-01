@@ -154,7 +154,7 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 愛犬アンケート＆愛犬性格診断のご案内（S-0314）。会員詳細の「案内中」の［表示］から開く
             Route::get('trainees/{trainee}/combined-survey-tokens/print', [TraineeCombinedSurveyTokenController::class, 'print'])
                 ->name('trainee-combined-survey-tokens.print');
-            // 愛犬性格診断詳細（S-0313。2026-10-18 追加）と評価文の保存。S-0309 の結果の表の行の［詳細］から開く。
+            // 愛犬性格診断詳細（S-0313。2026-10-18 追加）とアドバイスの保存。S-0309 の結果の表の行の［詳細］から開く。
             // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
             Route::get('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'show'])
                 ->scopeBindings()
@@ -162,16 +162,16 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'update'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.update');
-            // 評価文の公開（S-0313 の［公開］と S-0313-M01）・公開取消（［公開取消］と S-0313-M03）。2026-10-18 追加。
-            // 評価文そのものに公開した日時を付ける（トレーニング記録は作らない。2026-10-18 変更）
+            // アドバイスの公開（S-0313 の［公開］と S-0313-M01）・公開取消（［公開取消］と S-0313-M03）。2026-10-18 追加。
+            // アドバイスそのものに公開した日時を付ける（トレーニング記録は作らない。2026-10-18 変更）
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish', [TraineePersonalityDiagnosisResultController::class, 'publish'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.publish');
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish', [TraineePersonalityDiagnosisResultController::class, 'unpublish'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.unpublish');
-            // スタッフ用メモの保存（S-0313 のスタッフ用メモの［更新］）と、評価文・スタッフ用メモの AI の下書き（［AIで下書き］。JSON を返す）。
-            // 2026-10-19 追加。権限は評価文の［更新］と同じ（管理者・一般のトレーナー）。scopeBindings で別のトレーニーの結果は 404
+            // スタッフ用メモの保存（S-0313 のスタッフ用メモの［更新］）と、アドバイス・スタッフ用メモの AI の下書き（［AIで下書き］。JSON を返す）。
+            // 2026-10-19 追加。権限はアドバイスの［更新］と同じ（管理者・一般のトレーナー）。scopeBindings で別のトレーニーの結果は 404
             Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo', [TraineePersonalityDiagnosisResultController::class, 'updateStaffMemo'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.staff-memo.update');
@@ -246,7 +246,7 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 要約プロンプト設定
             Route::get('settings/summary-prompts', [SummaryPromptController::class, 'edit'])->name('settings.summary-prompts.edit');
             Route::put('settings/summary-prompts', [SummaryPromptController::class, 'update'])->name('settings.summary-prompts.update');
-            // 愛犬性格診断の評価文プロンプト（S-0602。S-0313 の［AIで下書き］の指示文。2026-10-19 追加）
+            // 愛犬性格診断のアドバイスのプロンプト（S-0602。S-0313 の［AIで下書き］の指示文。2026-10-19 追加）
             Route::get('settings/evaluation-prompts', [EvaluationPromptController::class, 'edit'])->name('settings.evaluation-prompts.edit');
             Route::put('settings/evaluation-prompts', [EvaluationPromptController::class, 'update'])->name('settings.evaluation-prompts.update');
 
@@ -381,8 +381,8 @@ Route::domain(config('subdomain.client_host'))->group(function () {
                 ->name('contracts');
             Route::get('/training-records/{trainingRecord}', [\App\Http\Controllers\Client\TrainingRecordController::class, 'show'])
                 ->name('training-records.show');
-            // 愛犬性格診断の評価（S-1418、6-15-21。2026-10-18 追加）— マイページの記録の一覧に混ぜた評価文から開く。
-            // 自分のトレーニーの公開済みの評価文だけ（それ以外は 404）。trainee-personality-diagnosis-results.*（トレーナー向け）は会員に開放しない
+            // 愛犬性格診断のアドバイス（S-1418、6-15-21。2026-10-18 追加）— マイページの記録の一覧に混ぜたアドバイスから開く。
+            // 自分のトレーニーの公開済みのアドバイスだけ（それ以外は 404）。trainee-personality-diagnosis-results.*（トレーナー向け）は会員に開放しない
             Route::get('/personality-diagnosis-results/{personalityDiagnosisResult}', [\App\Http\Controllers\Client\PersonalityDiagnosisResultController::class, 'show'])
                 ->name('personality-diagnosis-results.show');
             Route::get('/media/{mediaRecord}/play', [\App\Http\Controllers\Client\MediaRecordController::class, 'play'])

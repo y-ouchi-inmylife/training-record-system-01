@@ -3,8 +3,8 @@
 namespace App\Services\EvaluationDraft;
 
 /**
- * AI の下書き（2026-10-19 追加）。お客様用レポート（評価文の欄に入れる）とスタッフ用メモ（スタッフ用メモの欄に入れる）。
- * staffMemoMissing：返事に区切り「#####」がなく、スタッフ用メモを作れなかった（全部を評価文に入れた）
+ * AI の下書き（2026-10-19 追加）。お客様用レポート（アドバイスの欄に入れる）とスタッフ用メモ（スタッフ用メモの欄に入れる）。
+ * staffMemoMissing：返事に区切り「#####」がなく、スタッフ用メモを作れなかった（全部をアドバイスに入れた）
  */
 final class EvaluationDraft
 {
@@ -18,8 +18,8 @@ final class EvaluationDraft
     public const SEPARATOR = '#####';
 
     /**
-     * AI の返事を分ける。最初の「#####」の前を評価文、後ろをスタッフ用メモにする（前後の空白・改行は取る）。
-     * 「#####」がなければ全部を評価文にし、スタッフ用メモは空（staffMemoMissing）。返事が空（空白だけ）なら失敗
+     * AI の返事を分ける。最初の「#####」の前をアドバイス、後ろをスタッフ用メモにする（前後の空白・改行は取る）。
+     * 「#####」がなければ全部をアドバイスにし、スタッフ用メモは空（staffMemoMissing）。返事が空（空白だけ）なら失敗
      *
      * @throws EvaluationDraftFailedException 返事が空
      */

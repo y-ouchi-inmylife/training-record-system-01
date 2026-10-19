@@ -5,7 +5,7 @@ namespace App\Services\EvaluationDraft;
 use App\Models\TraineePersonalityDiagnosisResult;
 
 /**
- * 愛犬性格診断の評価文とスタッフ用メモの下書きを AI で作る（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「AIで下書き」）。
+ * 愛犬性格診断のアドバイスとスタッフ用メモの下書きを AI で作る（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「AIで下書き」）。
  *
  * コントローラーはこのインターフェイスだけを使う。AI の会社ごとの実装を 1 つずつ持ち、設定（config('services.evaluation_draft.driver')）で
  * 切り替える（今は Claude の ClaudeEvaluationDraftGenerator だけ。Gemini にするときは実装を 1 つ足し、AppServiceProvider の切り替えに足す）。

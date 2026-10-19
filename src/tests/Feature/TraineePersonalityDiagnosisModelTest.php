@@ -18,7 +18,7 @@ use Tests\TestCase;
  * - トレーニーのリレーション（案内・有効な案内・結果〔新しい順〕・最新の結果）
  * - answers の配列への変換、7 カテゴリの平均の decimal
  * - トレーニーを消したら案内と結果も消える。案内を消したら結果の案内の列は NULL（外部キー。db-schema.md）
- * - 評価文の状態（なし・下書き・公開済み。公開した日時で決まる。2026-10-18 変更：その前は結び付いたトレーニング記録で決めていた）、
+ * - アドバイスの状態（なし・下書き・公開済み。公開した日時で決まる。2026-10-18 変更：その前は結び付いたトレーニング記録で決めていた）、
  *   指定した結果の時点のレーダーチャートの値（2026-10-18 追加。要件定義書 6-16-15・6-16-16）
  */
 class TraineePersonalityDiagnosisModelTest extends TestCase
@@ -151,9 +151,9 @@ class TraineePersonalityDiagnosisModelTest extends TestCase
         $this->assertNull($fresh->token);
     }
 
-    // ---- 評価文の状態と公開（2026-10-18 追加。2026-10-18 変更：公開した日時で決める） ----
+    // ---- アドバイスの状態と公開（2026-10-18 追加。2026-10-18 変更：公開した日時で決める） ----
 
-    public function test_評価文の状態は評価文と公開した日時から決める(): void
+    public function test_アドバイスの状態はアドバイスと公開した日時から決める(): void
     {
         $result = $this->makeResult('2026-06-01 09:00:00');
         $this->assertSame(TraineePersonalityDiagnosisResult::EVALUATION_NONE, $result->evaluation_status);
@@ -180,7 +180,7 @@ class TraineePersonalityDiagnosisModelTest extends TestCase
         $this->assertSame('下書き', $result->fresh()->evaluation_status_label);
     }
 
-    public function test_評価文の状態は関連を読み込まずに決まる(): void
+    public function test_アドバイスの状態は関連を読み込まずに決まる(): void
     {
         $this->makeResult('2026-06-01 09:00:00')->update(['evaluation_text' => '文', 'evaluation_published_at' => '2026-10-18 10:00:00']);
         $result = TraineePersonalityDiagnosisResult::query()->sole();
@@ -194,7 +194,7 @@ class TraineePersonalityDiagnosisModelTest extends TestCase
 
     public function test_結果とトレーニング記録の結び付きはもうない(): void
     {
-        // 2026-10-18 変更：評価文を記録にしなくなったため、結び付けの関連と列を外した（000006）
+        // 2026-10-18 変更：アドバイスを記録にしなくなったため、結び付けの関連と列を外した（000006）
         $this->assertFalse(method_exists(TraineePersonalityDiagnosisResult::class, 'trainingRecord'));
         $this->assertFalse(method_exists(TrainingRecord::class, 'personalityDiagnosisResult'));
         $this->assertFalse(method_exists(TrainingRecord::class, 'personalityDiagnosisSection'));

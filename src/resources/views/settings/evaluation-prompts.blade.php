@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
 @php
-    $screenName = __('messages.personality_diagnosis_name').'の評価文プロンプト';
+    $screenName = __('messages.personality_diagnosis_name').'のアドバイスのプロンプト';
 @endphp
 
 @section('title', $screenName)
 
 @section('content')
-{{-- 愛犬性格診断の評価文プロンプト（S-0602。2026-10-19 追加。管理者のみ）。要約プロンプト（S-0601。settings/summary-prompts）と同じ作り：
+{{-- 愛犬性格診断のアドバイスのプロンプト（S-0602。2026-10-19 追加。管理者のみ）。要約プロンプト（S-0601。settings/summary-prompts）と同じ作り：
      見出しの右に［更新］、上に使い方の案内、指示文の入力欄（5000 文字以内。文字数カウンタは上限を超えると赤。入力は止めない）、
      未保存の直しがあるときの離脱の確認。違うところ：使える差し込みの印の一覧と、「#####」で分けて出すよう頼む説明を出す --}}
 <div class="container">
@@ -21,8 +21,11 @@
             </div>
 
             <div class="alert alert-info" style="max-width: 700px;" data-evaluation-prompt-guide>
-                <p class="mb-2">このプロンプトは、{{ __('messages.personality_diagnosis_name') }}詳細の［AIで下書き］で、AI が評価文とスタッフ用メモの下書きを作る際の「指示書」です。差し込みの印は、その診断の結果のデータに置き換えて AI に渡します。</p>
-                <p class="mb-2">お客様用とスタッフ用は「#####」で分けて出すよう指示してください（「#####」の前が評価文、後ろがスタッフ用メモの欄に入ります）。</p>
+                <p class="mb-2">このプロンプトは、{{ __('messages.personality_diagnosis_name') }}詳細の［AIで下書き］で、AI がアドバイスとスタッフ用メモの下書きを作る際の「指示書」です。差し込みの印は、その診断の結果のデータに置き換えて AI に渡します。</p>
+                <p class="mb-2">お客様用とスタッフ用は「#####」で分けて出すよう指示してください（「#####」の前がアドバイス、後ろがスタッフ用メモの欄に入ります）。</p>
+                {{-- 既定の指示文（トレーナーさんの文のまま）は「お客様用レポート」と呼んでいるので、欄との対応を書く（2026-10-19 追加。
+                     評価文をアドバイスと呼ぶことにしたとき） --}}
+                <p class="mb-2" data-evaluation-prompt-mapping>既定の指示文の「お客様用レポート」がアドバイスの欄、「スタッフ用メモ」がスタッフ用メモの欄に入ります。</p>
                 <p class="mb-1">使える差し込みの印：</p>
                 <ul class="mb-0 small" data-evaluation-prompt-placeholders>
                     @foreach($placeholders as $placeholder => $description)

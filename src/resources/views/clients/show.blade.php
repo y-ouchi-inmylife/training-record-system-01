@@ -108,12 +108,12 @@
     white-space: pre-wrap;
     word-break: break-word;
 }
-/* 公開済みの評価文のブロック（2026-10-18 追加。設計書 S-0305 セクション2）。
+/* 公開済みのアドバイスのブロック（2026-10-18 追加。設計書 S-0305 セクション2）。
    （この style は画面にそのまま出るので、診断の名前は書かない。名前は文のファイルの 1 か所から読むため）
    - 札「{診断の名前}（{名前}）」は、会員側の札（client.scss の .c-session-tag）と同じ紫の薄い面に本文の色の文字。
      Bootstrap の badge の形（小さな角丸・太字）のまま、色だけ変える（白の上でも記録のブロックの文字と見分けられる）
    - 点マーカーも紫にして、縦線の上で記録と見分けられるようにする（色だけに頼らず、札の文字でも分かる）
-   - 評価文は長くなりやすいので、はじめの 4 行で切る（記録のノートは全文を出すが、評価文は S-0313 で読む） */
+   - アドバイスは長くなりやすいので、はじめの 4 行で切る（記録のノートは全文を出すが、アドバイスは S-0313 で読む） */
 .record-block--evaluation::before {
     background: #6f42c1;
 }
@@ -336,16 +336,16 @@
             <div class="client-records-fill">
             <div class="card mb-3 client-records-card">
                 {{-- 見出し「これまでの記録（N件）」と［トレーニング記録を登録］（2026-10-18 変更：ユーザーレビューで、記録の欄に公開済みの
-                     評価文も並ぶようになったため、見出しをマイページの「これまでの記録」と同じ言い方にし、ボタンは何を登録するかを書いた。
-                     その前は「トレーニング記録（N件）」と［新規登録］）。件数は今までどおり記録だけ（評価文は数えない）。
-                     狭い幅で 1 行に収まらないときは、ボタンを次の行へ折り返して右に寄せる（flex-wrap と ms-auto。S-0313 の評価文の見出しの行と同じ） --}}
+                     アドバイスも並ぶようになったため、見出しをマイページの「これまでの記録」と同じ言い方にし、ボタンは何を登録するかを書いた。
+                     その前は「トレーニング記録（N件）」と［新規登録］）。件数は今までどおり記録だけ（アドバイスは数えない）。
+                     狭い幅で 1 行に収まらないときは、ボタンを次の行へ折り返して右に寄せる（flex-wrap と ms-auto。S-0313 のアドバイスの見出しの行と同じ） --}}
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <h6 class="mb-0" data-client-records-heading>これまでの記録（{{ $client->trainingRecords->count() }}件）</h6>
                     <a href="{{ route('training-records.create', ['client_id' => $client->id]) }}"
                        class="btn btn-primary ms-auto">トレーニング記録を登録</a>
                 </div>
-                {{-- 記録と、公開済みの愛犬性格診断の評価文を混ぜた一覧（2026-10-18 変更。コントローラで新しい順に並べた $timeline）。
-                     見出しの件数は記録だけ（評価文は数えない）。評価文だけがあるときも一覧を出す --}}
+                {{-- 記録と、公開済みの愛犬性格診断のアドバイスを混ぜた一覧（2026-10-18 変更。コントローラで新しい順に並べた $timeline）。
+                     見出しの件数は記録だけ（アドバイスは数えない）。アドバイスだけがあるときも一覧を出す --}}
                 @if($timeline->isNotEmpty())
                     <div class="card-body training-records-scroll">
                         <div class="training-records-timeline">
@@ -354,9 +354,9 @@
                                     @php
                                         $result = $entry['item'];
                                     @endphp
-                                    {{-- 評価文のブロック（設計書 S-0305 セクション2「公開済みの愛犬性格診断の評価文を混ぜる」）。
+                                    {{-- アドバイスのブロック（設計書 S-0305 セクション2「公開済みの愛犬性格診断のアドバイスを混ぜる」）。
                                          見出し行：公開した日・札「愛犬性格診断（{トレーニーの名前}）」・担当（公開したトレーナー。削除されていれば出さない）。
-                                         その下に小見出し「評価文」と、評価文のはじめの 4 行（改行を保持）。所感・メディアはない。
+                                         その下に小見出し「アドバイス」と、アドバイスのはじめの 4 行（改行を保持）。所感・メディアはない。
                                          ブロック全体を押すと愛犬性格診断詳細（S-0313） --}}
                                     <a href="{{ route('trainee-personality-diagnosis-results.show', [$result->trainee, $result]) }}" class="record-block-link" data-timeline-evaluation="{{ $result->id }}">
                                         <div class="record-block record-block--evaluation">
@@ -367,7 +367,7 @@
                                                     <span><span class="text-muted">担当：</span>{{ $result->evaluationPublishedBy->name }}</span>
                                                 @endif
                                             </div>
-                                            <div class="small fw-bold mt-2 text-body">評価文</div>
+                                            <div class="small fw-bold mt-2 text-body">アドバイス</div>
                                             <div class="record-block__line3 record-block__clamp">{{ $result->evaluation_text }}</div>
                                         </div>
                                     </a>

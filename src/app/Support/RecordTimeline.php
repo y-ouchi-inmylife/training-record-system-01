@@ -8,16 +8,16 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
- * トレーニング記録と、公開済みの愛犬性格診断の評価文を、1 つの一覧に混ぜて新しい順に並べる（2026-10-18 追加。
- * 要件定義書 6-3-3・6-15-6・6-16-16、設計書 S-0305 セクション2・S-1402「愛犬性格診断の評価を混ぜる」）。
+ * トレーニング記録と、公開済みの愛犬性格診断のアドバイスを、1 つの一覧に混ぜて新しい順に並べる（2026-10-18 追加。
+ * 要件定義書 6-3-3・6-15-6・6-16-16、設計書 S-0305 セクション2・S-1402「愛犬性格診断のアドバイスを混ぜる」）。
  * 会員詳細（S-0305）とマイページ（S-1402）で同じ並びにするため、ここ 1 か所で並べる。
  *
  * 並び：
- * - 日付の新しい順。記録はトレーニング日、評価文は公開した日（evaluation_published_at の日付）
- * - 同じ日なら時刻の新しい順。記録はトレーニングの時刻、評価文は公開した時刻
+ * - 日付の新しい順。記録はトレーニング日、アドバイスは公開した日（evaluation_published_at の日付）
+ * - 同じ日なら時刻の新しい順。記録はトレーニングの時刻、アドバイスは公開した時刻
  * - 時刻のない記録は、その日のいちばん後ろ（今の記録どうしの並び〔training_time の降順で NULL が後ろ〕と同じ）
- * - 日付と時刻がまったく同じなら、記録が先・評価文が後ろ。記録どうし・評価文どうしは渡された順のまま
- *   （PHP の並べ替えは安定。記録は呼ぶ側の並びのまま、評価文は公開した日時が同じなら id の順）
+ * - 日付と時刻がまったく同じなら、記録が先・アドバイスが後ろ。記録どうし・アドバイスどうしは渡された順のまま
+ *   （PHP の並べ替えは安定。記録は呼ぶ側の並びのまま、アドバイスは公開した日時が同じなら id の順）
  *
  * 件数（「トレーニング記録（N件）」「全 N 回」）は記録だけを数える。ここで混ぜた一覧の数を件数に使わない
  */
@@ -26,14 +26,14 @@ class RecordTimeline
     /** 一覧の 1 件の種類：トレーニング記録 */
     public const RECORD = 'record';
 
-    /** 一覧の 1 件の種類：愛犬性格診断の評価文 */
+    /** 一覧の 1 件の種類：愛犬性格診断のアドバイス */
     public const EVALUATION = 'evaluation';
 
     /**
      * 混ぜた一覧を返す。要素は type（RECORD / EVALUATION）・item（渡された要素そのまま）・date（一覧に出す日付）
      *
      * @param  iterable<int, mixed>  $records  トレーニング記録。要素は TrainingRecord か、記録を 'record' に持つ配列（マイページの $sessions）
-     * @param  iterable<int, TraineePersonalityDiagnosisResult>  $evaluations  公開済みの評価文の結果
+     * @param  iterable<int, TraineePersonalityDiagnosisResult>  $evaluations  公開済みのアドバイスの結果
      * @return Collection<int, array{type: string, item: mixed, date: CarbonInterface}>
      */
     public static function merge(iterable $records, iterable $evaluations): Collection
@@ -57,7 +57,7 @@ class RecordTimeline
             ];
         }
 
-        // 新しい順。キーが同じものは元の並び（記録が先、評価文が後ろ）のまま
+        // 新しい順。キーが同じものは元の並び（記録が先、アドバイスが後ろ）のまま
         usort($entries, fn (array $a, array $b) => strcmp($b['key'], $a['key']));
 
         return collect($entries)->map(fn (array $entry) => [

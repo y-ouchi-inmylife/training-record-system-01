@@ -66,7 +66,7 @@ class ClientContractNavRenderingTest extends TestCase
             $table->date('measured_date');
             $table->time('measured_time');
         });
-        // 記録の一覧に混ぜる公開済みの評価文を読む（2026-10-18 追加。中身は空）
+        // 記録の一覧に混ぜる公開済みのアドバイスを読む（2026-10-18 追加。中身は空）
         $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();
     }
