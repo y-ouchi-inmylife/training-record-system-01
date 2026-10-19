@@ -192,12 +192,18 @@
     </script>
     <script>
         // successフラッシュメッセージを5秒後に自動消去する（data-auto-dismiss 属性を持つ要素のみ）
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('[data-auto-dismiss]').forEach(function (el) {
-                setTimeout(function () {
+        // 後からスクリプトで出したお知らせにも同じ数え方を使えるよう、window.autoDismissAlert として呼べるようにする
+        // （2026-10-19 変更。S-0313 の［AIで自動生成］のお知らせ。ページを開いたときの動きは今のまま）。
+        // 5 秒のあいだに画面から外されたお知らせは閉じない（続けて出し直したときなど）
+        window.autoDismissAlert = function (el) {
+            setTimeout(function () {
+                if (document.body.contains(el)) {
                     bootstrap.Alert.getOrCreateInstance(el).close();
-                }, 5000);
-            });
+                }
+            }, 5000);
+        };
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-auto-dismiss]').forEach(window.autoDismissAlert);
         });
     </script>
     @stack('scripts')

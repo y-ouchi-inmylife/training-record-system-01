@@ -978,7 +978,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える<\/button>/u', $modal);
         $this->assertStringNotContainsString('btn-outline-danger', $modal);
         // お知らせはカードの上（最初は出さない）
-        $this->assertStringContainsString('<div class="alert d-none" role="status" data-evaluation-draft-notice></div>', $html);
+        // 2026-10-19 変更：入れ物だけを置き、お知らせは出すたびにスクリプトで作る（その前は <div class="alert d-none" role="status" …>）
+        $this->assertStringContainsString('<div data-evaluation-draft-notice></div>', $html);
+        $this->assertStringNotContainsString('<div class="alert d-none" role="status" data-evaluation-draft-notice>', $html);
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-evaluation'), strpos($html, 'data-evaluation-draft-notice'));
         // ブラウザの confirm は使わない
         $this->assertStringNotContainsString('confirm(', $html);
@@ -1316,5 +1318,27 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('unsavedGuard.hasChanges = false;', $html);
         // 仕組みは app.js から読み込む（ほかの画面と同じ）
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*app-[^"]*\\.js"/u', $html);
+    }
+
+    public function test_AIで自動生成のお知らせはほかのお知らせと同じ作りで緑は5秒で消え赤は消えない(): void
+    {
+        $html = $this->page($this->addResult('past-1', '2026-10-15 10:30:00'));
+
+        // レイアウトの「5 秒で消える」仕組みを、後から出したお知らせにも呼べる（ページを開いたときは今までどおり data-auto-dismiss を数える）
+        $this->assertMatchesRegularExpression('/window\.autoDismissAlert = function \(el\) \{\s*setTimeout\(function \(\) \{\s*if \(document\.body\.contains\(el\)\) \{\s*bootstrap\.Alert\.getOrCreateInstance\(el\)\.close\(\);\s*\}\s*\}, 5000\);\s*\};/u', $html);
+        $this->assertStringContainsString("document.querySelectorAll('[data-auto-dismiss]').forEach(window.autoDismissAlert);", $html);
+        // お知らせはフラッシュメッセージと同じクラス・閉じるボタン・role="alert"
+        $this->assertStringContainsString("alertEl.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger') + ' alert-dismissible fade show';", $html);
+        $this->assertStringContainsString("alertEl.setAttribute('role', 'alert');", $html);
+        $this->assertStringContainsString("closeButton.className = 'btn-close';", $html);
+        $this->assertStringContainsString("closeButton.setAttribute('data-bs-dismiss', 'alert');", $html);
+        // 緑だけ data-auto-dismiss を付けて 5 秒で消す。赤は消さない
+        $this->assertMatchesRegularExpression("/if \\(ok\\) \\{\\s*(?:\\/\\/[^\\n]*\\s*)?alertEl\\.setAttribute\\('data-auto-dismiss', ''\\);\\s*window\\.autoDismissAlert\\(alertEl\\);\\s*\\}/u", $html);
+        $this->assertSame(1, substr_count($html, 'window.autoDismissAlert(alertEl)'));
+        $this->assertStringContainsString("showNotice(false, 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');", $html);
+        // 出すたび・押すたびに前のお知らせを外す（閉じると要素ごと外れるので作り直す）
+        $this->assertSame(2, substr_count($html, 'notice.replaceChildren();'));
+        // 文は textContent で入れる（innerHTML は使わない）
+        $this->assertStringContainsString('alertEl.appendChild(document.createTextNode(message));', $html);
     }
 }

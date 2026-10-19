@@ -143,9 +143,11 @@
          - 2 つのまとまりのあいだは薄い線（border-top）と上下の空きで分ける
          - 見出しの行・アドバイスの小見出しの行とも、上下の真ん中をそろえ、狭い幅で 1 行に収まらないときはボタンを次の行へ折り返して右に寄せる
            （flex-wrap と ms-auto） --}}
-    {{-- AI の自動生成のお知らせ（2026-10-19 追加）。［AIで自動生成］のあと、下のスクリプトが文を入れて出す（成功は緑、失敗は赤）。
-         読み上げで伝わるよう role="status"。最初は出さない --}}
-    <div class="alert d-none" role="status" data-evaluation-draft-notice></div>
+    {{-- AI の自動生成のお知らせ（2026-10-19 追加）。［AIで自動生成］のあと、下のスクリプトがこの中にお知らせを作って出す（成功は緑、失敗は赤）。
+         最初は空。見た目・消え方・読み上げ（role="alert"）はレイアウトのフラッシュメッセージと同じ
+         （2026-10-19 変更：緑は data-auto-dismiss を付けて 5 秒で消す。赤はほかのエラーと同じく消さない。どちらも閉じるボタンあり。
+         その前は、この要素そのものに role="status" を付け、色を付け替えて出したままにしていた） --}}
+    <div data-evaluation-draft-notice></div>
 
     <div class="card mb-3" data-personality-diagnosis-evaluation>
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -408,15 +410,29 @@ document.addEventListener('DOMContentLoaded', function () {
     var confirmEl = document.querySelector('[data-evaluation-draft-confirm]');
     if (draftButton && textarea && staffMemo && notice && confirmEl) {
         var label = draftButton.textContent;
+        // お知らせはレイアウトのフラッシュメッセージと同じ作り。閉じると要素ごと外れるので、出すたびに作り直す
         var showNotice = function (ok, message) {
-            notice.textContent = message;
-            notice.classList.remove('d-none', 'alert-success', 'alert-danger');
-            notice.classList.add(ok ? 'alert-success' : 'alert-danger');
+            notice.replaceChildren();
+            var alertEl = document.createElement('div');
+            alertEl.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger') + ' alert-dismissible fade show';
+            alertEl.setAttribute('role', 'alert');
+            alertEl.appendChild(document.createTextNode(message));
+            var closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'btn-close';
+            closeButton.setAttribute('data-bs-dismiss', 'alert');
+            alertEl.appendChild(closeButton);
+            notice.appendChild(alertEl);
+            if (ok) {
+                // 緑はほかの完了メッセージと同じく 5 秒で消す（赤のエラーは消さない）
+                alertEl.setAttribute('data-auto-dismiss', '');
+                window.autoDismissAlert(alertEl);
+            }
         };
         var makeDraft = function () {
             draftButton.disabled = true;
             draftButton.textContent = '生成中…';
-            notice.classList.add('d-none');
+            notice.replaceChildren();
             fetch(draftButton.getAttribute('data-url'), {
                 method: 'POST',
                 headers: {
