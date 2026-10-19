@@ -973,7 +973,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $modal = substr($html, strpos($html, 'data-evaluation-draft-confirm>'));
         $modal = substr($modal, 0, strpos($modal, '</div>', strpos($modal, 'modal-footer')) + 6);
         $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで自動生成</h5>', $modal);
-        $this->assertStringContainsString('<p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した文で置き換えます。よろしいですか？</p>', $modal);
+        $this->assertStringContainsString('<p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した内容で置き換えます。よろしいですか？</p>', $modal);
         // ［キャンセル］は灰色の塗り（2026-10-19 変更：この画面のほかの確認のモーダルの［キャンセル］とそろえた。その前は赤の枠線）
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える<\/button>/u', $modal);
         $this->assertStringNotContainsString('btn-outline-danger', $modal);
@@ -985,10 +985,12 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // 画面のスクリプトの文
         // 2026-10-19 変更：ボタン名を［AIで自動生成］にし、文もそろえた（その前は「作成中…」「AIの下書きを…」）
         $this->assertStringContainsString("'生成中…'", $html);
-        $this->assertStringContainsString('AIで自動生成した文を入れました。内容を確かめて、［更新］で保存してください。', $html);
-        $this->assertStringContainsString('スタッフ用メモは作れませんでした。', $html);
+        // お知らせは何をしたかだけ（2026-10-19 変更：「#####」がないときは別の文にする。「文」という言葉は使わない）
+        $this->assertStringContainsString("'AIでアドバイスとスタッフ用メモを自動生成しました。'", $html);
+        $this->assertStringContainsString("'AIでアドバイスを自動生成しました。スタッフ用メモは自動生成できませんでした。'", $html);
+        $this->assertMatchesRegularExpression("/var message = body\\.staff_memo_missing\\s*\\? 'AIでアドバイスを自動生成しました。スタッフ用メモは自動生成できませんでした。'\\s*: 'AIでアドバイスとスタッフ用メモを自動生成しました。';/u", $html);
         $this->assertStringContainsString('AIで自動生成できませんでした。時間をおいてもう一度お試しください。', $html);
-        foreach (['AIで下書き', 'AIの下書き', '作成中…', 'それぞれ［更新］'] as $old) {
+        foreach (['AIで下書き', 'AIの下書き', '作成中…', 'それぞれ［更新］', 'AIで自動生成した文', '文を入れました', '［更新］で保存してください', 'スタッフ用メモは作れませんでした'] as $old) {
             $this->assertStringNotContainsString($old, $html, $old);
         }
         // 状態のバッジの「下書き」（公開していないアドバイス）は AI とは別の意味なので変えない
@@ -1245,7 +1247,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // M04・M02 は今のまま（公開取消 M03 は公開済みのときだけ。下で見る）
         $draft = substr($html, strpos($html, 'data-evaluation-draft-confirm>'));
         $draft = substr($draft, 0, strpos($draft, 'modal-footer'));
-        $this->assertMatchesRegularExpression('/<div class="modal-body">\s*<p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した文で置き換えます。よろしいですか？<\/p>\s*<\/div>/u', $draft);
+        $this->assertMatchesRegularExpression('/<div class="modal-body">\s*<p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した内容で置き換えます。よろしいですか？<\/p>\s*<\/div>/u', $draft);
         $delete = substr($html, strpos($html, 'data-personality-diagnosis-delete>'));
         $this->assertStringNotContainsString('現在の編集内容', substr($delete, 0, strpos($delete, 'modal-footer')));
 

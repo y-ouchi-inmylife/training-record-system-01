@@ -249,7 +249,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した文で置き換えます。よろしいですか？</p>
+                    <p class="mb-0">アドバイスとスタッフ用メモを、AIで自動生成した内容で置き換えます。よろしいですか？</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
@@ -435,10 +435,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 staffMemo.value = body.staff_memo || '';
                 textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 staffMemo.dispatchEvent(new Event('input', { bubbles: true }));
-                var message = 'AIで自動生成した文を入れました。内容を確かめて、［更新］で保存してください。';
-                if (body.staff_memo_missing) {
-                    message += 'スタッフ用メモは作れませんでした。';
-                }
+                // お知らせは何をしたかだけを伝える（2026-10-19 変更：次にすることの指示は書かず、「文」という言葉も使わない）
+                var message = body.staff_memo_missing
+                    ? 'AIでアドバイスを自動生成しました。スタッフ用メモは自動生成できませんでした。'
+                    : 'AIでアドバイスとスタッフ用メモを自動生成しました。';
                 showNotice(true, message);
             }).catch(function () {
                 showNotice(false, 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');
