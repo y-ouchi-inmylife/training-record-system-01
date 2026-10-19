@@ -43,4 +43,10 @@ return [
         'api_key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
     ],
+
+    // 愛犬性格診断の評価文とスタッフ用メモの AI の下書き（2026-10-19 追加。設計書 S-0313「AIで下書き」）。
+    // driver：使う AI の会社（今は anthropic だけ。App\Providers\AppServiceProvider で実装を選ぶ）。キー・モデルは上の anthropic を使う
+    'evaluation_draft' => [
+        'driver' => env('EVALUATION_DRAFT_DRIVER', 'anthropic'),
+    ],
 ];

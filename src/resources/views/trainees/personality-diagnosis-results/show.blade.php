@@ -104,6 +104,10 @@
     {{-- 評価文（要件定義書 6-16-15・6-16-16）。どの状態でもテキストエリア（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。
          空で保存すると「なし」に戻る（公開済みのときは空にできない）。公開済みのときも直せ、直すとそのまま会員様の画面に出る
          （2026-10-18 変更：その前は、公開でトレーニング記録を作り、公開済みは表示だけで記録へのリンクを出していた） --}}
+    {{-- AI の下書きのお知らせ（2026-10-19 追加）。［AIで下書き］のあと、下のスクリプトが文を入れて出す（成功は緑、失敗は赤）。
+         読み上げで伝わるよう role="status"。最初は出さない --}}
+    <div class="alert d-none" role="status" data-evaluation-draft-notice></div>
+
     <div class="card mb-3" data-personality-diagnosis-evaluation>
         {{-- 見出しの行：左に「評価文」とすぐ右に状態のバッジ（公開済みのときは、その右に公開した日）、右にボタン
              （なし・下書き：［更新］［公開］、公開済み：［更新］［公開取消］）。ボタンの大きさは、ほかのカードの見出しのボタン
@@ -125,7 +129,11 @@
                  ［公開］（青の塗り。業務の中で必ず使う操作）は、欄が空（空白だけを含む）なら押せない（disabled。入力に合わせて下のスクリプトで
                  切り替える。サーバーでも必須を確かめる）。押すとモーダル（S-0313-M01）で、欄の今の文（保存していない直しを含む）を送る。
                  ［公開取消］は白抜きの赤（4-4 の「取消など、消す操作で目立たせすぎたくないもの」）。押すとモーダル（S-0313-M03） --}}
+            {{-- ［AIで下書き］（2026-10-19 追加）：［更新］の左。いつも使うとはかぎらない操作なので青の枠線（4-4）。押すと評価文とスタッフ用メモの
+                 下書きを AI で作り、2 つの欄に入れる（保存はしない。下のスクリプト）。どちらかの欄に文があるときは、先に確かめる（S-0313-M04） --}}
             <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>
+                <button type="button" class="btn btn-outline-primary" data-evaluation-draft
+                        data-url="{{ route('trainee-personality-diagnosis-results.evaluation-draft', [$trainee, $result]) }}">AIで下書き</button>
                 <button type="submit" form="evaluation-form" class="btn btn-success">更新</button>
                 @if($isPublished)
                     <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#personality-diagnosis-unpublish"
@@ -146,6 +154,30 @@
                 <textarea class="form-control @error('evaluation_text') is-invalid @enderror" id="evaluation_text" name="evaluation_text"
                           rows="12" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::EVALUATION_MAX_LENGTH }}">{{ old('evaluation_text', $result->evaluation_text) }}</textarea>
                 <x-form-error field="evaluation_text" />
+            </form>
+        </div>
+    </div>
+
+    {{-- スタッフ用メモ（2026-10-19 追加。要件定義書 6-16-19、設計書 S-0313「スタッフ用メモ」）。トレーナーだけが見るメモで、会員様の画面には一切出さない。
+         評価文の下に置く。入力欄（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。公開・公開取消はない。
+         評価文の［更新］とは別のフォーム・別のルート（PUT …/staff-memo）で、スタッフ用メモだけを保存する（評価文の［更新］ではスタッフ用メモは変わらない）。
+         ［AIで下書き］で、AI のスタッフ用の下書きが入る --}}
+    <div class="card mb-3" data-personality-diagnosis-staff-memo>
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h6 class="mb-0">スタッフ用メモ</h6>
+            <div class="d-flex flex-wrap gap-2 ms-auto">
+                <button type="submit" form="staff-memo-form" class="btn btn-success">更新</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">会員様には表示されません。</p>
+            <form method="POST" action="{{ route('trainee-personality-diagnosis-results.staff-memo.update', [$trainee, $result]) }}" novalidate id="staff-memo-form" data-staff-memo-form>
+                @csrf
+                @method('PUT')
+                <label for="staff_memo" class="visually-hidden">スタッフ用メモ</label>
+                <textarea class="form-control @error('staff_memo') is-invalid @enderror" id="staff_memo" name="staff_memo"
+                          rows="6" maxlength="{{ \App\Models\TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH }}">{{ old('staff_memo', $result->staff_memo) }}</textarea>
+                <x-form-error field="staff_memo" />
             </form>
         </div>
     </div>
@@ -186,6 +218,27 @@
          2026-10-18 変更：ユーザーレビューで、文のあとに「よろしいですか？」を足した（同じ行に続け、全角の「？」。トレーナー側のほかの確認にそろえた）。
          2026-10-18 変更：ユーザーレビューで、公開取消の確認（M03「会員のマイページから{名前}の公開を取り消しますか？」）と言い方をそろえ、
          「会員のマイページに{名前}を公開しますか？」にした（その前は「〜を公開します。よろしいですか？」） --}}
+    {{-- AI の下書きの確かめモーダル（S-0313-M04。2026-10-19 追加）。評価文かスタッフ用メモのどちらかに文があるときだけ、［AIで下書き］で開く
+         （どちらも空なら開かずに作る）。［キャンセル］は赤の枠線、［置き換える］は青の塗り（設計書 S-0313-M04） --}}
+    <div class="modal fade" id="personality-diagnosis-draft-confirm" tabindex="-1"
+         aria-labelledby="personality-diagnosis-draft-confirm-label" aria-hidden="true" data-evaluation-draft-confirm>
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで下書き</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">評価文とスタッフ用メモを、AIの下書きで置き換えます。よろしいですか？</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @if(! $isPublished)
         <div class="modal fade" id="personality-diagnosis-publish" tabindex="-1"
              aria-labelledby="personality-diagnosis-publish-label" aria-hidden="true" data-personality-diagnosis-publish>
@@ -302,6 +355,68 @@ document.addEventListener('DOMContentLoaded', function () {
     if (unpublishForm) {
         unpublishForm.addEventListener('submit', function () {
             unpublishForm.querySelector('button[type="submit"]').disabled = true;
+        });
+    }
+
+    // ［AIで下書き］（2026-10-19 追加。設計書 S-0313「AIで下書き」）
+    // - どちらかの欄に文があれば、先に確かめのモーダル（S-0313-M04）。どちらも空なら確かめずに作る
+    // - 作っている間はボタンを「作成中…」にして押せなくする。返ってきたら 2 つの欄に入れる（保存はしない）
+    // - 欄に入れたら input のイベントを出し、［公開］を押せるかどうか（上の update）も動かす
+    var draftButton = document.querySelector('[data-evaluation-draft]');
+    var staffMemo = document.querySelector('[data-staff-memo-form] textarea[name="staff_memo"]');
+    var notice = document.querySelector('[data-evaluation-draft-notice]');
+    var confirmEl = document.querySelector('[data-evaluation-draft-confirm]');
+    if (draftButton && textarea && staffMemo && notice && confirmEl) {
+        var label = draftButton.textContent;
+        var showNotice = function (ok, message) {
+            notice.textContent = message;
+            notice.classList.remove('d-none', 'alert-success', 'alert-danger');
+            notice.classList.add(ok ? 'alert-success' : 'alert-danger');
+        };
+        var makeDraft = function () {
+            draftButton.disabled = true;
+            draftButton.textContent = '作成中…';
+            notice.classList.add('d-none');
+            fetch(draftButton.getAttribute('data-url'), {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                },
+            }).then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (body) {
+                    if (!response.ok || typeof body.evaluation !== 'string') {
+                        throw new Error('draft failed');
+                    }
+                    return body;
+                });
+            }).then(function (body) {
+                textarea.value = body.evaluation;
+                staffMemo.value = body.staff_memo || '';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                staffMemo.dispatchEvent(new Event('input', { bubbles: true }));
+                var message = 'AIの下書きを入れました。内容を確かめて、評価文とスタッフ用メモをそれぞれ［更新］で保存してください。';
+                if (body.staff_memo_missing) {
+                    message += 'スタッフ用メモは作れませんでした。';
+                }
+                showNotice(true, message);
+            }).catch(function () {
+                showNotice(false, 'AIの下書きを作れませんでした。時間をおいてもう一度お試しください。');
+            }).finally(function () {
+                draftButton.disabled = false;
+                draftButton.textContent = label;
+            });
+        };
+        draftButton.addEventListener('click', function () {
+            if (textarea.value.trim() === '' && staffMemo.value.trim() === '') {
+                makeDraft();
+                return;
+            }
+            bootstrap.Modal.getOrCreateInstance(confirmEl).show();
+        });
+        confirmEl.querySelector('[data-evaluation-draft-replace]').addEventListener('click', function () {
+            bootstrap.Modal.getOrCreateInstance(confirmEl).hide();
+            makeDraft();
         });
     }
 });

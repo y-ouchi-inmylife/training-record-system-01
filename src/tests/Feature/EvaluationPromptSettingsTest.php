@@ -1,0 +1,79 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\SystemSetting;
+use App\Models\Trainer;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\CreatesClientCountTables;
+use Tests\TestCase;
+
+/**
+ * 愛犬性格診断の評価文プロンプト（S-0602。2026-10-19 追加）。要約プロンプト（S-0601）と同じく管理者だけが開け、5000 字まで
+ */
+class EvaluationPromptSettingsTest extends TestCase
+{
+    use CreatesClientCountTables;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->createAccessLogsTable();
+        Schema::create('system_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key', 50)->unique();
+            $table->text('value')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    private function actingAsRole(string $role): void
+    {
+        $trainer = new Trainer(['name' => '佐藤', 'role' => $role]);
+        $trainer->id = 200;
+        $trainer->exists = true;
+        $this->actingAs($trainer, 'web');
+    }
+
+    public function test_管理者は開けて既定の指示文と差し込みの印の一覧と区切りの説明が出る(): void
+    {
+        $this->actingAsRole('admin');
+
+        $html = $this->get(route('settings.evaluation-prompts.edit'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<h2 class="mb-0">愛犬性格診断の評価文プロンプト</h2>', $html);
+        $this->assertStringContainsString('ドッグトレーナーとして、以下のデータから「お客様用レポート」と「スタッフ用指示書」を作成してください。', $html);
+        foreach (['{{犬の名前}}', '{{タイプ}}', '{{スコア}}', '{{悩み}}', '{{背景}}', '{{理想}}', '{{健康}}'] as $placeholder) {
+            $this->assertStringContainsString('<code>'.$placeholder.'</code>', $html, $placeholder);
+        }
+        $this->assertStringContainsString('お客様用とスタッフ用は「#####」で分けて出すよう指示してください', $html);
+        // メニューの要約プロンプトのすぐ下
+        $this->assertMatchesRegularExpression('/>要約プロンプト<\\/a><\\/li>\\s*<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断の評価文プロンプト<\\/a><\\/li>/u', $html);
+    }
+
+    public function test_一般のトレーナーとシステム管理者は開けない(): void
+    {
+        foreach (['staff', 'system_admin'] as $role) {
+            $this->actingAsRole($role);
+            $this->assertContains($this->get(route('settings.evaluation-prompts.edit'))->getStatusCode(), [302, 403], $role);
+            $this->assertContains($this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => 'x'])->getStatusCode(), [302, 403], $role);
+        }
+        $this->assertSame(0, SystemSetting::query()->count());
+    }
+
+    public function test_保存できて5000字まで(): void
+    {
+        $this->actingAsRole('admin');
+
+        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => str_repeat('あ', 5000)])
+            ->assertRedirect(route('settings.evaluation-prompts.edit'))
+            ->assertSessionHas('success', '愛犬性格診断の評価文プロンプト設定を保存しました。');
+        $this->assertSame(5000, mb_strlen(SystemSetting::query()->where('key', 'evaluation_prompt_current')->value('value')));
+
+        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => str_repeat('あ', 5001)])->assertSessionHasErrors('evaluation_prompt');
+        $this->put(route('settings.evaluation-prompts.update'), ['evaluation_prompt' => ''])->assertSessionHasErrors('evaluation_prompt');
+        $this->assertSame(5000, mb_strlen(SystemSetting::query()->where('key', 'evaluation_prompt_current')->value('value')));
+    }
+}

@@ -46,6 +46,9 @@ class TraineePersonalityDiagnosisResult extends Model
     /** 評価文の上限の文字数（改行を含む。設計書 S-0313） */
     public const EVALUATION_MAX_LENGTH = 10000;
 
+    /** スタッフ用メモの上限の文字数（改行を含む。評価文と同じ。2026-10-19 追加。設計書 S-0313） */
+    public const STAFF_MEMO_MAX_LENGTH = 10000;
+
     protected $fillable = [
         'trainee_id',
         'trainee_personality_diagnosis_token_id',
@@ -61,6 +64,8 @@ class TraineePersonalityDiagnosisResult extends Model
         'score_excitability',
         'personality_type',
         'evaluation_text',
+        // スタッフ用メモ（2026-10-19 追加。トレーナーだけが見る。会員様の画面には出さない）
+        'staff_memo',
         'evaluation_updated_by',
         'evaluation_updated_at',
         'evaluation_published_at',

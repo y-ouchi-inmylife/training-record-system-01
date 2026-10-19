@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
+use App\Services\EvaluationDraft\EvaluationDraftFailedException;
+use App\Services\EvaluationDraft\EvaluationDraftGenerator;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -161,6 +164,51 @@ class TraineePersonalityDiagnosisResultController extends Controller
         return redirect()
             ->route('trainees.show', $trainee)
             ->with('success', __('messages.personality_diagnosis_name').'の結果を削除しました。');
+    }
+
+    /**
+     * スタッフ用メモを更新する（PUT …/{personalityDiagnosisResult}/staff-memo。S-0313 のスタッフ用メモの［更新］。2026-10-19 追加）。
+     *
+     * 評価文の［更新］とは別のルート・別のフォーム（スタッフ用メモだけを保存し、評価文・公開の状態・最終更新〔評価文の〕は変えない。
+     * 逆に評価文の［更新］ではスタッフ用メモを変えない）。10,000 文字以内。改行は LF にそろえてから数える（評価文と同じ）。
+     * 空（空白だけを含む）なら NULL。会員様の画面には一切出さない
+     */
+    public function updateStaffMemo(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): RedirectResponse
+    {
+        $text = $request->input('staff_memo');
+        if (is_string($text)) {
+            $request->merge(['staff_memo' => str_replace(["\r\n", "\r"], "\n", $text)]);
+        }
+        $validated = $request->validate([
+            'staff_memo' => 'nullable|string|max:'.TraineePersonalityDiagnosisResult::STAFF_MEMO_MAX_LENGTH,
+        ]);
+
+        $personalityDiagnosisResult->update(['staff_memo' => blank($validated['staff_memo'] ?? null) ? null : $validated['staff_memo']]);
+
+        return $this->backToShow($trainee, $personalityDiagnosisResult, 'スタッフ用メモを更新しました。');
+    }
+
+    /**
+     * 評価文とスタッフ用メモの下書きを AI で作る（POST …/{personalityDiagnosisResult}/evaluation-draft。S-0313 の［AIで下書き］。2026-10-19 追加）。
+     *
+     * その場で AI を呼び（キューは使わない）、JSON の { evaluation, staff_memo, staff_memo_missing } を返す。何も保存しない
+     * （画面の JS が 2 つの欄に入れ、トレーナーがそれぞれ［更新］で保存する）。公開済みでも作れる。何度でも作れる。
+     * 失敗したら 502 と決まった文だけを返す（細かい原因はログにだけ。EvaluationDraftGenerator の実装が残す）。
+     * AI の会社は EvaluationDraftGenerator の実装で決まる（今は Claude）。アクセスログには記録しない
+     */
+    public function draft(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult, EvaluationDraftGenerator $generator): JsonResponse
+    {
+        try {
+            $draft = $generator->generate($personalityDiagnosisResult);
+        } catch (EvaluationDraftFailedException) {
+            return response()->json(['message' => 'AIの下書きを作れませんでした。時間をおいてもう一度お試しください。'], 502);
+        }
+
+        return response()->json([
+            'evaluation' => $draft->evaluation,
+            'staff_memo' => $draft->staffMemo,
+            'staff_memo_missing' => $draft->staffMemoMissing,
+        ]);
     }
 
     /**

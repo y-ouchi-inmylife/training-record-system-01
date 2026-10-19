@@ -1,0 +1,82 @@
+<?php
+
+namespace App\Services\EvaluationDraft;
+
+use Anthropic\Client;
+use App\Models\TraineePersonalityDiagnosisResult;
+use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Claude（Anthropic）で評価文とスタッフ用メモの下書きを作る（2026-10-19 追加。EvaluationDraftGenerator の実装）。
+ *
+ * 音声の要約（App\Services\SummarizationService）と同じ作り：anthropic-ai/sdk、キー・モデルは config('services.anthropic.*')
+ * （ANTHROPIC_API_KEY・ANTHROPIC_MODEL）。違うところ：
+ * - 待ち時間の上限は 60 秒（その場で呼んで画面で待つため）。SDK 0.6.0 の timeout の指定は HTTP の呼び出しに使われないので、
+ *   時間切れを付けた Guzzle を transporter として渡す
+ * - 再試行しない（maxRetries 0。費用のため。SDK の既定は 2 回まで再試行する）
+ * - 出す長さの上限（maxTokens）は 3000（お客様用 800 字＋スタッフ用 300 字の日本語が切れずに収まる量）
+ * - ログ（laravel.log）には、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけを残す。
+ *   送った文・返ってきた文・名前は残さない。失敗のときはエラーの内容を残す
+ */
+class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
+{
+    /** 出す長さの上限（トークン） */
+    public const MAX_TOKENS = 3000;
+
+    /** 待ち時間の上限（秒） */
+    public const TIMEOUT_SECONDS = 60;
+
+    public function generate(TraineePersonalityDiagnosisResult $result): EvaluationDraft
+    {
+        $apiKey = config('services.anthropic.api_key');
+        $model = (string) config('services.anthropic.model');
+        if (empty($apiKey)) {
+            Log::error('評価文のAI下書き：Anthropic の API キーが設定されていません', ['result_id' => $result->id]);
+            throw new EvaluationDraftFailedException('Anthropic API key is not set.');
+        }
+
+        $prompt = PersonalityEvaluationPrompt::render($result);
+        $started = microtime(true);
+        try {
+            $client = new Client(apiKey: $apiKey, requestOptions: [
+                'maxRetries' => 0,
+                'timeout' => self::TIMEOUT_SECONDS,
+                'transporter' => new GuzzleClient(['timeout' => self::TIMEOUT_SECONDS, 'connect_timeout' => 10]),
+            ]);
+            $response = $client->messages->create(
+                maxTokens: self::MAX_TOKENS,
+                messages: [['role' => 'user', 'content' => $prompt]],
+                model: $model,
+            );
+        } catch (\Throwable $e) {
+            Log::error('評価文のAI下書き：呼び出しに失敗しました', [
+                'result_id' => $result->id,
+                'model' => $model,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+                'error' => get_class($e).': '.$e->getMessage(),
+            ]);
+            throw new EvaluationDraftFailedException('AI の呼び出しに失敗しました。', previous: $e);
+        }
+
+        $text = '';
+        foreach ($response->content as $block) {
+            $text .= $block->text ?? '';
+        }
+        Log::info('評価文のAI下書き：作成しました', [
+            'result_id' => $result->id,
+            'model' => $model,
+            'input_tokens' => $response->usage->inputTokens,
+            'output_tokens' => $response->usage->outputTokens,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            'stop_reason' => $response->stopReason,
+        ]);
+
+        try {
+            return EvaluationDraft::fromResponse($text);
+        } catch (EvaluationDraftFailedException $e) {
+            Log::error('評価文のAI下書き：返事が空でした', ['result_id' => $result->id, 'model' => $model]);
+            throw $e;
+        }
+    }
+}

@@ -21,6 +21,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AudioRecordController;
 use App\Http\Controllers\RecordingV2Controller;
 use App\Http\Controllers\StatisticsController;
+use App\Http\Controllers\EvaluationPromptController;
 use App\Http\Controllers\SummaryPromptController;
 use App\Http\Controllers\TraineeController;
 use App\Http\Controllers\TraineeCombinedSurveyTokenController;
@@ -169,6 +170,14 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish', [TraineePersonalityDiagnosisResultController::class, 'unpublish'])
                 ->scopeBindings()
                 ->name('trainee-personality-diagnosis-results.unpublish');
+            // スタッフ用メモの保存（S-0313 のスタッフ用メモの［更新］）と、評価文・スタッフ用メモの AI の下書き（［AIで下書き］。JSON を返す）。
+            // 2026-10-19 追加。権限は評価文の［更新］と同じ（管理者・一般のトレーナー）。scopeBindings で別のトレーニーの結果は 404
+            Route::put('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo', [TraineePersonalityDiagnosisResultController::class, 'updateStaffMemo'])
+                ->scopeBindings()
+                ->name('trainee-personality-diagnosis-results.staff-memo.update');
+            Route::post('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft', [TraineePersonalityDiagnosisResultController::class, 'draft'])
+                ->scopeBindings()
+                ->name('trainee-personality-diagnosis-results.evaluation-draft');
             // 愛犬性格診断の結果の削除（S-0313 の［削除］。管理者のみ。2026-10 追加。2026-10-18 変更：当初は S-0309 の結果の表の行の［削除］）。
             // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
             Route::delete('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'destroy'])
@@ -237,6 +246,9 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 要約プロンプト設定
             Route::get('settings/summary-prompts', [SummaryPromptController::class, 'edit'])->name('settings.summary-prompts.edit');
             Route::put('settings/summary-prompts', [SummaryPromptController::class, 'update'])->name('settings.summary-prompts.update');
+            // 愛犬性格診断の評価文プロンプト（S-0602。S-0313 の［AIで下書き］の指示文。2026-10-19 追加）
+            Route::get('settings/evaluation-prompts', [EvaluationPromptController::class, 'edit'])->name('settings.evaluation-prompts.edit');
+            Route::put('settings/evaluation-prompts', [EvaluationPromptController::class, 'update'])->name('settings.evaluation-prompts.update');
 
             // トレーナー操作履歴
             Route::get('access-logs', [AccessLogController::class, 'index'])->name('access-logs.index');

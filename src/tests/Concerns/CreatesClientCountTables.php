@@ -183,6 +183,7 @@ trait CreatesClientCountTables
             $table->string('personality_type', 30)->nullable();
             // 評価文と、最後に評価文を保存したトレーナー・日時（2026-10-18 追加。2026_10_18_000003_add_evaluation_to_…）
             $table->text('evaluation_text')->nullable();
+            $table->text('staff_memo')->nullable(); // スタッフ用メモ（2026-10-19 追加。2026_10_19_000005）
             $table->unsignedBigInteger('evaluation_updated_by')->nullable();
             $table->timestamp('evaluation_updated_at')->nullable();
             // 評価文を公開した日時とトレーナー（2026-10-18 追加。2026_10_18_000005_add_evaluation_published_to_…）

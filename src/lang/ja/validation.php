@@ -353,6 +353,9 @@ return [
         'health_concerns' => '体のこと',
         // 愛犬性格診断の評価文（S-0313。2026-10-18 追加）
         'evaluation_text' => '評価文',
+        // スタッフ用メモ（S-0313）と評価文プロンプト（S-0602）。2026-10-19 追加
+        'staff_memo' => 'スタッフ用メモ',
+        'evaluation_prompt' => '評価文プロンプト',
         'password' => 'パスワード',
         'password_confirmation' => 'パスワード（確認）',
         'current_password' => '現在のパスワード',

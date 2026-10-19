@@ -627,4 +627,19 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertSame(1, (int) collect($response->viewData('periodData'))->sum('total_records'));
         $this->assertSame(1, (int) collect($response->viewData('monthlyData'))->sum('total_records'));
     }
+
+    // ---- スタッフ用メモは会員様の画面に出さない（2026-10-19 追加。設計書 S-0313「スタッフ用メモ」） ----
+
+    public function test_スタッフ用メモはマイページにも評価の画面にも会員詳細にも出さない(): void
+    {
+        $result = $this->addResult('2026-10-01 09:00:00', '公開した評価文', '2026-10-12 10:00:00');
+        $result->update(['staff_memo' => 'スタッフだけのメモ']);
+
+        $this->assertStringNotContainsString('スタッフだけのメモ', $this->mypage());
+        $page = $this->evaluationPage($result)->assertOk()->getContent();
+        $this->assertStringContainsString('公開した評価文', $page);
+        $this->assertStringNotContainsString('スタッフだけのメモ', $page);
+        // トレーナー側の会員詳細のタイムラインにも出さない（スタッフ用メモは S-0313 だけ）
+        $this->assertStringNotContainsString('スタッフだけのメモ', $this->clientShow());
+    }
 }

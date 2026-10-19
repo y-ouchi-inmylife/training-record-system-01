@@ -130,7 +130,8 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $start = strpos($html, 'data-personality-diagnosis-evaluation');
         $this->assertNotFalse($start);
 
-        return substr($html, $start, strpos($html, 'data-personality-diagnosis-answers', $start) - $start);
+        // 評価文のカードの終わり（2026-10-19 変更：すぐ下にスタッフ用メモのカードを置いた）
+        return substr($html, $start, strpos($html, 'data-personality-diagnosis-staff-memo', $start) - $start);
     }
 
     /** 画面の下の「最終更新」の文（前後の空白を除く）。出ていなければ null */
@@ -305,7 +306,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-publish-label">愛犬性格診断の公開</h5>', $html);
         // 公開取消の確認（M03）と言い方をそろえた問いかけの 1 文（2026-10-18 変更：その前は「〜を公開します。よろしいですか？」）
         $this->assertStringContainsString('<p class="mb-0">会員のマイページに愛犬性格診断を公開しますか？</p>', $html);
-        $this->assertStringNotContainsString('よろしいですか？', $html);
+        // 公開の確認モーダルの中だけで見る（2026-10-19 から、AI の下書きの確かめモーダル〔M04〕に「よろしいですか？」がある）
+        $publishModal = substr($html, strpos($html, 'data-personality-diagnosis-publish>'));
+        $publishModal = substr($publishModal, 0, strpos($publishModal, '</form>'));
+        $this->assertStringNotContainsString('よろしいですか？', $publishModal);
         $this->assertStringNotContainsString('愛犬性格診断を公開します。', $html);
         // 前の文は出ない
         $this->assertStringNotContainsString('評価文の公開<', $html);
@@ -853,5 +857,63 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->put(route('trainee-personality-diagnosis-results.update', [$this->trainee, $result]), ['evaluation_text' => '書き換え'])
             ->assertRedirect(route('login'));
         $this->assertNull($result->fresh()->evaluation_text);
+    }
+
+    // ---- ［AIで下書き］とスタッフ用メモ（2026-10-19 追加。設計書 S-0313） ----
+
+    public function test_AIで下書きのボタンは更新の左で青の枠線(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+
+        $header = $this->evaluationHeader($this->evaluationCard($this->page($result)));
+
+        $this->assertMatchesRegularExpression(
+            '/<button type="button" class="btn btn-outline-primary" data-evaluation-draft\s*data-url="'.preg_quote(route('trainee-personality-diagnosis-results.evaluation-draft', [$this->trainee, $result]), '/').'">AIで下書き<\/button>/u',
+            $header
+        );
+        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, '>AIで下書き</button>'));
+    }
+
+    public function test_スタッフ用メモの欄は評価文の下で会員様には表示されないの文と緑の更新(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+        $result->update(['staff_memo' => 'メモの文']);
+
+        $html = $this->page($result);
+
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-staff-memo'), strpos($html, 'data-personality-diagnosis-evaluation'));
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-answers'), strpos($html, 'data-personality-diagnosis-staff-memo'));
+        $card = substr($html, strpos($html, 'data-personality-diagnosis-staff-memo'));
+        $card = substr($card, 0, strpos($card, 'data-personality-diagnosis-answers'));
+        $this->assertStringContainsString('<h6 class="mb-0">スタッフ用メモ</h6>', $card);
+        $this->assertStringContainsString('<button type="submit" form="staff-memo-form" class="btn btn-success">更新</button>', $card);
+        $this->assertStringContainsString('<p class="text-muted small mb-2">会員様には表示されません。</p>', $card);
+        $this->assertStringContainsString('action="'.route('trainee-personality-diagnosis-results.staff-memo.update', [$this->trainee, $result]).'"', $card);
+        $this->assertMatchesRegularExpression('/<textarea class="form-control " id="staff_memo" name="staff_memo"\s*rows="6" maxlength="10000">メモの文<\/textarea>/u', $card);
+        // 公開・公開取消はない
+        $this->assertStringNotContainsString('公開', $card);
+    }
+
+    public function test_AIの下書きの確かめのモーダルとお知らせの置き場所(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+
+        $html = $this->page($result);
+
+        $modal = substr($html, strpos($html, 'data-evaluation-draft-confirm>'));
+        $modal = substr($modal, 0, strpos($modal, '</div>', strpos($modal, 'modal-footer')) + 6);
+        $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで下書き</h5>', $modal);
+        $this->assertStringContainsString('<p class="mb-0">評価文とスタッフ用メモを、AIの下書きで置き換えます。よろしいですか？</p>', $modal);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える<\/button>/u', $modal);
+        // お知らせは評価文のカードの上（最初は出さない）
+        $this->assertStringContainsString('<div class="alert d-none" role="status" data-evaluation-draft-notice></div>', $html);
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-evaluation'), strpos($html, 'data-evaluation-draft-notice'));
+        // ブラウザの confirm は使わない
+        $this->assertStringNotContainsString('confirm(', $html);
+        // 画面のスクリプトの文
+        $this->assertStringContainsString("'作成中…'", $html);
+        $this->assertStringContainsString('AIの下書きを入れました。内容を確かめて、評価文とスタッフ用メモをそれぞれ［更新］で保存してください。', $html);
+        $this->assertStringContainsString('スタッフ用メモは作れませんでした。', $html);
+        $this->assertStringContainsString('AIの下書きを作れませんでした。時間をおいてもう一度お試しください。', $html);
     }
 }
