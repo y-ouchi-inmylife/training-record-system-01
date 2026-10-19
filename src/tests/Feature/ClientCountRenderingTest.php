@@ -1705,9 +1705,14 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
         $row = $this->inProgressRow($html, 'ポチ');
         $this->assertNotNull($row);
-        // 欄のいちばん下に区切り線つきで、ラベルの列に「案内中」、値の列に種類の名前と［表示］［取消］
-        // （期限つきの案内でも期限の日は出さない。2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）
-        $this->assertMatchesRegularExpression('/<div class="row small mt-2 pt-2 border-top" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*<div class="col-4 fw-bold">案内中<\/div>/u', $html);
+        // 名前の行のすぐ下（犬種の行の上）に、ラベルの列に「案内中」、値の列に種類の名前と［表示］［取消］。区切り線は引かず、
+        // 属性の並びとの間に少しの余白（mb-2）（2026-10-19 変更：その前は欄のいちばん下に区切り線〔border-top〕つきで出していた）。
+        // 期限つきの案内でも期限の日は出さない（2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）
+        $this->assertMatchesRegularExpression(
+            '/>ポチ<\/a><\/h6>\s*<\/div>\s*<div class="row small mb-2" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*<div class="col-4 fw-bold">案内中<\/div>/u',
+            $html
+        );
+        $this->assertStringNotContainsString('border-top', substr($html, strpos($html, 'data-survey-in-progress'), 2000));
         $this->assertStringContainsString('<span>愛犬アンケート</span>', $row);
         $this->assertStringNotContainsString('まで）', $row);
         $this->assertStringNotContainsString('10/26', $row);
@@ -1718,8 +1723,10 @@ class ClientCountRenderingTest extends TestCase
             $row
         );
         $this->assertStringNotContainsString('愛犬性格診断', $row);
-        // 「案内中」の行は暮らしの様子・性格診断の行より後ろ（欄のいちばん下）
-        $this->assertGreaterThan(strpos($html, 'data-personality-diagnosis-row'), strpos($html, 'data-survey-in-progress'));
+        // 「案内中」の行は名前より後ろ、犬種（属性の並び）・性格診断の行より前
+        $this->assertGreaterThan(strpos($html, '>ポチ</a></h6>'), strpos($html, 'data-survey-in-progress'));
+        $this->assertLessThan(strpos($html, '<dt class="col-4 fw-normal text-muted">犬種</dt>'), strpos($html, 'data-survey-in-progress'));
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-row'), strpos($html, 'data-survey-in-progress'));
     }
 
     public function test_期限が空の案内も案内中の行は期限つきと同じ見た目(): void
@@ -1759,6 +1766,10 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('まで）', $row);
         $this->assertSame(2, substr_count($row, '>表示</a>'));
         $this->assertSame(2, substr_count($row, '>取消</button>'));
+        // 2 行とも名前の行のすぐ下、犬種の行の上（2026-10-19 変更）
+        $posRow = strpos($html, 'data-survey-in-progress>');
+        $this->assertGreaterThan(strpos($html, '>ポチ</a></h6>'), $posRow);
+        $this->assertLessThan(strpos($html, '<dt class="col-4 fw-normal text-muted">犬種</dt>'), strrpos($html, 'data-survey-in-progress-item'));
         $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
     }
 
