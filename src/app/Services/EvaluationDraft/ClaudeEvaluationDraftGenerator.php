@@ -32,6 +32,12 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
     /** AI の名前（ログ・EvaluationDraftProviders。2026-10-20 追加） */
     public const NAME = 'claude';
 
+    /**
+     * 最後まで書き終えたときの止まった理由（2026-10-20 追加。EvaluationDraft::ensureCompleted）。anthropic-ai/sdk 0.6.0 の StopReason のうち、
+     * end_turn（書き終えた）と stop_sequence（指定した停止の文字列。今は指定していない）。max_tokens・refusal・pause_turn・tool_use は失敗
+     */
+    public const COMPLETED_STOP_REASONS = ['end_turn', 'stop_sequence'];
+
     /** キーとモデルの設定がそろっているか（そろっていなければ S-0313 にボタンを出さない。2026-10-20 追加） */
     public static function isConfigured(): bool
     {
@@ -79,7 +85,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         foreach ($response->content as $block) {
             $text .= $block->text ?? '';
         }
-        Log::info('アドバイスのAI自動生成：作成しました', [
+        $logContext = [
             'result_id' => $result->id,
             'provider' => self::NAME,
             'model' => $model,
@@ -87,7 +93,10 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
             'output_tokens' => $response->usage->outputTokens,
             'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
             'stop_reason' => $response->stopReason,
-        ]);
+        ];
+        // 最後まで書き終えていなければ失敗（2026-10-20 追加。答えを「#####」で分ける前に確かめる）
+        EvaluationDraft::ensureCompleted($response->stopReason, self::COMPLETED_STOP_REASONS, $logContext);
+        Log::info('アドバイスのAI自動生成：作成しました', $logContext);
 
         try {
             return EvaluationDraft::fromResponse($text);

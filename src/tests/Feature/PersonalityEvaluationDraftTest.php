@@ -21,6 +21,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -112,7 +113,7 @@ class PersonalityEvaluationDraftTest extends TestCase
      *
      * @return array{0: ClaudeEvaluationDraftGenerator, 1: \ArrayObject}
      */
-    private function fakeClaude(string $text): array
+    private function fakeClaude(string $text, ?string $stopReason = 'end_turn'): array
     {
         config(['services.anthropic.api_key' => 'test-key', 'services.anthropic.model' => 'claude-test']);
         $requests = new \ArrayObject;
@@ -120,7 +121,7 @@ class PersonalityEvaluationDraftTest extends TestCase
             new Response(200, ['Content-Type' => 'application/json'], json_encode([
                 'id' => 'msg_test', 'type' => 'message', 'role' => 'assistant', 'model' => 'claude-test',
                 'content' => [['type' => 'text', 'text' => $text]],
-                'stop_reason' => 'end_turn', 'stop_sequence' => null,
+                'stop_reason' => $stopReason, 'stop_sequence' => null,
                 'usage' => ['input_tokens' => 10, 'output_tokens' => 20],
             ])),
         ]));
@@ -579,13 +580,13 @@ class PersonalityEvaluationDraftTest extends TestCase
      *
      * @return array{0: OpenAiEvaluationDraftGenerator, 1: \ArrayObject}
      */
-    private function fakeOpenAi(string $text, int $status = 200): array
+    private function fakeOpenAi(string $text, int $status = 200, ?string $finishReason = 'stop'): array
     {
         $requests = new \ArrayObject;
         $body = $status === 200
             ? [
                 'id' => 'chatcmpl-test', 'object' => 'chat.completion', 'created' => 1760000000, 'model' => 'openai-test',
-                'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => $text], 'finish_reason' => 'stop']],
+                'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => $text], 'finish_reason' => $finishReason]],
                 'usage' => ['prompt_tokens' => 11, 'completion_tokens' => 22, 'total_tokens' => 33],
             ]
             : ['error' => ['message' => $text, 'type' => 'invalid_request_error', 'code' => null, 'param' => null]];
@@ -817,5 +818,144 @@ class PersonalityEvaluationDraftTest extends TestCase
 
         $this->assertSame('メモ', $result->fresh()->staff_memo);
         $this->assertSame('新しいアドバイス', $result->fresh()->evaluation_text);
+    }
+
+    // ---- 最後まで書き終えなかったときは失敗（2026-10-20 追加：途中で切れた文が欄に入り、公開されるのを防ぐため） ----
+
+    /**
+     * 返事を差し替えた実装をコンテナに入れ、ルートから呼ばれるようにする（Gemini は Http::fake で差し替える）。
+     * Http::fake を何度も呼ぶと最初の差し替えが使われ続けるので、Gemini は毎回新しい HTTP クライアントの工場に入れ替えてから差し替える
+     */
+    private function bindFakeGenerator(string $provider, string $text, ?string $stopReason): void
+    {
+        if ($provider === 'gemini') {
+            Http::swap(new HttpFactory);
+        }
+        match ($provider) {
+            'claude' => $this->app->instance(ClaudeEvaluationDraftGenerator::class, $this->fakeClaude($text, $stopReason)[0]),
+            'openai' => $this->app->instance(OpenAiEvaluationDraftGenerator::class, $this->fakeOpenAi($text, 200, $stopReason)[0]),
+            'gemini' => Http::fake(['*' => Http::response([
+                'candidates' => [array_filter(['content' => ['role' => 'model', 'parts' => [['text' => $text]]], 'finishReason' => $stopReason], fn ($v) => $v !== null)],
+                'usageMetadata' => ['promptTokenCount' => 11, 'candidatesTokenCount' => 22, 'thoughtsTokenCount' => 33],
+            ])]),
+        };
+    }
+
+    /** @return array<string, array{completed: list<string>, failed: list<?string>}> 会社ごとの「書き終えた」と「書き終えていない」の止まった理由 */
+    private static function stopReasons(): array
+    {
+        return [
+            'claude' => ['completed' => ['end_turn', 'stop_sequence'], 'failed' => ['max_tokens', 'refusal', 'pause_turn', 'tool_use', null]],
+            'openai' => ['completed' => ['stop'], 'failed' => ['length', 'content_filter', 'tool_calls', 'function_call', null]],
+            'gemini' => ['completed' => ['STOP'], 'failed' => ['MAX_TOKENS', 'SAFETY', 'RECITATION', 'CONTINUATION', 'OTHER', 'FINISH_REASON_UNSPECIFIED', null]],
+        ];
+    }
+
+    public function test_会社ごとの最後まで書き終えた止まった理由(): void
+    {
+        $this->assertSame(['end_turn', 'stop_sequence'], ClaudeEvaluationDraftGenerator::COMPLETED_STOP_REASONS);
+        $this->assertSame(['stop'], OpenAiEvaluationDraftGenerator::COMPLETED_STOP_REASONS);
+        $this->assertSame(['STOP'], GeminiEvaluationDraftGenerator::COMPLETED_STOP_REASONS);
+    }
+
+    public function test_最後まで書き終えたときは今までどおり成功(): void
+    {
+        $result = $this->makeResult();
+        foreach (self::stopReasons() as $provider => $reasons) {
+            foreach ($reasons['completed'] as $reason) {
+                $this->bindFakeGenerator($provider, "お客様用の文\n#####\nスタッフ用の文", $reason);
+                $this->postDraft($result, $provider)->assertOk()
+                    ->assertExactJson(['evaluation' => 'お客様用の文', 'staff_memo' => 'スタッフ用の文', 'staff_memo_missing' => false]);
+            }
+        }
+    }
+
+    public function test_上限やほかの止まり方や止まった理由がないときは答えがあっても失敗で欄に入れる値を返さない(): void
+    {
+        $result = $this->makeResult();
+        $result->update(['evaluation_text' => '保存してあるアドバイス', 'staff_memo' => '保存してあるメモ']);
+        $message = ['message' => 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。'];
+
+        foreach (self::stopReasons() as $provider => $reasons) {
+            foreach ($reasons['failed'] as $reason) {
+                // 答え（「#####」もある）は返ってきているが、途中で止まった
+                $this->bindFakeGenerator($provider, "途中で切れたお客様用の文\n#####\n途中で切れたメモ", $reason);
+                $logs = [];
+                Log::listen(function ($event) use (&$logs) {
+                    $logs[] = $event->context['stop_reason'] ?? 'なし';
+                });
+                $response = $this->postDraft($result, $provider);
+                $response->assertStatus(502)->assertExactJson($message);
+                // 差し替えた止まった理由で失敗にしている（ログの止まった理由で確かめる）
+                $this->assertContains($reason ?? null, array_map(fn ($r) => $r === 'なし' ? null : $r, $logs), $provider.' '.($reason ?? 'null'));
+                $this->assertStringNotContainsString('途中で切れた', $response->getContent(), $provider.' '.($reason ?? 'null'));
+            }
+        }
+        // 欄は変えない（保存もしない）
+        $this->assertSame('保存してあるアドバイス', $result->fresh()->evaluation_text);
+        $this->assertSame('保存してあるメモ', $result->fresh()->staff_memo);
+    }
+
+    public function test_書き終えていないときは分ける前に失敗にする(): void
+    {
+        // 判定は 1 か所（EvaluationDraft::ensureCompleted）。書き終えた値のどれかなら通し、そうでなければ失敗
+        EvaluationDraft::ensureCompleted('stop', ['stop'], []);
+        foreach (['length', 'STOP', '', null] as $reason) {
+            try {
+                EvaluationDraft::ensureCompleted($reason, ['stop'], ['provider' => 'openai']);
+                $this->fail('失敗にならなかった：'.var_export($reason, true));
+            } catch (EvaluationDraftFailedException) {
+            }
+        }
+        // 区切りの「#####」がない答えでも、書き終えていなければ（全部をアドバイスにする前に）失敗
+        $result = $this->makeResult();
+        [$generator] = $this->fakeOpenAi('区切りのない途中の文', 200, 'length');
+        $this->expectException(EvaluationDraftFailedException::class);
+        $generator->generate($result);
+    }
+
+    public function test_書き終えていないときのログに止まった理由とトークン数が残り文とキーは残らない(): void
+    {
+        $result = $this->makeResult(life: ['wish' => '引っ張らずに歩きたい']);
+        $logs = [];
+        Log::listen(function ($event) use (&$logs) {
+            $logs[] = ['level' => $event->level, 'message' => $event->message, 'context' => $event->context];
+        });
+
+        foreach (['claude' => 'max_tokens', 'openai' => 'length', 'gemini' => 'MAX_TOKENS'] as $provider => $reason) {
+            $this->bindFakeGenerator($provider, "途中で切れたお客様用の文\n#####\n途中で切れたメモ", $reason);
+            $this->postDraft($result, $provider)->assertStatus(502);
+        }
+
+        $errors = array_values(array_filter($logs, fn ($log) => $log['level'] === 'error'));
+        $this->assertCount(3, $errors);
+        // 成功のログ（作成しました）は残さない
+        $this->assertCount(0, array_filter($logs, fn ($log) => $log['level'] === 'info'));
+        $expected = [
+            ['claude', 'claude-test', 'max_tokens', 10, 20],
+            ['openai', 'openai-test', 'length', 11, 22],
+            ['gemini', 'gemini-test', 'MAX_TOKENS', 11, 22],
+        ];
+        foreach ($expected as $i => [$provider, $model, $reason, $input, $output]) {
+            $context = $errors[$i]['context'];
+            $this->assertSame('アドバイスのAI自動生成：最後まで書き終えませんでした', $errors[$i]['message']);
+            $this->assertSame($result->id, $context['result_id']);
+            $this->assertSame($provider, $context['provider']);
+            $this->assertSame($model, $context['model']);
+            $this->assertSame($reason, $context['stop_reason']);
+            $this->assertSame($input, $context['input_tokens']);
+            $this->assertSame($output, $context['output_tokens']);
+            $this->assertArrayHasKey('elapsed_ms', $context);
+        }
+        // 考えた分のトークン数（OpenAI は reasoning_tokens、Gemini は thoughts_tokens）
+        $this->assertArrayHasKey('reasoning_tokens', $errors[1]['context']);
+        $this->assertSame(33, $errors[2]['context']['thoughts_tokens']);
+        // 送った文・返ってきた文・名前・キーは残さない
+        foreach ($errors as $log) {
+            $all = $log['message'].json_encode($log['context'], JSON_UNESCAPED_UNICODE);
+            foreach (['test-anthropic-key', 'test-openai-key', 'test-gemini-key', 'モモ', '引っ張らずに歩きたい', '途中で切れた'] as $secret) {
+                $this->assertStringNotContainsString($secret, $all, $secret);
+            }
+        }
     }
 }

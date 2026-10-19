@@ -2,6 +2,8 @@
 
 namespace App\Services\EvaluationDraft;
 
+use Illuminate\Support\Facades\Log;
+
 /**
  * AI の下書き（2026-10-19 追加）。お客様用レポート（アドバイスの欄に入れる）とスタッフ用メモ（スタッフ用メモの欄に入れる）。
  * staffMemoMissing：返事に区切り「#####」がなく、スタッフ用メモを作れなかった（全部をアドバイスに入れた）
@@ -16,6 +18,28 @@ final class EvaluationDraft
 
     /** 区切り（指示文で、お客様用とスタッフ用の間に出すよう頼んでいる文字） */
     public const SEPARATOR = '#####';
+
+    /**
+     * AI が最後まで書き終えたかを確かめる（2026-10-20 追加：アドバイスは会員様に見せる文なので、長さの上限などで途中で切れた文が
+     * 欄に入り、そのまま公開してしまうのを防ぐため。その前は止まった理由を見ず、答えが少しでもあれば成功にしていた）。
+     * 止まった理由が、その会社の「最後まで書き終えた」の値（各実装の COMPLETED_STOP_REASONS）のどれかでなければ
+     * （長さの上限・安全などの理由で止められた・止まった理由がない）、失敗のログ（error）を残して失敗にする。
+     * 3 社の実装が、答えを「#####」で分ける前に呼ぶ。ログの項目は呼ぶ側が渡す（送った文・返ってきた文・キーは入れない）
+     *
+     * @param  list<string>  $completedReasons  その会社の「最後まで書き終えた」の止まった理由
+     * @param  array<string, mixed>  $logContext  結果の id・AI の名前・モデル・止まった理由・トークン数・かかった時間
+     *
+     * @throws EvaluationDraftFailedException 最後まで書き終えていない
+     */
+    public static function ensureCompleted(?string $stopReason, array $completedReasons, array $logContext): void
+    {
+        if ($stopReason !== null && in_array($stopReason, $completedReasons, true)) {
+            return;
+        }
+
+        Log::error('アドバイスのAI自動生成：最後まで書き終えませんでした', $logContext);
+        throw new EvaluationDraftFailedException('AI の返事が最後まで書き終えていません（'.($stopReason ?? '止まった理由なし').'）。');
+    }
 
     /**
      * AI の返事を分ける。最初の「#####」の前をアドバイス、後ろをスタッフ用メモにする（前後の空白・改行は取る）。

@@ -30,6 +30,12 @@ class OpenAiEvaluationDraftGenerator implements EvaluationDraftGenerator
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
 
+    /**
+     * 最後まで書き終えたときの止まった理由（2026-10-20 追加。EvaluationDraft::ensureCompleted）。OpenAI の API の定義（openapi.yaml の
+     * choices[].finish_reason）のうち stop（自然な止まり方、または指定した停止の文字列）。length・content_filter・tool_calls・function_call は失敗
+     */
+    public const COMPLETED_STOP_REASONS = ['stop'];
+
     /** @param  ClientInterface|null  $httpClient  HTTP の送り手（テストで差し替える。null なら時間切れを付けた Guzzle） */
     public function __construct(private readonly ?ClientInterface $httpClient = null) {}
 
@@ -84,7 +90,7 @@ class OpenAiEvaluationDraftGenerator implements EvaluationDraftGenerator
 
         $choice = $response->choices[0] ?? null;
         $text = (string) ($choice?->message->content ?? '');
-        Log::info('アドバイスのAI自動生成：作成しました', [
+        $logContext = [
             'result_id' => $result->id,
             'provider' => self::NAME,
             'model' => $model,
@@ -93,7 +99,10 @@ class OpenAiEvaluationDraftGenerator implements EvaluationDraftGenerator
             'reasoning_tokens' => $response->usage?->completionTokensDetails?->reasoningTokens,
             'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
             'stop_reason' => $choice?->finishReason,
-        ]);
+        ];
+        // 最後まで書き終えていなければ失敗（2026-10-20 追加。答えを「#####」で分ける前に確かめる）
+        EvaluationDraft::ensureCompleted($choice?->finishReason, self::COMPLETED_STOP_REASONS, $logContext);
+        Log::info('アドバイスのAI自動生成：作成しました', $logContext);
 
         try {
             return EvaluationDraft::fromResponse($text);

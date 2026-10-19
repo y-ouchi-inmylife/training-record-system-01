@@ -28,6 +28,12 @@ class GeminiEvaluationDraftGenerator implements EvaluationDraftGenerator
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
 
+    /**
+     * 最後まで書き終えたときの止まった理由（2026-10-20 追加。EvaluationDraft::ensureCompleted）。Gemini の API の資料の FinishReason のうち
+     * STOP（自然な止まり方、または指定した停止の文字列）。MAX_TOKENS・SAFETY・RECITATION・CONTINUATION などは失敗
+     */
+    public const COMPLETED_STOP_REASONS = ['STOP'];
+
     /** generateContent の URL の頭（モデルの名前と :generateContent を後ろに付ける）。キーは付けない */
     public const ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
@@ -76,7 +82,8 @@ class GeminiEvaluationDraftGenerator implements EvaluationDraftGenerator
             ->reject(fn ($part) => ($part['thought'] ?? false) === true)
             ->map(fn ($part) => (string) ($part['text'] ?? ''))
             ->implode('');
-        Log::info('アドバイスのAI自動生成：作成しました', [
+        $stopReason = $candidate['finishReason'] ?? null;
+        $logContext = [
             'result_id' => $result->id,
             'provider' => self::NAME,
             'model' => $model,
@@ -84,8 +91,11 @@ class GeminiEvaluationDraftGenerator implements EvaluationDraftGenerator
             'output_tokens' => $response->json('usageMetadata.candidatesTokenCount'),
             'thoughts_tokens' => $response->json('usageMetadata.thoughtsTokenCount'),
             'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
-            'stop_reason' => $candidate['finishReason'] ?? null,
-        ]);
+            'stop_reason' => $stopReason,
+        ];
+        // 最後まで書き終えていなければ失敗（2026-10-20 追加。答えを「#####」で分ける前に確かめる）
+        EvaluationDraft::ensureCompleted(is_string($stopReason) ? $stopReason : null, self::COMPLETED_STOP_REASONS, $logContext);
+        Log::info('アドバイスのAI自動生成：作成しました', $logContext);
 
         try {
             return EvaluationDraft::fromResponse($text);
