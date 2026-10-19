@@ -95,8 +95,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/publish` | アドバイスを保存して公開する（公開した日時・トレーナーを入れる。トレーニング記録は作らない。ルート名 `trainee-personality-diagnosis-results.publish`。**2026-10-18 追加**。**2026-10-18 変更**：その前は評価文を本文にしたトレーニング記録を作っていた） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish` | アドバイスの公開取消（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果を 1 件削除する（物理削除。公開済みのアドバイスも一緒に消え、会員様の画面からも消える。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**。**2026-10-18 変更**：送信元を S-0309 から S-0313 に移した） | auth | 管理者 |
-| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo` | スタッフ用メモを保存する（ルート名 `trainee-personality-diagnosis-results.staff-memo.update`。**2026-10-19 追加**） | auth | 一般・管理者 |
-| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft` | アドバイスとスタッフ用メモの下書きを AI で作り JSON で返す（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**） | auth | 一般・管理者 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo` | **2026-10-19 に外した**（アドバイスの保存 `PUT …/{personalityDiagnosisResult}` で両方を受け取るようにしたため）。スタッフ用メモを保存していた（ルート名 `trainee-personality-diagnosis-results.staff-memo.update`。**2026-10-19 追加**） | auth | 一般・管理者 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft` | アドバイスとスタッフ用メモを AI で自動生成し（2026-10-19 変更：その前の呼び名は「下書き」） JSON で返す（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**） | auth | 一般・管理者 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -2504,13 +2504,16 @@ POST /training-records に以下を追加する。
 
 ###### PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}
 
-**概要**: アドバイスを保存する（ルート名 `trainee-personality-diagnosis-results.update`）。
+**概要**: アドバイスと**スタッフ用メモを両方まとめて**保存する（ルート名 `trainee-personality-diagnosis-results.update`。S-0313 のカード「アドバイスとスタッフ用メモ」の［更新］。**2026-10-19 変更**：2026-10-19 のユーザーレビューで、S-0313 の［更新］が 2 つで分かりにくかったため、アドバイスとスタッフ用メモを 1 つのカード・1 つの［更新］にまとめた。その前はアドバイスだけを保存し、スタッフ用メモは別のルート `PUT …/staff-memo` で保存していた）。
 
 **リクエスト**:
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | evaluation_text | string |  | nullable, string, max:10000 | アドバイス。空なら NULL で保存する（「なし」に戻る）。改行は LF にそろえる（愛犬アンケートの自由記述と同じ） |
+| staff_memo | string |  | nullable, string, max:10000 | スタッフ用メモ（**2026-10-19 追加**）。空なら NULL。改行は LF にそろえる。送られてこなければ（キーがなければ）変えない |
+
+- **2026-10-19 変更**：アドバイスの最終更新（`evaluation_updated_by`・`evaluation_updated_at`）は、アドバイスが変わったときだけ変える。アクセスログは、変わった方だけを今の種類で残す（アドバイス：`edit_trainee_personality_diagnosis_evaluation`、スタッフ用メモ：`edit_trainee_personality_diagnosis_staff_memo`。両方なら両方、どちらも変わらなければ残さない。ミドルウェアではなくコントローラで残す）。完了メッセージは「アドバイスとスタッフ用メモを更新しました。」、公開中でアドバイスが変わったときは「アドバイスとスタッフ用メモを更新しました。会員様のマイページにも反映されています。」。下の「処理」「レスポンス」の、最終更新をいつも入れる・アクセスログをいつも 1 件残す・完了メッセージの文は、その前の作り（経緯）
 
 **処理**:
 - 公開済み（`evaluation_published_at` が NULL でない）でも保存できる（そのまま会員様の画面に出る）。ただし**公開済みのときは空にできない**：空（空白だけを含む）なら入力エラー「公開中のアドバイスは空にできません。公開を取り消してから消してください。」（キー `evaluation_text`）（**2026-10-18 変更**：その前は公開済みなら 409）
@@ -2530,6 +2533,9 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | evaluation_text | string | ● | required, string, max:10000 | アドバイス（画面の欄に書いてある文。保存していない直しも含めて公開する） |
+| staff_memo | string |  | nullable, string, max:10000 | スタッフ用メモ（画面の欄に書いてある文。**2026-10-19 追加**：公開の前に、直したままのスタッフ用メモも保存する。送られてこなければ変えない） |
+
+- **2026-10-19 変更**：［公開する］で、2 つの欄の今の文を保存してから公開する（直したまま押しても、保存し忘れた古い文が公開されないように）。保存でアドバイス・スタッフ用メモが変わっていれば、公開の記録（`publish_…`）に加えて、変わった方の編集の記録（`edit_…_evaluation`・`edit_…_staff_memo`）も残す
 
 **処理**（1 つのトランザクション）:
 1. 結果の行を排他ロックして取り直す（`lockForUpdate`。同時に 2 回押されたときに困らないため）
@@ -2544,7 +2550,9 @@ POST /training-records に以下を追加する。
 - バリデーション失敗（アドバイスが空など）：`back()`
 - 押下時に確認モーダルを挟む（screen-design.md S-0313-M01）
 
-###### PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo
+###### PUT /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo（2026-10-19 に外した）
+
+**2026-10-19 変更**：このルートは外した（アドバイスの保存 `PUT …/{personalityDiagnosisResult}` で、アドバイスとスタッフ用メモを両方まとめて受け取るようにしたため。ほかで使っていなかった）。以下は外す前の作り（経緯）
 
 **概要**: スタッフ用メモを保存する（ルート名 `trainee-personality-diagnosis-results.staff-memo.update`。**2026-10-19 追加**。requirements.md 6-16-19）。
 
@@ -2561,7 +2569,7 @@ POST /training-records に以下を追加する。
 
 ###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft
 
-**概要**: アドバイスとスタッフ用メモの下書きを AI で作る（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**。requirements.md 6-16-19）。S-0313 の［AIで下書き］から JS で呼ぶ。**何も保存しない**。
+**概要**: アドバイスとスタッフ用メモを AI で自動生成する（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**。requirements.md 6-16-19）。S-0313 の［AIで自動生成］から JS で呼ぶ（**2026-10-19 変更**：ボタン名と呼び名を［AIで下書き］から変えた。ルート名は変えない）。**何も保存しない**。
 
 **処理**:
 - `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果は 404）。権限はアドバイスの保存と同じ（一般・管理者）
@@ -2573,7 +2581,7 @@ POST /training-records に以下を追加する。
 
 **レスポンス**（JSON）:
 - 成功（200）：`{ "evaluation": "…", "staff_memo": "…", "staff_memo_missing": false }`
-- AI の失敗・時間切れ・返事が空（502）：`{ "message": "AIの下書きを作れませんでした。時間をおいてもう一度お試しください。" }`
+- AI の失敗・時間切れ・返事が空（502）：`{ "message": "AIで自動生成できませんでした。時間をおいてもう一度お試しください。" }`（**2026-10-19 変更**：その前は「AIの下書きを作れませんでした。…」）
 - 別のトレーニーの結果・存在しない結果：404。ログインしていない：ログインの画面へ（JSON の要求なら 401）
 
 ###### POST /trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish
