@@ -21,6 +21,8 @@ use Psr\Http\Client\ClientInterface;
  *   （2026-10-19 追加：AI が Markdown の記号で書き、会員様の画面に記号が出てしまうため）
  * - ログ（laravel.log）には、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけを残す。
  *   送った文・返ってきた文・名前は残さない。失敗のときはエラーの内容を残す
+ * - 2026-10-20 変更：3 社（Claude・OpenAI・Gemini）を比べるため、ボタンを出すかの判定（isConfigured）を足し、ログに AI の名前を足し、
+ *   エラーの内容から API キーを伏せるようにした（EvaluationDraftProviders。ほかの 2 社の実装と同じ決まり）
  */
 class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
 {
@@ -30,6 +32,15 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
 
+    /** AI の名前（ログ・EvaluationDraftProviders。2026-10-20 追加） */
+    public const NAME = 'claude';
+
+    /** キーとモデルの設定がそろっているか（そろっていなければ S-0313 にボタンを出さない。2026-10-20 追加） */
+    public static function isConfigured(): bool
+    {
+        return filled(config('services.anthropic.api_key')) && filled(config('services.anthropic.model'));
+    }
+
     /** @param  ClientInterface|null  $transporter  HTTP の送り手（テストで差し替える。null なら時間切れを付けた Guzzle） */
     public function __construct(private readonly ?ClientInterface $transporter = null) {}
 
@@ -38,7 +49,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         $apiKey = config('services.anthropic.api_key');
         $model = (string) config('services.anthropic.model');
         if (empty($apiKey)) {
-            Log::error('アドバイスのAI自動生成：Anthropic の API キーが設定されていません', ['result_id' => $result->id]);
+            Log::error('アドバイスのAI自動生成：Anthropic の API キーが設定されていません', ['result_id' => $result->id, 'provider' => self::NAME]);
             throw new EvaluationDraftFailedException('Anthropic API key is not set.');
         }
 
@@ -59,9 +70,10 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         } catch (\Throwable $e) {
             Log::error('アドバイスのAI自動生成：呼び出しに失敗しました', [
                 'result_id' => $result->id,
+                'provider' => self::NAME,
                 'model' => $model,
                 'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
-                'error' => get_class($e).': '.$e->getMessage(),
+                'error' => str_replace((string) $apiKey, '[REDACTED]', get_class($e).': '.$e->getMessage()),
             ]);
             throw new EvaluationDraftFailedException('AI の呼び出しに失敗しました。', previous: $e);
         }
@@ -72,6 +84,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         }
         Log::info('アドバイスのAI自動生成：作成しました', [
             'result_id' => $result->id,
+            'provider' => self::NAME,
             'model' => $model,
             'input_tokens' => $response->usage->inputTokens,
             'output_tokens' => $response->usage->outputTokens,
@@ -82,7 +95,7 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
         try {
             return EvaluationDraft::fromResponse($text);
         } catch (EvaluationDraftFailedException $e) {
-            Log::error('アドバイスのAI自動生成：返事が空でした', ['result_id' => $result->id, 'model' => $model]);
+            Log::error('アドバイスのAI自動生成：返事が空でした', ['result_id' => $result->id, 'provider' => self::NAME, 'model' => $model]);
             throw $e;
         }
     }

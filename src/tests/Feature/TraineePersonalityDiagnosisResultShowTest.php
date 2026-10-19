@@ -44,6 +44,12 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // ［AIで自動生成］の 3 社のキーとモデル（2026-10-20 追加）。開発の .env に左右されないよう、テストの値を入れる（空ならボタンを出さない）
+        config([
+            'services.anthropic.api_key' => 'test-anthropic-key', 'services.anthropic.model' => 'claude-test',
+            'openai.api_key' => 'test-openai-key', 'services.openai.evaluation_model' => 'openai-test',
+            'services.gemini.api_key' => 'test-gemini-key', 'services.gemini.model' => 'gemini-test',
+        ]);
 
         $this->createClientsTable();
         $this->createAccessLogsTable();
@@ -429,8 +435,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // カードの見出しの行：「アドバイスとスタッフ用メモ」→ 右に［AIで自動生成］［更新］（2026-10-19 変更：カードを 1 つにまとめた）
         $header = $this->evaluationHeader($card);
         $this->assertMatchesRegularExpression('/<div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">\s*<h6 class="mb-0">アドバイスとスタッフ用メモ<\/h6>/u', $header);
-        $this->assertStringContainsString('<div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>', $header);
-        $this->assertSame(['AIで自動生成', '更新'], $this->buttonLabels($header));
+        $this->assertStringContainsString('<div class="d-flex flex-wrap justify-content-end gap-2 ms-auto" data-evaluation-buttons>', $header);
+        // 2026-10-20 変更：［AIで自動生成］を 3 社のボタンにした
+        $this->assertSame(['AIで自動生成（Claude）', 'AIで自動生成（OpenAI）', 'AIで自動生成（Gemini）', '更新'], $this->buttonLabels($header));
         // 大きさは通常（ほかのカードの見出しのボタンと同じ。btn-sm にしない）
         $this->assertStringNotContainsString('btn-sm', $card);
         // アドバイスの小見出しの行：「アドバイス」→ すぐ右にバッジ → 行の右に［公開］
@@ -550,7 +557,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertLessThan(strpos($section, 'data-evaluation-published-on'), strpos($section, 'data-evaluation-status'));
         $this->assertLessThan(strpos($section, '>公開取消</button>'), strpos($section, 'data-evaluation-published-on'));
         $this->assertSame(['公開取消'], $this->buttonLabels($section));
-        $this->assertSame(['AIで自動生成', '更新'], $this->buttonLabels($header));
+        $this->assertSame(['AIで自動生成（Claude）', 'AIで自動生成（OpenAI）', 'AIで自動生成（Gemini）', '更新'], $this->buttonLabels($header));
         $this->assertStringContainsString('<button type="submit" form="evaluation-form" class="btn btn-success">更新</button>', $header);
         // テキストエリアのまま直せる（2026-10-18 変更：その前は表示だけで、作った記録へのリンク）
         $this->assertStringContainsString(">公開した文\n2 行目</textarea>", $card);
@@ -1040,17 +1047,56 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
     // ---- ［AIで自動生成］とスタッフ用メモ（2026-10-19 追加。設計書 S-0313。2026-10-19 変更：その前は［AIで下書き］・2 つのカード） ----
 
-    public function test_AIで自動生成のボタンはカードの見出しの行の更新の左で青の枠線(): void
+    public function test_AIで自動生成のボタンは3社がこの順でカードの見出しの行の更新の左で青の枠線(): void
     {
+        // 2026-10-20 変更：しばらく 3 社を比べながら使うため、［AIで自動生成］を Claude・OpenAI・Gemini の 3 つにした
         $result = $this->addResult('past-1', '2026-10-15 10:30:00');
 
         $header = $this->evaluationHeader($this->evaluationCard($this->page($result)));
 
+        $url = preg_quote(route('trainee-personality-diagnosis-results.evaluation-draft', [$this->trainee, $result]), '/');
         $this->assertMatchesRegularExpression(
-            '/<button type="button" class="btn btn-outline-primary" data-evaluation-draft\s*data-url="'.preg_quote(route('trainee-personality-diagnosis-results.evaluation-draft', [$this->trainee, $result]), '/').'">AIで自動生成<\/button>/u',
+            '/<button type="button" class="btn btn-outline-primary text-nowrap" data-evaluation-draft data-provider="claude"\s*data-url="'.$url.'">AIで自動生成（Claude）<\/button>\s*'
+            .'<button type="button" class="btn btn-outline-primary text-nowrap" data-evaluation-draft data-provider="openai"\s*data-url="'.$url.'">AIで自動生成（OpenAI）<\/button>\s*'
+            .'<button type="button" class="btn btn-outline-primary text-nowrap" data-evaluation-draft data-provider="gemini"\s*data-url="'.$url.'">AIで自動生成（Gemini）<\/button>\s*'
+            .'<button type="submit" form="evaluation-form" class="btn btn-success">更新<\/button>/u',
             $header
         );
-        $this->assertLessThan(strpos($header, '>更新</button>'), strpos($header, '>AIで自動生成</button>'));
+        // 狭い幅で折り返したら右に寄せる（まとまりの中でも）
+        $this->assertStringContainsString('<div class="d-flex flex-wrap justify-content-end gap-2 ms-auto" data-evaluation-buttons>', $header);
+        $this->assertStringNotContainsString('>AIで自動生成</button>', $header);
+    }
+
+    public function test_キーかモデルが空のAIのボタンは出さずどれも出ないときは更新だけ(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+
+        // OpenAI はモデルが空、Gemini はキーが空
+        config(['services.openai.evaluation_model' => null, 'services.gemini.api_key' => '']);
+        $header = $this->evaluationHeader($this->evaluationCard($this->page($result)));
+        $this->assertSame(['AIで自動生成（Claude）', '更新'], $this->buttonLabels($header));
+
+        // Claude もキーが空：AI のボタンは出さない（スクリプトも動かない）
+        config(['services.anthropic.api_key' => null]);
+        $html = $this->page($result);
+        $header = $this->evaluationHeader($this->evaluationCard($html));
+        $this->assertSame(['更新'], $this->buttonLabels($header));
+        $this->assertStringNotContainsString('data-evaluation-draft data-provider', $html);
+    }
+
+    public function test_生成中は3つとも押せなくし押したボタンのAIを送り確かめのモーダルからはそのボタンのAIで作る(): void
+    {
+        $html = $this->page($this->addResult('past-1', '2026-10-15 10:30:00'));
+
+        $this->assertStringContainsString("var draftButtons = Array.prototype.slice.call(document.querySelectorAll('[data-evaluation-draft]'));", $html);
+        // 押したボタンは「生成中…」、3 つとも押せなくする。終わったら元に戻す
+        $this->assertMatchesRegularExpression("/var makeDraft = function \\(button\\) \\{\\s*var label = button\\.textContent;\\s*draftButtons\\.forEach\\(function \\(b\\) \\{ b\\.disabled = true; \\}\\);\\s*button\\.textContent = '生成中…';/u", $html);
+        $this->assertMatchesRegularExpression('/\\.finally\\(function \\(\\) \\{\\s*button\\.textContent = label;\\s*draftButtons\\.forEach\\(function \\(b\\) \\{ b\\.disabled = false; \\}\\);\\s*\\}\\);/u', $html);
+        // 押したボタンの AI を送る
+        $this->assertStringContainsString("body: JSON.stringify({ provider: button.getAttribute('data-provider') }),", $html);
+        // 確かめのモーダル（M04）は、どのボタンから開いたかを覚えておき、［置き換える］でその AI を呼ぶ
+        $this->assertStringContainsString('pendingButton = button;', $html);
+        $this->assertMatchesRegularExpression('/if \\(pendingButton\\) \\{\\s*makeDraft\\(pendingButton\\);/u', $html);
     }
 
     public function test_スタッフ用メモは同じカードのアドバイスの下で会員様には表示されないの文と結び付く(): void

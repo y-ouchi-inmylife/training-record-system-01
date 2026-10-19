@@ -156,9 +156,14 @@
     <div class="card mb-3" data-personality-diagnosis-evaluation>
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h6 class="mb-0">アドバイスとスタッフ用メモ</h6>
-            <div class="d-flex flex-wrap gap-2 ms-auto" data-evaluation-buttons>
-                <button type="button" class="btn btn-outline-primary" data-evaluation-draft
-                        data-url="{{ route('trainee-personality-diagnosis-results.evaluation-draft', [$trainee, $result]) }}">AIで自動生成</button>
+            {{-- ［AIで自動生成（Claude／OpenAI／Gemini）］（2026-10-20 変更：しばらく 3 社を比べながら使い、最終的に 1 つに絞るため。
+                 その前は［AIで自動生成］1 つ）。キーとモデルの設定がそろっている AI の分だけ、この順で出す（$draftProviders。EvaluationDraftProviders）。
+                 狭い幅で収まらないときは、まとまりごと次の行へ折り返して右に寄せ、まとまりの中で折り返しても右に寄せる。ボタンの文字は折り返さない --}}
+            <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto" data-evaluation-buttons>
+                @foreach($draftProviders as $provider => $providerLabel)
+                    <button type="button" class="btn btn-outline-primary text-nowrap" data-evaluation-draft data-provider="{{ $provider }}"
+                            data-url="{{ route('trainee-personality-diagnosis-results.evaluation-draft', [$trainee, $result]) }}">AIで自動生成（{{ $providerLabel }}）</button>
+                @endforeach
                 <button type="submit" form="evaluation-form" class="btn btn-success">更新</button>
             </div>
         </div>
@@ -426,14 +431,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ［AIで自動生成］（2026-10-19 追加。設計書 S-0313「AIで自動生成・スタッフ用メモ」。2026-10-19 にボタン名と文を変えた。前の文は Blade のコメントと設計書に残す）
     // - どちらかの欄に文があれば、先に確かめのモーダル（S-0313-M04）。どちらも空なら確かめずに作る
-    // - 作っている間はボタンを「生成中…」にして押せなくする。返ってきたら 2 つの欄に入れる（保存はしない）
+    // - 作っている間は押したボタンを「生成中…」にし、3 つとも押せなくする（同時に 2 つ走らないように）。返ってきたら 2 つの欄に入れる（保存はしない）
     // - 欄に入れたら input のイベントを出し、［公開］を押せるかどうか（上の update）も動かす
-    var draftButton = document.querySelector('[data-evaluation-draft]');
+    // - 2026-10-20 変更：ボタンを AI の会社ごとの 3 つにした。押したボタンの provider を送り、M04 から作るときはどのボタンから開いたかを覚えておく
+    var draftButtons = Array.prototype.slice.call(document.querySelectorAll('[data-evaluation-draft]'));
     var staffMemo = document.querySelector('[data-evaluation-form] textarea[name="staff_memo"]');
     var notice = document.querySelector('[data-evaluation-draft-notice]');
     var confirmEl = document.querySelector('[data-evaluation-draft-confirm]');
-    if (draftButton && textarea && staffMemo && notice && confirmEl) {
-        var label = draftButton.textContent;
+    if (draftButtons.length > 0 && textarea && staffMemo && notice && confirmEl) {
+        var pendingButton = null;
         // お知らせはレイアウトのフラッシュメッセージと同じ作り。閉じると要素ごと外れるので、出すたびに作り直す
         var showNotice = function (ok, message) {
             notice.replaceChildren();
@@ -453,16 +459,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.autoDismissAlert(alertEl);
             }
         };
-        var makeDraft = function () {
-            draftButton.disabled = true;
-            draftButton.textContent = '生成中…';
+        var makeDraft = function (button) {
+            var label = button.textContent;
+            draftButtons.forEach(function (b) { b.disabled = true; });
+            button.textContent = '生成中…';
             notice.replaceChildren();
-            fetch(draftButton.getAttribute('data-url'), {
+            fetch(button.getAttribute('data-url'), {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 },
+                body: JSON.stringify({ provider: button.getAttribute('data-provider') }),
             }).then(function (response) {
                 return response.json().catch(function () { return {}; }).then(function (body) {
                     if (!response.ok || typeof body.evaluation !== 'string') {
@@ -483,20 +492,26 @@ document.addEventListener('DOMContentLoaded', function () {
             }).catch(function () {
                 showNotice(false, 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');
             }).finally(function () {
-                draftButton.disabled = false;
-                draftButton.textContent = label;
+                button.textContent = label;
+                draftButtons.forEach(function (b) { b.disabled = false; });
             });
         };
-        draftButton.addEventListener('click', function () {
-            if (textarea.value.trim() === '' && staffMemo.value.trim() === '') {
-                makeDraft();
-                return;
-            }
-            bootstrap.Modal.getOrCreateInstance(confirmEl).show();
+        draftButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                if (textarea.value.trim() === '' && staffMemo.value.trim() === '') {
+                    makeDraft(button);
+                    return;
+                }
+                pendingButton = button;
+                bootstrap.Modal.getOrCreateInstance(confirmEl).show();
+            });
         });
         confirmEl.querySelector('[data-evaluation-draft-replace]').addEventListener('click', function () {
             bootstrap.Modal.getOrCreateInstance(confirmEl).hide();
-            makeDraft();
+            if (pendingButton) {
+                makeDraft(pendingButton);
+                pendingButton = null;
+            }
         });
     }
 });

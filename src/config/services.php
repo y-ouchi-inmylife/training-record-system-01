@@ -37,6 +37,9 @@ return [
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
+        // 愛犬性格診断のアドバイスの AI の自動生成（S-0313 の［AIで自動生成（OpenAI）］）で文を書くモデル（2026-10-20 追加）。
+        // 既定の値は持たない（空ならボタンを出さない）。キーは文字起こしと同じ OPENAI_API_KEY（config/openai.php）
+        'evaluation_model' => env('OPENAI_EVALUATION_MODEL'),
     ],
 
     'anthropic' => [
@@ -44,9 +47,12 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
     ],
 
-    // 愛犬性格診断のアドバイスとスタッフ用メモの AI の下書き（2026-10-19 追加。設計書 S-0313「AIで下書き」）。
-    // driver：使う AI の会社（今は anthropic だけ。App\Providers\AppServiceProvider で実装を選ぶ）。キー・モデルは上の anthropic を使う
-    'evaluation_draft' => [
-        'driver' => env('EVALUATION_DRAFT_DRIVER', 'anthropic'),
+    // 愛犬性格診断のアドバイスの AI の自動生成（S-0313 の［AIで自動生成（Gemini）］。2026-10-20 追加）。
+    // キーは URL に入れずヘッダー x-goog-api-key で送る（App\Services\EvaluationDraft\GeminiEvaluationDraftGenerator）。
+    // モデルの既定の値は持たない（キーかモデルが空ならボタンを出さない）。
+    // 2026-10-20 変更：AI の会社を選ぶ evaluation_draft.driver（EVALUATION_DRAFT_DRIVER）は外した（押したボタンで選ぶ。EvaluationDraftProviders）
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL'),
     ],
 ];

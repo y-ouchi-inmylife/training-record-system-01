@@ -11,6 +11,9 @@ use App\Services\EvaluationDraft\ClaudeEvaluationDraftGenerator;
 use App\Services\EvaluationDraft\EvaluationDraft;
 use App\Services\EvaluationDraft\EvaluationDraftFailedException;
 use App\Services\EvaluationDraft\EvaluationDraftGenerator;
+use App\Services\EvaluationDraft\EvaluationDraftProviders;
+use App\Services\EvaluationDraft\GeminiEvaluationDraftGenerator;
+use App\Services\EvaluationDraft\OpenAiEvaluationDraftGenerator;
 use App\Services\EvaluationDraft\PersonalityEvaluationPrompt;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Handler\MockHandler;
@@ -18,8 +21,11 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
@@ -43,6 +49,12 @@ class PersonalityEvaluationDraftTest extends TestCase
         parent::setUp();
 
         Carbon::setTestNow('2026-10-19 10:00:00');
+        // 3 社のキーとモデル（2026-10-20 追加）。開発の .env に左右されないよう、テストの値を入れる
+        config([
+            'services.anthropic.api_key' => 'test-anthropic-key', 'services.anthropic.model' => 'claude-test',
+            'openai.api_key' => 'test-openai-key', 'services.openai.evaluation_model' => 'openai-test',
+            'services.gemini.api_key' => 'test-gemini-key', 'services.gemini.model' => 'gemini-test',
+        ]);
 
         $this->createClientsTable();
         $this->createAccessLogsTable();
@@ -131,15 +143,20 @@ class PersonalityEvaluationDraftTest extends TestCase
         return TraineePersonalityDiagnosisResult::query()->create($attributes);
     }
 
-    /** 下書きを作るサービスを差し替える（$draft が例外なら失敗させる） */
-    private function fakeGenerator(EvaluationDraft|\Throwable $draft): void
+    /**
+     * 下書きを作るサービスを差し替える（$draft が例外なら失敗させる）。2026-10-20 変更：AI の会社ごとの実装を差し替える
+     * （その前は EvaluationDraftGenerator を 1 つ差し替えていた）。呼ばれた回数を返す
+     */
+    private function fakeGenerator(EvaluationDraft|\Throwable $draft, string $provider = 'claude'): \ArrayObject
     {
-        $this->app->instance(EvaluationDraftGenerator::class, new class($draft) implements EvaluationDraftGenerator
+        $calls = new \ArrayObject;
+        $this->app->instance(EvaluationDraftProviders::PROVIDERS[$provider]['class'], new class($draft, $calls) implements EvaluationDraftGenerator
         {
-            public function __construct(private EvaluationDraft|\Throwable $draft) {}
+            public function __construct(private EvaluationDraft|\Throwable $draft, private \ArrayObject $calls) {}
 
             public function generate(TraineePersonalityDiagnosisResult $result): EvaluationDraft
             {
+                $this->calls->append($result->id);
                 if ($this->draft instanceof \Throwable) {
                     throw $this->draft;
                 }
@@ -147,11 +164,19 @@ class PersonalityEvaluationDraftTest extends TestCase
                 return $this->draft;
             }
         });
+
+        return $calls;
     }
 
     private function draftUrl(TraineePersonalityDiagnosisResult $result, ?Trainee $trainee = null): string
     {
         return route('trainee-personality-diagnosis-results.evaluation-draft', [$trainee ?? $this->trainee, $result]);
+    }
+
+    /** 下書きを作る（押したボタンの AI を送る。2026-10-20 追加） */
+    private function postDraft(TraineePersonalityDiagnosisResult $result, mixed $provider = 'claude', ?Trainee $trainee = null)
+    {
+        return $this->postJson($this->draftUrl($result, $trainee), $provider === null ? [] : ['provider' => $provider]);
     }
 
     // ---- データの組み立て ----
@@ -424,7 +449,7 @@ class PersonalityEvaluationDraftTest extends TestCase
         $result->update(['evaluation_text' => '保存してあるアドバイス', 'staff_memo' => '保存してあるメモ']);
         $this->fakeGenerator(new EvaluationDraft('お客様用の下書き', 'スタッフ用の下書き', false));
 
-        $this->postJson($this->draftUrl($result))
+        $this->postDraft($result)
             ->assertOk()
             ->assertExactJson(['evaluation' => 'お客様用の下書き', 'staff_memo' => 'スタッフ用の下書き', 'staff_memo_missing' => false]);
 
@@ -444,7 +469,10 @@ class PersonalityEvaluationDraftTest extends TestCase
 
         foreach (['staff', 'admin'] as $role) {
             $this->actingAsRole($role);
-            $this->postJson($this->draftUrl($result))->assertOk()->assertJsonPath('evaluation', '下書き');
+            foreach (['claude', 'openai', 'gemini'] as $provider) {
+                $this->fakeGenerator(new EvaluationDraft('下書き '.$provider, 'メモ', false), $provider);
+                $this->postDraft($result, $provider)->assertOk()->assertJsonPath('evaluation', '下書き '.$provider);
+            }
         }
         $this->assertSame('公開した文', $result->fresh()->evaluation_text);
     }
@@ -455,9 +483,12 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->fakeGenerator(new EvaluationDraft('下書き', 'メモ', false));
         auth('web')->logout();
 
-        $response = $this->postJson($this->draftUrl($result));
+        $calls = $this->fakeGenerator(new EvaluationDraft('下書き', 'メモ', false));
+
+        $response = $this->postDraft($result);
 
         $this->assertContains($response->getStatusCode(), [302, 401]);
+        $this->assertCount(0, $calls);
     }
 
     public function test_ほかのトレーニーの結果は弾く(): void
@@ -466,7 +497,7 @@ class PersonalityEvaluationDraftTest extends TestCase
         $result = $this->makeResult(trainee: $other);
         $this->fakeGenerator(new EvaluationDraft('下書き', 'メモ', false));
 
-        $this->postJson($this->draftUrl($result, $this->trainee))->assertNotFound();
+        $this->postDraft($result, 'claude', $this->trainee)->assertNotFound();
     }
 
     public function test_AIの失敗のときは決まった文のエラーを返す_AIで自動生成できませんでした(): void
@@ -474,7 +505,7 @@ class PersonalityEvaluationDraftTest extends TestCase
         $result = $this->makeResult();
         $this->fakeGenerator(new EvaluationDraftFailedException('timeout'));
 
-        $this->postJson($this->draftUrl($result))
+        $this->postDraft($result)
             ->assertStatus(502)
             ->assertExactJson(['message' => 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。']);
         $this->assertNull($result->fresh()->evaluation_text);
@@ -485,9 +516,252 @@ class PersonalityEvaluationDraftTest extends TestCase
         $result = $this->makeResult();
         $this->fakeGenerator(EvaluationDraft::fromResponse('全部お客様用'));
 
-        $this->postJson($this->draftUrl($result))
+        $this->postDraft($result)
             ->assertOk()
             ->assertExactJson(['evaluation' => '全部お客様用', 'staff_memo' => '', 'staff_memo_missing' => true]);
+    }
+
+    // ---- 3 社の AI（2026-10-20 追加：しばらく Claude・OpenAI・Gemini を比べながら使い、最終的に 1 つに絞るため） ----
+
+    public function test_providerごとにその会社の実装を呼ぶ(): void
+    {
+        $result = $this->makeResult();
+        $calls = [];
+        foreach (['claude', 'openai', 'gemini'] as $provider) {
+            $calls[$provider] = $this->fakeGenerator(new EvaluationDraft('お客様用 '.$provider, 'メモ '.$provider, false), $provider);
+        }
+
+        foreach (['claude', 'openai', 'gemini'] as $provider) {
+            $this->postDraft($result, $provider)->assertOk()
+                ->assertExactJson(['evaluation' => 'お客様用 '.$provider, 'staff_memo' => 'メモ '.$provider, 'staff_memo_missing' => false]);
+        }
+        foreach ($calls as $provider => $list) {
+            $this->assertCount(1, $list, $provider);
+        }
+        // 対応表は 1 か所（AI の名前 → ボタンの名前・実装）。並びはボタンの並び
+        $this->assertSame(['claude' => 'Claude', 'openai' => 'OpenAI', 'gemini' => 'Gemini'], app(EvaluationDraftProviders::class)->available());
+        $this->assertSame(ClaudeEvaluationDraftGenerator::class, EvaluationDraftProviders::PROVIDERS['claude']['class']);
+        $this->assertSame(OpenAiEvaluationDraftGenerator::class, EvaluationDraftProviders::PROVIDERS['openai']['class']);
+        $this->assertSame(GeminiEvaluationDraftGenerator::class, EvaluationDraftProviders::PROVIDERS['gemini']['class']);
+        // AI の会社を選ぶ設定（EVALUATION_DRAFT_DRIVER）は外した
+        $this->assertNull(config('services.evaluation_draft'));
+    }
+
+    public function test_決まった3つ以外と設定が空のAIはAIを呼ばずにエラー(): void
+    {
+        $result = $this->makeResult();
+        $calls = [];
+        foreach (['claude', 'openai', 'gemini'] as $provider) {
+            $calls[$provider] = $this->fakeGenerator(new EvaluationDraft('下書き', 'メモ', false), $provider);
+        }
+        $message = ['message' => 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。'];
+
+        foreach (['anthropic', 'gpt', 'CLAUDE', '', null, ['claude']] as $provider) {
+            $this->postDraft($result, $provider)->assertStatus(422)->assertExactJson($message);
+        }
+        // キーかモデルが空の AI
+        config(['services.openai.evaluation_model' => '', 'services.gemini.api_key' => null]);
+        $this->postDraft($result, 'openai')->assertStatus(422)->assertExactJson($message);
+        $this->postDraft($result, 'gemini')->assertStatus(422)->assertExactJson($message);
+        $this->assertSame(['claude' => 'Claude'], app(EvaluationDraftProviders::class)->available());
+        config(['services.anthropic.api_key' => '']);
+        $this->postDraft($result, 'claude')->assertStatus(422)->assertExactJson($message);
+
+        foreach ($calls as $provider => $list) {
+            $this->assertCount(0, $list, $provider);
+        }
+        $this->assertNull($result->fresh()->evaluation_text);
+    }
+
+    /**
+     * HTTP の送り手を差し替えた OpenAI の実装と、送った要求の記録（外部の AI は呼ばない）
+     *
+     * @return array{0: OpenAiEvaluationDraftGenerator, 1: \ArrayObject}
+     */
+    private function fakeOpenAi(string $text, int $status = 200): array
+    {
+        $requests = new \ArrayObject;
+        $body = $status === 200
+            ? [
+                'id' => 'chatcmpl-test', 'object' => 'chat.completion', 'created' => 1760000000, 'model' => 'openai-test',
+                'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => $text], 'finish_reason' => 'stop']],
+                'usage' => ['prompt_tokens' => 11, 'completion_tokens' => 22, 'total_tokens' => 33],
+            ]
+            : ['error' => ['message' => $text, 'type' => 'invalid_request_error', 'code' => null, 'param' => null]];
+        $stack = HandlerStack::create(new MockHandler([new Response($status, ['Content-Type' => 'application/json'], json_encode($body))]));
+        $stack->push(Middleware::history($requests));
+
+        return [new OpenAiEvaluationDraftGenerator(new GuzzleClient(['handler' => $stack])), $requests];
+    }
+
+    public function test_OpenAIはsystemに書式の決まりuserに指示文を入れて長さの上限を付けて送る(): void
+    {
+        $result = $this->makeResult();
+        [$generator, $requests] = $this->fakeOpenAi("## お客様用レポート\n**モモちゃん**は慎重派です。\n#####\n**スタッフ用メモ**\n- 吠えに注意");
+
+        $draft = $generator->generate($result);
+
+        $request = $requests[0]['request'];
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertSame('openai-test', $body['model']);
+        $this->assertSame([
+            ['role' => 'system', 'content' => PersonalityEvaluationPrompt::FORMAT_RULES],
+            ['role' => 'user', 'content' => PersonalityEvaluationPrompt::render($result)],
+        ], $body['messages']);
+        $this->assertSame(3000, $body['max_completion_tokens']);
+        $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $body['messages'][1]['content']);
+        // キーは Authorization ヘッダー（URL には入れない）
+        $this->assertSame('Bearer test-openai-key', $request->getHeaderLine('Authorization'));
+        $this->assertStringNotContainsString('test-openai-key', (string) $request->getUri());
+        $this->assertStringEndsWith('/chat/completions', (string) $request->getUri());
+        // 返事の後始末は 3 社とも同じ（「#####」で分ける → Markdown → 呼び名の行）
+        $this->assertSame('モモちゃんは慎重派です。', $draft->evaluation);
+        $this->assertSame('・吠えに注意', $draft->staffMemo);
+        $this->assertFalse($draft->staffMemoMissing);
+
+        // 指示文を設定画面で変えても、system の書式の決まりは付く
+        SystemSetting::query()->create(['key' => 'evaluation_prompt_current', 'value' => '{{犬の名前}}のレポートを書いてください。']);
+        [$generator, $requests] = $this->fakeOpenAi('お客様用');
+        $generator->generate($result);
+        $body = json_decode((string) $requests[0]['request']->getBody(), true);
+        $this->assertSame(PersonalityEvaluationPrompt::FORMAT_RULES, $body['messages'][0]['content']);
+        $this->assertSame('モモのレポートを書いてください。', $body['messages'][1]['content']);
+    }
+
+    public function test_Geminiはキーをヘッダーで送りURLに入れずsystemInstructionに書式の決まりを入れる(): void
+    {
+        $result = $this->makeResult();
+        Http::fake([
+            '*' => Http::response([
+                'candidates' => [[
+                    'content' => ['role' => 'model', 'parts' => [
+                        ['text' => '考えた過程（出さない）', 'thought' => true],
+                        ['text' => "【お客様用レポート】\n**モモちゃん**は慎重派です。\n#####\n## スタッフ用メモ\n* 吠えに注意"],
+                    ]],
+                    'finishReason' => 'STOP',
+                ]],
+                'usageMetadata' => ['promptTokenCount' => 11, 'candidatesTokenCount' => 22, 'thoughtsTokenCount' => 5],
+            ]),
+        ]);
+
+        $draft = app(GeminiEvaluationDraftGenerator::class)->generate($result);
+
+        Http::assertSentCount(1);
+        Http::assertSent(function (HttpRequest $request) use ($result) {
+            $this->assertSame('https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent', $request->url());
+            // キーは URL に入れず、ヘッダー x-goog-api-key で送る
+            $this->assertStringNotContainsString('test-gemini-key', $request->url());
+            $this->assertStringNotContainsString('key=', $request->url());
+            $this->assertSame(['test-gemini-key'], $request->header('x-goog-api-key'));
+            $this->assertSame([], $request->header('Authorization'));
+            $this->assertSame(['parts' => [['text' => PersonalityEvaluationPrompt::FORMAT_RULES]]], $request['systemInstruction']);
+            $this->assertSame([['role' => 'user', 'parts' => [['text' => PersonalityEvaluationPrompt::render($result)]]]], $request['contents']);
+            $this->assertSame(3000, $request['generationConfig']['maxOutputTokens']);
+
+            return true;
+        });
+        // 考えた過程は入れず、返事の後始末は 3 社とも同じ
+        $this->assertSame('モモちゃんは慎重派です。', $draft->evaluation);
+        $this->assertSame('・吠えに注意', $draft->staffMemo);
+    }
+
+    public function test_Geminiも指示文を設定画面で変えるとその文で送り書式の決まりは付く(): void
+    {
+        $result = $this->makeResult();
+        SystemSetting::query()->create(['key' => 'evaluation_prompt_current', 'value' => '{{犬の名前}}のレポートを書いてください。']);
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'お客様用']]], 'finishReason' => 'STOP']]])]);
+
+        app(GeminiEvaluationDraftGenerator::class)->generate($result);
+
+        Http::assertSent(function (HttpRequest $request) {
+            return $request['systemInstruction']['parts'][0]['text'] === PersonalityEvaluationPrompt::FORMAT_RULES
+                && $request['contents'][0]['parts'][0]['text'] === 'モモのレポートを書いてください。';
+        });
+    }
+
+    public function test_ログにAIの名前とモデルが残り送った文と返ってきた文とキーは残らない(): void
+    {
+        $result = $this->makeResult(life: ['wish' => '引っ張らずに歩きたい']);
+        $logs = [];
+        Log::listen(function ($event) use (&$logs) {
+            $logs[] = ['level' => $event->level, 'message' => $event->message, 'context' => $event->context];
+        });
+        $secrets = ['test-openai-key', 'test-gemini-key', 'test-anthropic-key', 'モモ', '引っ張らずに歩きたい', '返ってきたお客様用の文', '返ってきたメモ'];
+
+        // 成功（OpenAI・Gemini）
+        [$generator] = $this->fakeOpenAi("返ってきたお客様用の文\n#####\n返ってきたメモ");
+        $generator->generate($result);
+        // Gemini の返事は、成功 → 失敗（キーを含むエラー）の順
+        Http::fakeSequence()
+            ->push(['candidates' => [['content' => ['parts' => [['text' => "返ってきたお客様用の文\n#####\n返ってきたメモ"]]], 'finishReason' => 'STOP']], 'usageMetadata' => ['promptTokenCount' => 1, 'candidatesTokenCount' => 2]])
+            ->push(['error' => ['message' => 'API key not valid: test-gemini-key']], 400);
+        app(GeminiEvaluationDraftGenerator::class)->generate($result);
+
+        $info = array_values(array_filter($logs, fn ($log) => $log['level'] === 'info'));
+        $this->assertSame(['openai', 'gemini'], array_column(array_column($info, 'context'), 'provider'));
+        $this->assertSame(['openai-test', 'gemini-test'], array_column(array_column($info, 'context'), 'model'));
+        $this->assertSame([11, 1], array_column(array_column($info, 'context'), 'input_tokens'));
+        $this->assertSame([22, 2], array_column(array_column($info, 'context'), 'output_tokens'));
+        foreach (['result_id', 'elapsed_ms', 'stop_reason'] as $key) {
+            $this->assertArrayHasKey($key, $info[0]['context']);
+            $this->assertArrayHasKey($key, $info[1]['context']);
+        }
+
+        // 失敗：エラーの中にキーが入っていても伏せる
+        $logs = [];
+        [$generator] = $this->fakeOpenAi('Incorrect API key provided: test-openai-key', 401);
+        try {
+            $generator->generate($result);
+            $this->fail('例外にならなかった');
+        } catch (EvaluationDraftFailedException) {
+        }
+        try {
+            app(GeminiEvaluationDraftGenerator::class)->generate($result);
+            $this->fail('例外にならなかった');
+        } catch (EvaluationDraftFailedException) {
+        }
+        $errors = array_values(array_filter($logs, fn ($log) => $log['level'] === 'error'));
+        $this->assertSame(['openai', 'gemini'], array_column(array_column($errors, 'context'), 'provider'));
+        $this->assertStringContainsString('[REDACTED]', $errors[0]['context']['error']);
+        $this->assertStringContainsString('[REDACTED]', $errors[1]['context']['error']);
+
+        $this->assertNotEmpty($logs);
+        foreach ([...$info, ...$errors] as $log) {
+            $all = $log['message'].json_encode($log['context'], JSON_UNESCAPED_UNICODE);
+            foreach ($secrets as $secret) {
+                $this->assertStringNotContainsString($secret, $all, $secret);
+            }
+        }
+    }
+
+    public function test_Claudeのログにも名前が残る(): void
+    {
+        $result = $this->makeResult();
+        $logs = [];
+        Log::listen(function ($event) use (&$logs) {
+            $logs[] = $event->context;
+        });
+        [$generator] = $this->fakeClaude('お客様用');
+
+        $generator->generate($result);
+
+        $this->assertSame('claude', $logs[0]['provider']);
+        $this->assertSame('claude-test', $logs[0]['model']);
+    }
+
+    public function test_GeminiとOpenAIの返事が空なら失敗(): void
+    {
+        $result = $this->makeResult();
+        [$generator] = $this->fakeOpenAi('');
+        try {
+            $generator->generate($result);
+            $this->fail('例外にならなかった');
+        } catch (EvaluationDraftFailedException) {
+        }
+        // 考えた過程だけで答えがない（出す長さの上限に届いたときなど）
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => '考えた過程', 'thought' => true]]], 'finishReason' => 'MAX_TOKENS']]])]);
+        $this->expectException(EvaluationDraftFailedException::class);
+        app(GeminiEvaluationDraftGenerator::class)->generate($result);
     }
 
     // ---- スタッフ用メモの保存（2026-10-19 変更：アドバイスと同じ［更新］〔PUT …/{result}〕で保存する。その前は PUT …/staff-memo） ----

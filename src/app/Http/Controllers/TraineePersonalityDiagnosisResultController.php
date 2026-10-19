@@ -6,7 +6,7 @@ use App\Models\AccessLog;
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Services\EvaluationDraft\EvaluationDraftFailedException;
-use App\Services\EvaluationDraft\EvaluationDraftGenerator;
+use App\Services\EvaluationDraft\EvaluationDraftProviders;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,6 +43,9 @@ use Illuminate\View\View;
  */
 class TraineePersonalityDiagnosisResultController extends Controller
 {
+    /** AI の自動生成に失敗したときの文言（設計書 S-0313。使えない AI が送られたときも同じ文。どの AI で作ったかは入れない） */
+    private const DRAFT_FAILED_MESSAGE = 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。';
+
     /** 公開済みのあいだに空で更新しようとしたときの文言（設計書 S-0313「バリデーションチェック」） */
     private const EMPTY_WHILE_PUBLISHED_MESSAGE = '公開中のアドバイスは空にできません。公開を取り消してから消してください。';
 
@@ -51,9 +54,10 @@ class TraineePersonalityDiagnosisResultController extends Controller
      *
      * レーダーチャートは、この結果を今回にし、それより前の結果から前回・初回を取る（Trainee::personalityRadarDataAsOf）。
      * そのためトレーニーの結果を全部（新しい順に）読み込む。表示はアクセスログに記録しない。
-     * 見出しの右の会員（S-0305 へのリンク）と内部ID のため、トレーニーの会員も読み込む（2026-10-18 追加）
+     * 見出しの右の会員（S-0305 へのリンク）と内部ID のため、トレーニーの会員も読み込む（2026-10-18 追加）。
+     * ［AIで自動生成］のボタンは、キーとモデルの設定がそろっている AI の分だけ出す（2026-10-20 追加。EvaluationDraftProviders）
      */
-    public function show(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult): View
+    public function show(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult, EvaluationDraftProviders $providers): View
     {
         $trainee->load(['personalityDiagnosisResults', 'client']);
         $personalityDiagnosisResult->load(['evaluationUpdatedBy']);
@@ -62,6 +66,7 @@ class TraineePersonalityDiagnosisResultController extends Controller
             'trainee' => $trainee,
             'result' => $personalityDiagnosisResult,
             'radarData' => $trainee->personalityRadarDataAsOf($personalityDiagnosisResult),
+            'draftProviders' => $providers->available(),
         ]);
     }
 
@@ -212,14 +217,20 @@ class TraineePersonalityDiagnosisResultController extends Controller
      * その場で AI を呼び（キューは使わない）、JSON の { evaluation, staff_memo, staff_memo_missing } を返す。何も保存しない
      * （画面の JS が 2 つの欄に入れ、トレーナーが 1 つの［更新］で保存する）。公開済みでも作れる。何度でも作れる。
      * 失敗したら 502 と決まった文だけを返す（細かい原因はログにだけ。EvaluationDraftGenerator の実装が残す）。
-     * AI の会社は EvaluationDraftGenerator の実装で決まる（今は Claude）。アクセスログには記録しない
+     * AI の会社は、押したボタンの provider（claude・openai・gemini）から EvaluationDraftProviders が選ぶ（2026-10-20 変更：3 社にした。
+     * その前は Claude だけ）。決まった 3 つ以外・キーかモデルの設定が空の会社なら、AI を呼ばずに 422 と同じ文を返す。アクセスログには記録しない
      */
-    public function draft(Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult, EvaluationDraftGenerator $generator): JsonResponse
+    public function draft(Request $request, Trainee $trainee, TraineePersonalityDiagnosisResult $personalityDiagnosisResult, EvaluationDraftProviders $providers): JsonResponse
     {
+        $generator = $providers->make($request->input('provider'));
+        if ($generator === null) {
+            return response()->json(['message' => self::DRAFT_FAILED_MESSAGE], 422);
+        }
+
         try {
             $draft = $generator->generate($personalityDiagnosisResult);
         } catch (EvaluationDraftFailedException) {
-            return response()->json(['message' => 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。'], 502);
+            return response()->json(['message' => self::DRAFT_FAILED_MESSAGE], 502);
         }
 
         return response()->json([
