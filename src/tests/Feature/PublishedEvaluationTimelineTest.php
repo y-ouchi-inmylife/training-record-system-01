@@ -480,9 +480,30 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertStringContainsString('personality-radar', $html);
         // 戻るのはマイページ（S-1404 と同じ「HOME」）
         $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('client-portal.dashboard'), '/').'" class="c-detail-back">\s*HOME\s*<\/a>/u', $html);
+        // グラフはその結果だけ（2026-10-19 変更：その前は、その結果の時点の今回・前回を重ねていた）。凡例は出さない
         $radar = $this->radarData($html);
-        $this->assertSame(['current', 'previous'], array_column($radar['series'], 'key'));
-        $this->assertSame(['2026/10/13', '2026/09/01'], array_column($radar['series'], 'date'));
+        $this->assertSame(['current'], array_column($radar['series'], 'key'));
+        $this->assertSame(['2026/10/13'], array_column($radar['series'], 'date'));
+        $this->assertStringNotContainsString('data-personality-radar-legend', $html);
+        $this->assertStringNotContainsString('c-personality-legend', $html);
+    }
+
+    public function test_アドバイスの画面のグラフは前回と初回がある会員でもその結果だけでマイページのグラフは前回と初回も出す(): void
+    {
+        // 2026-10-19 変更：S-1418 はその回の結果を見る画面。前の回と比べるのはマイページの愛犬のカードのグラフ
+        $this->addResult('2026-06-01 09:00:00', null, null, null, 'calm', '1.00');
+        $this->addResult('2026-09-01 09:00:00', null, null, null, 'calm', '1.50');
+        $e = $this->addResult('2026-10-13 09:00:00', 'アドバイス', '2026-10-14 11:30:00', null, 'calm', '2.00');
+
+        $radar = $this->radarData($this->evaluationPage($e)->assertOk()->getContent());
+        $this->assertSame([['key' => 'current', 'date' => '2026/10/13', 'values' => array_fill(0, 7, '2.0')]], $radar['series']);
+        $this->assertCount(7, $radar['labels']);
+        $this->assertCount(7, $radar['keys']);
+
+        // マイページ（S-1402）の愛犬のカードのグラフは今のまま今回・前回・初回
+        $dashboard = $this->radarData($this->mypage());
+        $this->assertSame(['current', 'previous', 'initial'], array_column($dashboard['series'], 'key'));
+        $this->assertSame(['2026/10/13', '2026/09/01', '2026/06/01'], array_column($dashboard['series'], 'date'));
     }
 
     public function test_アドバイスの画面のグラフはあとから新しい結果を足しても変わらない(): void

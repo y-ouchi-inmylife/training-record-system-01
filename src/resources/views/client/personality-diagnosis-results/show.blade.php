@@ -28,8 +28,10 @@
         @endif
     </div>
 
-    {{-- タイプと、その結果の時点のレーダーチャート（今回＝この結果、前回・初回＝それより前の結果）。
+    {{-- タイプと、その結果だけのレーダーチャート（2026-10-19 変更：前回・初回は重ねず、凡例も出さない〔線が 1 本で、日付は見出しにあるため〕。
+         前の回と比べるのはマイページの愛犬のカードのグラフ。その前は、その結果の時点の今回・前回・初回を重ね、グラフの下に凡例を出していた）。
          マイページの愛犬のカードと同じ小さな表示（.c-personality-radar・data-personality-radar-compact）・同じ部品（personality-radar.js）。
+         値はコントローラで今回だけにして渡す（部品は変えない）。
          タイプは「・」のあとでだけ折り返す。読み上げは「{呼び名}の愛犬性格診断のグラフ」だけ（点数は出さないものなので読み上げにも出さない） --}}
     <section aria-label="タイプとグラフ" data-evaluation-personality>
         <p class="fw-bold mb-1" style="word-break: keep-all;" data-evaluation-type>{!! collect(explode('・', $typeLabel))->map(fn ($part) => e($part))->implode('・<wbr>') !!}</p>
@@ -39,8 +41,6 @@
                         data-personality-radar="{{ json_encode($radarData, JSON_UNESCAPED_UNICODE) }}"
                         data-personality-radar-compact></canvas>
             </div>
-            <ul class="c-personality-legend list-unstyled d-flex flex-wrap column-gap-3 row-gap-0 mt-1 mb-0"
-                data-personality-radar-legend="evaluation-personality-radar"></ul>
         @endif
     </section>
 

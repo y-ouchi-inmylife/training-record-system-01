@@ -665,6 +665,22 @@ class Trainee extends Model
     }
 
     /**
+     * 指定した結果だけのレーダーチャートの値（2026-10-19 追加。会員側の愛犬性格診断の画面 S-1418 用）。形は personality_radar_data と同じで、
+     * series は今回（key = current）の 1 つだけ（前回・初回は重ねない）。記録の画面はその回の結果を見る画面で、前の回と比べるのは
+     * マイページの愛犬のカード（personality_radar_data）で行うため。指定した結果がこのトレーニーの結果でなければ null
+     *
+     * @return array{labels: string[], keys: string[], series: array{key: string, date: string, values: (string|null)[]}[]}|null
+     */
+    public function personalityRadarDataOnly(TraineePersonalityDiagnosisResult $result): ?array
+    {
+        if ((int) $result->trainee_id !== (int) $this->id) {
+            return null;
+        }
+
+        return self::buildPersonalityRadarData(collect([$result]));
+    }
+
+    /**
      * 新しい順の結果から、レーダーチャートの値を組み立てる（いちばん前が今回。2026-10-18 に personality_radar_data から切り出し、
      * 指定した結果の時点の組み立て〔personalityRadarDataAsOf〕と共通にした）。結果がなければ null
      *
