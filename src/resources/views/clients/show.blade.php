@@ -697,19 +697,28 @@
                                          2〜3 文字のラベル（犬種・性別・誕生日）は狭い幅でも 1 行に収まるので付けない --}}
                                     <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">去勢・<wbr>避妊</dt>
                                     <dd class="col-8 mb-1">{{ $trainee->neuter_status_label }}</dd>
-                                    {{-- 最終計測（設計書 S-0305 セクション3「最終計測」参照）。
-                                         最新 1 件は Trainee::latest_measurement アクセサ経由で取り出し、
-                                         「Y/m/d（N.NNkg）」で表示。0 件は空欄（§2-4 参照）。
-                                         N+1 回避のため ClientController::show で trainees.measurements を eager load 済み。 --}}
-                                    {{-- 計測値の登録のボタンは置かない（2026-10 変更。計測値の登録はトレーニー詳細 S-0309 の
-                                         計測値の欄から行い、会員詳細のトレーニーの欄はトレーニーの情報を見る場所にするため）。
-                                         値だけをほかの属性と同じ dd で出す（行の高さもほかの属性とそろう） --}}
-                                    <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測</dt>
-                                    <dd class="col-8 mb-0">@if($trainee->latest_measurement){{ $trainee->latest_measurement->measured_date->format('Y/m/d') }}（{{ number_format((float) $trainee->latest_measurement->weight_kg, 2) }}kg）@endif</dd>
+                                    {{-- 暮らしの様子（2026-10-19 変更。設計書 S-0305 セクション3「名前の下の項目の並びと出し方」）。去勢・避妊の下、
+                                         愛犬性格診断の上に、ほかの項目と同じ「ラベル・値」の行で、いつも出す（その前は回答があるときだけ、欄のいちばん下に
+                                         リンクだけの行を出していた）。
+                                         - 値はバッジ：愛犬アンケートの回答があれば「入力あり」（bg-success）、なければ「入力なし」（bg-secondary）。
+                                           色は評価文の状態のバッジ（公開済み＝bg-success、なし＝bg-secondary）に合わせる
+                                         - 回答があるかどうかは最新の回答の有無で決める（答えの中身が空かどうかは見ない。答え直しの案内を出している間も、
+                                           前回の答えがあれば入力あり）。latestIntakeSurveyResponse は ClientController::show で先読み済み
+                                         - ラベルは入力ありのときだけリンク（トレーニー詳細 S-0309 の暮らしの様子の欄 #intake-survey、同じタブ。
+                                           読み上げ用の名前は「{表示名}の暮らしの様子」）。入力なしのときはほかのラベルと同じ灰色の文字
+                                         - ラベルは「暮らしの」と「様子」の間でだけ折り返す（狭い幅でラベルの列に収まらないため。去勢・避妊と同じやり方） --}}
+                                    @if($trainee->latestIntakeSurveyResponse !== null)
+                                        <dt class="col-4 fw-normal" style="word-break: keep-all; overflow-wrap: normal;"><a href="{{ route('trainees.show', $trainee) }}#intake-survey"
+                                           aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの<wbr>様子</a></dt>
+                                        <dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-success">入力あり</span></dd>
+                                    @else
+                                        <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">暮らしの<wbr>様子</dt>
+                                        <dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-secondary">入力なし</span></dd>
+                                    @endif
                                 </dl>
                                 {{-- 性格診断の行（2026-10 追加。要件定義書 6-16-11〜6-16-13、設計書 S-0305 セクション3「性格診断の行」）。
-                                     - いつも出す（結果・案内の有無にかかわらず）。最終計測の下（dl のすぐ後ろ）、「暮らしの様子」のリンクの上
-                                       （2026-10 変更：当初は「暮らしの様子」の下。トレーニー詳細の欄の順にそろえた）
+                                     - いつも出す（結果・案内の有無にかかわらず）。暮らしの様子の下、最終計測の上（2026-10-19 変更：ユーザーレビューで
+                                       並びを 去勢・避妊 → 暮らしの様子 → 愛犬性格診断 → 最終計測 にした。その前は最終計測の下、「暮らしの様子」のリンクの上）
                                      - 左は「性格診断」の文字のリンク。いつもトレーニー詳細（S-0309）の性格診断の欄（#personality-diagnosis、
                                        同じタブ）へ。結果がなくても飛ぶ（欄に「（未回答）」が出る）。左の位置・文字の大きさ・上の間隔は
                                        「暮らしの様子」のリンクにそろえる（small mt-1）
@@ -740,20 +749,23 @@
                                         @endif
                                     </div>
                                 </div>
-                                {{-- 暮らしの様子（愛犬アンケートに回答済みのときだけ。2026-10 変更。設計書 S-0305 セクション3「暮らしの様子」）。
-                                     属性の並びの最後、性格診断の行の下に、文字のリンク（ボタンではない）で置く（2026-10 変更：当初は最終計測のすぐ下・
-                                     性格診断の行の上。トレーニー詳細の欄の順〔性格診断 → 暮らしの様子〕にそろえた）。dl の行には入れず、
-                                     dl の後ろに置く（値の列がない 1 項目のため。dl.row のラベル列〔col-4〕と同じく左端から始まるので、
-                                     左の位置は属性の見出しにそろう）。リンク先はトレーニー詳細（S-0309）の暮らしの様子の欄（#intake-survey、同じタブ）。
-                                     読み上げでどのトレーニーのものかが分かるよう、aria-label を「{表示名}の暮らしの様子」にする
-                                     （見える文字「暮らしの様子」を含む） --}}
-                                {{-- 2026-10-19 変更：状態ではなく回答があるかどうかで出す（答え直しの案内を出している間も、前回の答えを見られるように） --}}
-                                @if($trainee->latestIntakeSurveyResponse !== null)
-                                    <div class="small mt-1">
-                                        <a href="{{ route('trainees.show', $trainee) }}#intake-survey"
-                                           aria-label="{{ $trainee->display_name }}の暮らしの様子">暮らしの様子</a>
-                                    </div>
-                                @endif
+                                {{-- 最終計測だけの並び。性格診断の行との間は、性格診断の行の上と同じ間隔（mt-1） --}}
+                                <dl class="row mb-0 small mt-1">
+                                    {{-- 最終計測（設計書 S-0305 セクション3「最終計測」参照）。欄のいちばん下（2026-10-19 変更：その前は去勢・避妊の下）。
+                                         最新 1 件は Trainee::latest_measurement アクセサ経由で取り出し、
+                                         「Y/m/d（N.NNkg）」で表示。0 件は「計測なし」（2026-10-19 変更：その前は空欄〔§2-4〕。
+                                         文字の色は愛犬性格診断の「診断なし」と同じ text-muted）。
+                                         N+1 回避のため ClientController::show で trainees.measurements を eager load 済み。 --}}
+                                    {{-- 計測値の登録のボタンは置かない（2026-10 変更。計測値の登録はトレーニー詳細 S-0309 の
+                                         計測値の欄から行い、会員詳細のトレーニーの欄はトレーニーの情報を見る場所にするため）。
+                                         値だけをほかの属性と同じ dd で出す（行の高さもほかの属性とそろう） --}}
+                                    <dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測</dt>
+                                    @if($trainee->latest_measurement)
+                                        <dd class="col-8 mb-0" data-latest-measurement>{{ $trainee->latest_measurement->measured_date->format('Y/m/d') }}（{{ number_format((float) $trainee->latest_measurement->weight_kg, 2) }}kg）</dd>
+                                    @else
+                                        <dd class="col-8 mb-0 text-muted" data-latest-measurement>計測なし</dd>
+                                    @endif
+                                </dl>
                                     </div>
                                 </div>
                             </div>

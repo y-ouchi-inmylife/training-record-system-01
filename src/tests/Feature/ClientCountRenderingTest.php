@@ -608,18 +608,19 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('登録内容のないトレーニー', $script);
     }
 
-    public function test_トレーニーの欄に備考の行はなく去勢避妊の次が最終計測(): void
+    public function test_トレーニーの欄に備考の行はなく去勢避妊の次が暮らしの様子(): void
     {
         $client = $this->makeClient('0001', '山田');
         $this->trainee($client, 'ポチ');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // ラベルの並び（2026-10 変更：トレーニーの備考をなくした）
+        // ラベルの並び（2026-10 変更：トレーニーの備考をなくした。2026-10-19 変更：去勢・避妊の次は暮らしの様子、最終計測はいちばん下。
+        // 愛犬性格診断は dl の外の行なので、ここには入らない）
         // ラベルの文字（折り返しの印 <wbr> を除いたもの。2026-10-18 から「去勢・避妊」「最終計測」に印が入る）
         preg_match_all('/<dt class="col-4 fw-normal text-muted"[^>]*>(.+?)<\/dt>/u', $html, $m);
         $m[1] = array_map(fn ($label) => str_replace('<wbr>', '', $label), $m[1]);
-        $this->assertSame(['犬種', '性別', '誕生日', '去勢・避妊', '最終計測'], array_slice($m[1], 0, 5));
+        $this->assertSame(['犬種', '性別', '誕生日', '去勢・避妊', '暮らしの様子', '最終計測'], array_slice($m[1], 0, 6));
         $this->assertNotContains('備考', $m[1]);
     }
 
@@ -715,10 +716,11 @@ class ClientCountRenderingTest extends TestCase
             $html
         );
 
-        // 最終計測の行は写真の有無にかかわらず同じ並べ方（ほかの属性と同じ dd）
-        $this->assertSame(2, preg_match_all('/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測<\/dt>\s*<dd class="col-8 mb-0"><\/dd>/u', $html));
-        // 項目の dl は写真の有無で変わらない（flex-grow-1 などを持たない）
+        // 最終計測の行は写真の有無にかかわらず同じ並べ方（ほかの属性と同じ dd。計測がないので「計測なし」。2026-10-19 変更：その前は空欄）
+        $this->assertSame(2, preg_match_all('/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測<\/dt>\s*<dd class="col-8 mb-0 text-muted" data-latest-measurement>計測なし<\/dd>/u', $html));
+        // 項目の dl は写真の有無で変わらない（flex-grow-1 などを持たない）。最終計測だけの dl も同じ
         $this->assertSame(2, substr_count($html, '<dl class="row mb-0 small">'));
+        $this->assertSame(2, substr_count($html, '<dl class="row mb-0 small mt-1">'));
     }
 
     public function test_トレーニーの欄に計測を追加のボタンと計測値のモーダルを出さない(): void
@@ -740,7 +742,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('name="return_to"', $html);
         $this->assertStringNotContainsString(route('trainee-measurements.store', $id), $html);
         // 最終計測の値は今までどおり（ほかの属性と同じ dd の中に値だけ）
-        $this->assertMatchesRegularExpression('/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測<\/dt>\s*<dd class="col-8 mb-0">2026\/10\/13（3\.20kg）<\/dd>/u', $html);
+        $this->assertMatchesRegularExpression('/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">最終<wbr>計測<\/dt>\s*<dd class="col-8 mb-0" data-latest-measurement>2026\/10\/13（3\.20kg）<\/dd>/u', $html);
     }
 
     public function test_pc幅では左のトレーニング記録カードを右の列の高さに合わせる(): void
@@ -838,10 +840,11 @@ class ClientCountRenderingTest extends TestCase
     {
         $url = preg_quote(route('trainees.show', $traineeId).'#intake-survey', '/');
 
-        // 性格診断の行（リンク・日付）のすぐ後ろ（2026-10 変更：当初は属性の並び〔dl〕のすぐ後ろ。2026-10-19 変更：行のボタンをなくした）
-        return '/aria-label="'.preg_quote($name, '/').'の愛犬性格診断">愛犬<wbr>性格診断<\/a>\s*<\/div>\s*<div class="col-8 d-flex flex-wrap align-items-center gap-2">\s*'
-            .'<span[^>]*data-personality-diagnosis-latest>[^<]*<\/span>\s*<\/div>\s*<\/div>\s*'
-            .'<div class="small mt-1">\s*<a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの様子<\/a>\s*<\/div>/us';
+        // 去勢・避妊の行のすぐ後ろに、ラベルがリンクの「暮らしの様子」と「入力あり」のバッジ（2026-10-19 変更：その前は性格診断の行の
+        // すぐ後ろに、リンクだけの行〔div.small.mt-1〕を出していた）
+        return '/<dd class="col-8 mb-1">[^<]*<\/dd>\s*'
+            .'<dt class="col-4 fw-normal" style="word-break: keep-all; overflow-wrap: normal;"><a href="'.$url.'"\s*aria-label="'.preg_quote($name, '/').'の暮らしの様子">暮らしの<wbr>様子<\/a><\/dt>\s*'
+            .'<dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-success">入力あり<\/span><\/dd>\s*<\/dl>/us';
     }
 
     public function test_回答済みの暮らしの様子のリンクの読み上げ用の名前は名前が未登録なら名前未登録(): void
@@ -1268,9 +1271,9 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 並びは 最終計測 → 性格診断の行 → 暮らしの様子（回答済みのときだけ）（2026-10 変更：当初は暮らしの様子の後ろに
-        // 性格診断の行。トレーニー詳細の欄の順にそろえた）
-        // 回答済みのトレーニー：属性の並び（dl）のすぐ後ろに性格診断の行、その後ろに暮らしの様子のリンク
+        // 並びは 去勢・避妊 → 暮らしの様子（いつも。バッジ）→ 性格診断の行 → 最終計測（2026-10-19 変更：その前は
+        // 最終計測 → 性格診断の行 → 暮らしの様子〔回答済みのときだけのリンク〕）
+        // 回答済みのトレーニー：属性の並び（dl。最後が暮らしの様子）のすぐ後ろに性格診断の行
         $this->assertMatchesRegularExpression(
             '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
             .'<a href="'.preg_quote(route('trainees.show', $answered), '/').'#personality-diagnosis" style="word-break: keep-all; overflow-wrap: normal;"\s*aria-label="ポチの愛犬性格診断">愛犬<wbr>性格診断<\/a>/u',
@@ -1285,16 +1288,17 @@ class ClientCountRenderingTest extends TestCase
             $html
         );
         $afterNotIssued = substr($html, strpos($html, 'aria-label="名前未登録の愛犬性格診断">愛犬<wbr>性格診断</a>'));
-        $this->assertStringNotContainsString('暮らしの様子</a>', $afterNotIssued);
+        // 回答のないトレーニーは、暮らしの様子のラベルをリンクにせず「入力なし」（2026-10-19 変更：その前は行ごと出さなかった）
+        $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary">入力なし</span>'));
         // 行のボタンのまとまりはない（2026-10-19 変更：トレーニーの欄の［案内を発行］と「案内中」の行にまとめた）。
-        // 性格診断の行（リンク・診断なし）のあと、トレーニーの欄が閉じる
+        // 性格診断の行（リンク・診断なし）のあと、最終計測の行（2026-10-19 変更：いちばん下）で、トレーニーの欄が閉じる
         $this->assertStringNotContainsString('role="group" aria-label="名前未登録の愛犬性格診断"', $html);
         $this->assertMatchesRegularExpression(
-            '/data-personality-diagnosis-latest>診断なし<\/span>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/us',
+            '/data-personality-diagnosis-latest>診断なし<\/span>\s*<\/div>\s*<\/div>\s*<dl class="row mb-0 small mt-1">.*?計測なし<\/dd>\s*<\/dl>\s*<\/div>\s*<\/div>\s*<\/div>/us',
             $afterNotIssued,
-            '愛犬性格診断の行のあと、トレーニーの欄が閉じる'
+            '愛犬性格診断の行のあと、最終計測の行でトレーニーの欄が閉じる'
         );
-        $this->assertSame(1, substr_count($html, '>暮らしの様子</a>'));
+        $this->assertSame(1, substr_count($html, '>暮らしの<wbr>様子</a>'));
         $this->assertSame(2, substr_count($html, '>愛犬<wbr>性格診断</a>'));
     }
 
@@ -1695,9 +1699,9 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression($this->issueButtonPattern($answered, 'ポチ'), $html);
         $this->assertMatchesRegularExpression($this->issueButtonPattern($tokenOnly, 'たま'), $html);
         $this->assertStringNotContainsString('data-survey-in-progress', $html);
-        // 暮らしの様子のリンクは回答があるときだけ（今のまま）
+        // 暮らしの様子のラベルのリンク（と「入力あり」）は回答があるときだけ
         $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
-        $this->assertSame(1, substr_count($html, '>暮らしの様子</a>'));
+        $this->assertSame(1, substr_count($html, '>暮らしの<wbr>様子</a>'));
     }
 
     public function test_回答待ちがあれば案内を発行を出さず案内中の行に種類の名前と表示と取消を出し期限の日は出さない(): void
@@ -2094,5 +2098,76 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(2, substr_count($segment, '<div class="d-flex gap-2">'));
         $this->assertStringContainsString('>愛犬アンケート</span>', $segment);
         $this->assertStringContainsString('>愛犬性格診断</span>', $segment);
+    }
+
+    // ---- 名前の下の項目の並び・暮らしの様子のバッジ・最終計測の「計測なし」（2026-10-19 変更。設計書 S-0305 セクション3「名前の下の項目の並びと出し方」） ----
+
+    public function test_項目の並びは犬種性別誕生日去勢避妊暮らしの様子愛犬性格診断最終計測(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->intakeResponse($id, $this->intakeToken($id, '2026-10-16 14:32:00'));
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $markers = [
+            '<dt class="col-4 fw-normal text-muted">犬種</dt>',
+            '<dt class="col-4 fw-normal text-muted">性別</dt>',
+            '<dt class="col-4 fw-normal text-muted">誕生日</dt>',
+            '去勢・<wbr>避妊</dt>',
+            '>暮らしの<wbr>様子</a></dt>',
+            'data-personality-diagnosis-row',
+            '最終<wbr>計測</dt>',
+        ];
+        $positions = array_map(fn ($marker) => strpos($html, $marker), $markers);
+        foreach ($positions as $i => $position) {
+            $this->assertNotFalse($position, $markers[$i]);
+        }
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions);
+    }
+
+    public function test_暮らしの様子は回答があれば入力ありのバッジとラベルのリンクでなければ入力なしのバッジでリンクなし(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $answered = $this->trainee($client, 'ポチ');
+        $this->intakeResponse($answered, $this->intakeToken($answered, '2026-10-16 14:32:00'));
+        $none = $this->trainee($client, 'たま');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 回答あり：ラベルはトレーニー詳細の暮らしの様子の欄へのリンク、値は「入力あり」（bg-success）
+        $this->assertMatchesRegularExpression($this->lifeLinkPattern($answered, 'ポチ'), $html);
+        // 回答なし：ラベルはほかのラベルと同じ灰色の文字（リンクなし）、値は「入力なし」（bg-secondary）。行はいつも出す
+        $this->assertSame(1, preg_match_all(
+            '/<dt class="col-4 fw-normal text-muted" style="word-break: keep-all; overflow-wrap: normal;">暮らしの<wbr>様子<\/dt>\s*'
+            .'<dd class="col-8 mb-0" data-intake-survey-status><span class="badge bg-secondary">入力なし<\/span><\/dd>/u',
+            $html
+        ));
+        $this->assertStringNotContainsString(route('trainees.show', $none).'#intake-survey', $html);
+        $this->assertSame(2, substr_count($html, 'data-intake-survey-status'));
+    }
+
+    public function test_最終計測は計測がなければ計測なしをあれば日付と体重を出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $measured = $this->trainee($client, 'ポチ');
+        $this->trainee($client, 'たま');
+        Schema::table('trainee_measurements', fn (Blueprint $table) => $table->decimal('weight_kg', 5, 2)->nullable());
+        DB::table('trainee_measurements')->insert([
+            'trainee_id' => $measured, 'measured_date' => '2026-10-14', 'measured_time' => '08:00:00', 'weight_kg' => 5,
+        ]);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 計測あり：今までどおりの出し方（文字の色はほかの値と同じ）
+        $this->assertStringContainsString('<dd class="col-8 mb-0" data-latest-measurement>2026/10/14（5.00kg）</dd>', $html);
+        // 計測なし：「計測なし」（愛犬性格診断の「診断なし」と同じ text-muted）
+        $this->assertSame(1, substr_count($html, '<dd class="col-8 mb-0 text-muted" data-latest-measurement>計測なし</dd>'));
+        $this->assertStringContainsString('<span class="text-muted" data-personality-diagnosis-latest>診断なし</span>', $html);
     }
 }
