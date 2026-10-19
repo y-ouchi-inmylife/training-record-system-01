@@ -2170,4 +2170,108 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, substr_count($html, '<dd class="col-8 mb-0 text-muted" data-latest-measurement>計測なし</dd>'));
         $this->assertStringContainsString('<span class="text-muted" data-personality-diagnosis-latest>診断なし</span>', $html);
     }
+
+    // ---- 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」） ----
+
+    /** 組み合わせの案内（2 つの案内を作って結び付ける）。期限は 2 つとも同じ。[愛犬アンケートの案内の id, 愛犬性格診断の案内の id] */
+    private function combinedTokens(int $traineeId, string $expiresAt = '2026-10-26 23:59:59', string $createdAt = '2026-10-19 10:00:00'): array
+    {
+        $row = ['trainee_id' => $traineeId, 'expires_at' => $expiresAt, 'created_at' => $createdAt, 'updated_at' => $createdAt];
+        $intakeId = DB::table('trainee_intake_survey_tokens')->insertGetId(['token' => bin2hex(random_bytes(16)), ...$row]);
+        $personalityId = DB::table('trainee_personality_diagnosis_tokens')->insertGetId(['token' => bin2hex(random_bytes(16)), ...$row]);
+        DB::table('trainee_intake_survey_tokens')->where('id', $intakeId)->update(['trainee_personality_diagnosis_token_id' => $personalityId]);
+
+        return [$intakeId, $personalityId];
+    }
+
+    public function test_組み合わせの案内中は1つにまとめ愛犬アンケートを答えたあとは愛犬性格診断だけにする(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        [$intakeId] = $this->combinedTokens($id);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 2 つとも回答待ち：「案内中　愛犬アンケート＆愛犬性格診断　［表示］［取消］」の 1 段
+        $row = (string) $this->inProgressRow($html, 'ポチ');
+        $this->assertSame(1, substr_count($row, 'data-survey-in-progress-item'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート＆愛犬性格診断</span>', $row);
+        $this->assertMatchesRegularExpression(
+            '/<a href="'.preg_quote(route('trainee-combined-survey-tokens.print', $id), '/').'" class="btn btn-sm btn-outline-primary text-nowrap"\s*aria-label="愛犬アンケート＆愛犬性格診断の案内を表示">表示<\/a>\s*'
+            .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#combinedSurveyCancelModal"\s*'
+            .'data-combined-survey-trainee-id="'.$id.'"\s*aria-label="愛犬アンケート＆愛犬性格診断の案内を取消">取消<\/button>/u',
+            $row
+        );
+        $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
+        // 取消の確認（M09）の文は、まだ答えていない分をまとめて取り消すこと
+        $this->assertStringContainsString('id="combinedSurveyCancelModal"', $html);
+        $this->assertStringContainsString('発行済みの愛犬アンケート＆愛犬性格診断の案内のうち、まだお答えいただいていない分がまとめて使えなくなります。', $html);
+        $this->assertStringContainsString(json_encode(route('trainee-combined-survey-tokens.destroy', ['trainee' => '__ID__'])), $html);
+
+        // 愛犬アンケートだけ答えたあと：残っている愛犬性格診断だけ（［表示］は愛犬性格診断のご案内、［取消］は愛犬性格診断の取消）
+        DB::table('trainee_intake_survey_tokens')->where('id', $intakeId)->update(['answered_at' => '2026-10-19 11:00:00']);
+        $row = (string) $this->inProgressRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ');
+        $this->assertSame(1, substr_count($row, 'data-survey-in-progress-item'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', $row);
+        $this->assertStringNotContainsString('＆', $row);
+        $this->assertStringContainsString(route('trainee-personality-diagnosis-tokens.print', $id), $row);
+        $this->assertStringContainsString('data-bs-target="#personalityDiagnosisCancelModal"', $row);
+    }
+
+    public function test_組み合わせの取消で未回答の分がまとめて消え案内を発行に戻る(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $id = $this->trainee($client, 'ポチ');
+        $this->combinedTokens($id);
+
+        $this->delete(route('trainee-combined-survey-tokens.destroy', $id))->assertRedirect(route('clients.show', $client));
+
+        $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
+        $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->count());
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertNull($this->inProgressRow($html, 'ポチ'));
+        $this->assertMatchesRegularExpression($this->issueButtonPattern($id, 'ポチ'), $html);
+    }
+
+    public function test_組み合わせの期限切れは両方なら組み合わせの名前で片方なら愛犬性格診断(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $both = $this->trainee($client, 'ポチ');
+        $this->combinedTokens($both);
+        $one = $this->trainee($client, 'タマ');
+        [$oneIntake] = $this->combinedTokens($one);
+        DB::table('trainee_intake_survey_tokens')->where('id', $oneIntake)->update(['answered_at' => '2026-10-20 09:00:00']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート＆愛犬性格診断</span>', (string) $this->expiredRow($html, 'ポチ'));
+        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', (string) $this->expiredRow($html, 'タマ'));
+        $this->assertStringNotContainsString('＆', (string) $this->expiredRow($html, 'タマ'));
+        // どちらも［案内を発行］を出す
+        $this->assertMatchesRegularExpression($this->issueButtonPattern($both, 'ポチ'), $html);
+        $this->assertMatchesRegularExpression($this->issueButtonPattern($one, 'タマ'), $html);
+    }
+
+    public function test_案内の発行のモーダルは3つの種類から選び組み合わせの送信先を持つ(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, 'ポチ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(3, substr_count($html, 'type="radio" name="survey_kind"'));
+        $this->assertMatchesRegularExpression(
+            '/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindCombined" value="combined">\s*'
+            .'<label class="form-check-label" for="surveyIssueKindCombined">愛犬アンケート＆愛犬性格診断<\/label>/u',
+            $html
+        );
+        $this->assertStringContainsString('combined: '.json_encode(route('trainee-combined-survey-tokens.store', ['trainee' => '__ID__'])), $html);
+    }
 }

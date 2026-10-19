@@ -7,6 +7,7 @@ use App\Http\Requests\ClientIntakeSurveyRequest;
 use App\Models\Trainee;
 use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\TraineeIntakeSurveyToken;
+use App\Models\TraineePersonalityDiagnosisToken;
 use App\Support\ClientMypageLink;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  * - 案内には有効期限がない。送信して回答を保存した時点で使い切りになる（開いただけでは使い切りにしない）
  * - 使えない URL（存在しない・取消済み・トレーニー削除済み）と回答済みは、専用の画面（200）で伝える
  * - お客様の回答はアクセスログに記録しない（回答日時が回答の記録を兼ねる）
+ * - 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加。案内が愛犬性格診断の案内と結び付いているとき）：画面の上に進み具合（1/2）を出し、
+ *   送信したら完了の画面ではなく、結び付いた愛犬性格診断の回答の画面（2/2）へ進む。回答済みの案内を開いたときも、
+ *   愛犬性格診断がまだ答えられれば、そちらへ進む（途中でやめたときに、同じリンクから続きを答えられるように）
  */
 class IntakeSurveyController extends Controller
 {
@@ -32,14 +36,19 @@ class IntakeSurveyController extends Controller
     /**
      * 愛犬アンケート回答画面（S-1413。GET /client-portal/intake-survey/{token}）
      */
-    public function show(string $token): View
+    public function show(string $token): View|RedirectResponse
     {
         $tokenRecord = TraineeIntakeSurveyToken::query()->where('token', $token)->first();
         if ($tokenRecord === null) {
             return $this->unavailableView(self::UNAVAILABLE, $token);
         }
         if ($tokenRecord->answered_at !== null) {
-            return $this->unavailableView(self::ANSWERED, $token);
+            // 組み合わせの案内で、愛犬性格診断がまだ答えられるなら、そちらへ進む（2026-10-19 追加）
+            $next = $this->nextPersonalityDiagnosisToken($tokenRecord);
+
+            return $next !== null
+                ? redirect()->route('client-portal.personality-diagnosis.show', ['token' => $next->token])
+                : $this->unavailableView(self::ANSWERED, $token);
         }
         if ($tokenRecord->isExpired()) {
             return $this->unavailableView(self::EXPIRED, $token);
@@ -56,7 +65,23 @@ class IntakeSurveyController extends Controller
             // 前回の回答（最新の回答。なければ null）。暮らしの様子の 4 欄の初期値にする（2026-10-19 追加：回答したあとに
             // 案内を発行し直したとき〔答え直し〕、前回の答えを見ながら直せるように。設計書 S-1413「初期値」）
             'previousResponse' => $trainee->latestIntakeSurveyResponse,
+            // 愛犬アンケート＆愛犬性格診断の案内なら、進み具合（1/2）を出す（2026-10-19 追加。続けて答える愛犬性格診断がまだ答えられるとき）
+            'showProgress' => $this->nextPersonalityDiagnosisToken($tokenRecord) !== null,
         ]);
+    }
+
+    /**
+     * 組み合わせの案内（2026-10-19 追加）で、続けて答える愛犬性格診断の案内がまだ答えられる（未回答で期限内）ならその案内。
+     * 単独の案内・愛犬性格診断が回答済み・期限切れ・取消済みなら null
+     */
+    private function nextPersonalityDiagnosisToken(TraineeIntakeSurveyToken $tokenRecord): ?TraineePersonalityDiagnosisToken
+    {
+        if (! $tokenRecord->isCombined()) {
+            return null;
+        }
+        $next = $tokenRecord->personalityDiagnosisToken;
+
+        return $next !== null && $next->isActive() ? $next : null;
     }
 
     /**
@@ -121,6 +146,14 @@ class IntakeSurveyController extends Controller
 
         if ($result !== true) {
             return $this->unavailableView($result, $token);
+        }
+
+        // 組み合わせの案内なら、完了の画面ではなく、そのまま愛犬性格診断の回答の画面（2/2）へ進む（2026-10-19 追加）。
+        // 愛犬アンケートを受け付けたことを、進んだ先の画面の上に一言で伝える
+        $next = $this->nextPersonalityDiagnosisToken(TraineeIntakeSurveyToken::query()->where('token', $token)->firstOrFail());
+        if ($next !== null) {
+            return redirect()->route('client-portal.personality-diagnosis.show', ['token' => $next->token])
+                ->with('combinedIntakeAnswered', true);
         }
 
         // ［マイページへ戻る］を出すか（ログインしている会員の、自分の愛犬の案内か。2026-10 追加）。

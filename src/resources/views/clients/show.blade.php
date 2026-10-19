@@ -591,11 +591,22 @@
                                        そのときは「案内中」の行を 2 つ出す（愛犬アンケート → 愛犬性格診断の順）。1 つでもあれば［案内を発行］は出さない
                                      - 期限の日は出さない（2026-10-19 変更：ユーザーレビューで要らないことになった。その前は「（10/26まで）」を出していた）
                                      - activeIntakeSurveyToken・activePersonalityDiagnosisToken は ClientController::show で先読み済み
+                                     - 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加）：2 つとも回答待ちなら 1 つの「案内中」にまとめ、［表示］は
+                                       組み合わせのご案内（S-0314）、［取消］は組み合わせの取消（M09。まだ答えていない分をまとめて消す）。
+                                       愛犬アンケートだけ答えたあとは、残りの愛犬性格診断を単独の案内と同じに出す（Trainee::has_active_combined_survey）
                                      経緯：その前は、名前の行の右に［愛犬アンケートの案内を発行］（回答済みのときは白抜き）または
                                      ［愛犬アンケートの案内を表示］［取消］、愛犬性格診断の行の右に［案内を発行］または［案内を表示］［取消］を置いていた --}}
                                 @php
                                     $activeSurveys = [];
-                                    if ($trainee->activeIntakeSurveyToken !== null) {
+                                    if ($trainee->has_active_combined_survey) {
+                                        $activeSurveys[] = [
+                                            'name' => \App\Support\CombinedSurveyName::name(),
+                                            'printUrl' => route('trainee-combined-survey-tokens.print', $trainee),
+                                            'cancelModal' => '#combinedSurveyCancelModal',
+                                            'cancelAttribute' => 'data-combined-survey-trainee-id',
+                                        ];
+                                    }
+                                    if ($trainee->activeIntakeSurveyToken !== null && ! $trainee->has_active_combined_survey) {
                                         $activeSurveys[] = [
                                             'name' => __('messages.intake_survey_name'),
                                             'printUrl' => route('trainee-intake-survey-tokens.print', $trainee),
@@ -603,7 +614,7 @@
                                             'cancelAttribute' => 'data-intake-survey-trainee-id',
                                         ];
                                     }
-                                    if ($trainee->activePersonalityDiagnosisToken !== null) {
+                                    if ($trainee->activePersonalityDiagnosisToken !== null && ! $trainee->has_active_combined_survey) {
                                         $activeSurveys[] = [
                                             'name' => __('messages.personality_diagnosis_name'),
                                             'printUrl' => route('trainee-personality-diagnosis-tokens.print', $trainee),
@@ -616,6 +627,8 @@
                                     $expiredSurveyName = match ($trainee->expired_survey_kind) {
                                         'intake' => __('messages.intake_survey_name'),
                                         'personality' => __('messages.personality_diagnosis_name'),
+                                        // 愛犬アンケート＆愛犬性格診断の案内が 2 つとも未回答で期限切れ（2026-10-19 追加）
+                                        'combined' => \App\Support\CombinedSurveyName::name(),
                                         default => null,
                                     };
                                 @endphp
@@ -877,6 +890,8 @@
         @include('trainees._intake-survey-cancel-modal')
         {{-- 性格診断の案内の取消確認モーダル（S-0305-M07。2026-10 追加） --}}
         @include('trainees._personality-diagnosis-cancel-modal')
+        {{-- 愛犬アンケート＆愛犬性格診断の案内の取消確認モーダル（S-0305-M09。2026-10-19 追加） --}}
+        @include('trainees._combined-survey-cancel-modal')
         {{-- 案内の発行モーダル（S-0305-M08。2026-10-19 追加）。トレーニーが何頭いても 1 つ --}}
         @include('trainees._survey-issue-modal')
     @endif

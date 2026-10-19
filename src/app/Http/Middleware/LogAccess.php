@@ -39,6 +39,10 @@ class LogAccess
         // （target_type='Trainee'、target_id はルートの {trainee}）。お客様の回答・結果を見たことは記録しない
         'trainee-personality-diagnosis-tokens.store' => 'create_trainee_personality_diagnosis_token',
         'trainee-personality-diagnosis-tokens.destroy' => 'delete_trainee_personality_diagnosis_token',
+        // 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加）。2 つの案内を作る・消すが、操作は 1 つなので 1 件だけ記録する
+        // （単独の 2 つの種類としては記録しない）。対象はトレーニー
+        'trainee-combined-survey-tokens.store' => 'create_trainee_combined_survey_token',
+        'trainee-combined-survey-tokens.destroy' => 'delete_trainee_combined_survey_token',
         // 性格診断の結果の削除（2026-10 追加）。対象はトレーニー（target_id はルートの {trainee}。結果の id は記録しない）
         'trainee-personality-diagnosis-results.destroy' => 'delete_trainee_personality_diagnosis_result',
         // 愛犬性格診断の評価文の保存（S-0313。2026-10-18 追加）。対象はトレーニー（結果の削除と同じ。結果の id は記録しない）。

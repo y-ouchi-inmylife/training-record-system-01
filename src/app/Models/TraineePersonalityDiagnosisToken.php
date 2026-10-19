@@ -6,6 +6,7 @@ use App\Models\Concerns\ExpiresAtEndOfDay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * 性格診断用 URL のトークン（DS-1100。2026-10 追加）。
@@ -51,6 +52,15 @@ class TraineePersonalityDiagnosisToken extends Model
     public function trainee(): BelongsTo
     {
         return $this->belongsTo(Trainee::class);
+    }
+
+    /**
+     * この案内と結び付いた愛犬アンケートの案内（2026-10-19 追加。「愛犬アンケート＆愛犬性格診断」の案内のとき。単独の案内なら null）。
+     * 回答の画面の進み具合（2/2）を出すかどうかに使う
+     */
+    public function combinedIntakeSurveyToken(): HasOne
+    {
+        return $this->hasOne(TraineeIntakeSurveyToken::class, 'trainee_personality_diagnosis_token_id');
     }
 
     /**

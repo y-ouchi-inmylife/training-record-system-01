@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CombinedSurveyName;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -49,6 +50,9 @@ class AccessLog extends Model
             // 愛犬性格診断の名前は lang/ja/messages.php の 1 か所から読む（2026-10-18 変更：その前は「性格診断…」）
             'create_trainee_personality_diagnosis_token' => __('messages.personality_diagnosis_name').'案内発行',
             'delete_trainee_personality_diagnosis_token' => __('messages.personality_diagnosis_name').'案内取消',
+            // 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加）。名前は 2 つの名前から組み立てる
+            'create_trainee_combined_survey_token' => CombinedSurveyName::name().'案内発行',
+            'delete_trainee_combined_survey_token' => CombinedSurveyName::name().'案内取消',
             'delete_trainee_personality_diagnosis_result' => __('messages.personality_diagnosis_name').'結果削除',
             // 評価文の更新の表示名は、ほかの edit_* の「〜編集」にそろえる（2026-10-18 変更：その前は「…評価文保存」）
             'edit_trainee_personality_diagnosis_evaluation' => __('messages.personality_diagnosis_name').'評価文編集',

@@ -46,6 +46,10 @@ return [
     // 名前を折り返してよい位置で分けたもの（上の $intakeSurveyNameParts）
     'intake_survey_name_parts' => $intakeSurveyNameParts,
 
+    // 「愛犬アンケート＆愛犬性格診断」の案内の名前のひな形（2026-10-19 追加）。:intake・:personality に上の 2 つの名前を入れる
+    // （名前は直書きしない）。組み立ては App\Support\CombinedSurveyName::name()（画面・コントローラーはそこから読む）
+    'combined_survey_name' => ':intake＆:personality',
+
     // 会員のマイページ（S-1402）の愛犬のカードに出す、回答待ちの案内のお知らせ（2026-10 追加）。
     // 名称（「愛犬アンケート」「愛犬性格診断」）は文をここだけで変える（上の $intakeSurveyName・$personalityDiagnosisName）。
     // ご案内の画面の見出し（「愛犬アンケートのご案内」「愛犬性格診断のご案内」）と名称をそろえる
@@ -61,7 +65,15 @@ return [
     'client_survey_notice' => [
         'intake' => $intakeSurveyName.'にお答えください。',
         'personality' => $personalityDiagnosisName.'にお答えください。',
+        // 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加）。:name＝App\Support\CombinedSurveyName::name()
+        'combined' => ':nameにお答えください。',
         'answer' => '回答する',
+    ],
+
+    // 愛犬アンケート＆愛犬性格診断の案内で、愛犬アンケートを送信して愛犬性格診断の回答の画面に進んだときの一言（2026-10-19 追加）。
+    // :intake・:personality＝2 つの名前
+    'client_combined_survey' => [
+        'intake_answered' => ':intakeを受け付けました。続けて:personalityにお答えください。',
     ],
 
     // 回答完了の画面・使えない案内の画面（愛犬アンケート S-1414・S-1413、性格診断 S-1416・S-1415）に、
@@ -91,6 +103,12 @@ return [
             'intro' => ':callNameの:surveyのご案内をお送りします。',
             'intro_unnamed' => ':surveyのご案内をお送りします。',
             'body' => '下のリンクから、ご回答をお願いいたします。',
+        ],
+        // 愛犬アンケート＆愛犬性格診断（2026-10-19 追加）。:survey・:diagnosis は 2 つの名前（InvitationMessage が渡す）
+        'combined' => [
+            'intro' => ':callNameの:surveyと:diagnosisのご案内をお送りします。',
+            'intro_unnamed' => ':surveyと:diagnosisのご案内をお送りします。',
+            'body' => '下のリンクから、続けてご回答をお願いいたします。（:diagnosisは全:count問です）',
         ],
         'personality' => [
             // :diagnosis＝愛犬性格診断の名前（personality_diagnosis_name。InvitationMessage が渡す。名前を差し替えたときも文面に出るように）

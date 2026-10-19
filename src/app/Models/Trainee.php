@@ -412,8 +412,10 @@ class Trainee extends Model
     }
 
     /**
-     * 会員詳細の「期限切れ」の行に出す案内の種類（'intake'／'personality'。出さないなら null。2026-10-19 追加。
+     * 会員詳細の「期限切れ」の行に出す案内の種類（'intake'／'personality'／'combined'。出さないなら null。2026-10-19 追加。
      * 設計書 S-0305 セクション3「案内の操作」）。
+     * 'combined'（2026-10-19 追加）：いちばん新しい案内が「愛犬アンケート＆愛犬性格診断」で、2 つとも未回答で期限切れのとき。
+     * 愛犬アンケートだけ答えて愛犬性格診断が期限切れなら 'personality'（2 つは同じ日時に作るので、いちばん新しいのは愛犬性格診断の方）。
      *
      * そのトレーニーのいちばん新しく発行した案内（2 つの種類を合わせて、発行日時がいちばん新しいもの。同じなら愛犬性格診断）が、
      * 未回答で期限が切れているときだけ、その種類を返す。
@@ -441,7 +443,28 @@ class Trainee extends Model
             default => ['personality', $personality],
         };
 
-        return $latest->answered_at === null && $latest->isExpired() ? $kind : null;
+        if ($latest->answered_at !== null || ! $latest->isExpired()) {
+            return null;
+        }
+        // 組み合わせの愛犬性格診断の案内で、結び付いた愛犬アンケートの案内も未回答なら、組み合わせとして出す
+        if ($kind === 'personality' && $intake !== null && $intake->trainee_personality_diagnosis_token_id === $personality->id
+            && $intake->answered_at === null) {
+            return 'combined';
+        }
+
+        return $kind;
+    }
+
+    /**
+     * 「愛犬アンケート＆愛犬性格診断」の案内が、2 つとも回答待ち（未回答で期限内）か（2026-10-19 追加）。
+     * 会員詳細の「案内中」・マイページのお知らせで、2 つを 1 つの案内として出すときに使う。
+     * 愛犬アンケートだけ答えたあとは false（残っている愛犬性格診断の案内は、単独の案内と同じに出す）。
+     * 呼び出し側は activeIntakeSurveyToken・activePersonalityDiagnosisToken を eager load しておくこと
+     */
+    public function getHasActiveCombinedSurveyAttribute(): bool
+    {
+        return $this->activeIntakeSurveyToken !== null && $this->activePersonalityDiagnosisToken !== null
+            && $this->activeIntakeSurveyToken->trainee_personality_diagnosis_token_id === $this->activePersonalityDiagnosisToken->id;
     }
 
     /**

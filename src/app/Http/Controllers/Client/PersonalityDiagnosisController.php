@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
  * - 使えない URL（存在しない・取消済み・トレーニー削除済み）と回答済みは、専用の画面（200）で伝える
  * - 愛犬アンケートと違い、トレーニーの値は書き換えない（結果として残すだけ）
  * - お客様の回答はアクセスログに記録しない（回答日時が回答の記録を兼ねる）
+ * - 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加）の愛犬性格診断は、画面の上に進み具合（2/2）を出す。送信したあとは単独と同じ完了の画面
  * - 時間切れ（419）のときの出し直しは bootstrap/app.php から showForm() を呼ぶ（段階3 のコミット 2）
  */
 class PersonalityDiagnosisController extends Controller
@@ -49,7 +50,8 @@ class PersonalityDiagnosisController extends Controller
      */
     public static function showForm(string $token, array $restoredAnswers = [], bool $expired = false): View
     {
-        $reason = self::checkToken(TraineePersonalityDiagnosisToken::query()->where('token', $token)->first());
+        $tokenRecord = TraineePersonalityDiagnosisToken::query()->where('token', $token)->first();
+        $reason = self::checkToken($tokenRecord);
         if ($reason !== true) {
             return self::unavailableView($reason, $token);
         }
@@ -62,6 +64,10 @@ class PersonalityDiagnosisController extends Controller
             'choices' => PersonalityDiagnosisQuestions::choices(),
             'restoredAnswers' => $restoredAnswers,
             'expired' => $expired,
+            // 愛犬アンケート＆愛犬性格診断の案内の愛犬性格診断なら、進み具合（2/2）を出す（2026-10-19 追加。マイページのお知らせから
+            // 開いたとき〔途中でやめた続き〕も同じ）。愛犬アンケートを送信して進んできたときは、受け付けたことを一言で伝える
+            'showProgress' => $tokenRecord->combinedIntakeSurveyToken()->exists(),
+            'combinedIntakeAnswered' => (bool) session('combinedIntakeAnswered', false),
         ]);
     }
 

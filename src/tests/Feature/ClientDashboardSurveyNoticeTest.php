@@ -373,4 +373,51 @@ class ClientDashboardSurveyNoticeTest extends TestCase
         $this->travelTo(Carbon::parse('2026-10-26 23:59:59'));
         $this->assertSame(['intake', 'personality'], $this->noticeKinds($this->card($this->open(), 'モモちゃん')));
     }
+
+    // ---- 愛犬アンケート＆愛犬性格診断の案内（2026-10-19 追加。設計書 S-1402「回答待ちの案内のお知らせ」） ----
+
+    /** 組み合わせの案内（2 つの案内を作って結び付ける）。愛犬アンケートの案内の id を返す */
+    private function combinedTokens(int $traineeId, string $intakeToken, string $personalityToken): int
+    {
+        $row = ['trainee_id' => $traineeId, 'created_at' => now(), 'updated_at' => now()];
+        $personalityId = DB::table('trainee_personality_diagnosis_tokens')->insertGetId(['token' => $personalityToken, ...$row]);
+
+        return DB::table('trainee_intake_survey_tokens')->insertGetId([
+            'token' => $intakeToken, 'trainee_personality_diagnosis_token_id' => $personalityId, ...$row,
+        ]);
+    }
+
+    public function test_組み合わせで2つとも回答待ちならお知らせを1つ出し回答するは組み合わせのリンク(): void
+    {
+        $id = $this->trainee('モモ');
+        $this->combinedTokens($id, 'intaketoken000000000000000000001', 'pdtoken0000000000000000000000001');
+
+        $card = $this->card($this->open(), 'モモちゃん');
+
+        $this->assertSame(['combined'], $this->noticeKinds($card));
+        $this->assertStringContainsString('<div class="c-survey-notice c-survey-notice--combined" data-client-survey-notice="combined">', $card);
+        $this->assertStringContainsString('<span>愛犬アンケート＆愛犬性格診断にお答えください。</span>', $card);
+        $this->assertStringContainsString(
+            '<a href="'.route('client-portal.intake-survey.show', ['token' => 'intaketoken000000000000000000001']).'" class="btn btn-primary btn-sm text-nowrap">回答する</a>',
+            $card
+        );
+        // アイコンは 2 つ（愛犬アンケートと愛犬性格診断）
+        $this->assertSame(2, substr_count($card, '<svg class="c-survey-notice-icon"'));
+    }
+
+    public function test_組み合わせで愛犬アンケートを答えたあとは愛犬性格診断のお知らせ(): void
+    {
+        $id = $this->trainee('モモ');
+        $intakeId = $this->combinedTokens($id, 'intaketoken000000000000000000001', 'pdtoken0000000000000000000000001');
+        DB::table('trainee_intake_survey_tokens')->where('id', $intakeId)->update(['answered_at' => now()]);
+
+        $card = $this->card($this->open(), 'モモちゃん');
+
+        $this->assertSame(['personality'], $this->noticeKinds($card));
+        $this->assertStringContainsString('<span>愛犬性格診断にお答えください。</span>', $card);
+        $this->assertStringContainsString(
+            '<a href="'.route('client-portal.personality-diagnosis.show', ['token' => 'pdtoken0000000000000000000000001']).'" class="btn btn-primary btn-sm text-nowrap">回答する</a>',
+            $card
+        );
+    }
 }

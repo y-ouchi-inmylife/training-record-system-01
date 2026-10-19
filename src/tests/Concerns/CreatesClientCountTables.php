@@ -89,6 +89,9 @@ trait CreatesClientCountTables
             $table->id();
             $table->string('token', 64)->unique();
             $table->unsignedBigInteger('trainee_id');
+            // 続けて答える愛犬性格診断の案内（2026-10-19 追加。愛犬アンケート＆愛犬性格診断の案内。NULL は単独の案内）。
+            // 愛犬性格診断の案内の表を作らないテストもあるので、外部キーは付けない
+            $table->unsignedBigInteger('trainee_personality_diagnosis_token_id')->nullable();
             $table->timestamp('expires_at')->nullable(); // 有効期限（2026-10-19 追加。NULL は期限なし）
             $table->timestamp('answered_at')->nullable();
             $table->timestamps();

@@ -27,8 +27,17 @@
        「まだ答えていない質問が N 問あります。」と最初の未回答の問へのリンク
      - 所要時間の目安は書かない（設計書 S-1415） --}}
 <div class="c-login c-login--wide">
+    {{-- 愛犬アンケート＆愛犬性格診断の案内なら、進み具合（2/2）を見出しの上に出す（2026-10-19 追加） --}}
+    @if($showProgress ?? false)
+        @include('client._survey-progress', ['step' => 2])
+    @endif
     <h1 class="mb-2">{{ __('messages.personality_diagnosis_name') }}</h1>
     <p class="mb-4">愛犬についてお答えください。ふだんの様子に近いものを選んでください。その状況になったことがなければ「未経験」を選んでください。</p>
+
+    {{-- 愛犬アンケートを送信して進んできたとき（組み合わせの案内。2026-10-19 追加）。受け付けたことと、続けて答えることを一言で伝える --}}
+    @if($combinedIntakeAnswered ?? false)
+        <div class="alert alert-success" role="status" data-combined-intake-answered>{{ __('messages.client_combined_survey.intake_answered', ['intake' => __('messages.intake_survey_name'), 'personality' => __('messages.personality_diagnosis_name')]) }}</div>
+    @endif
 
     <div class="card c-login-card">
         <div class="card-body p-4">

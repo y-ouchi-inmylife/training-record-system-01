@@ -28,6 +28,7 @@ class TraineeIntakeSurveyToken extends Model
     protected $fillable = [
         'token',
         'trainee_id',
+        'trainee_personality_diagnosis_token_id',
         'expires_at',
         'answered_at',
         'created_by',
@@ -50,6 +51,21 @@ class TraineeIntakeSurveyToken extends Model
     public function trainee(): BelongsTo
     {
         return $this->belongsTo(Trainee::class);
+    }
+
+    /**
+     * 続けて答える愛犬性格診断の案内（2026-10-19 追加。「愛犬アンケート＆愛犬性格診断」の案内のとき。単独の案内なら null。
+     * 相手が消えたら列は NULL になる）。発行は App\Services\TraineeCombinedSurveyTokenService
+     */
+    public function personalityDiagnosisToken(): BelongsTo
+    {
+        return $this->belongsTo(TraineePersonalityDiagnosisToken::class, 'trainee_personality_diagnosis_token_id');
+    }
+
+    /** 「愛犬アンケート＆愛犬性格診断」の案内として発行したか（2026-10-19 追加。愛犬性格診断の案内と結び付いているか） */
+    public function isCombined(): bool
+    {
+        return $this->trainee_personality_diagnosis_token_id !== null;
     }
 
     /**

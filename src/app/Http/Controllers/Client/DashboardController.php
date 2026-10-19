@@ -162,7 +162,7 @@ class DashboardController extends Controller
 
     /**
      * 回答待ちの案内のお知らせ（2026-10 追加。設計書 S-1402「回答待ちの案内のお知らせ」）。
-     * 並びは 愛犬アンケート → 性格診断。kind は文（lang/ja/messages.php の client_survey_notice）と見た目を、
+     * 並びは 愛犬アンケート → 性格診断（愛犬アンケート＆愛犬性格診断の案内は 1 つにまとめる。kind は combined）。kind は文（lang/ja/messages.php の client_survey_notice）と見た目を、
      * url は印刷した案内と同じ回答の URL（トークンの URL）。
      *
      * 「回答待ち」の判定は、会員詳細（S-0305）で［案内を表示］［取消］を出す条件と同じ：
@@ -174,6 +174,15 @@ class DashboardController extends Controller
      */
     private function surveyNotices($trainee): array
     {
+        // 愛犬アンケート＆愛犬性格診断の案内が 2 つとも回答待ち：1 つのお知らせにまとめ、［回答する］は組み合わせのリンク
+        // （愛犬アンケートの案内のリンク。2026-10-19 追加）。愛犬アンケートだけ答えたあとは、下の愛犬性格診断のお知らせになる
+        if ($trainee->has_active_combined_survey) {
+            return [[
+                'kind' => 'combined',
+                'url' => route('client-portal.intake-survey.show', ['token' => $trainee->activeIntakeSurveyToken->token]),
+            ]];
+        }
+
         $notices = [];
         if ($trainee->intake_survey_status === Trainee::INTAKE_AWAITING) {
             $notices[] = [

@@ -23,6 +23,7 @@ use App\Http\Controllers\RecordingV2Controller;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\SummaryPromptController;
 use App\Http\Controllers\TraineeController;
+use App\Http\Controllers\TraineeCombinedSurveyTokenController;
 use App\Http\Controllers\TraineeIntakeSurveyTokenController;
 use App\Http\Controllers\TraineePersonalityDiagnosisResultController;
 use App\Http\Controllers\TraineePersonalityDiagnosisTokenController;
@@ -142,6 +143,16 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 性格診断案内画面（S-0312）。会員詳細の「性格診断」の行の［案内を表示］から開く（2026-10-17 変更：当初は別タブ）
             Route::get('trainees/{trainee}/personality-diagnosis-tokens/print', [TraineePersonalityDiagnosisTokenController::class, 'print'])
                 ->name('trainee-personality-diagnosis-tokens.print');
+
+            // 愛犬アンケート＆愛犬性格診断の案内（2 つの案内を同時に作って結び付ける。2026-10-19 追加）。単独の案内と同じ形
+            Route::post('trainees/{trainee}/combined-survey-tokens', [TraineeCombinedSurveyTokenController::class, 'store'])
+                ->name('trainee-combined-survey-tokens.store');
+            Route::get('trainees/{trainee}/combined-survey-tokens', [TraineeCombinedSurveyTokenController::class, 'redirectToClient']);
+            Route::delete('trainees/{trainee}/combined-survey-tokens', [TraineeCombinedSurveyTokenController::class, 'destroy'])
+                ->name('trainee-combined-survey-tokens.destroy');
+            // 愛犬アンケート＆愛犬性格診断のご案内（S-0314）。会員詳細の「案内中」の［表示］から開く
+            Route::get('trainees/{trainee}/combined-survey-tokens/print', [TraineeCombinedSurveyTokenController::class, 'print'])
+                ->name('trainee-combined-survey-tokens.print');
             // 愛犬性格診断詳細（S-0313。2026-10-18 追加）と評価文の保存。S-0309 の結果の表の行の［詳細］から開く。
             // scopeBindings：結果は {trainee} の personalityDiagnosisResults() に限る（別のトレーニーの結果なら 404）
             Route::get('trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}', [TraineePersonalityDiagnosisResultController::class, 'show'])

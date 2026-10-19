@@ -7,7 +7,7 @@ use App\Models\Trainee;
 use Carbon\CarbonInterface;
 
 /**
- * 3 つのご案内（マイページ登録 S-0307・愛犬アンケート S-0311・愛犬性格診断 S-0312）の、LINE・メールで送る文面（2026-10-18 追加。
+ * ご案内（マイページ登録 S-0307・愛犬アンケート S-0311・愛犬性格診断 S-0312・愛犬アンケート＆愛犬性格診断 S-0314。S-0314 は 2026-10-19 追加）の、LINE・メールで送る文面（2026-10-18 追加。
  * 設計書 screen-design.md S-0307「LINE・メールで送る文面」）。
  *
  * 画面に出す文と［文面をコピー］でコピーする文は、ここで組み立てた 1 つの文字列を両方に使う（食い違わないように）。
@@ -71,6 +71,26 @@ class InvitationMessage
                 'diagnosis' => __('messages.personality_diagnosis_name'),
             ]),
             __('messages.invitation_message.personality.body', ['count' => count(PersonalityDiagnosisQuestions::questions())]),
+            $url,
+            self::expiresOrOnceLine($expiresAt),
+        );
+    }
+
+    /**
+     * 愛犬アンケート＆愛犬性格診断のご案内（2026-10-19 追加）。1 つのリンクで続けて答えてもらう。
+     * 本文に愛犬性格診断の問題の数を入れる。最後から 2 段目は単独の案内と同じ（組み合わせは期限を付けてから作ったので、いつも期限の行）
+     */
+    public static function combined(Trainee $trainee, string $url, ?CarbonInterface $expiresAt = null): string
+    {
+        $names = [
+            'survey' => __('messages.intake_survey_name'),
+            'diagnosis' => __('messages.personality_diagnosis_name'),
+        ];
+
+        return self::compose(
+            $trainee->client,
+            __('messages.invitation_message.combined.'.self::introKey($trainee), ['callName' => $trainee->client_call_name, ...$names]),
+            __('messages.invitation_message.combined.body', ['count' => count(PersonalityDiagnosisQuestions::questions()), ...$names]),
             $url,
             self::expiresOrOnceLine($expiresAt),
         );

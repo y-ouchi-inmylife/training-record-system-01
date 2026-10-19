@@ -1440,6 +1440,38 @@ input[type="tel"] {
     --c-survey-notice-color: #{$purple};
     background-color: mix($purple, $mat, 8%);
 }
+// 愛犬アンケート＆愛犬性格診断（2026-10-19 追加）：ご案内の画面（S-0314）の帯と同じく、緑と紫の 2 色。左の線は上半分を緑・下半分を紫、
+// 面は左の薄い緑から右の薄い紫へ。緑だけ・紫だけの単独のお知らせと見分けがつく（文字は同じ $ink。色だけに頼らない）
+.c-survey-notice--combined {
+    border-left-color: transparent;
+    border-image: linear-gradient(to bottom, $green-600 50%, $purple 50%) 1;
+    background-color: transparent;
+    background-image: linear-gradient(to right, mix($green-600, $mat, 8%), mix($purple, $mat, 8%));
+
+    // アイコンは 1 つ目（愛犬アンケート）を緑、2 つ目（愛犬性格診断）を紫
+    .c-survey-notice-icon:last-of-type {
+        color: $purple;
+    }
+}
+// 愛犬アンケート＆愛犬性格診断の案内の進み具合（2026-10-19 追加。回答の画面 S-1413・S-1415 の見出しの上。client/_survey-progress）。
+// 「1/2」の札（会員側の青の塗り・白の文字）と、組み合わせの名前（本文の色の小さめの太字）を横に並べる。狭い幅では名前が折り返す
+.c-survey-progress {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: $ink;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+.c-survey-progress-count {
+    display: inline-block;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background-color: $brand-bright;
+    color: $mat;
+}
 // ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402）。回答待ちの案内と同じ帯の作りで、色は注意のピンク（$caution・$caution-bg）。
 // 2026-10-18 変更：ユーザーレビューで、急ぎであることが分かるように目立つ色にした（最初は会員側の青〔$brand-bright〕で、愛犬ごとの案内と
 // 同じくらいの目立ち方。次に琥珀色にしたが、まだ優しく見えたためピンクにした）。愛犬性格診断の案内（紫・薄いラベンダーの面）より赤寄りで、面の色も濃い。

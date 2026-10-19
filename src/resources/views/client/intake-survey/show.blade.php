@@ -31,6 +31,10 @@
      - 会員の氏名・連絡先・住所は出さない（ログインしない画面で、URL を知っていれば開けるため）
      - 所要時間の目安は書かない（設計書 S-1413） --}}
 <div class="c-login c-login--wide">
+    {{-- 愛犬アンケート＆愛犬性格診断の案内なら、進み具合（1/2）を見出しの上に出す（2026-10-19 追加） --}}
+    @if($showProgress ?? false)
+        @include('client._survey-progress', ['step' => 1])
+    @endif
     <h1 class="mb-2">{{ __('messages.intake_survey_name') }}</h1>
     <p class="mb-4">愛犬のことを教えてください。トレーニングの参考にさせていただきます。</p>
 

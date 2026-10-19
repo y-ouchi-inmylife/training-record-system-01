@@ -2,6 +2,8 @@
      会員詳細のトレーニーの欄の［案内を発行］から開き、愛犬アンケートか愛犬性格診断のどちらか 1 つを選んで発行する。
      ユーザーレビューで、トレーニーの欄に種類ごとの［…を発行］［…を表示］［取消］がばらばらに並び分かりにくかったため、
      ［案内を発行］1 つとこのモーダルにまとめた。1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（サーバーでも守る）。
+     2026-10-19 追加：選択肢に「愛犬アンケート＆愛犬性格診断」（2 つの案内を同時に作って結び付け、1 つのリンクで続けて答えてもらう）を
+     足して 3 つにした（運用上、2 つを同時に送りたいことがあるため）。組み合わせは 1 つの案内として数える。
 
      - 開き方：ボタンに data-bs-toggle="modal" data-bs-target="#surveyIssueModal" と、data-survey-issue-trainee-id
        （トレーニーの id）・data-survey-issue-trainee-name（表示名）を付ける。トレーニーが何頭いてもモーダルは 1 つにし、
@@ -28,9 +30,13 @@
                             <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindIntake" value="intake">
                             <label class="form-check-label" for="surveyIssueKindIntake">{{ __('messages.intake_survey_name') }}</label>
                         </div>
-                        <div class="form-check mb-0">
+                        <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindPersonality" value="personality">
                             <label class="form-check-label" for="surveyIssueKindPersonality">{{ __('messages.personality_diagnosis_name') }}</label>
+                        </div>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindCombined" value="combined">
+                            <label class="form-check-label" for="surveyIssueKindCombined">{{ \App\Support\CombinedSurveyName::name() }}</label>
                         </div>
                     </fieldset>
                 </div>
@@ -50,6 +56,7 @@
     const STORE_URL_TEMPLATES = {
         intake: @json(route('trainee-intake-survey-tokens.store', ['trainee' => '__ID__'])),
         personality: @json(route('trainee-personality-diagnosis-tokens.store', ['trainee' => '__ID__'])),
+        combined: @json(route('trainee-combined-survey-tokens.store', ['trainee' => '__ID__'])),
     };
     const modalEl = document.getElementById('surveyIssueModal');
     const formEl = document.getElementById('surveyIssueForm');
