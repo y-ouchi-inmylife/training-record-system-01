@@ -423,7 +423,7 @@ erDiagram
 
 ##### 注記（**2026-10-18 追加**）
 
-- **愛犬性格診断の評価文は本表に入れない**：評価文はトレーニングの記録ではない（実施日・担当・メディア・所感を持たない）ので、結果（D-1200）の側に持ち、公開も結果の側の列（`evaluation_published_at`・`evaluation_published_by`）で表す（要件定義書 6-16-16）。会員詳細（S-0305）とマイページ（S-1402）では、公開済みの評価文を本表の行と混ぜて出す（混ぜるのは画面の処理。表は分けたまま）
+- **愛犬性格診断のアドバイスは本表に入れない**：アドバイスはトレーニングの記録ではない（実施日・担当・メディア・所感を持たない）ので、結果（D-1200）の側に持ち、公開も結果の側の列（`evaluation_published_at`・`evaluation_published_by`）で表す（要件定義書 6-16-16）。会員詳細（S-0305）とマイページ（S-1402）では、公開済みのアドバイスを本表の行と混ぜて出す（混ぜるのは画面の処理。表は分けたまま）
 - **経緯**：同じ 2026-10-18 の最初の形（段階1 の②）では、本表に結び付けた結果の列 `trainee_personality_diagnosis_result_id`（一意。結果を削除すると NULL）を足し、評価文を公開すると本表の行を作って評価文をノートに写していた。2026-10-18 のユーザーレビューで、評価文と記録の本文の二重持ちをやめるため、公開でトレーニング記録を作らず、評価文そのものに公開した日時を持たせる形にした。列は `2026_10_18_000006_drop_trainee_personality_diagnosis_result_id_from_training_records_table` で外す（`2026_10_18_000004` は書き換えない）
 
 
@@ -881,12 +881,12 @@ erDiagram
 | score_fear | DECIMAL(3,2) | YES | NULL | カテゴリ「恐怖心」（Q29〜Q35）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら **NULL**＝点数なし。**2026-10-18 変更**：その前は 0.00 で NOT NULL）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
 | score_trainability | DECIMAL(3,2) | YES | NULL | カテゴリ「訓練性能」（Q36〜Q42）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら **NULL**＝点数なし。**2026-10-18 変更**：その前は 0.00 で NOT NULL）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
 | score_excitability | DECIMAL(3,2) | YES | NULL | カテゴリ「興奮性」（Q43〜Q50）の平均（0.00〜4.00）。「未経験」を除いた回答の平均を小数第2位に丸めた値（全問「未経験」なら **NULL**＝点数なし。**2026-10-18 変更**：その前は 0.00 で NOT NULL）。計算の決まりは要件定義書 6-16「愛犬性格診断の採点とタイプの判定」 |
-| evaluation_text | TEXT | YES | NULL | 評価文（会員様向けの文章。**2026-10-18 追加**。要件定義書 6-16-15）。トレーナーが愛犬性格診断詳細（S-0313）で書く。空で保存したときは NULL にする（なし）。公開済み（`evaluation_published_at` が NULL でない）のあいだは NULL にできない（アプリ側で確かめる）。公開したあとも直せ、直すとそのまま会員様の画面に出る（**2026-10-18 変更**：その前は、公開するとこの文を本文にしたトレーニング記録を作っていた） |
-| staff_memo | TEXT | YES | NULL | スタッフ用メモ（**2026-10-19 追加**。マイグレーション `2026_10_19_000005`。要件定義書 6-16-19）。トレーナーだけが見るメモで、**会員様の画面には一切出さない**。S-0313 で書き、評価文とは別に保存する。［AIで下書き］でスタッフ用の下書きが入る（保存はトレーナーが行う）。空で保存したときは NULL。結果を削除すると一緒に消える |
-| evaluation_updated_by | BIGINT UNSIGNED | YES | NULL | 最後に評価文を保存したトレーナーのID（外部キー。**2026-10-18 追加**）。保存したとき（公開のときを含む）に入れる。評価文を一度も保存していなければ NULL |
-| evaluation_updated_at | TIMESTAMP | YES | NULL | 最後に評価文を保存した日時（**2026-10-18 追加**）。`updated_at` とは別に持つ（`updated_at` は採点の計算し直し〔`personality-diagnosis:rescore`〕でも変わるため） |
-| evaluation_published_at | TIMESTAMP | YES | NULL | 評価文を公開した日時（**2026-10-18 追加**。要件定義書 6-16-16）。NULL でなければ公開済み。会員様の記録の一覧・会員詳細のトレーニング記録の欄では、この日時を評価文の日付・時刻として並べる。公開を取り消すと NULL に戻す。もう一度公開すると、そのときの日時になる |
-| evaluation_published_by | BIGINT UNSIGNED | YES | NULL | 評価文を公開したトレーナーのID（外部キー。**2026-10-18 追加**）。会員様の画面では「担当」として出す。公開を取り消すと NULL に戻す |
+| evaluation_text | TEXT | YES | NULL | アドバイス（会員様向けの文章。**2026-10-18 追加**。要件定義書 6-16-15）。トレーナーが愛犬性格診断詳細（S-0313）で書く。空で保存したときは NULL にする（なし）。公開済み（`evaluation_published_at` が NULL でない）のあいだは NULL にできない（アプリ側で確かめる）。公開したあとも直せ、直すとそのまま会員様の画面に出る（**2026-10-18 変更**：その前は、公開するとこの文を本文にしたトレーニング記録を作っていた） |
+| staff_memo | TEXT | YES | NULL | スタッフ用メモ（**2026-10-19 追加**。マイグレーション `2026_10_19_000005`。要件定義書 6-16-19）。トレーナーだけが見るメモで、**会員様の画面には一切出さない**。S-0313 で書き、アドバイスとは別に保存する。［AIで下書き］でスタッフ用の下書きが入る（保存はトレーナーが行う）。空で保存したときは NULL。結果を削除すると一緒に消える |
+| evaluation_updated_by | BIGINT UNSIGNED | YES | NULL | 最後にアドバイスを保存したトレーナーのID（外部キー。**2026-10-18 追加**）。保存したとき（公開のときを含む）に入れる。アドバイスを一度も保存していなければ NULL |
+| evaluation_updated_at | TIMESTAMP | YES | NULL | 最後にアドバイスを保存した日時（**2026-10-18 追加**）。`updated_at` とは別に持つ（`updated_at` は採点の計算し直し〔`personality-diagnosis:rescore`〕でも変わるため） |
+| evaluation_published_at | TIMESTAMP | YES | NULL | アドバイスを公開した日時（**2026-10-18 追加**。要件定義書 6-16-16）。NULL でなければ公開済み。会員様の記録の一覧・会員詳細のトレーニング記録の欄では、この日時をアドバイスの日付・時刻として並べる。公開を取り消すと NULL に戻す。もう一度公開すると、そのときの日時になる |
+| evaluation_published_by | BIGINT UNSIGNED | YES | NULL | アドバイスを公開したトレーナーのID（外部キー。**2026-10-18 追加**）。会員様の画面では「担当」として出す。公開を取り消すと NULL に戻す |
 | personality_type | VARCHAR(30) | YES | NULL | タイプ（5-24. の値）。**丸める前の**平均から判定する（要件定義書 6-16「愛犬性格診断の採点とタイプの判定」）。点数なし（NULL）のカテゴリは判定から外し、全カテゴリが点数なしなら **NULL**＝判定なし（**2026-10-18 変更**：その前は NOT NULL で、全問「未経験」は calm）。表示名はコードに持つ |
 | wish | TEXT | YES | NULL | 自由記述の質問「こうなったらいいな」の答え（**2026-10-19 追加**。マイグレーション `2026_10_19_000006`。設問文は要件定義書 D-1200「自由記述の質問（4 問）」。DB の列コメントは当時の呼び名「暮らしの様子「…」」のまま〔変えるには新しいマイグレーションが要るため〕）。回答の画面（S-1415）で 50 問のあとに答える。任意・2,000 文字以内（改行は LF にそろえる）。空・空白だけで送られたときは NULL |
 | recent_events | TEXT | YES | NULL | 自由記述の質問「最近の様子」の答え（**2026-10-19 追加**。同上） |
@@ -904,7 +904,7 @@ erDiagram
 | trainee_personality_diagnosis_results_token_id_idx | trainee_personality_diagnosis_token_id | INDEX | トークンによる逆引き。名前は MySQL の識別子の上限（64 文字）に収めるため `token_id` に縮めている（D-1100 と同じ） |
 | trainee_personality_diagnosis_results_eval_by_idx | evaluation_updated_by | INDEX | 外部キー用（**2026-10-18 追加**。名前は 64 文字に収めるため `eval_by` に縮める） |
 | trainee_personality_diagnosis_results_pub_by_idx | evaluation_published_by | INDEX | 外部キー用（**2026-10-18 追加**。名前は 64 文字に収めるため `pub_by` に縮める） |
-| trainee_personality_diagnosis_results_pub_at_idx | trainee_id, evaluation_published_at | INDEX | 会員の公開済みの評価文を、公開した日時の順に取るため（会員詳細・マイページ。**2026-10-18 追加**） |
+| trainee_personality_diagnosis_results_pub_at_idx | trainee_id, evaluation_published_at | INDEX | 会員の公開済みのアドバイスを、公開した日時の順に取るため（会員詳細・マイページ。**2026-10-18 追加**） |
 
 ##### 制約
 
@@ -912,7 +912,7 @@ erDiagram
 |--------|------|------|-----------|------|
 | trainee_personality_diagnosis_results_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | CASCADE | トレーニー削除時は結果も削除する（要件定義書 D-1200。愛犬アンケートの回答と同じ） |
 | trainee_personality_diagnosis_results_token_id_foreign | FOREIGN KEY | trainee_personality_diagnosis_token_id → trainee_personality_diagnosis_tokens(id) | SET NULL | トークンが削除されても結果は残す（D-1100 と同じ） |
-| trainee_personality_diagnosis_results_eval_by_foreign | FOREIGN KEY | evaluation_updated_by → trainers(id) | SET NULL | トレーナーを削除しても評価文は残し、最終保存者だけを NULL にする（**2026-10-18 追加**。ほかの表の `updated_by` と同じ） |
+| trainee_personality_diagnosis_results_eval_by_foreign | FOREIGN KEY | evaluation_updated_by → trainers(id) | SET NULL | トレーナーを削除してもアドバイスは残し、最終保存者だけを NULL にする（**2026-10-18 追加**。ほかの表の `updated_by` と同じ） |
 | trainee_personality_diagnosis_results_pub_by_foreign | FOREIGN KEY | evaluation_published_by → trainers(id) | SET NULL | トレーナーを削除しても公開は続け、公開したトレーナーだけを NULL にする（**2026-10-18 追加**） |
 | trainee_personality_diagnosis_results_type_check | CHECK | personality_type IN ('guardian', 'affectionate', 'sensitive', 'smart', 'energetic', 'calm') | — | タイプの値制限（5-24.） |
 | trainee_personality_diagnosis_results_scores_check | CHECK | 7 つの `score_*` がどれも 0 以上 4 以下 | — | 平均の値の範囲 |
@@ -924,9 +924,9 @@ erDiagram
 - **「未経験」は文字列 `"na"`**：`null` にすると「答えていない」と区別がつかなくなるため、答えたことが分かる値にする（回答は全問必須なので、答えていない問は保存されない）
 - **平均は小数第2位に丸めて保存**（`DECIMAL(3,2)`。四捨五入。今の GAS の `toFixed(2)` と同じ結果）。**タイプは丸める前の値で判定してから保存する**（丸めた値で比べると、同点の扱いが今の GAS と変わることがあるため）
 - **1頭に何件でも持てる**（ユニーク制約を付けない）。トレーニー詳細（S-0309）では、レーダーチャートに今回（いちばん新しい回）・前回（その 1 つ前）・初回（いちばん古い回）を重ね、結果の表は新しい順（最新を上。**2026-10 変更**：当初は古い順）に並べる。並べる基準はどちらも `answered_at` の降順、同じ日時なら `id` の降順
-- **`created_by` / `updated_by` は持たない**：結果はお客様の操作で作られるため（D-1100 と同じ）。トレーナーが書く評価文だけは、最終保存者・日時を `evaluation_updated_by`・`evaluation_updated_at` に持つ（**2026-10-18 追加**。結果そのものの更新者ではないので、`updated_by` の名前にはしない）
-- **評価文は本表の列に持つ**（**2026-10-18 変更**。要件定義書 6-16-15）：結果 1 件に評価文は 1 つなので、別の表にしない。評価文の状態（なし・下書き・公開済み）は列に持たず、`evaluation_text` と `evaluation_published_at` から決める（**2026-10-18 変更**：その前は、トレーニング記録〔D-0200〕に本表の行を結び付けた記録の有無から決めていた）。段階2（AI で下書きを作る）では、AI の下書きもこの列に入れる。スタッフ向けのメモの置き場所は段階2 で決める（**2026-10-18 変更**：その前は「公開のときに記録の所感に入れる」としていたが、公開で記録を作らなくなったため）。当初は「『AI のレポート』の列は今回は作らない（次の段階で、別の表または列として本表の行にひも付けて足す想定）」としていた
-- **結果そのものの「公開」の列は持たない**（**2026-10 変更**）：会員が回答したらすぐマイページ（S-1402）の愛犬のカードに出すため（要件定義書 6-15-19）。行を削除すれば（6-16-14）、マイページからも消える。**評価文の公開**は別で、`evaluation_published_at`・`evaluation_published_by` で持つ（**2026-10-18 変更**：2026-10-18 のユーザーレビューで、評価文と記録の本文の二重持ちをやめるため、公開でトレーニング記録を作らず、評価文そのものに公開した日時を持たせる形にした。当初は次の段階で `published_at`・`published_by` のような列を足す想定で、同じ 2026-10-18 の最初の形では結び付いたトレーニング記録の有無で表していた）
+- **`created_by` / `updated_by` は持たない**：結果はお客様の操作で作られるため（D-1100 と同じ）。トレーナーが書くアドバイスだけは、最終保存者・日時を `evaluation_updated_by`・`evaluation_updated_at` に持つ（**2026-10-18 追加**。結果そのものの更新者ではないので、`updated_by` の名前にはしない）
+- **アドバイスは本表の列に持つ**（**2026-10-18 変更**。要件定義書 6-16-15）：結果 1 件にアドバイスは 1 つなので、別の表にしない。アドバイスの状態（なし・下書き・公開済み）は列に持たず、`evaluation_text` と `evaluation_published_at` から決める（**2026-10-18 変更**：その前は、トレーニング記録〔D-0200〕に本表の行を結び付けた記録の有無から決めていた）。段階2（AI で下書きを作る）では、AI の下書きもこの列に入れる。スタッフ向けのメモの置き場所は段階2 で決める（**2026-10-18 変更**：その前は「公開のときに記録の所感に入れる」としていたが、公開で記録を作らなくなったため）。当初は「『AI のレポート』の列は今回は作らない（次の段階で、別の表または列として本表の行にひも付けて足す想定）」としていた
+- **結果そのものの「公開」の列は持たない**（**2026-10 変更**）：会員が回答したらすぐマイページ（S-1402）の愛犬のカードに出すため（要件定義書 6-15-19）。行を削除すれば（6-16-14）、マイページからも消える。**アドバイスの公開**は別で、`evaluation_published_at`・`evaluation_published_by` で持つ（**2026-10-18 変更**：2026-10-18 のユーザーレビューで、評価文と記録の本文の二重持ちをやめるため、公開でトレーニング記録を作らず、評価文そのものに公開した日時を持たせる形にした。当初は次の段階で `published_at`・`published_by` のような列を足す想定で、同じ 2026-10-18 の最初の形では結び付いたトレーニング記録の有無で表していた）
 - 結果の保存の流れ（同時送信の防ぎ方を含む）は DS-1100 の備考参照
 
 
@@ -1430,9 +1430,9 @@ erDiagram
 | delete_trainee_combined_survey_token | 愛犬アンケート＆愛犬性格診断の案内の取消（**2026-10-19 追加**） |
 | delete_trainee_personality_diagnosis_token | 愛犬性格診断の案内の取消（**2026-10 追加**） |
 | delete_trainee_personality_diagnosis_result | 愛犬性格診断の結果の削除（**2026-10 追加**） |
-| edit_trainee_personality_diagnosis_evaluation | 愛犬性格診断の評価文の更新（**2026-10-18 追加**。要件定義書 6-16-15）。操作履歴の表示名は「愛犬性格診断評価文編集」（ほかの `edit_*` の「〜編集」にそろえる。**2026-10-18 変更**：その前は「愛犬性格診断評価文保存」。キーは変えない） |
-| publish_trainee_personality_diagnosis_evaluation | 愛犬性格診断の評価文の公開（**2026-10-18 追加**。要件定義書 6-16-16）。操作履歴の表示名は「愛犬性格診断評価文公開」 |
-| unpublish_trainee_personality_diagnosis_evaluation | 愛犬性格診断の評価文の公開取消（**2026-10-18 追加**）。操作履歴の表示名は「愛犬性格診断評価文公開取消」（ほかの取消〔「愛犬性格診断案内取消」など〕にそろえる。**2026-10-18 変更**：2026-10-18 のユーザーレビューで、［公開をやめる］を［公開取消］にし、ほかの案内の取消とそろえた。その前は「愛犬性格診断評価文公開停止」。種別の値〔`unpublish_…`〕は変えない） |
+| edit_trainee_personality_diagnosis_evaluation | 愛犬性格診断のアドバイスの更新（**2026-10-18 追加**。要件定義書 6-16-15）。操作履歴の表示名は「愛犬性格診断アドバイス編集」（ほかの `edit_*` の「〜編集」にそろえる。**2026-10-18 変更**：その前は「愛犬性格診断評価文保存」。キーは変えない） |
+| publish_trainee_personality_diagnosis_evaluation | 愛犬性格診断のアドバイスの公開（**2026-10-18 追加**。要件定義書 6-16-16）。操作履歴の表示名は「愛犬性格診断アドバイス公開」 |
+| unpublish_trainee_personality_diagnosis_evaluation | 愛犬性格診断のアドバイスの公開取消（**2026-10-18 追加**）。操作履歴の表示名は「愛犬性格診断アドバイス公開取消」（ほかの取消〔「愛犬性格診断案内取消」など〕にそろえる。**2026-10-18 変更**：2026-10-18 のユーザーレビューで、［公開をやめる］を［公開取消］にし、ほかの案内の取消とそろえた。その前は「愛犬性格診断評価文公開停止」。種別の値〔`unpublish_…`〕は変えない） |
 | create_client_contract | 契約登録 |
 | edit_client_contract | 契約編集 |
 | delete_client_contract | 契約削除 |
@@ -1444,7 +1444,7 @@ erDiagram
 
 - **`view_trainee` を持たない注記の前提について**（2026-10 追記）：上の「トレーニーは詳細画面が会員詳細（S-0305）内に置かれるため」は、トレーニーを会員詳細の中だけで扱っていた段階①の前提で書いたもの。その後、トレーニー詳細は独立した画面（S-0309、`trainees.show`）になったが、トレーニー詳細の参照は記録していない（`view_trainee` は持たない）点は変わっていない。2026-10 に愛犬アンケートの回答（D-1100。愛犬の健康状態などを含む）を S-0309 で表示するようになったが、本書では参照の操作種別を追加していない。**第1段階では記録しない**。愛犬アンケートの回答を S-0309 で見せるようになっても、参照を記録しない既存の方針のまま。第2段階（回答を AI に送る段階）で、個人情報の扱いと一緒に見直す
 - **愛犬アンケート案内**（2026-10 追加）：`create_trainee_intake_survey_token`（発行）・`delete_trainee_intake_survey_token`（取消）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（トークンの行は取消で物理削除されるため、トークンではなくトレーニーを対象として記録する）。案内の発行は会員詳細（S-0305）の「愛犬アンケートの案内を発行」だけで行う（トレーニー登録 S-0308 では発行しない。**2026-10 変更**）ため、発行は必ず `create_trainee_intake_survey_token` として記録される
-- **愛犬性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）と、結果の削除 `delete_trainee_personality_diagnosis_result`、評価文の更新 `edit_trainee_personality_diagnosis_evaluation`・公開 `publish_trainee_personality_diagnosis_evaluation`・公開取消 `unpublish_trainee_personality_diagnosis_evaluation`（**2026-10-18 追加**）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（愛犬アンケート案内と同じ。結果の id は記録しない）。（**2026-10-18 変更**：その前〔段階1 の②〕は、評価文の公開を `create_training_record` として記録していた。公開で記録を作らなくなったため、専用の種別にした）愛犬性格診断詳細（S-0313）を見たことは記録しない。お客様の愛犬性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
+- **愛犬性格診断の案内**（2026-10 追加）：`create_trainee_personality_diagnosis_token`（発行）・`delete_trainee_personality_diagnosis_token`（取消）と、結果の削除 `delete_trainee_personality_diagnosis_result`、アドバイスの更新 `edit_trainee_personality_diagnosis_evaluation`・公開 `publish_trainee_personality_diagnosis_evaluation`・公開取消 `unpublish_trainee_personality_diagnosis_evaluation`（**2026-10-18 追加**）の `target_type` は `'Trainee'`、`target_id` はトレーニーの id とする（愛犬アンケート案内と同じ。結果の id は記録しない）。（**2026-10-18 変更**：その前〔段階1 の②〕は、評価文の公開を `create_training_record` として記録していた。公開で記録を作らなくなったため、専用の種別にした）愛犬性格診断詳細（S-0313）を見たことは記録しない。お客様の愛犬性格診断の回答と、トレーナーが結果を見たこと（トレーニー詳細を見たことに含める）は記録しない
 - **お客様の愛犬アンケートの回答は記録しない**：アクセスログはトレーナーの操作の記録で、`access_logs.trainer_id` が NOT NULL のため（お客様の操作を入れる先がない）。回答の記録は D-1100 の `answered_at` が兼ねる
 
 ### 5-17. メディア種別
