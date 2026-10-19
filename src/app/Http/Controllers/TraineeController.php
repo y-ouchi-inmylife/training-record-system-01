@@ -56,8 +56,8 @@ class TraineeController extends Controller
      */
     public function show(Trainee $trainee): View
     {
-        // latestIntakeSurveyResponse と activeIntakeSurveyToken は愛犬アンケートの欄の状態と、
-        // 削除確認の文言に使う（2026-10 追加）。personalityDiagnosisResults は性格診断の欄の結果の一覧
+        // latestIntakeSurveyResponse と activeIntakeSurveyToken は削除確認の文言に使う（2026-10 追加。2026-10-19 に暮らしの様子の欄を外したので、
+        // 画面の欄には使わない）。personalityDiagnosisResults は性格診断の欄の結果の一覧
         // （新しい順。2026-10 追加。何件あってもクエリは 1 本）。personalityDiagnosisResults と activePersonalityDiagnosisToken は
         // 削除確認の文言にも使う（2026-10 追加）。結果の表の評価文の状態は結果の列だけで決まる（2026-10-18）
         $trainee->load(['client', 'measurements', 'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'personalityDiagnosisResults', 'activePersonalityDiagnosisToken']);

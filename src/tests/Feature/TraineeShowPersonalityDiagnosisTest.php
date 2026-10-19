@@ -17,7 +17,7 @@ use Tests\TestCase;
 /**
  * トレーニー詳細（S-0309）の性格診断の欄（2026-10 追加。設計書 S-0309「性格診断の欄」）。
  *
- * - 計測値の下・暮らしの様子の欄の上に、いつも出す（id="personality-diagnosis"・scroll-margin-top。2026-10 変更：当初は暮らしの様子の欄の下）。結果がなければ「（未回答）」だけ
+ * - 計測値の下（いちばん下）に、いつも出す（id="personality-diagnosis"・scroll-margin-top。2026-10 変更：当初は暮らしの様子の欄の下。2026-10-19 に暮らしの様子の欄を外した）。結果がなければ「（未回答）」だけ
  * - 上にレーダーチャート 1 つ、下にすべての回の結果の表（新しい順。2026-10 変更：当初は古い順。回答日・タイプ・7 カテゴリ・評価文の状態・［詳細］）
  * - 各行の［詳細］で愛犬性格診断詳細（S-0313）へ。50 問の回答・評価文・削除は S-0313（2026-10-18 変更：当初は各行の［回答］で
  *   50 問の回答のモーダルを出し、管理者には各行の［削除］と削除確認モーダル S-0309-M01 を出していた。S-0313 の形は
@@ -108,7 +108,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
     }
 
-    /** 性格診断の欄（カードの始まりから、暮らしの様子の欄・削除確認・50 問の回答のモーダル、計測値のモーダルの手前まで） */
+    /** 性格診断の欄（カードの始まりから、削除確認・50 問の回答のモーダル、計測値のモーダルの手前まで） */
     private function card(string $html): string
     {
         $start = strpos($html, '<div class="card mb-3" id="personality-diagnosis"');
@@ -116,8 +116,6 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         $ends = array_filter([
             strpos($html, 'data-personality-diagnosis-answers', $start),
             strpos($html, 'data-personality-diagnosis-delete', $start),
-            // 性格診断の欄の次は暮らしの様子の欄（2026-10 変更：性格診断の欄を暮らしの様子の欄の上に移した）
-            strpos($html, 'id="intake-survey"', $start),
             strpos($html, 'id="measurementModal-', $start),
         ]);
         $end = min($ends);
@@ -158,16 +156,14 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
         return $row;
     }
 
-    public function test_計測値の後ろ_暮らしの様子の欄の前にidとscroll_margin_topを付けて出す(): void
+    public function test_計測値の後ろのいちばん下にidとscroll_margin_topを付けて出す(): void
     {
         $html = $this->page();
 
         $this->assertStringContainsString('<div class="card mb-3" id="personality-diagnosis" style="scroll-margin-top: 4.5rem;">', $html);
-        // 並びは 計測値 → 性格診断 → 暮らしの様子（2026-10 変更：当初は暮らしの様子の後ろ）
+        // 並びは 計測値 → 性格診断（いちばん下。2026-10-19 変更：その下の暮らしの様子の欄を外した）
         $this->assertGreaterThan(strpos($html, 'data-trainee-photo-measurements'), strpos($html, 'id="personality-diagnosis"'));
-        $this->assertLessThan(strpos($html, 'id="intake-survey"'), strpos($html, 'id="personality-diagnosis"'));
-        // 欄の間の余白は今までどおり（どちらも mb-3）
-        $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
+        $this->assertStringNotContainsString('id="intake-survey"', $html);
         $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">愛犬性格診断<\/h6>\s*<\/div>/u', $this->card($html));
     }
 

@@ -101,6 +101,29 @@
         </div>
     </div>
 
+    {{-- 暮らしの様子（2026-10-19 追加。要件定義書 6-16-13、設計書 S-0313「暮らしの様子の欄」）。「結果」の欄と「評価文」の欄のあいだ。
+         この診断で答えた 4 問（PersonalityDiagnosisQuestions::lifeQuestions()。回答の画面 S-1415 と共用）を、設問文と答えの対で出す。
+         作りは、その前のトレーニー詳細（S-0309）の暮らしの様子の欄と同じ：設問文の先頭の「●」は読み上げでは読まず（aria-hidden）、
+         d-flex で折り返したときに 2 行目を「●」の右から始める。答えは改行を保持（pre-wrap）、空の問は「（未回答）」（text-muted）。
+         見るだけ（編集・削除の操作は置かない） --}}
+    <div class="card mb-3" data-personality-diagnosis-life>
+        <div class="card-header">
+            <h6 class="mb-0">暮らしの様子</h6>
+        </div>
+        <div class="card-body">
+            <dl class="mb-0">
+                @foreach(\App\Support\PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question)
+                    <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
+                    @if(blank($result->{$column}))
+                        <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted" data-life-answer="{{ $column }}">（未回答）</dd>
+                    @else
+                        <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }}" style="white-space: pre-wrap;" data-life-answer="{{ $column }}">{{ $result->{$column} }}</dd>
+                    @endif
+                @endforeach
+            </dl>
+        </div>
+    </div>
+
     {{-- 評価文（要件定義書 6-16-15・6-16-16）。どの状態でもテキストエリア（10,000 文字以内）と［更新］（データ保存なので緑。4-4）。
          空で保存すると「なし」に戻る（公開済みのときは空にできない）。公開済みのときも直せ、直すとそのまま会員様の画面に出る
          （2026-10-18 変更：その前は、公開でトレーニング記録を作り、公開済みは表示だけで記録へのリンクを出していた） --}}
@@ -219,7 +242,8 @@
          2026-10-18 変更：ユーザーレビューで、公開取消の確認（M03「会員のマイページから{名前}の公開を取り消しますか？」）と言い方をそろえ、
          「会員のマイページに{名前}を公開しますか？」にした（その前は「〜を公開します。よろしいですか？」） --}}
     {{-- AI の下書きの確かめモーダル（S-0313-M04。2026-10-19 追加）。評価文かスタッフ用メモのどちらかに文があるときだけ、［AIで下書き］で開く
-         （どちらも空なら開かずに作る）。［キャンセル］は赤の枠線、［置き換える］は青の塗り（設計書 S-0313-M04） --}}
+         （どちらも空なら開かずに作る）。［キャンセル］は灰色の塗り（この画面のほかの確認のモーダルと同じ。4-4）、［置き換える］は青の塗り
+         （設計書 S-0313-M04。2026-10-19 変更：その前の［キャンセル］は赤の枠線） --}}
     <div class="modal fade" id="personality-diagnosis-draft-confirm" tabindex="-1"
          aria-labelledby="personality-diagnosis-draft-confirm-label" aria-hidden="true" data-evaluation-draft-confirm>
         <div class="modal-dialog modal-dialog-centered">
@@ -232,7 +256,7 @@
                     <p class="mb-0">評価文とスタッフ用メモを、AIの下書きで置き換えます。よろしいですか？</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                     <button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える</button>
                 </div>
             </div>

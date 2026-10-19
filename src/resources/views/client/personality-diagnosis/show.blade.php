@@ -80,6 +80,21 @@
                     @endforeach
                 @endforeach
 
+                {{-- 暮らしの様子の 4 問（2026-10-19 追加。設計書 S-1415「暮らしの様子」）。50 問のあとに置く（トレーナーさんの元の Google フォームと
+                     同じ順。その前は愛犬アンケート S-1413 で聞いていた）。作りは愛犬アンケートにあったときと同じ：小見出し「暮らしの様子」と控えめな
+                     カッコ書き、設問の先頭の「●」は読み上げない、textarea（rows="4"・2,000 文字以内）、どれも任意。設問文は
+                     PersonalityDiagnosisQuestions::lifeQuestions() の 1 か所から。初期値は空（50 問と同じく、答え直しでも前回の答えは入れない）。
+                     入力エラーで戻ったときは入力した値、時間切れ（419）で出し直したときは送られてきた答え（$restoredAnswers）を戻す --}}
+                <h2 class="fs-6 fw-bold mb-3 mt-4">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>
+                @foreach($lifeQuestions as $column => $question)
+                    <div class="mb-3" data-life-question="{{ $column }}">
+                        <label for="{{ $column }}" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></label>
+                        <textarea class="form-control @error($column) is-invalid @enderror"
+                                  id="{{ $column }}" name="{{ $column }}" rows="4" maxlength="{{ \App\Support\PersonalityDiagnosisQuestions::LIFE_ANSWER_MAX_LENGTH }}">{{ old($column, $restoredAnswers[$column] ?? null) }}</textarea>
+                        <x-form-error :field="$column" />
+                    </div>
+                @endforeach
+
                 @include('layouts.partials.privacy-consent')
 
                 <div class="d-grid">

@@ -29,57 +29,13 @@ class TraineeIntakeSurveyResponse extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | 自由記述 4 欄の設問文（要件定義書 D-1100）
+    | 暮らしの様子の 4 問（2026-10-19 に愛犬性格診断へ移した）
     |--------------------------------------------------------------------------
-    | 回答画面（S-1413）と回答の表示（S-0309）の両方から使う、ただ 1 つの置き場所。
-    | 設問文は、トレーナーが Google フォームで使っていた文面のまま（要件定義書 D-1100）。
-    | 文面を直すときは、要件定義書 D-1100 も同時に直すこと。
-    | 例文は持たない（2026-10 変更。お客様の回答を例文に誘導してしまうおそれがあるため。当初は Google フォームの
-    | 文面から取った例文を 2 つずつ持ち、回答画面の入力欄の下に出していた）。
+    | 自由記述 4 欄（wish・recent_events・ideal_days・health_concerns）は、愛犬性格診断の回答（D-1200）へ移した
+    | （設問文は PersonalityDiagnosisQuestions::lifeQuestions()、空の判定は TraineePersonalityDiagnosisResult::hasLifeAnswers()）。
+    | トレーナーさんの元の仕組み（Google フォーム）では 4 問は性格診断の一部だったため。愛犬アンケートは基本情報だけになり、
+    | この表の 4 列は 2026_10_19_000007 で外した（今あった答えは消した）
     */
-
-    /**
-     * 暮らしの様子の自由記述（questions() の 4 問）のどれか 1 つにでも文字が入っているか（2026-10-19 追加。会員詳細 S-0305 の
-     * 暮らしの様子の「入力あり」）。null・空文字・空白や改行だけ（全角の空白「　」も含む）の答えは空とみなす。
-     * 「愛犬のこと」（名前・犬種などの基本情報）の項目は見ない
-     */
-    public function hasLifeAnswers(): bool
-    {
-        foreach (array_keys(self::questions()) as $column) {
-            if (preg_replace('/[\s\x{3000}]+/u', '', (string) $this->{$column}) !== '') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 自由記述 4 欄（カラム名 → 短い呼び名・設問文）。この並びで画面に出す
-     *
-     * @return array<string, array{label: string, question: string}>
-     */
-    public static function questions(): array
-    {
-        return [
-            'wish' => [
-                'label' => 'こうなったらいいな',
-                'question' => '日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？',
-            ],
-            'recent_events' => [
-                'label' => '最近の様子',
-                'question' => '最近の様子で、ふと気になったことや、印象に残っている出来事があれば教えてください。',
-            ],
-            'ideal_days' => [
-                'label' => '理想の毎日',
-                'question' => 'これから一緒に、どんな楽しいことをしたいですか？『理想の毎日』を聞かせてください。',
-            ],
-            'health_concerns' => [
-                'label' => '体のこと',
-                'question' => '体のことで気になることや、お医者様から言われていることがあれば教えてください。',
-            ],
-        ];
-    }
 
     protected $fillable = [
         'trainee_id',
@@ -92,10 +48,6 @@ class TraineeIntakeSurveyResponse extends Model
         'birth_month',
         'birth_day',
         'neuter_status',
-        'wish',
-        'recent_events',
-        'ideal_days',
-        'health_concerns',
     ];
 
     protected function casts(): array

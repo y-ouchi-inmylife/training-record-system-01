@@ -103,6 +103,24 @@ class ClientPersonalityDiagnosisSessionExpiredTest extends TestCase
         $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
     }
 
+    public function test_時間切れなら暮らしの様子の4問の答えも入れたまま出し直す(): void
+    {
+        // 2026-10-19 追加：4 問を愛犬アンケートから移した。文字列なら上限（2,000 文字）までを戻し、文字列でない値は戻さない
+        $this->issueToken();
+
+        $html = $this->post($this->url(), [
+            'answers' => ['Q01' => '2'],
+            'wish' => "お留守番が\n上手になってほしい",
+            'recent_events' => ['配列'],
+            'health_concerns' => str_repeat('あ', 2005),
+        ])->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="wish" name="wish" rows="4" maxlength="2000">'."お留守番が\n上手になってほしい".'</textarea>', $html);
+        $this->assertStringContainsString('id="recent_events" name="recent_events" rows="4" maxlength="2000"></textarea>', $html);
+        $this->assertStringContainsString('id="health_concerns" name="health_concerns" rows="4" maxlength="2000">'.str_repeat('あ', 2000).'</textarea>', $html);
+        $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
+    }
+
     public function test_正しくない値と設問にないキーは戻さない(): void
     {
         $this->issueToken();

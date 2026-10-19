@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Support;
 
+use App\Models\TraineePersonalityDiagnosisResult;
 use App\Support\PersonalityDiagnosisQuestions;
 use PHPUnit\Framework\TestCase;
 
@@ -73,6 +74,43 @@ class PersonalityDiagnosisQuestionsTest extends TestCase
         $this->assertSame(array_keys(PersonalityDiagnosisQuestions::categories()), array_keys(PersonalityDiagnosisQuestions::typeByCategory()));
         foreach (PersonalityDiagnosisQuestions::typeByCategory() as $type) {
             $this->assertArrayHasKey($type, PersonalityDiagnosisQuestions::types());
+        }
+    }
+
+    // ---- 暮らしの様子の 4 問（2026-10-19 に愛犬アンケートから移した。要件定義書 D-1200） ----
+
+    public function test_暮らしの様子は4問で列名の順に並び例文は持たない(): void
+    {
+        $questions = PersonalityDiagnosisQuestions::lifeQuestions();
+
+        $this->assertSame(['wish', 'recent_events', 'ideal_days', 'health_concerns'], array_keys($questions));
+        $this->assertSame(['こうなったらいいな', '最近の様子', '理想の毎日', '体のこと'], array_column($questions, 'label'));
+        foreach ($questions as $question) {
+            // 例文は持たない（回答を例文に誘導しないため）
+            $this->assertSame(['label', 'question'], array_keys($question));
+        }
+        $this->assertSame(2000, PersonalityDiagnosisQuestions::LIFE_ANSWER_MAX_LENGTH);
+    }
+
+    public function test_暮らしの様子の設問文は要件定義書のとおり(): void
+    {
+        $questions = PersonalityDiagnosisQuestions::lifeQuestions();
+
+        $this->assertSame('日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？', $questions['wish']['question']);
+        $this->assertSame('最近の様子で、ふと気になったことや、印象に残っている出来事があれば教えてください。', $questions['recent_events']['question']);
+        $this->assertSame('これから一緒に、どんな楽しいことをしたいですか？『理想の毎日』を聞かせてください。', $questions['ideal_days']['question']);
+        $this->assertSame('体のことで気になることや、お医者様から言われていることがあれば教えてください。', $questions['health_concerns']['question']);
+    }
+
+    public function test_暮らしの様子の空の判定は結果のモデルで全角の空白や改行だけも空(): void
+    {
+        $result = fn (array $attributes) => new TraineePersonalityDiagnosisResult($attributes);
+
+        $this->assertFalse($result([])->hasLifeAnswers());
+        $this->assertFalse($result(['wish' => '', 'recent_events' => " \n\t", 'ideal_days' => '　　', 'health_concerns' => null])->hasLifeAnswers());
+        $this->assertTrue($result(['health_concerns' => '　気になる'])->hasLifeAnswers());
+        foreach (array_keys(PersonalityDiagnosisQuestions::lifeQuestions()) as $column) {
+            $this->assertContains($column, (new TraineePersonalityDiagnosisResult)->getFillable());
         }
     }
 }

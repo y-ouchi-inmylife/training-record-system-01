@@ -46,7 +46,7 @@ class PersonalityDiagnosisController extends Controller
     /**
      * トークンを確かめて、回答の画面（または使えない URL の画面）を返す。
      *
-     * @param  array<string, string>  $restoredAnswers  時間切れで出し直すときに選んだ状態に戻す回答（正しい値だけ）
+     * @param  array<string, string>  $restoredAnswers  時間切れで出し直すときに選んだ状態に戻す回答（正しい値だけ。暮らしの様子の 4 問は列名のキー）
      * @param  bool  $expired  時間切れで出し直したか（画面の上に知らせを出す）
      */
     public static function showForm(string $token, array $restoredAnswers = [], bool $expired = false): View
@@ -63,6 +63,9 @@ class PersonalityDiagnosisController extends Controller
             'questionIdsByCategory' => PersonalityDiagnosisQuestions::questionIdsByCategory(),
             'questions' => PersonalityDiagnosisQuestions::questions(),
             'choices' => PersonalityDiagnosisQuestions::choices(),
+            // 暮らしの様子の 4 問（2026-10-19 に愛犬アンケートから移した。50 問のあとに出す）。初期値は空（50 問と同じく、
+            // 答え直しでも前回の答えは入れない）。時間切れで出し直すときは送られてきた答えを戻す（$restoredAnswers の列名のキー）
+            'lifeQuestions' => PersonalityDiagnosisQuestions::lifeQuestions(),
             'restoredAnswers' => $restoredAnswers,
             'expired' => $expired,
             // 愛犬アンケート＆愛犬性格診断の案内の愛犬性格診断なら、進み具合（2/2）を出す（2026-10-19 追加。マイページのお知らせから
@@ -84,8 +87,9 @@ class PersonalityDiagnosisController extends Controller
     public function store(ClientPersonalityDiagnosisRequest $request, string $token, PersonalityDiagnosisScorer $scorer): View|RedirectResponse
     {
         $answers = $request->answers();
+        $lifeAnswers = $request->lifeAnswers();
 
-        $result = DB::transaction(function () use ($answers, $token, $scorer) {
+        $result = DB::transaction(function () use ($answers, $lifeAnswers, $token, $scorer) {
             $tokenRecord = TraineePersonalityDiagnosisToken::query()->where('token', $token)->lockForUpdate()->first();
             $reason = self::checkToken($tokenRecord);
             if ($reason !== true) {
@@ -100,6 +104,8 @@ class PersonalityDiagnosisController extends Controller
                 'question_version' => PersonalityDiagnosisQuestions::VERSION,
                 'answers' => $answers,
                 ...$scorer->score($answers)->toResultAttributes(),
+                // 暮らしの様子の 4 問（2026-10-19 追加。その診断の結果に保存する）
+                ...$lifeAnswers,
             ]);
 
             $tokenRecord->update(['answered_at' => $answeredAt]);

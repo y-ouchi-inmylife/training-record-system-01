@@ -94,12 +94,13 @@ class ClientCombinedSurveyTest extends TestCase
         return $this->post(route('client-portal.intake-survey.store', ['token' => self::INTAKE]), ['name' => 'モモ']);
     }
 
-    private function submitPersonality()
+    /** @param  array<string, string>  $life  暮らしの様子の 4 問（列名 → 答え） */
+    private function submitPersonality(array $life = [])
     {
         $json = json_decode(file_get_contents(__DIR__.'/../fixtures/personality-diagnosis-cases.json'), true, 512, JSON_THROW_ON_ERROR);
         $answers = array_map(fn ($v) => (string) $v, collect($json['cases'])->firstWhere('name', 'past-1')['answers']);
 
-        return $this->post(route('client-portal.personality-diagnosis.store', ['token' => self::PERSONALITY]), ['answers' => $answers]);
+        return $this->post(route('client-portal.personality-diagnosis.store', ['token' => self::PERSONALITY]), ['answers' => $answers] + $life);
     }
 
     public function test_組み合わせのリンクで愛犬アンケート1_2から送信で愛犬性格診断2_2へ進み送信で完了(): void
@@ -116,6 +117,9 @@ class ClientCombinedSurveyTest extends TestCase
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち1つ目：</span>', $html);
         $this->assertStringContainsString('<span>愛犬アンケート＆愛犬性格診断</span>', $html);
         $this->assertLessThan(strpos($html, '<h1 class="mb-2">愛犬アンケート</h1>'), strpos($html, 'data-survey-progress'));
+        // 1/2 の愛犬アンケートは基本情報だけ。暮らしの様子の 4 問は出さない（2026-10-19 変更：愛犬性格診断へ移した）
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('<textarea', $html);
 
         // 送信すると、完了の画面ではなく愛犬性格診断の回答の画面へ
         $this->submitIntake()->assertRedirect($this->personalityUrl());
@@ -127,10 +131,15 @@ class ClientCombinedSurveyTest extends TestCase
         $this->assertStringContainsString('<p class="c-survey-progress" data-survey-progress="2/2">', $html);
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち2つ目：</span>', $html);
         $this->assertStringContainsString('愛犬アンケートを受け付けました。続けて愛犬性格診断にお答えください。', $html);
+        // 2/2 の愛犬性格診断は 50 問のあとに暮らしの様子の 4 問（2026-10-19 追加）
+        $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
+        $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, '>暮らしの様子<'));
+        $this->assertSame(4, substr_count($html, '<textarea'));
 
-        // 送信すると、今の愛犬性格診断の完了の画面
-        $this->submitPersonality()->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
+        // 送信すると、今の愛犬性格診断の完了の画面。暮らしの様子の答えは愛犬性格診断の結果に保存する
+        $this->submitPersonality(['wish' => 'お留守番が上手になってほしい'])->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
         $this->assertSame(1, DB::table('trainee_personality_diagnosis_results')->count());
+        $this->assertSame('お留守番が上手になってほしい', DB::table('trainee_personality_diagnosis_results')->value('wish'));
 
         // 最後の完了の画面の 1 文目も契約前のお客様にもそぐう文（2026-10-19 変更）
         $html = $this->get(route('client-portal.personality-diagnosis.thanks'))->assertOk()->getContent();

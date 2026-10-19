@@ -82,14 +82,12 @@
              - 愛犬ごとのカード。並びはマイページの愛犬のカードと同じ（Client::trainees() の id 昇順）。愛犬がいなければ欄ごと出さない
              - カードの中は上の登録内容と同じ形（縦一列、ラベル上・値下、項目の間だけに罫線、空の値はラベルを残して値を空に）
              - 値の出し方は会員詳細（S-0305）と同じアクセサ。性別は項目名を添えるので「不明」も出す。写真は出さない
-             - 暮らしの様子はトレーニー詳細（S-0309）の欄と同じ作り（設問の先頭の「●」は読み上げでは読まない、回答は改行を保持）。
-               見るだけ。愛犬アンケートに答えていない愛犬も 4 問を出し、各問「（未回答）」
+             - 暮らしの様子は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移したため。その前は登録内容の下に愛犬アンケートの 4 問と答えを出していた）
              - カードの下に［{呼び名}の情報を変更］（上の 3 つの入口ボタンと同じ見た目）→ S-1417 --}}
         @if($trainees->isNotEmpty())
             <h2 class="h4 mt-5 mb-3">愛犬の情報</h2>
             @foreach($trainees as $trainee)
                 @php
-                    $intakeResponse = $trainee->latestIntakeSurveyResponse;
                     $profileItems = [
                         '名前' => $trainee->name,
                         '犬種' => $trainee->breed,
@@ -102,24 +100,12 @@
                     <div class="card-body p-4">
                         <h3 class="h5 mb-0">{{ $trainee->client_call_name }}</h3>
                         @foreach($profileItems as $label => $value)
-                            <div class="py-3 border-bottom">
+                            {{-- 罫線は項目の間だけ（2026-10-19 変更：暮らしの様子を外したので、最後の去勢・避妊の下には引かない） --}}
+                            <div class="{{ $loop->last ? 'pt-3' : 'py-3 border-bottom' }}">
                                 <div class="text-muted small mb-1">{{ $label }}</div>
                                 <div style="min-height: 1.5rem;">{{ $value }}</div>
                             </div>
                         @endforeach
-                        <div class="pt-3">
-                            <div class="text-muted small mb-2">暮らしの様子</div>
-                            <dl class="mb-0" data-client-intake-survey-answers>
-                                @foreach(\App\Models\TraineeIntakeSurveyResponse::questions() as $column => $question)
-                                    <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
-                                    @if($intakeResponse === null || blank($intakeResponse->{$column}))
-                                        <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted">（未回答）</dd>
-                                    @else
-                                        <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }}" style="white-space: pre-wrap;">{{ $intakeResponse->{$column} }}</dd>
-                                    @endif
-                                @endforeach
-                            </dl>
-                        </div>
                     </div>
                 </div>
                 <div class="d-grid {{ $loop->last ? '' : 'mb-4' }}">

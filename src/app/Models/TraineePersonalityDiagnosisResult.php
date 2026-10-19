@@ -63,6 +63,11 @@ class TraineePersonalityDiagnosisResult extends Model
         'score_trainability',
         'score_excitability',
         'personality_type',
+        // 暮らしの様子の 4 問（2026-10-19 追加。愛犬アンケートから移した。PersonalityDiagnosisQuestions::lifeQuestions()）
+        'wish',
+        'recent_events',
+        'ideal_days',
+        'health_concerns',
         'evaluation_text',
         // スタッフ用メモ（2026-10-19 追加。トレーナーだけが見る。会員様の画面には出さない）
         'staff_memo',
@@ -127,6 +132,21 @@ class TraineePersonalityDiagnosisResult extends Model
 
             return intdiv($tenths, 10).'.'.($tenths % 10);
         }, $this->scores());
+    }
+
+    /**
+     * 暮らしの様子の 4 問（PersonalityDiagnosisQuestions::lifeQuestions()）のどれか 1 つにでも文字が入っているか
+     * （2026-10-19 に愛犬アンケートの回答から移した）。null・空文字・空白や改行だけ（全角の空白「　」も含む）の答えは空とみなす
+     */
+    public function hasLifeAnswers(): bool
+    {
+        foreach (array_keys(PersonalityDiagnosisQuestions::lifeQuestions()) as $column) {
+            if (preg_replace('/[\s\x{3000}]+/u', '', (string) $this->{$column}) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

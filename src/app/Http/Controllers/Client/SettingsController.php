@@ -42,8 +42,8 @@ class SettingsController extends Controller
      *
      * 登録内容の一覧と、3 つの変更画面（S-1411/S-1410/S-1409）への入口を配置する。
      * その下の「愛犬の情報」の欄（2026-10-18 追加。要件定義書 6-15-20）には、ログイン中の会員のトレーニーを
-     * マイページの愛犬のカードと同じ並び（Client::trainees() の id 昇順）で渡す。暮らしの様子に出す最新の
-     * 愛犬アンケートの回答を一緒に読み込む（トレーニーが何頭いてもクエリの数は変わらない）。
+     * マイページの愛犬のカードと同じ並び（Client::trainees() の id 昇順）で渡す（2026-10-19 変更：暮らしの様子を出さなくなったので、
+     * 最新の愛犬アンケートの回答は読み込まない）。
      */
     public function show(): View
     {
@@ -51,7 +51,7 @@ class SettingsController extends Controller
 
         return view('client.settings.show', [
             'client' => $client,
-            'trainees' => $client->trainees()->with('latestIntakeSurveyResponse')->get(),
+            'trainees' => $client->trainees()->get(),
         ]);
     }
 

@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Trainee;
-use App\Models\TraineeIntakeSurveyResponse;
+use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -196,7 +196,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         }
     }
 
-    public function test_小見出しと区切り線と送信先(): void
+    public function test_小見出しと区切り線は置かず送信先(): void
     {
         $this->traineeWithToken('モモ');
 
@@ -205,14 +205,12 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertStringContainsString('<div class="c-login c-login--wide">', $html);
         // 小見出し「愛犬のこと」は置かない（2026-10 変更。説明文と重なるため）。カードは名前の欄から始まる
         $this->assertStringNotContainsString('>愛犬のこと<', $html);
-        $this->assertSame(1, substr_count($html, '<h2 '));
         $this->assertMatchesRegularExpression('/novalidate>\s*<input type="hidden" name="_token"[^>]*>\s*<div class="mb-3">\s*<label for="name"/u', $html);
-        // 「暮らしの様子」の同じ行の後ろに控えめなカッコ書き。「どれも任意です。…」の 1 行はなくした（2026-10 変更）
-        $this->assertStringContainsString('<h2 class="fs-6 fw-bold mb-3">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>', $html);
-        $this->assertStringNotContainsString('どれも任意です', $html);
-        // 区切り線は 1 本だけ（去勢・避妊のまとまりの下）
-        $this->assertSame(1, substr_count($html, 'border-bottom'));
-        $this->assertLessThan(strpos($html, '暮らしの様子'), strpos($html, 'border-bottom'));
+        // 小見出し「暮らしの様子」と、基本情報との境目の区切り線は置かない（2026-10-19 変更：4 問を愛犬性格診断へ移したため。
+        // その前は小見出しが 1 つ、区切り線が去勢・避妊のまとまりの下に 1 本）
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('<h2 ', $html);
+        $this->assertSame(0, substr_count($html, 'border-bottom'));
         $action = preg_quote(route('client-portal.intake-survey.store', ['token' => self::TOKEN]), '/');
         $this->assertMatchesRegularExpression('/<form method="POST" action="'.$action.'" novalidate>/u', $html);
         $this->assertStringContainsString('<button type="submit" class="btn btn-primary">送信する</button>', $html);
@@ -290,27 +288,21 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*trainee-birthday-input[^"]*\.js"/u', $html);
     }
 
-    public function test_自由記述は設問文の先頭に読み上げない印を付け例文は出さない(): void
+    public function test_暮らしの様子の4問は出さない(): void
     {
+        // 2026-10-19 変更：4 問を愛犬性格診断（S-1415）へ移した。愛犬アンケートは基本情報（名前・犬種・性別・誕生日・去勢・避妊）だけ
         $this->traineeWithToken('モモ');
 
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
-        $positions = [];
-        foreach (TraineeIntakeSurveyResponse::questions() as $column => $question) {
-            // 設問の先頭に「●」。aria-hidden で読み上げでは読まず、設問文は別の要素（折り返しは「●」の右から）
-            $this->assertStringContainsString('<label for="'.$column.'" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>'.$question['question'].'</span></label>', $html);
-            $this->assertMatchesRegularExpression('/<textarea class="form-control\s*"\s+id="'.$column.'" name="'.$column.'" rows="4" maxlength="2000"/u', $html);
-            $positions[] = strpos($html, 'id="'.$column.'"');
+        $this->assertStringNotContainsString('<textarea', $html);
+        $this->assertStringNotContainsString('●', $html);
+        foreach (PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question) {
+            $this->assertStringNotContainsString('name="'.$column.'"', $html);
+            $this->assertStringNotContainsString($question['question'], $html);
         }
-        // 例文は出さない（2026-10 変更。回答を例文に誘導しないため）
-        $this->assertStringNotContainsString('例：', $html);
-        $this->assertStringNotContainsString('-examples', $html);
-        $this->assertSame(4, substr_count($html, '<span class="me-1" aria-hidden="true">●</span>'));
-        // こうなったらいいな → 最近の様子 → 理想の毎日 → 体のこと の順
-        $sorted = $positions;
-        sort($sorted);
-        $this->assertSame($sorted, $positions);
+        // 説明文は今までどおり
+        $this->assertStringContainsString('愛犬のことを教えてください。', $html);
     }
 
     public function test_会員の氏名や連絡先は出さない(): void
@@ -459,34 +451,20 @@ class ClientIntakeSurveyShowTest extends TestCase
 
     // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
 
-    public function test_答え直しの画面は今のトレーニーの値と前回の答えを最初から入れる(): void
+    public function test_答え直しの画面は今のトレーニーの値を最初から入れる(): void
     {
+        // 前回の回答の基本情報ではなく、今のトレーニーの値を入れる（2026-10-19 変更：暮らしの様子を愛犬性格診断へ移したので、
+        // 前回の回答から入れる欄はなくなった。その前は暮らしの様子の 4 欄に前回の答えを入れていた）
         $trainee = $this->traineeWithToken('モモ', null, ['breed' => '柴犬']);
         DB::table('trainee_intake_survey_responses')->insert([
-            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-01 09:00:00', 'wish' => '古い答え', 'recent_events' => '古い様子',
-                'created_at' => now(), 'updated_at' => now()],
-            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-10 09:00:00', 'wish' => "新しい答え\n2行目", 'recent_events' => null,
+            ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-10 09:00:00', 'breed' => '前回の犬種',
                 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         $html = $this->get($this->showPath())->assertOk()->getContent();
 
-        // 基本情報は今のトレーニーの値
         $this->assertMatchesRegularExpression('/id="breed"[^>]*value="柴犬"/u', $html);
-        // 暮らしの様子は前回の回答（最新の回答）の答え。答えていなかった欄は空
-        $this->assertStringContainsString('id="wish" name="wish" rows="4" maxlength="2000">'."新しい答え\n2行目".'</textarea>', $html);
-        $this->assertStringContainsString('id="recent_events" name="recent_events" rows="4" maxlength="2000"></textarea>', $html);
-        $this->assertStringNotContainsString('古い答え', $html);
-        $this->assertStringNotContainsString('古い様子', $html);
-    }
-
-    public function test_前回の回答がなければ暮らしの様子の欄は空(): void
-    {
-        $this->traineeWithToken('モモ');
-
-        $html = $this->get($this->showPath())->assertOk()->getContent();
-
-        $this->assertSame(4, preg_match_all('/rows="4" maxlength="2000"><\/textarea>/u', $html));
+        $this->assertStringNotContainsString('前回の犬種', $html);
     }
 
     // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----

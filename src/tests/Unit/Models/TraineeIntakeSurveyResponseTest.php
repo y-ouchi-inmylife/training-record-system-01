@@ -9,7 +9,7 @@ use Tests\TestCase;
  * 愛犬アンケートの回答のモデル（D-1100。2026-10 追加）。
  *
  * 答えたとおりの表示（性別・去勢・避妊・誕生日。性別・去勢・避妊はトレーニーと同じ値・同じ対応表）と、
- * 自由記述の設問文と例文（要件定義書 D-1100）を確かめる。
+ * 暮らしの様子の 4 問を持たないこと（2026-10-19 に愛犬性格診断へ移した。設問文のテストは PersonalityDiagnosisQuestionsTest）を確かめる。
  */
 class TraineeIntakeSurveyResponseTest extends TestCase
 {
@@ -50,31 +50,15 @@ class TraineeIntakeSurveyResponseTest extends TestCase
         $this->assertNull((new TraineeIntakeSurveyResponse)->birthday_label);
     }
 
-    public function test_自由記述は4欄でカラム名の順に並ぶ(): void
+    public function test_暮らしの様子の4問は持たない(): void
     {
-        $questions = TraineeIntakeSurveyResponse::questions();
-
-        $this->assertSame(['wish', 'recent_events', 'ideal_days', 'health_concerns'], array_keys($questions));
-        $this->assertSame(
-            ['こうなったらいいな', '最近の様子', '理想の毎日', '体のこと'],
-            array_column($questions, 'label')
-        );
-        foreach ($questions as $column => $question) {
-            $this->assertContains($column, (new TraineeIntakeSurveyResponse)->getFillable());
-            $this->assertNotSame('', $question['question']);
-            // 例文は持たない（2026-10 変更。回答を例文に誘導しないため）
-            $this->assertSame(['label', 'question'], array_keys($question));
+        // 2026-10-19 変更：4 問を愛犬性格診断へ移した（設問文は PersonalityDiagnosisQuestions::lifeQuestions()、
+        // 空の判定は TraineePersonalityDiagnosisResult::hasLifeAnswers()）。この表の 4 列は 2026_10_19_000007 で外した
+        $this->assertFalse(method_exists(TraineeIntakeSurveyResponse::class, 'questions'));
+        $this->assertFalse(method_exists(TraineeIntakeSurveyResponse::class, 'hasLifeAnswers'));
+        foreach (['wish', 'recent_events', 'ideal_days', 'health_concerns'] as $column) {
+            $this->assertNotContains($column, (new TraineeIntakeSurveyResponse)->getFillable());
         }
-    }
-
-    public function test_設問文は要件定義書のとおり(): void
-    {
-        $questions = TraineeIntakeSurveyResponse::questions();
-
-        $this->assertSame('日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？', $questions['wish']['question']);
-        $this->assertSame('最近の様子で、ふと気になったことや、印象に残っている出来事があれば教えてください。', $questions['recent_events']['question']);
-        $this->assertSame('これから一緒に、どんな楽しいことをしたいですか？『理想の毎日』を聞かせてください。', $questions['ideal_days']['question']);
-        $this->assertSame('体のことで気になることや、お医者様から言われていることがあれば教えてください。', $questions['health_concerns']['question']);
     }
 
     public function test_トレーニーとトークンへのひも付け(): void

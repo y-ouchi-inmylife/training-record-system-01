@@ -3,7 +3,6 @@
 namespace App\Services\EvaluationDraft;
 
 use App\Models\SystemSetting;
-use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Support\PersonalityDiagnosisQuestions;
 
@@ -49,14 +48,14 @@ class PersonalityEvaluationPrompt
             '{{犬の名前}}' => '愛犬の名前（未登録なら空）',
             '{{タイプ}}' => 'タイプ（例「慎重派・しっかり番犬タイプ」。全カテゴリが点数なしなら「判定なし」）',
             '{{スコア}}' => '7 つのカテゴリの点数（例「対人:2.5, 対犬:2.9, …」。小数第1位。点数なしは「—」）',
-            '{{悩み}}' => '愛犬アンケートの「こうなったらいいな」の答え',
-            '{{背景}}' => '愛犬アンケートの「最近の様子」の答え',
-            '{{理想}}' => '愛犬アンケートの「理想の毎日」の答え',
-            '{{健康}}' => '愛犬アンケートの「体のこと」の答え',
+            '{{悩み}}' => 'この愛犬性格診断で答えた暮らしの様子の「こうなったらいいな」の答え',
+            '{{背景}}' => 'この愛犬性格診断で答えた暮らしの様子の「最近の様子」の答え',
+            '{{理想}}' => 'この愛犬性格診断で答えた暮らしの様子の「理想の毎日」の答え',
+            '{{健康}}' => 'この愛犬性格診断で答えた暮らしの様子の「体のこと」の答え',
         ];
     }
 
-    /** 暮らしの様子の 4 問の当てはめ（差し込みの印 → 回答の列） */
+    /** 暮らしの様子の 4 問の当てはめ（差し込みの印 → 愛犬性格診断の結果の列。2026-10-19 変更：その前は愛犬アンケートの回答の列） */
     private const LIFE_COLUMNS = [
         '{{悩み}}' => 'wish',
         '{{背景}}' => 'recent_events',
@@ -90,30 +89,18 @@ class PersonalityEvaluationPrompt
         foreach ($result->displayScores() as $category => $score) {
             $scores[] = PersonalityDiagnosisQuestions::categories()[$category].':'.($score ?? '—');
         }
-        $response = self::intakeResponseFor($result);
 
         $data = [
             '{{犬の名前}}' => (string) ($trainee?->name ?? ''),
             '{{タイプ}}' => $result->personality_type_label,
             '{{スコア}}' => implode(', ', $scores),
         ];
+        // 暮らしの様子の 4 問は、この診断の結果に保存した答え（2026-10-19 変更：4 問を愛犬性格診断へ移した。その前は、愛犬アンケートの
+        // 回答のうち診断の回答日以前でいちばん新しいもの〔なければいちばん新しいもの〕を探して使っていた）
         foreach (self::LIFE_COLUMNS as $placeholder => $column) {
-            $data[$placeholder] = (string) ($response?->{$column} ?? '');
+            $data[$placeholder] = (string) ($result->{$column} ?? '');
         }
 
         return $data;
-    }
-
-    /**
-     * 使う愛犬アンケートの回答：その診断の回答日以前でいちばん新しい回答。なければいちばん新しい回答。どちらもなければ null
-     */
-    public static function intakeResponseFor(TraineePersonalityDiagnosisResult $result): ?TraineeIntakeSurveyResponse
-    {
-        $query = fn () => TraineeIntakeSurveyResponse::query()
-            ->where('trainee_id', $result->trainee_id)
-            ->orderByDesc('answered_at')
-            ->orderByDesc('id');
-
-        return $query()->where('answered_at', '<=', $result->answered_at)->first() ?? $query()->first();
     }
 }

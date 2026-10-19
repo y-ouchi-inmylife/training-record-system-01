@@ -152,6 +152,39 @@ class PersonalityDiagnosisQuestions
     }
 
     /**
+     * 暮らしの様子の自由記述 4 問（列名 → 短い呼び名・設問文）。50 問のあとにこの並びで出す（2026-10-19 に愛犬アンケートから移した。
+     * トレーナーさんの元の Google フォームでは性格診断の一部で、50 問と同じ順）。設問文は Google フォームの文面のまま。
+     * 回答の画面（S-1415）・愛犬性格診断詳細（S-0313）・AI の下書き（PersonalityEvaluationPrompt）から使う、ただ 1 つの置き場所。
+     * どれも任意・2,000 文字以内。例文は持たない（お客様の回答を例文に誘導してしまうおそれがあるため）
+     *
+     * @return array<string, array{label: string, question: string}>
+     */
+    public static function lifeQuestions(): array
+    {
+        return [
+            'wish' => [
+                'label' => 'こうなったらいいな',
+                'question' => '日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？',
+            ],
+            'recent_events' => [
+                'label' => '最近の様子',
+                'question' => '最近の様子で、ふと気になったことや、印象に残っている出来事があれば教えてください。',
+            ],
+            'ideal_days' => [
+                'label' => '理想の毎日',
+                'question' => 'これから一緒に、どんな楽しいことをしたいですか？『理想の毎日』を聞かせてください。',
+            ],
+            'health_concerns' => [
+                'label' => '体のこと',
+                'question' => '体のことで気になることや、お医者様から言われていることがあれば教えてください。',
+            ],
+        ];
+    }
+
+    /** 暮らしの様子の 4 問の上限の文字数（改行を含む。愛犬アンケートにあったときと同じ） */
+    public const LIFE_ANSWER_MAX_LENGTH = 2000;
+
+    /**
      * タイプ（値 → 表示名。db-schema.md 5-24.）
      *
      * @return array<string, string>

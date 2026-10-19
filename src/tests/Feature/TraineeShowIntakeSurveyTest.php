@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Trainee;
-use App\Models\TraineeIntakeSurveyResponse;
 use App\Models\Trainer;
+use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,12 +13,12 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニー詳細（S-0309）の暮らしの様子の欄（愛犬アンケートの回答）と、削除の確認の文言（2026-10 追加）。
+ * トレーニー詳細（S-0309）の愛犬アンケートまわりと、削除の確認の文言（2026-10 追加）。
  *
- * - 欄の見出しは「暮らしの様子」。状態の文字・日付は出さない（2026-10 変更。案内の状態は会員詳細のボタンで
- *   分かるため）。未発行・回答待ちのときは、本文に「（未回答）」とだけ出す
- * - 欄はカードに id="intake-survey" と scroll-margin-top を付ける（会員詳細の「暮らしの様子」のリンクの飛び先）
- * - 発行・表示・取消のボタン・取消モーダル・欄の中の完了メッセージは置かない（操作は会員詳細だけ）
+ * - 暮らしの様子の欄（愛犬アンケートの回答の自由記述 4 欄）は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移し、診断ごとの答えは
+ *   愛犬性格診断詳細 S-0313 で見る。その前は見出し「暮らしの様子」の欄〔id="intake-survey"〕に最新の回答の 4 問を出していた）。
+ *   愛犬アンケートの回答の基本情報も出さない（トレーニーの基本情報に反映済み）
+ * - 発行・表示・取消のボタン・取消モーダル・完了メッセージは置かない（操作は会員詳細だけ）
  * - 削除の確認：計測値の文の後ろに、回答があれば回答の文、未回答の案内があれば案内の文をこの順で足し、
  *   最後を「このトレーニーを削除しますか？」で締める（どちらもないときは今までの文のまま）
  *
@@ -90,27 +90,6 @@ class TraineeShowIntakeSurveyTest extends TestCase
         ], $attributes));
     }
 
-    /**
-     * 愛犬アンケートの欄（カード）の HTML だけを取り出す。画面上部のトレーニーの情報（名前・犬種など）と
-     * 見分けるため、確かめる範囲を欄の中に絞る。欄のすぐ後ろは計測値のモーダル
-     */
-    private function intakeCard(string $html): string
-    {
-        $start = strpos($html, 'id="intake-survey"');
-        $this->assertNotFalse($start);
-        $card = substr($html, $start);
-        // 暮らしの様子の欄はいちばん下の欄（2026-10 変更：性格診断の欄を上に移した）。次に来るのはモーダル
-        // （性格診断の削除確認・50 問の回答、計測値）なので、その手前まで
-        $ends = array_filter([
-            strpos($card, 'data-personality-diagnosis-delete'),
-            strpos($card, 'data-personality-diagnosis-answers'),
-            strpos($card, 'id="measurementModal-'),
-        ]);
-        $this->assertNotEmpty($ends);
-
-        return substr($card, 0, min($ends));
-    }
-
     private function addMeasurements(int $count): void
     {
         for ($i = 1; $i <= $count; $i++) {
@@ -128,14 +107,34 @@ class TraineeShowIntakeSurveyTest extends TestCase
         return $m[1];
     }
 
-    public function test_回答済みなら見出しが暮らしの様子の欄にidとscroll_margin_topを付ける(): void
+    /** 暮らしの様子の欄（と愛犬アンケートの回答の中身）が画面にないこと（2026-10-19 変更） */
+    private function assertNoLifeCard(string $html): void
     {
-        $this->addResponse();
+        $this->assertStringNotContainsString('id="intake-survey"', $html);
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('data-intake-survey-answers', $html);
+        $this->assertStringNotContainsString('●', $html);
+        foreach (PersonalityDiagnosisQuestions::lifeQuestions() as $question) {
+            $this->assertStringNotContainsString($question['question'], $html);
+        }
+    }
 
+    public function test_未発行でも回答待ちでも回答済みでも暮らしの様子の欄は出さない(): void
+    {
+        $this->assertNoLifeCard($this->get(route('trainees.show', $this->trainee))->assertOk()->getContent());
+
+        $this->issueToken();
+        $this->assertNoLifeCard($this->get(route('trainees.show', $this->trainee))->assertOk()->getContent());
+
+        DB::table('trainee_intake_survey_tokens')->update(['answered_at' => '2026-10-16 14:32:00']);
+        $this->addResponse('2026-10-16 14:32:00', ['breed' => 'トイプードル']);
         $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
-        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">暮らしの様子<\/h6>\s*<\/div>/u', $html);
+        $this->assertNoLifeCard($html);
+        // 回答の基本情報も出さない（画面上部はトレーニーの値）。状態の文字・回答日時も出さない
+        $this->assertStringNotContainsString('トイプードル', $html);
+        $this->assertStringNotContainsString('2026/10/16', $html);
+        $this->assertStringNotContainsString('回答済み', $html);
+        $this->assertNoOperations($html);
     }
 
     /** 欄（と画面全体）に操作のボタン・取消モーダルがないこと */
@@ -146,66 +145,6 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertStringNotContainsString('案内を表示', $html);
         $this->assertStringNotContainsString('intakeSurveyCancelModal', $html);
         $this->assertStringNotContainsString(route('trainee-intake-survey-tokens.store', $this->trainee), $html);
-    }
-
-    /**
-     * 回答がないときの欄：見出し「暮らしの様子」と、本文に「（未回答）」の 1 行だけ（2026-10 変更）。
-     * 設問文・「●」・状態の文字・発行日・会員詳細への案内は出さない。id と scroll-margin-top は回答済みと同じ
-     */
-    private function assertUnansweredCard(string $html): void
-    {
-        $this->assertStringContainsString('<div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">', $html);
-        $card = $this->intakeCard($html);
-        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">暮らしの様子<\/h6>\s*<\/div>\s*<div class="card-body">\s*<p class="mb-0 text-muted">（未回答）<\/p>\s*<\/div>/u', $card);
-        $this->assertSame(1, substr_count($card, '（未回答）'));
-        $this->assertStringNotContainsString('data-intake-survey-answers', $card);
-        $this->assertStringNotContainsString('●', $card);
-        foreach (TraineeIntakeSurveyResponse::questions() as $question) {
-            $this->assertStringNotContainsString($question['question'], $card);
-        }
-        // 「愛犬アンケート」は削除の確認の文（「発行済みの愛犬アンケートの案内も…」）には出るため、欄の中で確かめる
-        $this->assertStringNotContainsString('愛犬アンケート', $card);
-        $this->assertStringNotContainsString('未発行', $html);
-        $this->assertStringNotContainsString('愛犬アンケートの案内はまだ発行していません。', $html);
-        $this->assertStringNotContainsString('回答待ち', $html);
-        $this->assertStringNotContainsString('2026/10/15', $html);
-        $this->assertStringNotContainsString('会員詳細から行えます', $html);
-    }
-
-    public function test_未発行なら見出しと未回答だけを出す(): void
-    {
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertUnansweredCard($html);
-        $this->assertNoOperations($html);
-    }
-
-    public function test_回答待ちなら見出しと未回答だけを出す(): void
-    {
-        $this->issueToken();
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertUnansweredCard($html);
-        $this->assertNoOperations($html);
-    }
-
-    public function test_回答済みなら状態の文字と回答日時を出さない(): void
-    {
-        $this->issueToken('2026-10-16 14:32:00');
-        $this->addResponse();
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-        $card = $this->intakeCard($html);
-
-        $this->assertStringNotContainsString('愛犬アンケート', $card);
-        $this->assertStringNotContainsString('回答済み', $card);
-        $this->assertStringNotContainsString('2026/10/16', $card);
-        $this->assertStringNotContainsString('14:32', $card);
-        $this->assertStringNotContainsString('会員詳細から行えます', $card);
-        // 本文は自由記述から始まる
-        $this->assertMatchesRegularExpression('/<div class="card-body">\s*<dl class="mb-0" data-intake-survey-answers>/u', $card);
-        $this->assertNoOperations($html);
     }
 
     public function test_欄の中に完了メッセージは出さない(): void
@@ -346,89 +285,6 @@ class TraineeShowIntakeSurveyTest extends TestCase
         $this->assertSame('愛犬アンケートの回答と愛犬性格診断の結果も一緒に削除されます。発行済みの愛犬アンケートの案内と愛犬性格診断の案内も使えなくなります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
     }
 
-    // ---- 回答の内容（2026-10 追加。設計書 S-0309「愛犬アンケートの欄」） ----
-
-    public function test_回答済みでも基本情報の回答は欄に出さない(): void
-    {
-        // 基本情報の回答はトレーニーの基本情報に反映済みで、画面上部と重なるため出さない（2026-10 変更）
-        $this->trainee->update(['breed' => '柴']);
-        $this->addResponse('2026-10-16 14:32:00', [
-            'name' => 'モモ', 'breed' => 'トイプードル', 'sex' => 'female',
-            'birth_year' => 2022, 'birth_month' => 3, 'neuter_status' => 'unknown',
-            'wish' => '留守番中に鳴き続けてしまうのを直したい',
-        ]);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-        $card = $this->intakeCard($html);
-
-        foreach (['名前', '犬種', '性別', '誕生日', '去勢・避妊'] as $label) {
-            $this->assertStringNotContainsString('>'.$label.'<', $card, $label);
-        }
-        $this->assertStringNotContainsString('トイプードル', $card);
-        $this->assertStringNotContainsString('女の子', $card);
-        $this->assertStringNotContainsString('2022年3月生まれ', $card);
-        $this->assertStringNotContainsString('data-intake-survey-basics', $card);
-        // 画面上部のトレーニーの情報は今までどおり出る（欄の外）
-        $this->assertStringContainsString('柴', substr($html, 0, strpos($html, 'id="intake-survey"')));
-    }
-
-    public function test_自由記述は設問文の先頭に読み上げない印を付け回答の対で改行を保持し答えなかった設問は未回答(): void
-    {
-        $this->addResponse('2026-10-16 14:32:00', [
-            'wish' => "留守番中に鳴き続けてしまう\nのを直したい",
-            'ideal_days' => 'ドッグランで遊びたい',
-        ]);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $questions = TraineeIntakeSurveyResponse::questions();
-        $q = fn (string $column) => preg_quote($questions[$column]['question'], '/');
-        // 設問文の先頭の「●」は回答画面（S-1413）と同じ作り（aria-hidden で読み上げない。d-flex でぶら下げ）
-        $dt = fn (string $column) => '<dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●<\/span><span>'.$q($column).'<\/span><\/dt>';
-        $this->assertMatchesRegularExpression('/'.$dt('wish').'\s*<dd class="mb-3" style="white-space: pre-wrap;">留守番中に鳴き続けてしまう\nのを直したい<\/dd>/u', $html);
-        $this->assertMatchesRegularExpression('/'.$dt('recent_events').'\s*<dd class="mb-3 text-muted">（未回答）<\/dd>/u', $html);
-        $this->assertMatchesRegularExpression('/'.$dt('ideal_days').'\s*<dd class="mb-3" style="white-space: pre-wrap;">ドッグランで遊びたい<\/dd>/u', $html);
-        $this->assertMatchesRegularExpression('/'.$dt('health_concerns').'\s*<dd class="mb-0 text-muted">（未回答）<\/dd>/u', $html);
-        // 「●」は 4 問の設問文にだけ付ける（回答の行には付けない）。例文は出さない
-        $this->assertSame(4, substr_count($html, '●'));
-        $this->assertStringNotContainsString('例：', $html);
-    }
-
-    public function test_回答の内容は愛犬アンケートの欄の中に出し編集や削除の操作は置かない(): void
-    {
-        $this->addResponse('2026-10-16 14:32:00', ['breed' => 'トイプードル']);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-        $card = $this->intakeCard($html);
-
-        $this->assertStringContainsString('data-intake-survey-answers', $card);
-        $this->assertStringNotContainsString('<button', $card);
-        $this->assertStringNotContainsString('<form', $card);
-    }
-
-    public function test_回答がなければ回答の内容は出さない(): void
-    {
-        $this->issueToken();
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertStringNotContainsString('data-intake-survey-basics', $html);
-        $this->assertStringNotContainsString('data-intake-survey-answers', $html);
-        // 暮らしの様子の欄の「（未回答）」は本文の 1 行だけ（性格診断の欄にも「（未回答）」があるので、欄の中で数える）
-        $this->assertSame(1, substr_count($this->intakeCard($html), '（未回答）'));
-    }
-
-    public function test_回答が複数件あれば最新の1件を出す(): void
-    {
-        $this->addResponse('2026-10-16 14:32:00', ['wish' => '古い回答']);
-        $this->addResponse('2026-10-18 09:05:00', ['wish' => '新しい回答']);
-
-        $html = $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-
-        $this->assertStringContainsString('>新しい回答</dd>', $html);
-        $this->assertStringNotContainsString('古い回答', $html);
-    }
-
     // ---- 削除の確認：公開済みの評価文（2026-10-18 追加。要件定義書 6-16-4・6-16-16。2026-10-18 変更：その前は
     //      結果から作ったトレーニング記録が残ることの文） ----
 
@@ -472,19 +328,6 @@ class TraineeShowIntakeSurveyTest extends TestCase
     }
 
     // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
-
-    public function test_回答が2件あれば最新の回答を出し答え直しの案内があっても前回の答えを出す(): void
-    {
-        $this->addResponse('2026-10-01 09:00:00', ['wish' => '古い答え']);
-        $this->addResponse('2026-10-10 09:00:00', ['wish' => '新しい答え']);
-        $this->issueToken();
-
-        $card = $this->intakeCard($this->get(route('trainees.show', $this->trainee))->assertOk()->getContent());
-
-        $this->assertStringContainsString('新しい答え', $card);
-        $this->assertStringNotContainsString('古い答え', $card);
-        $this->assertStringContainsString('data-intake-survey-answers', $card);
-    }
 
     public function test_削除の確認_回答が2件でも文は今までどおり(): void
     {

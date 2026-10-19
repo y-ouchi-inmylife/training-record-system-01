@@ -904,7 +904,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $modal = substr($modal, 0, strpos($modal, '</div>', strpos($modal, 'modal-footer')) + 6);
         $this->assertStringContainsString('<h5 class="modal-title" id="personality-diagnosis-draft-confirm-label">AIで下書き</h5>', $modal);
         $this->assertStringContainsString('<p class="mb-0">評価文とスタッフ用メモを、AIの下書きで置き換えます。よろしいですか？</p>', $modal);
-        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える<\/button>/u', $modal);
+        // ［キャンセル］は灰色の塗り（2026-10-19 変更：この画面のほかの確認のモーダルの［キャンセル］とそろえた。その前は赤の枠線）
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="button" class="btn btn-primary" data-evaluation-draft-replace>置き換える<\/button>/u', $modal);
+        $this->assertStringNotContainsString('btn-outline-danger', $modal);
         // お知らせは評価文のカードの上（最初は出さない）
         $this->assertStringContainsString('<div class="alert d-none" role="status" data-evaluation-draft-notice></div>', $html);
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-evaluation'), strpos($html, 'data-evaluation-draft-notice'));
@@ -915,5 +917,71 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringContainsString('AIの下書きを入れました。内容を確かめて、評価文とスタッフ用メモをそれぞれ［更新］で保存してください。', $html);
         $this->assertStringContainsString('スタッフ用メモは作れませんでした。', $html);
         $this->assertStringContainsString('AIの下書きを作れませんでした。時間をおいてもう一度お試しください。', $html);
+    }
+
+    public function test_確かめのモーダルのキャンセルはどれも灰色の塗り(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+        $this->markPublished($result);
+        $this->actingAsRole('admin');
+
+        $html = $this->page($result);
+
+        // 画面の確認のモーダル（削除〔管理者だけ〕・公開取消・AIで下書き）の［キャンセル］は、すべて同じ見た目
+        preg_match_all('/<button type="button" class="([^"]*)" data-bs-dismiss="modal">キャンセル<\/button>/u', $html, $m);
+        $this->assertGreaterThanOrEqual(3, count($m[1]));
+        $this->assertSame(array_fill(0, count($m[1]), 'btn btn-secondary'), $m[1]);
+    }
+
+    // ---- 暮らしの様子の欄（2026-10-19 追加。要件定義書 6-16-13、設計書 S-0313「暮らしの様子の欄」） ----
+
+    /** 暮らしの様子の欄（カードの始まりから、評価文のお知らせの手前まで） */
+    private function lifeCard(string $html): string
+    {
+        $start = strpos($html, 'data-personality-diagnosis-life');
+        $this->assertNotFalse($start);
+        $card = substr($html, $start);
+
+        return substr($card, 0, strpos($card, 'data-evaluation-draft-notice'));
+    }
+
+    public function test_暮らしの様子の欄は結果の欄と評価文の欄のあいだにその診断の4問を出し空は未回答(): void
+    {
+        $other = $this->addResult('past-2', '2026-10-01 10:30:00');
+        $other->update(['recent_events' => '別の診断の答え', 'wish' => '別の診断の悩み']);
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+        $result->update(['wish' => "引っ張らずに歩きたい\n吠えないでほしい", 'recent_events' => '', 'ideal_days' => null, 'health_concerns' => '膝のこと']);
+
+        $html = $this->page($result);
+
+        // 並び：結果 → 暮らしの様子 → 評価文（AI の下書きのお知らせを含む）→ スタッフ用メモ
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-life'), strpos($html, '<h6 class="mb-0">結果</h6>'));
+        $this->assertLessThan(strpos($html, 'data-evaluation-draft-notice'), strpos($html, 'data-personality-diagnosis-life'));
+        $this->assertLessThan(strpos($html, 'data-personality-diagnosis-evaluation'), strpos($html, 'data-personality-diagnosis-life'));
+        $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-life'));
+
+        $card = $this->lifeCard($html);
+        $this->assertMatchesRegularExpression('/<div class="card-header">\s*<h6 class="mb-0">暮らしの様子<\/h6>\s*<\/div>/u', $card);
+        $questions = PersonalityDiagnosisQuestions::lifeQuestions();
+        $dt = fn (string $column) => '<dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●<\/span><span>'.preg_quote($questions[$column]['question'], '/').'<\/span><\/dt>';
+        $this->assertMatchesRegularExpression('/'.$dt('wish').'\s*<dd class="mb-3" style="white-space: pre-wrap;" data-life-answer="wish">引っ張らずに歩きたい\n吠えないでほしい<\/dd>/u', $card);
+        $this->assertMatchesRegularExpression('/'.$dt('recent_events').'\s*<dd class="mb-3 text-muted" data-life-answer="recent_events">（未回答）<\/dd>/u', $card);
+        $this->assertMatchesRegularExpression('/'.$dt('ideal_days').'\s*<dd class="mb-3 text-muted" data-life-answer="ideal_days">（未回答）<\/dd>/u', $card);
+        $this->assertMatchesRegularExpression('/'.$dt('health_concerns').'\s*<dd class="mb-0" style="white-space: pre-wrap;" data-life-answer="health_concerns">膝のこと<\/dd>/u', $card);
+        $this->assertSame(4, substr_count($card, '●'));
+        // ほかの診断の答えは出さない。編集・削除の操作は置かない
+        $this->assertStringNotContainsString('別の診断', $html);
+        $this->assertStringNotContainsString('<button', $card);
+        $this->assertStringNotContainsString('<form', $card);
+    }
+
+    public function test_暮らしの様子に答えていない診断は4問とも未回答(): void
+    {
+        $result = $this->addResult('past-1', '2026-10-15 10:30:00');
+
+        $card = $this->lifeCard($this->page($result));
+
+        $this->assertSame(4, substr_count($card, '>（未回答）</dd>'));
+        $this->assertStringNotContainsString('pre-wrap', $card);
     }
 }

@@ -250,9 +250,9 @@ class Trainee extends Model
     public const CONTENT_RELATIONS = [
         'measurements',                 // 計測値（D-0800）
         'intakeSurveyTokens',           // 愛犬アンケートの案内（回答済み・未回答とも）
-        'intakeSurveyResponses',        // 愛犬アンケートの回答（暮らしの様子を含む）
+        'intakeSurveyResponses',        // 愛犬アンケートの回答（基本情報。2026-10-19 から暮らしの様子は愛犬性格診断の結果の側）
         'personalityDiagnosisTokens',   // 愛犬性格診断の案内（回答済み・未回答とも）
-        'personalityDiagnosisResults',  // 愛犬性格診断の結果（評価文を含む）
+        'personalityDiagnosisResults',  // 愛犬性格診断の結果（評価文・暮らしの様子を含む）
     ];
 
     /**
@@ -456,18 +456,6 @@ class Trainee extends Model
     }
 
     /**
-     * 暮らしの様子に文字が入っているか（2026-10-19 追加。会員詳細 S-0305 の暮らしの様子の「入力あり」／「入力なし」）。
-     * 最新の愛犬アンケートの回答のうち、暮らしの様子の自由記述のどれか 1 つにでも文字が入っているとき true
-     * （TraineeIntakeSurveyResponse::hasLifeAnswers()）。回答がないとき・すべて空のときは false。前の回答は見ない。
-     * 2026-10-19 変更：ユーザーレビューで、すべて空でも「入力あり」になっていたため。その前は最新の回答があるかで決めていた。
-     * 呼び出し側は latestIntakeSurveyResponse を eager load しておくこと（会員詳細でトレーニーごとに問い合わせを出さないため）
-     */
-    public function getHasIntakeLifeAnswersAttribute(): bool
-    {
-        return $this->latestIntakeSurveyResponse?->hasLifeAnswers() ?? false;
-    }
-
-    /**
      * 「愛犬アンケート＆愛犬性格診断」の案内が、2 つとも回答待ち（未回答で期限内）か（2026-10-19 追加）。
      * 会員詳細の「案内中」・マイページのお知らせで、2 つを 1 つの案内として出すときに使う。
      * 愛犬アンケートだけ答えたあとは false（残っている愛犬性格診断の案内は、単独の案内と同じに出す）。
@@ -484,7 +472,7 @@ class Trainee extends Model
      * （有効な案内あり → 回答待ち、なければ回答あり → 回答済み、どちらもない → 未発行）。
      * 2026-10-19 変更：回答したあとも案内を発行し直して答え直してもらえるようにしたため、有効な案内（答え直しの案内）が
      * あれば、回答があっても「回答待ち」にする（会員詳細の［表示］［取消］、マイページのお知らせのため）。
-     * その前は回答ありを先に見ていた。暮らしの様子を出すかどうかは、状態ではなく latestIntakeSurveyResponse の有無で見る
+     * その前は回答ありを先に見ていた
      *
      * 呼び出し側は latestIntakeSurveyResponse と activeIntakeSurveyToken を eager load しておくこと
      * （会員詳細でトレーニーごとに追加のクエリを出さないため）

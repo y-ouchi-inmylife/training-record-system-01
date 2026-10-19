@@ -62,10 +62,6 @@ class IntakeSurveyController extends Controller
         return view('client.intake-survey.show', [
             'token' => $token,
             'trainee' => $trainee,
-            'questions' => TraineeIntakeSurveyResponse::questions(),
-            // 前回の回答（最新の回答。なければ null）。暮らしの様子の 4 欄の初期値にする（2026-10-19 追加：回答したあとに
-            // 案内を発行し直したとき〔答え直し〕、前回の答えを見ながら直せるように。設計書 S-1413「初期値」）
-            'previousResponse' => $trainee->latestIntakeSurveyResponse,
             // 愛犬アンケート＆愛犬性格診断の案内なら、進み具合（1/2）を出す（2026-10-19 追加。続けて答える愛犬性格診断がまだ答えられるとき）
             'showProgress' => $this->nextPersonalityDiagnosisToken($tokenRecord) !== null,
         ]);
@@ -132,9 +128,6 @@ class IntakeSurveyController extends Controller
             ];
             foreach (['name', 'breed', 'sex', 'birth_year', 'birth_month', 'birth_day', 'neuter_status'] as $key) {
                 $response[$key] = $validated[$key] ?? null;
-            }
-            foreach (array_keys(TraineeIntakeSurveyResponse::questions()) as $column) {
-                $response[$column] = $validated[$column] ?? null;
             }
             TraineeIntakeSurveyResponse::query()->create($response);
 

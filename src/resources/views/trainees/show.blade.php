@@ -192,8 +192,8 @@
         </div>
     </div>
 
-    {{-- 性格診断の欄（2026-10 追加。要件定義書 6-16-2・6-16-13、設計書 S-0309「性格診断の欄」）。計測値の下・暮らしの様子の欄の上に置き、いつも出す
-         （2026-10 変更：当初は暮らしの様子の欄の下。ユーザーレビューで入れ替えた）。
+    {{-- 性格診断の欄（2026-10 追加。要件定義書 6-16-2・6-16-13、設計書 S-0309「性格診断の欄」）。計測値の下（いちばん下）に置き、いつも出す
+         （2026-10 変更：当初は暮らしの様子の欄の下。ユーザーレビューで入れ替えた。2026-10-19 に暮らしの様子の欄を外した）。
          - レーダーチャートを 1 つ（今回・前回・初回を重ねる。personality-radar.js）と、すべての回の結果の表を 1 つ出す。
            xl 以上はグラフが左・表が右、それより狭いときはグラフが上・表が下（2026-10 変更）
            （2026-10 変更：当初は回ごとに見出しの行・レーダーチャート・点数の表を並べ、開閉していた。回数が増えても欄が長くならない
@@ -207,7 +207,7 @@
            50 問の回答・評価文・結果の削除は S-0313 で行う（2026-10-18 変更：当初は各行の［回答］で 50 問の回答をモーダルで出し、
            管理者には各行の［削除］と確認モーダル S-0309-M01 を出していた）
          - 操作（発行・表示・取消）は置かない（会員詳細 S-0305 だけで行う）
-         - id="personality-diagnosis" と scroll-margin-top は、会員詳細の「性格診断」のリンクの飛び先にするため（暮らしの様子と同じ値） --}}
+         - id="personality-diagnosis" と scroll-margin-top は、会員詳細の「性格診断」のリンクの飛び先にするため（2026-10-19 に外した暮らしの様子の欄と同じ値） --}}
     @php
         $pdResults = $trainee->personalityDiagnosisResults;
         $pdCategories = \App\Support\PersonalityDiagnosisQuestions::categories();
@@ -297,56 +297,9 @@
         </div>
     </div>
 
-    {{-- 暮らしの様子の欄（愛犬アンケートの回答。2026-10 追加。要件定義書 6-16-2・6-16-10、設計書 S-0309
-         「暮らしの様子の欄」）。性格診断の欄の下（いちばん下）に置く（毎日使う計測値を上に残し、一度きりの回答は下に置くため。
-         2026-10 変更：当初は計測値のカードの下・性格診断の欄の上）。
-         - 欄は回答の中身（自由記述）を読むためのもの。案内の状態は会員詳細のボタンで分かるため、ここでは状態・日付を
-           出さず、回答がないとき（未発行・回答待ち）は本文に「（未回答）」とだけ出す（設問文は出さない。見た目は
-           回答済みの空欄の「（未回答）」と同じ text-muted）。2026-10 変更：当初は見出し「愛犬アンケート」の欄で、
-           状態の文字・発行日・回答日時と「案内の発行・取消は会員詳細から行えます。」を出していた。
-           見出しは回答画面（S-1413）の小見出しと同じ「暮らしの様子」で、回答の有無で変えない
-         - 回答がないときも、欄の id と scroll-margin-top は回答済みのときと同じに付ける（欄の作りを 1 つにそろえる）
-         - 発行・表示・取消のボタン、取消モーダル（S-0305-M06）は置かない。愛犬アンケート案内の操作は会員詳細
-           （S-0305）だけで行う（要件定義書 6-16-8 備考）
-         - 回答があるかは latestIntakeSurveyResponse（TraineeController::show で読み込み済み）があるかどうかで見る
-           （2026-10-19 変更：答え直しの案内を出している間〔状態は回答待ち〕も、前回の答えを出すため。その前は
-           Trainee::intake_survey_status が「回答済み」かどうかで見ていた）
-         - 自由記述 4 欄を、設問文（TraineeIntakeSurveyResponse::questions()。回答画面 S-1413 と共用）と回答の対で
-           出し、改行を保持する。設問文の先頭の「●」は S-1413 と同じ作り（aria-hidden="true" で読み上げでは読まず、
-           d-flex で折り返したときに 2 行目を「●」の右から始める）。回答の行には付けない。答えなかった設問は
-           「（未回答）」（§2-4 の例外。お客様が答えなかったこと自体が情報になるため）。編集・削除の操作は置かない
-         - 回答した基本情報（名前・犬種・性別・誕生日・去勢・避妊）は出さない：基本情報の回答はトレーニーの基本情報に
-           反映済みで、画面上部と重なるため。回答そのものは trainee_intake_survey_responses に残っている
-         - 回答が複数件あるとき（2026-10-19 から、答え直すと増える）は、最新の 1 件（latestIntakeSurveyResponse）だけを出す
-           （前回までの回答は残すが、画面には出さない）
-         - id="intake-survey" と scroll-margin-top は、会員詳細の「暮らしの様子」のリンクから飛ぶ先にするため（見出しを変えても
-           id は変えない）。scroll-margin-top はナビゲーションバー（sticky-top）に隠れないための値で、ナビゲーション
-           バーの高さ 56px（Bootstrap の既定値から計算：上下の余白 0.5rem×2 ＋ 中身 40px。lg 以上）に
-           余白 16px を足した 72px（4.5rem） --}}
-    <div class="card mb-3" id="intake-survey" style="scroll-margin-top: 4.5rem;">
-        <div class="card-header">
-            <h6 class="mb-0">暮らしの様子</h6>
-        </div>
-        <div class="card-body">
-            @if($trainee->latestIntakeSurveyResponse !== null)
-                @php
-                    $intakeResponse = $trainee->latestIntakeSurveyResponse;
-                @endphp
-                <dl class="mb-0" data-intake-survey-answers>
-                    @foreach(\App\Models\TraineeIntakeSurveyResponse::questions() as $column => $question)
-                        <dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●</span><span>{{ $question['question'] }}</span></dt>
-                        @if(blank($intakeResponse->{$column}))
-                            <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }} text-muted">（未回答）</dd>
-                        @else
-                            <dd class="{{ $loop->last ? 'mb-0' : 'mb-3' }}" style="white-space: pre-wrap;">{{ $intakeResponse->{$column} }}</dd>
-                        @endif
-                    @endforeach
-                </dl>
-            @else
-                <p class="mb-0 text-muted">（未回答）</p>
-            @endif
-        </div>
-    </div>
+    {{-- 暮らしの様子の欄（愛犬アンケートの回答の自由記述 4 欄）は 2026-10-19 に外した（設計書 S-0309）。4 問を愛犬性格診断へ移し、
+         診断ごとの答えは愛犬性格診断詳細（S-0313）の「暮らしの様子」の欄で見る。その前は性格診断の欄の下（いちばん下）に、
+         最新の愛犬アンケートの回答の 4 問を出していた（id="intake-survey"。会員詳細の「暮らしの様子」のリンクの飛び先） --}}
 
     {{-- 計測値の登録・編集モーダル（登録・編集で共用。この画面だけで使う）。登録・編集・削除の後は
          S-0309 に戻る。ID を一意化した辞書形式の経緯は設計書 S-0309「計測値モーダル」参照。 --}}

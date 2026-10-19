@@ -100,10 +100,6 @@ class ClientIntakeSurveySubmitTest extends TestCase
             'birth_month' => '3',
             'birth_day' => '',
             'neuter_status' => 'unknown',
-            'wish' => "留守番中に鳴き続けてしまう\nのを直したい",
-            'recent_events' => '',
-            'ideal_days' => 'ドッグランで遊びたい',
-            'health_concerns' => null,
         ];
     }
 
@@ -130,10 +126,6 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertSame(3, $saved->birth_month);
         $this->assertNull($saved->birth_day);
         $this->assertSame('unknown', $saved->neuter_status);
-        $this->assertSame("留守番中に鳴き続けてしまう\nのを直したい", $saved->wish);
-        $this->assertNull($saved->recent_events);
-        $this->assertSame('ドッグランで遊びたい', $saved->ideal_days);
-        $this->assertNull($saved->health_concerns);
     }
 
     public function test_名前のほかに何も答えなくても送信できる(): void
@@ -272,14 +264,21 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertNull($trainee->birth_day);
     }
 
-    public function test_自由記述は反映しない(): void
+    public function test_暮らしの様子の4問を送っても受け取らずどこにも保存しない(): void
     {
+        // 2026-10-19 変更：4 問を愛犬性格診断へ移した。愛犬アンケートの回答の表にはもう列がなく（2026_10_19_000007）、
+        // 送られてきても検証も保存もしない（2,000 文字を超えていてもエラーにしない）
         $trainee = $this->traineeWithToken();
 
-        $this->submit(['wish' => 'こうなったらいい', 'health_concerns' => 'パテラ']);
+        $this->submit(['wish' => 'こうなったらいい', 'health_concerns' => 'パテラ', 'recent_events' => str_repeat('あ', 2001)])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('client-portal.intake-survey.thanks'));
 
-        // 自由記述はトレーニーのどの列にも入らない（2026-10 変更：以前は備考〔note〕が変わらないことで確かめていた。
-        // トレーニーの備考はなくした）
+        $saved = TraineeIntakeSurveyResponse::query()->sole();
+        foreach (['wish', 'recent_events', 'ideal_days', 'health_concerns'] as $column) {
+            $this->assertArrayNotHasKey($column, $saved->getAttributes());
+        }
+        // トレーニーのどの列にも入らない
         $row = json_encode(DB::table('trainees')->where('id', $trainee->id)->first(), JSON_UNESCAPED_UNICODE);
         $this->assertStringNotContainsString('こうなったらいい', $row);
         $this->assertStringNotContainsString('パテラ', $row);
@@ -411,86 +410,15 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->submit(['breed' => str_repeat('あ', 101)])->assertSessionHasErrors(['breed' => '犬種は100文字以内で入力してください。']);
     }
 
-    public function test_自由記述は2000文字以内で項目名は設問の短い呼び名(): void
+    public function test_誕生日の全角の数字を受け付ける(): void
     {
         $this->traineeWithToken();
 
-        $data = [];
-        foreach (array_keys(TraineeIntakeSurveyResponse::questions()) as $column) {
-            $data[$column] = str_repeat('あ', 2001);
-        }
-        $this->submit($data)->assertSessionHasErrors([
-            'wish' => 'こうなったらいいなは2000文字以内で入力してください。',
-            'recent_events' => '最近の様子は2000文字以内で入力してください。',
-            'ideal_days' => '理想の毎日は2000文字以内で入力してください。',
-            'health_concerns' => '体のことは2000文字以内で入力してください。',
-        ]);
-
-        $data = array_map(fn () => str_repeat('あ', 2000), $data);
-        $this->submit($data)->assertRedirect(route('client-portal.intake-survey.thanks'));
-    }
-
-    public function test_自由記述はCRLFの改行をLFに直してから数えるのでちょうど2000字なら受け付ける(): void
-    {
-        // ブラウザの maxlength は改行を 1 文字と数えるが、送信では CRLF（2 文字）になる。
-        // LF に直すと 2,000 字（改行 9 個を含む）、CRLF のままなら 2,009 字の文章
-        $this->traineeWithToken();
-        $text = implode("\r\n", array_fill(0, 10, str_repeat('あ', 199))).'あ';
-        $this->assertSame(2009, mb_strlen($text));
-        $this->assertSame(2000, mb_strlen(str_replace("\r\n", "\n", $text)));
-
-        $this->submit(['wish' => $text])->assertRedirect(route('client-portal.intake-survey.thanks'));
-
-        $saved = TraineeIntakeSurveyResponse::query()->sole()->wish;
-        $this->assertSame(2000, mb_strlen($saved));
-        $this->assertStringNotContainsString("\r", $saved);
-    }
-
-    public function test_自由記述はLFに直しても2001字ならエラー(): void
-    {
-        $this->traineeWithToken();
-        $text = implode("\r\n", array_fill(0, 10, str_repeat('あ', 199))).'ああ';
-
-        $this->submit(['wish' => $text])
-            ->assertSessionHasErrors(['wish' => 'こうなったらいいなは2000文字以内で入力してください。']);
-        $this->assertSame(0, TraineeIntakeSurveyResponse::query()->count());
-    }
-
-    public function test_自由記述の改行は4欄ともLFにそろえて保存しCRを残さない(): void
-    {
-        $this->traineeWithToken();
-
-        $this->submit([
-            'wish' => "1行目\r\n2行目",
-            'recent_events' => "CRだけ\r改行",
-            'ideal_days' => "混在\r\nCRLF\rCR\nLF",
-            'health_concerns' => "LFだけ\n改行",
-        ])->assertRedirect(route('client-portal.intake-survey.thanks'));
-
-        $saved = TraineeIntakeSurveyResponse::query()->sole();
-        $this->assertSame("1行目\n2行目", $saved->wish);
-        $this->assertSame("CRだけ\n改行", $saved->recent_events);
-        $this->assertSame("混在\nCRLF\nCR\nLF", $saved->ideal_days);
-        $this->assertSame("LFだけ\n改行", $saved->health_concerns);
-    }
-
-    public function test_改行を直しても誕生日の全角の数字の受け付けは変わらない(): void
-    {
-        $this->traineeWithToken();
-
-        $this->submit(['birth_year' => '２０２２', 'birth_month' => '３', 'wish' => "a\r\nb"])
+        $this->submit(['birth_year' => '２０２２', 'birth_month' => '３'])
             ->assertRedirect(route('client-portal.intake-survey.thanks'));
 
         $saved = TraineeIntakeSurveyResponse::query()->sole();
         $this->assertSame([2022, 3], [$saved->birth_year, $saved->birth_month]);
-        $this->assertSame("a\nb", $saved->wish);
-    }
-
-    public function test_項目名は設問の短い呼び名と食い違わない(): void
-    {
-        foreach (TraineeIntakeSurveyResponse::questions() as $column => $question) {
-            $this->assertSame($question['label'], __('validation.attributes.'.$column));
-        }
     }
 
     public function test_検証エラーで戻ったとき入力が残りトレーニーの値より優先される(): void
@@ -513,12 +441,11 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertMatchesRegularExpression('/data-birthday-part="year"[^>]*value="2022"/u', $html);
         // 空で送った名前は空のまま（トレーニーの名前に戻さない）
         $this->assertMatchesRegularExpression('/id="name" name="name" required maxlength="50" autocomplete="off"\s*value=""/u', $html);
-        $this->assertStringContainsString(">留守番中に鳴き続けてしまう\nのを直したい</textarea>", $html);
     }
 
     // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
 
-    public function test_答え直すとトレーニーの属性と暮らしの様子が新しい値になり前回の回答は残る(): void
+    public function test_答え直すとトレーニーの属性が新しい値になり前回の回答は残る(): void
     {
         $trainee = $this->traineeWithToken(['breed' => '柴犬', 'sex' => 'male']);
         // 前回の回答（前の案内で答えたもの）
@@ -529,7 +456,7 @@ class ClientIntakeSurveySubmitTest extends TestCase
         DB::table('trainee_intake_survey_responses')->insert([
             'trainee_id' => $trainee->id, 'trainee_intake_survey_token_id' => $previousTokenId,
             'answered_at' => '2026-10-10 09:00:00', 'name' => 'モモ', 'breed' => '柴犬', 'sex' => 'male',
-            'wish' => '前回の答え', 'ideal_days' => '前回の理想', 'created_at' => '2026-10-10 09:00:00', 'updated_at' => '2026-10-10 09:00:00',
+            'created_at' => '2026-10-10 09:00:00', 'updated_at' => '2026-10-10 09:00:00',
         ]);
 
         $this->submit($this->fullAnswer())->assertRedirect(route('client-portal.intake-survey.thanks'));
@@ -537,10 +464,9 @@ class ClientIntakeSurveySubmitTest extends TestCase
         // 回答は新しい行として増え、前回の回答は消えずに残る
         $responses = TraineeIntakeSurveyResponse::query()->orderBy('answered_at')->get();
         $this->assertCount(2, $responses);
-        $this->assertSame('前回の答え', $responses[0]->wish);
-        $this->assertSame('前回の理想', $responses[0]->ideal_days);
+        $this->assertSame('柴犬', $responses[0]->breed);
         $this->assertSame('2026-10-10 09:00:00', $responses[0]->answered_at->format('Y-m-d H:i:s'));
-        $this->assertSame("留守番中に鳴き続けてしまう\nのを直したい", $responses[1]->wish);
+        $this->assertSame('トイプードル', $responses[1]->breed);
         // 新しい答えが今の答え（最新の回答）
         $latest = $trainee->fresh()->latestIntakeSurveyResponse;
         $this->assertSame($responses[1]->id, $latest->id);

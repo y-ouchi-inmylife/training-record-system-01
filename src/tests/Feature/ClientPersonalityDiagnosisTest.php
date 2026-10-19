@@ -22,6 +22,8 @@ use Tests\TestCase;
  * - 回答の画面：見出し・説明文（愛犬の名前は使わない）・7 カテゴリの見出し・50 問の fieldset／legend・選択肢 6 つ・初期値なし
  * - 送信：採点して結果を保存し、案内を使い切りにして S-1416 へ。トレーニーは書き換えない
  * - 未回答・正しくない値・回答済み・取消済みのときは保存しない
+ * - 暮らしの様子の 4 問（2026-10-19 に愛犬アンケートから移した）：50 問のあとに出し、送信でその結果に保存する。どれも任意・2,000 文字以内。
+ *   初期値は空（50 問と同じく、答え直しでも前回の答えは入れない）
  */
 class ClientPersonalityDiagnosisTest extends TestCase
 {
@@ -85,10 +87,11 @@ class ClientPersonalityDiagnosisTest extends TestCase
         return $this->get(route('client-portal.personality-diagnosis.show', ['token' => self::TOKEN]))->assertOk()->getContent();
     }
 
-    private function submit(array $answers): TestResponse
+    /** @param  array<string, mixed>  $life  暮らしの様子の 4 問（列名 → 答え） */
+    private function submit(array $answers, array $life = []): TestResponse
     {
         return $this->from(route('client-portal.personality-diagnosis.show', ['token' => self::TOKEN]))
-            ->post(route('client-portal.personality-diagnosis.store', ['token' => self::TOKEN]), ['answers' => $answers]);
+            ->post(route('client-portal.personality-diagnosis.store', ['token' => self::TOKEN]), ['answers' => $answers] + $life);
     }
 
     // ---- 回答の画面 ----
@@ -254,6 +257,142 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $response->assertOk();
         $response->assertSee('この愛犬性格診断はご利用いただけません。お手数ですがトレーナーにお問い合わせください。');
         $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
+    }
+
+    // ---- 暮らしの様子の 4 問（2026-10-19 追加。愛犬アンケートから移した。設計書 S-1415「暮らしの様子」） ----
+
+    public function test_50問のあとに小見出し暮らしの様子と4問を出しプライバシーと送信の前に置く(): void
+    {
+        $this->issueToken();
+
+        $html = $this->showPage();
+
+        $heading = '<h2 class="fs-6 fw-bold mb-3 mt-4">暮らしの様子<span class="fw-normal small text-muted">（思いつくことをご自由にお書きください。）</span></h2>';
+        $this->assertSame(1, substr_count($html, $heading));
+        // 50 問（最後の Q50）のあと、送信の前
+        $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, $heading));
+        $positions = [];
+        foreach (PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question) {
+            // 設問の先頭の「●」は読み上げない。textarea（rows 4・2,000 文字以内）。どれも任意（required を付けない）
+            $this->assertStringContainsString('<label for="'.$column.'" class="form-label d-flex"><span class="me-1" aria-hidden="true">●</span><span>'.$question['question'].'</span></label>', $html);
+            $this->assertMatchesRegularExpression('/<textarea class="form-control\s*"\s+id="'.$column.'" name="'.$column.'" rows="4" maxlength="2000"><\/textarea>/u', $html);
+            $positions[] = strpos($html, 'id="'.$column.'"');
+        }
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions);
+        $this->assertGreaterThan(strpos($html, $heading), $positions[0]);
+        $this->assertLessThan(strpos($html, '<button type="submit" class="btn btn-primary">送信する</button>'), end($positions));
+        $this->assertSame(4, substr_count($html, '●'));
+        $this->assertStringNotContainsString(' required', substr($html, strpos($html, $heading)));
+        $this->assertStringNotContainsString('例：', $html);
+    }
+
+    public function test_答え直しでも暮らしの様子の初期値は空(): void
+    {
+        // 50 問と同じく、前回の結果の答えは入れない
+        TraineePersonalityDiagnosisResult::query()->create([
+            'trainee_id' => $this->trainee->id, 'answered_at' => '2026-10-01 09:00:00', 'question_version' => 'v1',
+            'answers' => $this->fixtureCase('all-zero')['answers'], 'score_people' => 0, 'score_dogs' => 0, 'score_possessiveness' => 0,
+            'score_separation' => 0, 'score_fear' => 0, 'score_trainability' => 0, 'score_excitability' => 0, 'personality_type' => 'calm',
+            'wish' => '前回の答え', 'health_concerns' => '前回の体のこと',
+        ]);
+        $this->issueToken();
+
+        $html = $this->showPage();
+
+        $this->assertSame(4, preg_match_all('/rows="4" maxlength="2000"><\/textarea>/u', $html));
+        $this->assertStringNotContainsString('前回の答え', $html);
+        $this->assertStringNotContainsString('前回の体のこと', $html);
+        $this->assertStringNotContainsString('checked', $html);
+    }
+
+    public function test_送信で4問をその結果に保存し空や空白だけはnullで改行はLFにそろえる(): void
+    {
+        $this->issueToken();
+
+        $this->submit($this->fixtureCase('past-1')['answers'], [
+            'wish' => "留守番中に鳴き続けてしまう\r\nのを直したい",
+            'recent_events' => '',
+            'ideal_days' => "混在\r\nCRLF\rCR\nLF",
+            'health_concerns' => '   ',
+        ])->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
+
+        $result = TraineePersonalityDiagnosisResult::query()->sole();
+        $this->assertSame("留守番中に鳴き続けてしまう\nのを直したい", $result->wish);
+        $this->assertNull($result->recent_events);
+        $this->assertSame("混在\nCRLF\nCR\nLF", $result->ideal_days);
+        $this->assertNull($result->health_concerns);
+        // 50 問の採点は今までどおり
+        $this->assertSame($this->fixtureCase('past-1')['expected']['type'], $result->personality_type);
+    }
+
+    public function test_4問とも送らなくても送れて4列はnull(): void
+    {
+        $this->issueToken();
+
+        $this->submit($this->fixtureCase('all-zero')['answers'])->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
+
+        $result = TraineePersonalityDiagnosisResult::query()->sole();
+        foreach (array_keys(PersonalityDiagnosisQuestions::lifeQuestions()) as $column) {
+            $this->assertNull($result->{$column}, $column);
+        }
+        $this->assertFalse($result->hasLifeAnswers());
+    }
+
+    public function test_4問は2000文字以内で項目名は設問の短い呼び名(): void
+    {
+        $this->issueToken();
+        $answers = $this->fixtureCase('all-zero')['answers'];
+        $life = array_fill_keys(array_keys(PersonalityDiagnosisQuestions::lifeQuestions()), str_repeat('あ', 2001));
+
+        $this->submit($answers, $life)->assertSessionHasErrors([
+            'wish' => 'こうなったらいいなは2000文字以内で入力してください。',
+            'recent_events' => '最近の様子は2000文字以内で入力してください。',
+            'ideal_days' => '理想の毎日は2000文字以内で入力してください。',
+            'health_concerns' => '体のことは2000文字以内で入力してください。',
+        ]);
+        $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
+
+        $this->submit($answers, array_map(fn () => str_repeat('あ', 2000), $life))->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
+        $this->assertSame(2000, mb_strlen(TraineePersonalityDiagnosisResult::query()->sole()->wish));
+    }
+
+    public function test_4問はCRLFの改行をLFに直してから数える(): void
+    {
+        // ブラウザの maxlength は改行を 1 文字と数えるが、送信では CRLF（2 文字）になる。LF に直すと 2,000 字、CRLF のままなら 2,009 字
+        $this->issueToken();
+        $answers = $this->fixtureCase('all-zero')['answers'];
+        $text = implode("\r\n", array_fill(0, 10, str_repeat('あ', 199))).'あ';
+        $this->assertSame(2009, mb_strlen($text));
+
+        $this->submit($answers, ['wish' => $text.'あ'])->assertSessionHasErrors(['wish' => 'こうなったらいいなは2000文字以内で入力してください。']);
+        $this->submit($answers, ['wish' => $text])->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
+
+        $saved = TraineePersonalityDiagnosisResult::query()->sole()->wish;
+        $this->assertSame(2000, mb_strlen($saved));
+        $this->assertStringNotContainsString("\r", $saved);
+    }
+
+    public function test_項目名は設問の短い呼び名と食い違わない(): void
+    {
+        foreach (PersonalityDiagnosisQuestions::lifeQuestions() as $column => $question) {
+            $this->assertSame($question['label'], __('validation.attributes.'.$column));
+        }
+    }
+
+    public function test_未回答で戻ったとき4問の入力が残る(): void
+    {
+        $this->issueToken();
+        $answers = $this->fixtureCase('past-1')['answers'];
+        unset($answers['Q50']);
+
+        $response = $this->submit($answers, ['wish' => "1行目\n2行目", 'ideal_days' => 'ドッグラン']);
+
+        $html = $this->followRedirects($response)->getContent();
+        $this->assertStringContainsString('id="wish" name="wish" rows="4" maxlength="2000">'."1行目\n2行目".'</textarea>', $html);
+        $this->assertStringContainsString('id="ideal_days" name="ideal_days" rows="4" maxlength="2000">ドッグラン</textarea>', $html);
+        $this->assertStringContainsString('id="recent_events" name="recent_events" rows="4" maxlength="2000"></textarea>', $html);
     }
 
     // ---- 回答完了 ----

@@ -88,26 +88,19 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->actingAs($trainer, 'web');
     }
 
-    private function makeResult(array $scores = [], ?string $type = 'guardian', string $answeredAt = '2026-10-15 10:00:00', ?Trainee $trainee = null): TraineePersonalityDiagnosisResult
+    /** @param  array<string, string|null>  $life  暮らしの様子の 4 問（列名 → 答え。2026-10-19 から診断の結果に持つ） */
+    private function makeResult(array $scores = [], ?string $type = 'guardian', string $answeredAt = '2026-10-15 10:00:00', ?Trainee $trainee = null, array $life = []): TraineePersonalityDiagnosisResult
     {
         $attributes = [
             'trainee_id' => ($trainee ?? $this->trainee)->id, 'answered_at' => $answeredAt, 'question_version' => 'v1',
             'answers' => ['Q01' => 2], 'personality_type' => $type,
-        ];
+        ] + $life;
         $defaults = ['people' => '2.50', 'dogs' => '2.88', 'possessiveness' => '2.75', 'separation' => '2.00', 'fear' => '2.94', 'trainability' => '2.71', 'excitability' => '2.50'];
         foreach (array_merge($defaults, $scores) as $category => $score) {
             $attributes['score_'.$category] = $score;
         }
 
         return TraineePersonalityDiagnosisResult::query()->create($attributes);
-    }
-
-    private function intakeResponse(string $answeredAt, array $answers): void
-    {
-        DB::table('trainee_intake_survey_responses')->insert([
-            'trainee_id' => $this->trainee->id, 'answered_at' => $answeredAt, 'created_at' => $answeredAt, 'updated_at' => $answeredAt,
-            'name' => 'モモ', 'breed' => '柴犬', ...$answers,
-        ]);
     }
 
     /** 下書きを作るサービスを差し替える（$draft が例外なら失敗させる） */
@@ -137,8 +130,7 @@ class PersonalityEvaluationDraftTest extends TestCase
 
     public function test_データは名前とタイプとスコアと暮らしの様子の4問で会員の個人情報や犬種は入らない(): void
     {
-        $result = $this->makeResult(['dogs' => null]);
-        $this->intakeResponse('2026-10-10 09:00:00', [
+        $result = $this->makeResult(['dogs' => null], life: [
             'wish' => 'お留守番が上手になってほしい', 'recent_events' => '散歩で吠える', 'ideal_days' => 'ドッグランで遊びたい', 'health_concerns' => '膝が弱い',
         ]);
 
@@ -178,19 +170,44 @@ class PersonalityEvaluationDraftTest extends TestCase
         }
     }
 
-    public function test_使う回答は診断の日以前でいちばん新しいものでなければいちばん新しいもの(): void
+    public function test_暮らしの様子はその診断の結果の4問を使いほかの診断や愛犬アンケートの回答は使わない(): void
     {
-        $result = $this->makeResult(answeredAt: '2026-10-15 10:00:00');
-        $this->intakeResponse('2026-10-01 09:00:00', ['wish' => '古い答え']);
-        $this->intakeResponse('2026-10-15 10:00:00', ['wish' => '診断の日の答え']);
-        $this->intakeResponse('2026-10-18 09:00:00', ['wish' => '診断より後の答え']);
+        // 2026-10-19 変更：4 問を愛犬性格診断へ移し、その診断の結果に保存した答えを使う（その前は、愛犬アンケートの回答のうち
+        // 診断の日以前でいちばん新しいもの〔なければいちばん新しいもの〕を探して使っていた）
+        $older = $this->makeResult(answeredAt: '2026-10-01 09:00:00', life: ['wish' => '前の診断の答え', 'health_concerns' => '前の診断の体のこと']);
+        $result = $this->makeResult(answeredAt: '2026-10-15 10:00:00', life: ['wish' => 'この診断の答え', 'recent_events' => "1行目\n2行目"]);
+        $this->makeResult(answeredAt: '2026-10-18 09:00:00', life: ['wish' => '後の診断の答え', 'ideal_days' => '後の診断の理想']);
+        // 愛犬アンケートの回答（基本情報だけ。暮らしの様子の列はもうない）があっても使わない
+        DB::table('trainee_intake_survey_responses')->insert([
+            'trainee_id' => $this->trainee->id, 'answered_at' => '2026-10-14 09:00:00', 'name' => 'モモ', 'breed' => '柴犬',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
 
-        // 診断の日以前でいちばん新しい
-        $this->assertSame('診断の日の答え', PersonalityEvaluationPrompt::data($result)['{{悩み}}']);
+        $data = PersonalityEvaluationPrompt::data($result);
 
-        // 診断の日以前の回答がなければ、いちばん新しい回答
-        DB::table('trainee_intake_survey_responses')->where('answered_at', '<=', '2026-10-15 10:00:00')->delete();
-        $this->assertSame('診断より後の答え', PersonalityEvaluationPrompt::data($result)['{{悩み}}']);
+        $this->assertSame('この診断の答え', $data['{{悩み}}']);
+        $this->assertSame("1行目\n2行目", $data['{{背景}}']);
+        // この診断で答えなかった問いは空（ほかの診断の答えで埋めない）
+        $this->assertSame('', $data['{{理想}}']);
+        $this->assertSame('', $data['{{健康}}']);
+        $this->assertSame('前の診断の答え', PersonalityEvaluationPrompt::data($older)['{{悩み}}']);
+        $this->assertSame('前の診断の体のこと', PersonalityEvaluationPrompt::data($older)['{{健康}}']);
+    }
+
+    public function test_差し込みの印の説明は愛犬性格診断で答えた暮らしの様子の答え(): void
+    {
+        $placeholders = PersonalityEvaluationPrompt::placeholders();
+
+        $this->assertSame('この愛犬性格診断で答えた暮らしの様子の「こうなったらいいな」の答え', $placeholders['{{悩み}}']);
+        $this->assertSame('この愛犬性格診断で答えた暮らしの様子の「最近の様子」の答え', $placeholders['{{背景}}']);
+        $this->assertSame('この愛犬性格診断で答えた暮らしの様子の「理想の毎日」の答え', $placeholders['{{理想}}']);
+        $this->assertSame('この愛犬性格診断で答えた暮らしの様子の「体のこと」の答え', $placeholders['{{健康}}']);
+        $this->assertStringNotContainsString('愛犬アンケート', implode('', $placeholders));
+        // 設定画面（S-0602）にもこの説明が出る
+        $this->actingAsRole('admin');
+        $html = $this->get(route('settings.evaluation-prompts.edit'))->assertOk()->getContent();
+        $this->assertStringContainsString('この愛犬性格診断で答えた暮らしの様子の「こうなったらいいな」の答え', $html);
+        $this->assertStringNotContainsString('愛犬アンケート', $html);
     }
 
     // ---- 指示文 ----

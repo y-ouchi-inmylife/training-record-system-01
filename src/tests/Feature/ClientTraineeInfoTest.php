@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Trainee;
+use App\Support\PersonalityDiagnosisQuestions;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,10 +15,11 @@ use Tests\TestCase;
 /**
  * 会員の登録情報（S-1406）の「愛犬の情報」の欄と、愛犬の情報の変更（S-1417）（2026-10-18 追加。要件定義書 6-15-20）。
  *
- * - S-1406：自分の愛犬ごとのカード（マイページと同じ並び・呼び名）に、名前・犬種・性別・誕生日・去勢・避妊と
- *   暮らしの様子（愛犬アンケートの 4 問。見るだけ）。愛犬がいなければ欄を出さない。トレーニーの数でクエリが増えない
+ * - S-1406：自分の愛犬ごとのカード（マイページと同じ並び・呼び名）に、名前・犬種・性別・誕生日・去勢・避妊。
+ *   暮らしの様子は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移した。その前は愛犬アンケートの 4 問を見るだけで出していた）。
+ *   愛犬がいなければ欄を出さない。トレーニーの数でクエリが増えない
  * - S-1417：今の値を入れて開き、保存すると登録情報に戻って完了メッセージ。入力のきまりは愛犬アンケートと同じ。
- *   暮らしの様子・写真・最終更新者は変えない。操作の記録は残さない。ほかの会員の愛犬は 403、ログインしていなければログインの画面へ
+ *   愛犬アンケートの回答・写真・最終更新者は変えない。操作の記録は残さない。ほかの会員の愛犬は 403、ログインしていなければログインの画面へ
  */
 class ClientTraineeInfoTest extends TestCase
 {
@@ -98,14 +100,6 @@ class ClientTraineeInfoTest extends TestCase
         return array_combine($m[1], $m[2]);
     }
 
-    /** カードの暮らしの様子（設問 => 回答の dd の HTML） */
-    private function lifeAnswers(string $card): array
-    {
-        preg_match_all('/<dt class="fw-normal text-muted d-flex"><span class="me-1" aria-hidden="true">●<\/span><span>(.*?)<\/span><\/dt>\s*(<dd.*?<\/dd>)/su', $card, $m);
-
-        return array_combine($m[1], $m[2]);
-    }
-
     private function update(int $traineeId, array $data, ?Client $client = null)
     {
         return $this->actingAs($client ?? $this->client, 'client')->put(route('client-portal.trainees.update', $traineeId), $data);
@@ -160,37 +154,25 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertStringContainsString('<a href="'.route('client-portal.trainees.edit', $id).'" class="btn btn-primary">アイちゃんの情報を変更</a>', $card);
     }
 
-    public function test_暮らしの様子は4問の設問と最新の回答を出し答えていない問いは未回答(): void
+    public function test_暮らしの様子は出さず罫線は項目の間だけ(): void
     {
+        // 2026-10-19 変更：4 問を愛犬性格診断へ移した（その前はカードの下に愛犬アンケートの 4 問と答えを出していた）
         $id = $this->trainee('アイ', self::FULL);
-        $this->answer($id, ['wish' => '古い回答'], '2026-10-01 09:00:00');
-        $this->answer($id, ['wish' => "引っ張らずに歩きたい\n吠えないでほしい", 'recent_events' => null, 'ideal_days' => '', 'health_concerns' => '膝のこと']);
+        $this->answer($id, ['breed' => 'マルチーズ']);
 
-        $answers = $this->lifeAnswers($this->cards($this->profile())[0]);
+        $html = $this->profile();
+        $card = $this->cards($html)[0];
 
-        $this->assertSame([
-            '日々の暮らしの中で、もっとこうなったらいいな、と感じることはありますか？',
-            '最近の様子で、ふと気になったことや、印象に残っている出来事があれば教えてください。',
-            'これから一緒に、どんな楽しいことをしたいですか？『理想の毎日』を聞かせてください。',
-            '体のことで気になることや、お医者様から言われていることがあれば教えてください。',
-        ], array_keys($answers));
-        $answers = array_values($answers);
-        $this->assertSame('<dd class="mb-3" style="white-space: pre-wrap;">引っ張らずに歩きたい'."\n".'吠えないでほしい</dd>', $answers[0]);
-        $this->assertSame('<dd class="mb-3 text-muted">（未回答）</dd>', $answers[1]);
-        $this->assertSame('<dd class="mb-3 text-muted">（未回答）</dd>', $answers[2]);
-        $this->assertSame('<dd class="mb-0" style="white-space: pre-wrap;">膝のこと</dd>', $answers[3]);
-    }
-
-    public function test_愛犬アンケートに答えていない愛犬も基本情報を出し暮らしの様子は4問とも未回答(): void
-    {
-        $this->trainee('アイ', self::FULL);
-
-        $card = $this->cards($this->profile())[0];
-
-        $this->assertSame('アイ', $this->items($card)['名前']);
-        $answers = $this->lifeAnswers($card);
-        $this->assertCount(4, $answers);
-        $this->assertSame(4, substr_count(implode('', $answers), '（未回答）'));
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('●', $html);
+        $this->assertStringNotContainsString('<dl', $card);
+        foreach (PersonalityDiagnosisQuestions::lifeQuestions() as $question) {
+            $this->assertStringNotContainsString($question['question'], $html);
+        }
+        // 項目は 5 つで、罫線は項目の間の 4 本（最後の去勢・避妊の下には引かない）
+        $this->assertCount(5, $this->items($card));
+        $this->assertSame(4, substr_count($card, 'class="py-3 border-bottom"'));
+        $this->assertMatchesRegularExpression('/<div class="pt-3">\s*<div class="text-muted small mb-1">去勢・避妊<\/div>/u', $card);
     }
 
     public function test_ほかの会員の愛犬は出さない(): void
@@ -227,11 +209,11 @@ class ClientTraineeInfoTest extends TestCase
         };
 
         $id = $this->trainee('アイ', self::FULL);
-        $this->answer($id, ['wish' => 'a']);
+        $this->answer($id, []);
         $one = $count();
 
         foreach (['アムロ', 'ハナ', 'モモ'] as $name) {
-            $this->answer($this->trainee($name, self::FULL), ['wish' => 'b']);
+            $this->answer($this->trainee($name, self::FULL), []);
         }
         $this->assertCount(4, $this->cards($this->profile()));
         $this->assertSame($one, $count());
@@ -351,17 +333,16 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertSame(0, preg_match_all('/\schecked>/', $html));
     }
 
-    public function test_暮らしの様子と写真は送っても変えない(): void
+    public function test_愛犬アンケートの回答と写真は送っても変えない(): void
     {
         $id = $this->trainee('アイ', self::FULL + ['photo_path' => 'trainees/1/photo.jpg']);
-        $this->answer($id, ['wish' => '元の回答']);
+        $this->answer($id, ['breed' => '元の犬種']);
 
         $this->update($id, array_merge(self::FULL, ['name' => 'アイ', 'wish' => '書き換え', 'health_concerns' => '書き換え', 'photo_path' => null, 'client_id' => 999]))
             ->assertRedirect(route('client-portal.profile.show'));
 
         $response = DB::table('trainee_intake_survey_responses')->sole();
-        $this->assertSame('元の回答', $response->wish);
-        $this->assertNull($response->health_concerns);
+        $this->assertSame('元の犬種', $response->breed);
         $trainee = Trainee::query()->find($id);
         $this->assertSame('trainees/1/photo.jpg', $trainee->photo_path);
         $this->assertSame($this->client->id, (int) $trainee->client_id);
