@@ -7,10 +7,16 @@ use App\Models\SystemSetting;
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\Trainer;
+use App\Services\EvaluationDraft\ClaudeEvaluationDraftGenerator;
 use App\Services\EvaluationDraft\EvaluationDraft;
 use App\Services\EvaluationDraft\EvaluationDraftFailedException;
 use App\Services\EvaluationDraft\EvaluationDraftGenerator;
 use App\Services\EvaluationDraft\PersonalityEvaluationPrompt;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +95,28 @@ class PersonalityEvaluationDraftTest extends TestCase
     }
 
     /** @param  array<string, string|null>  $life  自由記述の質問（4 問）（列名 → 答え。2026-10-19 から診断の結果に持つ） */
+    /**
+     * HTTP の送り手を差し替えた Claude の実装と、送った要求の記録（外部の AI は呼ばない）
+     *
+     * @return array{0: ClaudeEvaluationDraftGenerator, 1: \ArrayObject}
+     */
+    private function fakeClaude(string $text): array
+    {
+        config(['services.anthropic.api_key' => 'test-key', 'services.anthropic.model' => 'claude-test']);
+        $requests = new \ArrayObject;
+        $stack = HandlerStack::create(new MockHandler([
+            new Response(200, ['Content-Type' => 'application/json'], json_encode([
+                'id' => 'msg_test', 'type' => 'message', 'role' => 'assistant', 'model' => 'claude-test',
+                'content' => [['type' => 'text', 'text' => $text]],
+                'stop_reason' => 'end_turn', 'stop_sequence' => null,
+                'usage' => ['input_tokens' => 10, 'output_tokens' => 20],
+            ])),
+        ]));
+        $stack->push(Middleware::history($requests));
+
+        return [new ClaudeEvaluationDraftGenerator(new GuzzleClient(['handler' => $stack])), $requests];
+    }
+
     private function makeResult(array $scores = [], ?string $type = 'guardian', string $answeredAt = '2026-10-15 10:00:00', ?Trainee $trainee = null, array $life = []): TraineePersonalityDiagnosisResult
     {
         $attributes = [
@@ -235,7 +263,8 @@ class PersonalityEvaluationDraftTest extends TestCase
         $draft = EvaluationDraft::fromResponse("\n  お客様用の文\n\n#####\n　スタッフ用の文\n##### 続き\n");
 
         $this->assertSame('お客様用の文', $draft->evaluation);
-        $this->assertSame("スタッフ用の文\n##### 続き", $draft->staffMemo);
+        // 2 つめの「##### 」は区切りでなく見出しの記号として後始末で外れる（2026-10-19 変更：その前は「##### 続き」のまま）
+        $this->assertSame("スタッフ用の文\n続き", $draft->staffMemo);
         $this->assertFalse($draft->staffMemoMissing);
     }
 
@@ -253,6 +282,88 @@ class PersonalityEvaluationDraftTest extends TestCase
         $this->expectException(EvaluationDraftFailedException::class);
 
         EvaluationDraft::fromResponse(" \n　");
+    }
+
+    // ---- 念のための後始末（2026-10-19 追加：AI が Markdown の記号で書き、会員様の画面に記号が出てしまうため） ----
+
+    public function test_後始末で見出しと太字と区切り線と箇条書きの記号が外れる(): void
+    {
+        $this->assertSame(
+            "【見出し】\n見出し2\n小見出し\n深い見出し\n本文の太字と2つめの太字です。\n\n・項目1\n・項目2\n  ・字下げした項目\n・太字の項目\n終わり",
+            EvaluationDraft::stripMarkdown(
+                "# 【見出し】\n## 見出し2\n### 小見出し\n######　深い見出し\n本文の**太字**と**2つめの太字**です。\n---\n\n- 項目1\n* 項目2\n  - 字下げした項目\n- **太字の項目**\n***\n___\n- - -\n終わり"
+            )
+        );
+    }
+
+    public function test_後始末は文の中の普通の記号を壊さない(): void
+    {
+        $text = "3*4=12、2-1=1、A-B の対比です。\n#タグ風の文（空白なし）\n文中の # や * や - はそのまま\n**閉じていない太字\n-- 2 つだけの線\n・もとから中黒の項目\n「#####」の話";
+
+        $this->assertSame($text, EvaluationDraft::stripMarkdown($text));
+    }
+
+    public function test_区切りで分けてから後始末をしてそれぞれ前後の空白を取る(): void
+    {
+        $draft = EvaluationDraft::fromResponse("## お客様用レポート\n**モモちゃん**は慎重派です。\n- 散歩を楽しむ\n---\n#####\n## スタッフ用メモ\n* 吠えに注意\n");
+
+        $this->assertSame("お客様用レポート\nモモちゃんは慎重派です。\n・散歩を楽しむ", $draft->evaluation);
+        $this->assertSame("スタッフ用メモ\n・吠えに注意", $draft->staffMemo);
+        $this->assertFalse($draft->staffMemoMissing);
+
+        // 区切りがないときも全部に後始末をする
+        $draft = EvaluationDraft::fromResponse("# 見出し\n- 項目\n");
+        $this->assertSame("見出し\n・項目", $draft->evaluation);
+        $this->assertTrue($draft->staffMemoMissing);
+    }
+
+    // ---- Claude に渡すもの（2026-10-19 追加。SDK の HTTP の送り手を差し替え、外部の AI は呼ばない） ----
+
+    public function test_書式の決まりはsystemに入りユーザーの発言は今までどおりの指示文(): void
+    {
+        $result = $this->makeResult();
+        [$generator, $requests] = $this->fakeClaude("## 見出し\n**お客様用**\n#####\n- スタッフ用");
+
+        $draft = $generator->generate($result);
+
+        $body = json_decode((string) $requests[0]['request']->getBody(), true);
+        $this->assertSame(PersonalityEvaluationPrompt::FORMAT_RULES, $body['system']);
+        $this->assertSame([['role' => 'user', 'content' => PersonalityEvaluationPrompt::render($result)]], $body['messages']);
+        $this->assertStringStartsWith('ドッグトレーナーとして、', $body['messages'][0]['content']);
+        $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $body['messages'][0]['content']);
+        $this->assertStringNotContainsString('プレーンテキスト', $body['messages'][0]['content']);
+        // 長さの上限は今のまま
+        $this->assertSame(3000, $body['max_tokens']);
+        // 返事は分けてから後始末される
+        $this->assertSame("見出し\nお客様用", $draft->evaluation);
+        $this->assertSame('・スタッフ用', $draft->staffMemo);
+    }
+
+    public function test_設定画面で指示文を変えてもsystemの書式の決まりは付く(): void
+    {
+        $result = $this->makeResult();
+        SystemSetting::query()->create(['key' => 'evaluation_prompt_current', 'value' => '{{犬の名前}}のレポートを書いてください。']);
+        [$generator, $requests] = $this->fakeClaude('お客様用');
+
+        $generator->generate($result);
+
+        $body = json_decode((string) $requests[0]['request']->getBody(), true);
+        $this->assertSame(PersonalityEvaluationPrompt::FORMAT_RULES, $body['system']);
+        $this->assertSame([['role' => 'user', 'content' => 'モモのレポートを書いてください。']], $body['messages']);
+    }
+
+    public function test_書式の決まりの文(): void
+    {
+        $this->assertSame(
+            "次の決まりを必ず守ってください。\n"
+            ."・出力は普通の文章（プレーンテキスト）で書き、Markdown の記号（#、*、**、-、---、>、表など）は使わないでください。\n"
+            ."・見出しが必要なときは「【】」で囲んでください。\n"
+            ."・箇条書きが必要なときは、行の頭に「・」を付けてください。\n"
+            .'・お客様用レポートとスタッフ用メモの区切りの「#####」だけは、そのまま出力してください。',
+            PersonalityEvaluationPrompt::FORMAT_RULES
+        );
+        // 既定の指示文（トレーナーさんの文）には混ぜない
+        $this->assertStringNotContainsString('次の決まりを必ず守ってください。', PersonalityEvaluationPrompt::DEFAULT_TEMPLATE);
     }
 
     // ---- 下書きのルート ----

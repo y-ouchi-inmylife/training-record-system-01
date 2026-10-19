@@ -24,6 +24,7 @@ class EvaluationPromptController extends Controller
         return view('settings.evaluation-prompts', [
             'currentPrompt' => PersonalityEvaluationPrompt::template(),
             'placeholders' => PersonalityEvaluationPrompt::placeholders(),
+            'formatRules' => PersonalityEvaluationPrompt::FORMAT_RULES,
         ]);
     }
 

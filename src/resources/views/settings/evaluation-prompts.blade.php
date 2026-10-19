@@ -54,6 +54,13 @@
                     <div class="form-text text-muted" id="evaluation-prompt-char-counter" style="max-width: 700px;"></div>
                 </div>
             </form>
+
+            {{-- 書式の決まり（2026-10-19 追加）。指示文とは別に毎回 AI に渡す決まりを読むだけで出す。フォームの外に置き、保存・離脱の確認の対象にしない --}}
+            <section class="mb-3" style="max-width: 700px;" aria-labelledby="evaluation-format-rules-heading" data-evaluation-format-rules>
+                <p class="fw-bold mb-1" id="evaluation-format-rules-heading">書式の決まり</p>
+                <p class="small text-muted mb-2">次の書式の決まりは、指示文とは別に毎回 AI に渡します。ここでは変更できません。</p>
+                <div class="border rounded bg-light p-3 small" style="white-space: pre-wrap;" data-evaluation-format-rules-text>{{ $formatRules }}</div>
+            </section>
         </div>
     </div>
 </div>

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SystemSetting;
 use App\Models\Trainer;
+use App\Services\EvaluationDraft\PersonalityEvaluationPrompt;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\CreatesClientCountTables;
@@ -58,6 +59,15 @@ class EvaluationPromptSettingsTest extends TestCase
         // 「評価文」とは呼ばない（2026-10-19 変更：アドバイスと呼ぶことにした。画面の題・メニュー・案内とも）
         $this->assertStringNotContainsString('評価文', $html);
         $this->assertStringContainsString('<title>愛犬性格診断のアドバイスのプロンプト', $html);
+        // 書式の決まりを読むだけで出す（2026-10-19 追加。フォームの外。入力欄にしない）
+        $this->assertStringContainsString('<p class="fw-bold mb-1" id="evaluation-format-rules-heading">書式の決まり</p>', $html);
+        $this->assertStringContainsString('<p class="small text-muted mb-2">次の書式の決まりは、指示文とは別に毎回 AI に渡します。ここでは変更できません。</p>', $html);
+        $this->assertStringContainsString('data-evaluation-format-rules-text>'.e(PersonalityEvaluationPrompt::FORMAT_RULES).'</div>', $html);
+        $form = substr($html, strpos($html, '<form id="evaluationPromptForm"'));
+        $form = substr($form, 0, strpos($form, '</form>'));
+        $this->assertStringNotContainsString('次の決まりを必ず守ってください。', $form);
+        $this->assertSame(1, substr_count($html, '<textarea'));
+        $this->assertGreaterThan(strpos($html, '</form>'), strpos($html, 'data-evaluation-format-rules'));
         // メニューの要約プロンプトのすぐ下
         $this->assertMatchesRegularExpression('/>要約プロンプト<\\/a><\\/li>\\s*<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断のアドバイスのプロンプト<\\/a><\\/li>/u', $html);
     }

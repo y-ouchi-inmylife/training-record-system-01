@@ -6,6 +6,7 @@ use Anthropic\Client;
 use App\Models\TraineePersonalityDiagnosisResult;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
+use Psr\Http\Client\ClientInterface;
 
 /**
  * Claude（Anthropic）でアドバイスとスタッフ用メモを自動生成する（2026-10-19 追加。EvaluationDraftGenerator の実装。2026-10-19 変更：呼び名を「下書き」から変えた）。
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Log;
  *   時間切れを付けた Guzzle を transporter として渡す
  * - 再試行しない（maxRetries 0。費用のため。SDK の既定は 2 回まで再試行する）
  * - 出す長さの上限（maxTokens）は 3000（お客様用 800 字＋スタッフ用 300 字の日本語が切れずに収まる量）
+ * - 書式の決まり（PersonalityEvaluationPrompt::FORMAT_RULES。Markdown の記号を使わない）を system に入れ、指示文はユーザーの発言で渡す
+ *   （2026-10-19 追加：AI が Markdown の記号で書き、会員様の画面に記号が出てしまうため）
  * - ログ（laravel.log）には、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけを残す。
  *   送った文・返ってきた文・名前は残さない。失敗のときはエラーの内容を残す
  */
@@ -26,6 +29,9 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
 
     /** 待ち時間の上限（秒） */
     public const TIMEOUT_SECONDS = 60;
+
+    /** @param  ClientInterface|null  $transporter  HTTP の送り手（テストで差し替える。null なら時間切れを付けた Guzzle） */
+    public function __construct(private readonly ?ClientInterface $transporter = null) {}
 
     public function generate(TraineePersonalityDiagnosisResult $result): EvaluationDraft
     {
@@ -42,12 +48,13 @@ class ClaudeEvaluationDraftGenerator implements EvaluationDraftGenerator
             $client = new Client(apiKey: $apiKey, requestOptions: [
                 'maxRetries' => 0,
                 'timeout' => self::TIMEOUT_SECONDS,
-                'transporter' => new GuzzleClient(['timeout' => self::TIMEOUT_SECONDS, 'connect_timeout' => 10]),
+                'transporter' => $this->transporter ?? new GuzzleClient(['timeout' => self::TIMEOUT_SECONDS, 'connect_timeout' => 10]),
             ]);
             $response = $client->messages->create(
                 maxTokens: self::MAX_TOKENS,
                 messages: [['role' => 'user', 'content' => $prompt]],
                 model: $model,
+                system: PersonalityEvaluationPrompt::FORMAT_RULES,
             );
         } catch (\Throwable $e) {
             Log::error('アドバイスのAI自動生成：呼び出しに失敗しました', [
