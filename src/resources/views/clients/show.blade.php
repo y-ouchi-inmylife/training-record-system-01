@@ -589,7 +589,7 @@
                                      （［表示］［取消］）にまとめた。1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで。
                                      - $activeSurveys：回答待ちの案内（未回答で期限内）。前の決まりで出した案内が残っていると 2 つあることがあり、
                                        そのときは「案内中」の行を 2 つ出す（愛犬アンケート → 愛犬性格診断の順）。1 つでもあれば［案内を発行］は出さない
-                                     - 期限の日は expires_at から n/j。期限が空（期限を付ける前に発行した案内）なら日を出さない
+                                     - 期限の日は出さない（2026-10-19 変更：ユーザーレビューで要らないことになった。その前は「（10/26まで）」を出していた）
                                      - activeIntakeSurveyToken・activePersonalityDiagnosisToken は ClientController::show で先読み済み
                                      経緯：その前は、名前の行の右に［愛犬アンケートの案内を発行］（回答済みのときは白抜き）または
                                      ［愛犬アンケートの案内を表示］［取消］、愛犬性格診断の行の右に［案内を発行］または［案内を表示］［取消］を置いていた --}}
@@ -598,7 +598,6 @@
                                     if ($trainee->activeIntakeSurveyToken !== null) {
                                         $activeSurveys[] = [
                                             'name' => __('messages.intake_survey_name'),
-                                            'expiresAt' => $trainee->activeIntakeSurveyToken->expires_at,
                                             'printUrl' => route('trainee-intake-survey-tokens.print', $trainee),
                                             'cancelModal' => '#intakeSurveyCancelModal',
                                             'cancelAttribute' => 'data-intake-survey-trainee-id',
@@ -607,7 +606,6 @@
                                     if ($trainee->activePersonalityDiagnosisToken !== null) {
                                         $activeSurveys[] = [
                                             'name' => __('messages.personality_diagnosis_name'),
-                                            'expiresAt' => $trainee->activePersonalityDiagnosisToken->expires_at,
                                             'printUrl' => route('trainee-personality-diagnosis-tokens.print', $trainee),
                                             'cancelModal' => '#personalityDiagnosisCancelModal',
                                             'cancelAttribute' => 'data-personality-diagnosis-trainee-id',
@@ -709,10 +707,10 @@
                                     </div>
                                 @endif
                                 {{-- 「案内中」の行（2026-10-19 追加。回答待ちの案内があるときだけ）。欄のいちばん下に、上に区切り線を引いて出す。
-                                     属性の並び（dl.row）と同じ col-4／col-8 で組み、ラベルの列に小見出し「案内中」、値の列に種類と期限の日
-                                     （「愛犬アンケート（10/26まで）」。期限が空なら日を出さない）と、右に［表示］（白抜きの青。ご案内の画面を同じタブで
-                                     開く）［取消］（白抜きの赤。今の取消の確認 M06・M07 を開く）。2 つあれば値の列に 2 段で出す。
-                                     幅が足りないときは、ボタンのまとまりが次の行に回って右寄せ（flex-wrap・ms-auto） --}}
+                                     属性の並び（dl.row）と同じ col-4／col-8 で組み、ラベルの列に小見出し「案内中」、値の列に種類の名前
+                                     （期限の日は出さない。2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）と、右に［表示］（白抜きの青。ご案内の画面を
+                                     同じタブで開く）［取消］（白抜きの赤。今の取消の確認 M06・M07 を開く）。2 つあれば値の列に 2 段で出す。
+                                     ボタンのまとまりは、幅が足りれば種類の名前と同じ行の右、足りないときは次の行に回って右寄せ（flex-wrap・ms-auto） --}}
                                 @if($activeSurveys !== [])
                                     <div class="row small mt-2 pt-2 border-top" role="group"
                                          aria-label="{{ $trainee->display_name }}の案内中の案内" data-survey-in-progress>
@@ -720,7 +718,7 @@
                                         <div class="col-8">
                                             @foreach($activeSurveys as $survey)
                                                 <div class="d-flex flex-wrap align-items-center gap-2 @if(! $loop->first) mt-1 @endif" data-survey-in-progress-item>
-                                                    <span>{{ $survey['name'] }}@if($survey['expiresAt'])（{{ $survey['expiresAt']->format('n/j') }}まで）@endif</span>
+                                                    <span>{{ $survey['name'] }}</span>
                                                     <div class="d-flex flex-wrap justify-content-end gap-2 ms-auto">
                                                         <a href="{{ $survey['printUrl'] }}" class="btn btn-sm btn-outline-primary text-nowrap"
                                                            aria-label="{{ $survey['name'] }}の案内を表示">表示</a>

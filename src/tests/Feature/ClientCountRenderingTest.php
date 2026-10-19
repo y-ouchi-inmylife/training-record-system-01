@@ -1691,7 +1691,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, substr_count($html, '>暮らしの様子</a>'));
     }
 
-    public function test_回答待ちがあれば案内を発行を出さず案内中の行に種類と期限の日と表示と取消を出す(): void
+    public function test_回答待ちがあれば案内を発行を出さず案内中の行に種類の名前と表示と取消を出し期限の日は出さない(): void
     {
         $this->travelTo(Carbon::parse('2026-10-20 10:00:00'));
         $this->fakeMediaDisk();
@@ -1705,9 +1705,12 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
         $row = $this->inProgressRow($html, 'ポチ');
         $this->assertNotNull($row);
-        // 欄のいちばん下に区切り線つきで、ラベルの列に「案内中」、値の列に種類と期限の日と［表示］［取消］
+        // 欄のいちばん下に区切り線つきで、ラベルの列に「案内中」、値の列に種類の名前と［表示］［取消］
+        // （期限つきの案内でも期限の日は出さない。2026-10-19 変更：その前は「愛犬アンケート（10/26まで）」）
         $this->assertMatchesRegularExpression('/<div class="row small mt-2 pt-2 border-top" role="group"\s*aria-label="ポチの案内中の案内" data-survey-in-progress>\s*<div class="col-4 fw-bold">案内中<\/div>/u', $html);
-        $this->assertStringContainsString('<span>愛犬アンケート（10/26まで）</span>', $row);
+        $this->assertStringContainsString('<span>愛犬アンケート</span>', $row);
+        $this->assertStringNotContainsString('まで）', $row);
+        $this->assertStringNotContainsString('10/26', $row);
         $this->assertMatchesRegularExpression(
             '/<a href="'.preg_quote(route('trainee-intake-survey-tokens.print', $id), '/').'" class="btn btn-sm btn-outline-primary text-nowrap"\s*aria-label="愛犬アンケートの案内を表示">表示<\/a>\s*'
             .'<button type="button" class="btn btn-sm btn-outline-danger text-nowrap"\s*data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"\s*'
@@ -1719,7 +1722,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertGreaterThan(strpos($html, 'data-personality-diagnosis-row'), strpos($html, 'data-survey-in-progress'));
     }
 
-    public function test_期限が空の案内は案内中の行に日を出さない(): void
+    public function test_期限が空の案内も案内中の行は期限つきと同じ見た目(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1752,7 +1755,8 @@ class ClientCountRenderingTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(2, substr_count($row, 'data-survey-in-progress-item'));
         // 愛犬アンケート → 愛犬性格診断の順
-        $this->assertLessThan(strpos($row, '<span>愛犬性格診断（10/25まで）</span>'), strpos($row, '<span>愛犬アンケート</span>'));
+        $this->assertLessThan(strpos($row, '<span>愛犬性格診断</span>'), strpos($row, '<span>愛犬アンケート</span>'));
+        $this->assertStringNotContainsString('まで）', $row);
         $this->assertSame(2, substr_count($row, '>表示</a>'));
         $this->assertSame(2, substr_count($row, '>取消</button>'));
         $this->assertStringNotContainsString('data-survey-issue-trainee-id="'.$id.'"', $html);
