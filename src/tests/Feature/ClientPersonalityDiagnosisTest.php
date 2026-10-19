@@ -22,7 +22,7 @@ use Tests\TestCase;
  * - 回答の画面：見出し・説明文（愛犬の名前は使わない）・7 カテゴリの見出し・50 問の fieldset／legend・選択肢 6 つ・初期値なし
  * - 送信：採点して結果を保存し、案内を使い切りにして S-1416 へ。トレーニーは書き換えない
  * - 未回答・正しくない値・回答済み・取消済みのときは保存しない
- * - 暮らしの様子の 4 問（2026-10-19 に愛犬アンケートから移した）：50 問のあとに出し、送信でその結果に保存する。どれも任意・2,000 文字以内。
+ * - 自由記述の質問（4 問）（2026-10-19 に愛犬アンケートから移した）：50 問のあとに出し、送信でその結果に保存する。どれも任意・2,000 文字以内。
  *   初期値は空（50 問と同じく、答え直しでも前回の答えは入れない）
  */
 class ClientPersonalityDiagnosisTest extends TestCase
@@ -87,7 +87,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
         return $this->get(route('client-portal.personality-diagnosis.show', ['token' => self::TOKEN]))->assertOk()->getContent();
     }
 
-    /** @param  array<string, mixed>  $life  暮らしの様子の 4 問（列名 → 答え） */
+    /** @param  array<string, mixed>  $life  自由記述の質問（4 問）（列名 → 答え） */
     private function submit(array $answers, array $life = []): TestResponse
     {
         return $this->from(route('client-portal.personality-diagnosis.show', ['token' => self::TOKEN]))
@@ -259,7 +259,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
     }
 
-    // ---- 暮らしの様子の 4 問（2026-10-19 追加。愛犬アンケートから移した。設計書 S-1415「暮らしの様子」） ----
+    // ---- 自由記述の質問（4 問）（2026-10-19 追加。愛犬アンケートから移した。設計書 S-1415「自由記述の質問」） ----
 
     /**
      * 50 問のあと・4 問の前の区切りの線と文（2026-10-19 変更：小見出し「暮らしの様子（思いつくことをご自由にお書きください。）」を、
@@ -327,7 +327,7 @@ class ClientPersonalityDiagnosisTest extends TestCase
         $this->assertStringContainsString('<legend class="fs-6 mb-3">テストの文。</legend>', $this->showPage());
     }
 
-    public function test_答え直しでも暮らしの様子の初期値は空(): void
+    public function test_答え直しでも自由記述の質問の初期値は空(): void
     {
         // 50 問と同じく、前回の結果の答えは入れない
         TraineePersonalityDiagnosisResult::query()->create([

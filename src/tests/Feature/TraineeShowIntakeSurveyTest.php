@@ -15,7 +15,7 @@ use Tests\TestCase;
 /**
  * トレーニー詳細（S-0309）の愛犬アンケートまわりと、削除の確認の文言（2026-10 追加）。
  *
- * - 暮らしの様子の欄（愛犬アンケートの回答の自由記述 4 欄）は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移し、診断ごとの答えは
+ * - 自由記述の質問の欄（愛犬アンケートの回答の自由記述 4 欄）は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移し、診断ごとの答えは
  *   愛犬性格診断詳細 S-0313 で見る。その前は見出し「暮らしの様子」の欄〔id="intake-survey"〕に最新の回答の 4 問を出していた）。
  *   愛犬アンケートの回答の基本情報も出さない（トレーニーの基本情報に反映済み）
  * - 発行・表示・取消のボタン・取消モーダル・完了メッセージは置かない（操作は会員詳細だけ）
@@ -107,7 +107,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         return $m[1];
     }
 
-    /** 暮らしの様子の欄（と愛犬アンケートの回答の中身）が画面にないこと（2026-10-19 変更） */
+    /** 自由記述の質問の欄（と愛犬アンケートの回答の中身）が画面にないこと（2026-10-19 変更） */
     private function assertNoLifeCard(string $html): void
     {
         $this->assertStringNotContainsString('id="intake-survey"', $html);
@@ -119,7 +119,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
         }
     }
 
-    public function test_未発行でも回答待ちでも回答済みでも暮らしの様子の欄は出さない(): void
+    public function test_未発行でも回答待ちでも回答済みでも自由記述の質問の欄は出さない(): void
     {
         $this->assertNoLifeCard($this->get(route('trainees.show', $this->trainee))->assertOk()->getContent());
 

@@ -288,7 +288,7 @@ class ClientIntakeSurveyShowTest extends TestCase
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*trainee-birthday-input[^"]*\.js"/u', $html);
     }
 
-    public function test_暮らしの様子の4問は出さない(): void
+    public function test_自由記述の質問の4問は出さない(): void
     {
         // 2026-10-19 変更：4 問を愛犬性格診断（S-1415）へ移した。愛犬アンケートは基本情報（名前・犬種・性別・誕生日・去勢・避妊）だけ
         $this->traineeWithToken('モモ');
@@ -453,8 +453,8 @@ class ClientIntakeSurveyShowTest extends TestCase
 
     public function test_答え直しの画面は今のトレーニーの値を最初から入れる(): void
     {
-        // 前回の回答の基本情報ではなく、今のトレーニーの値を入れる（2026-10-19 変更：暮らしの様子を愛犬性格診断へ移したので、
-        // 前回の回答から入れる欄はなくなった。その前は暮らしの様子の 4 欄に前回の答えを入れていた）
+        // 前回の回答の基本情報ではなく、今のトレーニーの値を入れる（2026-10-19 変更：自由記述の質問を愛犬性格診断へ移したので、
+        // 前回の回答から入れる欄はなくなった。その前は自由記述の質問の 4 欄に前回の答えを入れていた）
         $trainee = $this->traineeWithToken('モモ', null, ['breed' => '柴犬']);
         DB::table('trainee_intake_survey_responses')->insert([
             ['trainee_id' => $trainee->id, 'answered_at' => '2026-10-10 09:00:00', 'breed' => '前回の犬種',

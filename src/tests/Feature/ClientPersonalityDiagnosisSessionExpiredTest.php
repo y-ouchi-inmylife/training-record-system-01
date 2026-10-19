@@ -103,7 +103,7 @@ class ClientPersonalityDiagnosisSessionExpiredTest extends TestCase
         $this->assertSame(0, TraineePersonalityDiagnosisResult::query()->count());
     }
 
-    public function test_時間切れなら暮らしの様子の4問の答えも入れたまま出し直す(): void
+    public function test_時間切れなら自由記述の質問の4問の答えも入れたまま出し直す(): void
     {
         // 2026-10-19 追加：4 問を愛犬アンケートから移した。文字列なら上限（2,000 文字）までを戻し、文字列でない値は戻さない
         $this->issueToken();

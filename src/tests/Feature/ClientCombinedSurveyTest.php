@@ -94,7 +94,7 @@ class ClientCombinedSurveyTest extends TestCase
         return $this->post(route('client-portal.intake-survey.store', ['token' => self::INTAKE]), ['name' => 'モモ']);
     }
 
-    /** @param  array<string, string>  $life  暮らしの様子の 4 問（列名 → 答え） */
+    /** @param  array<string, string>  $life  自由記述の質問（4 問）（列名 → 答え） */
     private function submitPersonality(array $life = [])
     {
         $json = json_decode(file_get_contents(__DIR__.'/../fixtures/personality-diagnosis-cases.json'), true, 512, JSON_THROW_ON_ERROR);
@@ -117,7 +117,7 @@ class ClientCombinedSurveyTest extends TestCase
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち1つ目：</span>', $html);
         $this->assertStringContainsString('<span>愛犬アンケート＆愛犬性格診断</span>', $html);
         $this->assertLessThan(strpos($html, '<h1 class="mb-2">愛犬アンケート</h1>'), strpos($html, 'data-survey-progress'));
-        // 1/2 の愛犬アンケートは基本情報だけ。暮らしの様子の 4 問は出さない（2026-10-19 変更：愛犬性格診断へ移した）
+        // 1/2 の愛犬アンケートは基本情報だけ。自由記述の質問（4 問）は出さない（2026-10-19 変更：愛犬性格診断へ移した）
         $this->assertStringNotContainsString('暮らしの様子', $html);
         $this->assertStringNotContainsString('<textarea', $html);
 
@@ -131,7 +131,7 @@ class ClientCombinedSurveyTest extends TestCase
         $this->assertStringContainsString('<p class="c-survey-progress" data-survey-progress="2/2">', $html);
         $this->assertStringContainsString('<span class="visually-hidden">2つのうち2つ目：</span>', $html);
         $this->assertStringContainsString('愛犬アンケートを受け付けました。続けて愛犬性格診断にお答えください。', $html);
-        // 2/2 の愛犬性格診断は 50 問のあとに、区切りの線・「以下の質問にお答えください。」と暮らしの様子の 4 問（2026-10-19 追加・変更）
+        // 2/2 の愛犬性格診断は 50 問のあとに、区切りの線・「以下の質問にお答えください。」と自由記述の質問（4 問）（2026-10-19 追加・変更）
         $this->assertSame(50, substr_count($html, '<fieldset class="mb-3" id="q-Q'));
         $this->assertGreaterThan(strpos($html, 'id="q-Q50"'), strpos($html, 'data-life-divider'));
         $this->assertGreaterThan(strpos($html, 'data-life-divider'), strpos($html, '<legend class="fs-6 mb-3">以下の質問にお答えください。</legend>'));
@@ -139,7 +139,7 @@ class ClientCombinedSurveyTest extends TestCase
         $this->assertStringNotContainsString('思いつくことをご自由にお書きください。', $html);
         $this->assertSame(4, substr_count($html, '<textarea'));
 
-        // 送信すると、今の愛犬性格診断の完了の画面。暮らしの様子の答えは愛犬性格診断の結果に保存する
+        // 送信すると、今の愛犬性格診断の完了の画面。自由記述の質問の答えは愛犬性格診断の結果に保存する
         $this->submitPersonality(['wish' => 'お留守番が上手になってほしい'])->assertRedirect(route('client-portal.personality-diagnosis.thanks'));
         $this->assertSame(1, DB::table('trainee_personality_diagnosis_results')->count());
         $this->assertSame('お留守番が上手になってほしい', DB::table('trainee_personality_diagnosis_results')->value('wish'));

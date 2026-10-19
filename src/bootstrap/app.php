@@ -98,7 +98,7 @@ return Application::configure(basePath: dirname(__DIR__))
                         $restored[$id] = (string) $value;
                     }
                 }
-                // 暮らしの様子の 4 問（2026-10-19 追加）：文字列なら上限までを戻す（保存はしない）
+                // 自由記述の質問（4 問）（2026-10-19 追加）：文字列なら上限までを戻す（保存はしない）
                 foreach (array_keys(\App\Support\PersonalityDiagnosisQuestions::lifeQuestions()) as $column) {
                     $value = $request->input($column);
                     if (is_string($value)) {

@@ -46,7 +46,7 @@ class PersonalityDiagnosisController extends Controller
     /**
      * トークンを確かめて、回答の画面（または使えない URL の画面）を返す。
      *
-     * @param  array<string, string>  $restoredAnswers  時間切れで出し直すときに選んだ状態に戻す回答（正しい値だけ。暮らしの様子の 4 問は列名のキー）
+     * @param  array<string, string>  $restoredAnswers  時間切れで出し直すときに選んだ状態に戻す回答（正しい値だけ。自由記述の質問（4 問）は列名のキー）
      * @param  bool  $expired  時間切れで出し直したか（画面の上に知らせを出す）
      */
     public static function showForm(string $token, array $restoredAnswers = [], bool $expired = false): View
@@ -63,7 +63,7 @@ class PersonalityDiagnosisController extends Controller
             'questionIdsByCategory' => PersonalityDiagnosisQuestions::questionIdsByCategory(),
             'questions' => PersonalityDiagnosisQuestions::questions(),
             'choices' => PersonalityDiagnosisQuestions::choices(),
-            // 暮らしの様子の 4 問（2026-10-19 に愛犬アンケートから移した。50 問のあとに出す）。初期値は空（50 問と同じく、
+            // 自由記述の質問（4 問）（2026-10-19 に愛犬アンケートから移した。50 問のあとに出す）。初期値は空（50 問と同じく、
             // 答え直しでも前回の答えは入れない）。時間切れで出し直すときは送られてきた答えを戻す（$restoredAnswers の列名のキー）
             'lifeQuestions' => PersonalityDiagnosisQuestions::lifeQuestions(),
             'restoredAnswers' => $restoredAnswers,
@@ -104,7 +104,7 @@ class PersonalityDiagnosisController extends Controller
                 'question_version' => PersonalityDiagnosisQuestions::VERSION,
                 'answers' => $answers,
                 ...$scorer->score($answers)->toResultAttributes(),
-                // 暮らしの様子の 4 問（2026-10-19 追加。その診断の結果に保存する）
+                // 自由記述の質問（4 問）（2026-10-19 追加。その診断の結果に保存する）
                 ...$lifeAnswers,
             ]);
 

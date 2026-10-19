@@ -250,9 +250,9 @@ class Trainee extends Model
     public const CONTENT_RELATIONS = [
         'measurements',                 // 計測値（D-0800）
         'intakeSurveyTokens',           // 愛犬アンケートの案内（回答済み・未回答とも）
-        'intakeSurveyResponses',        // 愛犬アンケートの回答（基本情報。2026-10-19 から暮らしの様子は愛犬性格診断の結果の側）
+        'intakeSurveyResponses',        // 愛犬アンケートの回答（基本情報。2026-10-19 から自由記述の質問は愛犬性格診断の結果の側）
         'personalityDiagnosisTokens',   // 愛犬性格診断の案内（回答済み・未回答とも）
-        'personalityDiagnosisResults',  // 愛犬性格診断の結果（評価文・暮らしの様子を含む）
+        'personalityDiagnosisResults',  // 愛犬性格診断の結果（評価文・自由記述の質問を含む）
     ];
 
     /**

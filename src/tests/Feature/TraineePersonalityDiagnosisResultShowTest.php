@@ -933,10 +933,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertSame(array_fill(0, count($m[1]), 'btn btn-secondary'), $m[1]);
     }
 
-    // ---- 暮らしの様子（2026-10-19 追加。要件定義書 6-16-15、設計書 S-0313「暮らしの様子」。2026-10-19 変更：別のカードから、
-    //      結果の欄の右の列の点数の表の下へ移した） ----
+    // ---- 自由記述の質問（2026-10-19 追加。要件定義書 6-16-15、設計書 S-0313「自由記述の質問」。2026-10-19 変更：別のカードから、
+    //      結果の欄の右の列の点数の表の下へ移した。同じ日に見出しをやめ、区切りの線と見えない名前にした） ----
 
-    /** 暮らしの様子（data-personality-diagnosis-life の始まりから、結果の欄の閉じ〔評価文のお知らせ〕の手前まで） */
+    /** 自由記述の質問（data-personality-diagnosis-life の始まりから、結果の欄の閉じ〔評価文のお知らせ〕の手前まで） */
     private function lifeCard(string $html): string
     {
         $start = strpos($html, 'data-personality-diagnosis-life');
@@ -946,7 +946,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         return substr($card, 0, strpos($card, 'data-evaluation-draft-notice'));
     }
 
-    public function test_暮らしの様子は結果の欄の右の列の点数の表の下にその診断の4問を出し空は未回答(): void
+    public function test_自由記述の質問は結果の欄の右の列の点数の表の下にその診断の4問を出し空は未回答(): void
     {
         $other = $this->addResult('past-2', '2026-10-01 10:30:00');
         $other->update(['recent_events' => '別の診断の答え', 'wish' => '別の診断の悩み']);
@@ -955,14 +955,19 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
 
         $html = $this->page($result);
 
-        // 結果の欄の右の列（col-xl-8）の中、点数の表のあと。見出しは「タイプ」のラベルと同じ見た目で、別のカードの見出しにはしない
+        // 結果の欄の右の列（col-xl-8）の中、点数の表のあと。見出しは置かず、区切りの線のあとに 4 問（2026-10-19 変更：その前は
+        // 「タイプ」のラベルと同じ見た目の見出しを置いていた）。4 問のまとまりには見えない名前「自由記述の質問」を付ける
         $this->assertSame(1, preg_match(
             '/<div class="col-12 col-xl-8">\s*<div class="text-muted small">タイプ<\/div>.*?data-personality-diagnosis-scores.*?<\/table>\s*<\/div>\s*'
-            .'(?:\{\{--.*?--\}\}\s*)?<div class="mt-3" data-personality-diagnosis-life>\s*'
-            .'<div class="text-muted small mb-1" id="personality-diagnosis-life-label">暮らしの様子<\/div>\s*<dl class="mb-0" aria-labelledby="personality-diagnosis-life-label">/su',
+            .'(?:\{\{--.*?--\}\}\s*)?<div class="border-bottom mt-3 mb-3" aria-hidden="true" data-life-divider><\/div>\s*'
+            .'<div role="group" aria-label="自由記述の質問" data-personality-diagnosis-life>\s*<dl class="mb-0">\s*<dt class="fw-normal text-muted d-flex">/su',
             $html
         ));
-        $this->assertStringNotContainsString('<h6 class="mb-0">暮らしの様子</h6>', $html);
+        // 見出し（当時の呼び名・今の呼び名とも）は画面に出さない。別のカードの見出しにもしない
+        $this->assertStringNotContainsString('暮らしの様子', $html);
+        $this->assertStringNotContainsString('id="personality-diagnosis-life-label"', $html);
+        $this->assertStringNotContainsString('>自由記述の質問<', $html);
+        $this->assertSame(1, substr_count($html, 'data-life-divider'));
         $this->assertSame(1, substr_count($html, 'data-personality-diagnosis-life'));
         // 結果のカードの中（評価文のお知らせ・評価文・スタッフ用メモの前）。評価文とスタッフ用メモの欄は今のまま
         $this->assertLessThan(strpos($html, 'data-personality-diagnosis-life'), strpos($html, '<h6 class="mb-0">結果</h6>'));
@@ -984,7 +989,7 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         $this->assertStringNotContainsString('<form', $card);
     }
 
-    public function test_暮らしの様子に答えていない診断は4問とも未回答(): void
+    public function test_自由記述の質問に答えていない診断は4問とも未回答(): void
     {
         $result = $this->addResult('past-1', '2026-10-15 10:30:00');
 

@@ -264,7 +264,7 @@ class ClientIntakeSurveySubmitTest extends TestCase
         $this->assertNull($trainee->birth_day);
     }
 
-    public function test_暮らしの様子の4問を送っても受け取らずどこにも保存しない(): void
+    public function test_自由記述の質問の4問を送っても受け取らずどこにも保存しない(): void
     {
         // 2026-10-19 変更：4 問を愛犬性格診断へ移した。愛犬アンケートの回答の表にはもう列がなく（2026_10_19_000007）、
         // 送られてきても検証も保存もしない（2,000 文字を超えていてもエラーにしない）

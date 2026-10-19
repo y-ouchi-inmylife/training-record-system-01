@@ -15,7 +15,7 @@
 @section('content')
 {{-- 会員の愛犬の情報の変更画面（S-1417。2026-10-18 追加。要件定義書 6-15-20）。
      作り（戻る導線・カードの外の見出し・カード・フル幅の［変更する］）は S-1411 登録情報の変更（client/settings/edit）にそろえる。
-     入力欄は愛犬アンケート（S-1413）と同じ部品（client/_trainee-basic-fields）。暮らしの様子・写真は変えない。
+     入力欄は愛犬アンケート（S-1413）と同じ部品（client/_trainee-basic-fields）。自由記述の質問・写真は変えない。
      保存すると登録情報（S-1406）に戻り、layouts.client の共通の受け皿に完了メッセージを出す --}}
 <div class="container">
     <div class="c-settings">

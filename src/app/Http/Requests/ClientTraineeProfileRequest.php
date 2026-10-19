@@ -12,7 +12,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * - 名前・犬種・性別・誕生日・去勢・避妊の規則は、愛犬アンケート（ClientIntakeSurveyRequest。S-1413）の
  *   愛犬の基本情報と同じ。規則は basicInfoRules() の 1 か所にまとめ、愛犬アンケートでも使う
  * - 誕生日はトレーナー側・愛犬アンケートと同じ判定（trait NormalizesTraineeBirthday。エラーのキーは birth_date）
- * - 暮らしの様子（自由記述）・写真は受け取らない（rules() にないキーは validated() に入らない）
+ * - 自由記述の質問（愛犬性格診断の自由記述）・写真は受け取らない（rules() にないキーは validated() に入らない）
  * - 項目名と文言は lang/ja/validation.php（愛犬アンケートと同じ）
  */
 class ClientTraineeProfileRequest extends FormRequest

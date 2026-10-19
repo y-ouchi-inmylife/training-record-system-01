@@ -4,7 +4,7 @@
      <form> の中に置き、誕生日の入力中の年齢の表示のため、呼び出し側のページで trainee-birthday-input.js を読み込む。
      - $initial：項目の値を返す関数（fn (string $key)）。トレーニーの今の値、入力エラーで戻ったときは入力した値だけ
      - $sexLabels・$neuterStatusLabels：性別・去勢・避妊の選択肢（Trainee::sexLabels()・neuterStatusLabels()）
-     - $lastFieldClass：最後の欄（去勢・避妊）の class（2026-10-19 から、愛犬アンケートも区切り線を付けない〔暮らしの様子を愛犬性格診断へ移した〕）
+     - $lastFieldClass：最後の欄（去勢・避妊）の class（2026-10-19 から、愛犬アンケートも区切り線を付けない〔自由記述の質問を愛犬性格診断へ移した〕）
        （mb-3 pb-3 border-bottom）。省略すると mb-3 --}}
 <div class="mb-3">
     <label for="name" class="form-label">名前 <span class="text-danger">*</span></label>

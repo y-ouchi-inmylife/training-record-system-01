@@ -11,7 +11,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * お客様がログインせずに送る（性格診断用 URL のトークンで対象のトレーニーが決まる）ため、authorize() は常に true。
  * トークンが使えるかどうかはコントローラで確かめる（愛犬アンケートの ClientIntakeSurveyRequest と同じ）。
  *
- * - 暮らしの様子の 4 問（wish・recent_events・ideal_days・health_concerns。2026-10-19 に愛犬アンケートから移した）：どれも任意・
+ * - 自由記述の質問（4 問）（wish・recent_events・ideal_days・health_concerns。2026-10-19 に愛犬アンケートから移した）：どれも任意・
  *   2,000 文字以内。検証の前に改行を LF にそろえる（prepareForValidation()。ブラウザは maxlength で改行を 1 文字と数えるが、送信では
  *   CRLF の 2 文字になるため）。項目名は lang/ja/validation.php の設問の短い呼び名
  * - answers.Q01〜answers.Q50：すべて必須。値は 0〜4 か na（未経験）。設問と選択肢は PersonalityDiagnosisQuestions から
@@ -52,7 +52,7 @@ class ClientPersonalityDiagnosisRequest extends FormRequest
     }
 
     /**
-     * 検証の前に、暮らしの様子の 4 問の改行を LF にそろえる（CRLF → LF、残った CR → LF）
+     * 検証の前に、自由記述の質問（4 問）の改行を LF にそろえる（CRLF → LF、残った CR → LF）
      */
     protected function prepareForValidation(): void
     {
@@ -67,7 +67,7 @@ class ClientPersonalityDiagnosisRequest extends FormRequest
     }
 
     /**
-     * 検証を通った暮らしの様子の 4 問（列名 → 答え。空・空白だけは null）
+     * 検証を通った自由記述の質問（4 問）（列名 → 答え。空・空白だけは null）
      *
      * @return array<string, string|null>
      */

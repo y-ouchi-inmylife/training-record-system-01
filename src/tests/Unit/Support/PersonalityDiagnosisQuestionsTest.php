@@ -77,9 +77,9 @@ class PersonalityDiagnosisQuestionsTest extends TestCase
         }
     }
 
-    // ---- 暮らしの様子の 4 問（2026-10-19 に愛犬アンケートから移した。要件定義書 D-1200） ----
+    // ---- 自由記述の質問（4 問）（2026-10-19 に愛犬アンケートから移した。要件定義書 D-1200） ----
 
-    public function test_暮らしの様子は4問で列名の順に並び例文は持たない(): void
+    public function test_自由記述の質問は4問で列名の順に並び例文は持たない(): void
     {
         $questions = PersonalityDiagnosisQuestions::lifeQuestions();
 
@@ -92,7 +92,7 @@ class PersonalityDiagnosisQuestionsTest extends TestCase
         $this->assertSame(2000, PersonalityDiagnosisQuestions::LIFE_ANSWER_MAX_LENGTH);
     }
 
-    public function test_暮らしの様子の設問文は要件定義書のとおり(): void
+    public function test_自由記述の質問の設問文は要件定義書のとおり(): void
     {
         $questions = PersonalityDiagnosisQuestions::lifeQuestions();
 
@@ -102,7 +102,7 @@ class PersonalityDiagnosisQuestionsTest extends TestCase
         $this->assertSame('体のことで気になることや、お医者様から言われていることがあれば教えてください。', $questions['health_concerns']['question']);
     }
 
-    public function test_暮らしの様子の空の判定は結果のモデルで全角の空白や改行だけも空(): void
+    public function test_自由記述の質問の空の判定は結果のモデルで全角の空白や改行だけも空(): void
     {
         $result = fn (array $attributes) => new TraineePersonalityDiagnosisResult($attributes);
 

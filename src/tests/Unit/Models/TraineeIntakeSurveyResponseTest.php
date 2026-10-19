@@ -9,7 +9,7 @@ use Tests\TestCase;
  * 愛犬アンケートの回答のモデル（D-1100。2026-10 追加）。
  *
  * 答えたとおりの表示（性別・去勢・避妊・誕生日。性別・去勢・避妊はトレーニーと同じ値・同じ対応表）と、
- * 暮らしの様子の 4 問を持たないこと（2026-10-19 に愛犬性格診断へ移した。設問文のテストは PersonalityDiagnosisQuestionsTest）を確かめる。
+ * 自由記述の質問（4 問）を持たないこと（2026-10-19 に愛犬性格診断へ移した。設問文のテストは PersonalityDiagnosisQuestionsTest）を確かめる。
  */
 class TraineeIntakeSurveyResponseTest extends TestCase
 {
@@ -50,7 +50,7 @@ class TraineeIntakeSurveyResponseTest extends TestCase
         $this->assertNull((new TraineeIntakeSurveyResponse)->birthday_label);
     }
 
-    public function test_暮らしの様子の4問は持たない(): void
+    public function test_自由記述の質問の4問は持たない(): void
     {
         // 2026-10-19 変更：4 問を愛犬性格診断へ移した（設問文は PersonalityDiagnosisQuestions::lifeQuestions()、
         // 空の判定は TraineePersonalityDiagnosisResult::hasLifeAnswers()）。この表の 4 列は 2026_10_19_000007 で外した

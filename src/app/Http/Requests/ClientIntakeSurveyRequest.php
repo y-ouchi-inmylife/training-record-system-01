@@ -20,7 +20,7 @@ use Illuminate\Foundation\Http\FormRequest;
  *   （GET）が、使えない URL の画面を出す
  * - 誕生日はトレーナー側（TraineeRequest）と同じ判定（trait NormalizesTraineeBirthday）
  * - 項目名と文言は lang/ja/validation.php（screen-design.md S-1413）
- * - 2026-10-19 変更：暮らしの様子の自由記述 4 欄を愛犬性格診断へ移した（ClientPersonalityDiagnosisRequest）。愛犬アンケートは基本情報だけ
+ * - 2026-10-19 変更：自由記述の質問 4 問を愛犬性格診断へ移した（ClientPersonalityDiagnosisRequest）。愛犬アンケートは基本情報だけ
  */
 class ClientIntakeSurveyRequest extends FormRequest
 {

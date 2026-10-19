@@ -16,7 +16,7 @@ use Tests\TestCase;
  * 会員の登録情報（S-1406）の「愛犬の情報」の欄と、愛犬の情報の変更（S-1417）（2026-10-18 追加。要件定義書 6-15-20）。
  *
  * - S-1406：自分の愛犬ごとのカード（マイページと同じ並び・呼び名）に、名前・犬種・性別・誕生日・去勢・避妊。
- *   暮らしの様子は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移した。その前は愛犬アンケートの 4 問を見るだけで出していた）。
+ *   自由記述の質問は出さない（2026-10-19 変更：4 問を愛犬性格診断へ移した。その前は愛犬アンケートの 4 問を見るだけで出していた）。
  *   愛犬がいなければ欄を出さない。トレーニーの数でクエリが増えない
  * - S-1417：今の値を入れて開き、保存すると登録情報に戻って完了メッセージ。入力のきまりは愛犬アンケートと同じ。
  *   愛犬アンケートの回答・写真・最終更新者は変えない。操作の記録は残さない。ほかの会員の愛犬は 403、ログインしていなければログインの画面へ
@@ -154,7 +154,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertStringContainsString('<a href="'.route('client-portal.trainees.edit', $id).'" class="btn btn-primary">アイちゃんの情報を変更</a>', $card);
     }
 
-    public function test_暮らしの様子は出さず罫線は項目の間だけ(): void
+    public function test_自由記述の質問は出さず罫線は項目の間だけ(): void
     {
         // 2026-10-19 変更：4 問を愛犬性格診断へ移した（その前はカードの下に愛犬アンケートの 4 問と答えを出していた）
         $id = $this->trainee('アイ', self::FULL);
@@ -241,7 +241,7 @@ class ClientTraineeInfoTest extends TestCase
         $this->assertMatchesRegularExpression('/id="neuter_status-neutered" value="neutered"\s+checked>/u', $html);
         // 印が付くのは性別と去勢・避妊の 2 つ
         $this->assertSame(2, preg_match_all('/\schecked>/', $html));
-        // 愛犬アンケートと同じ説明文。暮らしの様子・写真の欄はない。最後の欄に区切り線は引かない
+        // 愛犬アンケートと同じ説明文。自由記述の質問・写真の欄はない。最後の欄に区切り線は引かない
         $this->assertStringContainsString('※ 年だけ、または年と月だけでも入力できます。', $html);
         $this->assertStringNotContainsString('<textarea', $html);
         $this->assertStringNotContainsString('type="file"', $html);

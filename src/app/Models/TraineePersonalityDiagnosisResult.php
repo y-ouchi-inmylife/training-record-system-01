@@ -63,7 +63,7 @@ class TraineePersonalityDiagnosisResult extends Model
         'score_trainability',
         'score_excitability',
         'personality_type',
-        // 暮らしの様子の 4 問（2026-10-19 追加。愛犬アンケートから移した。PersonalityDiagnosisQuestions::lifeQuestions()）
+        // 自由記述の質問（4 問）（2026-10-19 追加。愛犬アンケートから移した。PersonalityDiagnosisQuestions::lifeQuestions()）
         'wish',
         'recent_events',
         'ideal_days',
@@ -135,7 +135,7 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
-     * 暮らしの様子の 4 問（PersonalityDiagnosisQuestions::lifeQuestions()）のどれか 1 つにでも文字が入っているか
+     * 自由記述の質問（4 問）（PersonalityDiagnosisQuestions::lifeQuestions()）のどれか 1 つにでも文字が入っているか
      * （2026-10-19 に愛犬アンケートの回答から移した）。null・空文字・空白や改行だけ（全角の空白「　」も含む）の答えは空とみなす
      */
     public function hasLifeAnswers(): bool

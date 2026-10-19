@@ -133,7 +133,7 @@ trait CreatesClientCountTables
             $table->unsignedTinyInteger('birth_month')->nullable();
             $table->unsignedTinyInteger('birth_day')->nullable();
             $table->string('neuter_status', 20)->nullable();
-            // 暮らしの様子の 4 列（wish など）は 2026-10-19 に外した（2026_10_19_000007。愛犬性格診断の結果へ移した）
+            // 自由記述の質問の 4 列（wish など）は 2026-10-19 に外した（2026_10_19_000007。愛犬性格診断の結果へ移した）
             $table->timestamps();
         });
     }
@@ -178,7 +178,7 @@ trait CreatesClientCountTables
                 $table->decimal('score_'.$category, 3, 2)->nullable();
             }
             $table->string('personality_type', 30)->nullable();
-            // 暮らしの様子の 4 問（2026-10-19 追加。2026_10_19_000006）
+            // 自由記述の質問（4 問）（2026-10-19 追加。2026_10_19_000006）
             $table->text('wish')->nullable();
             $table->text('recent_events')->nullable();
             $table->text('ideal_days')->nullable();

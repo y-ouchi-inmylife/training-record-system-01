@@ -608,14 +608,14 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('登録内容のないトレーニー', $script);
     }
 
-    public function test_トレーニーの欄に備考と暮らしの様子の行はなく去勢避妊の次が最終計測(): void
+    public function test_トレーニーの欄に備考と自由記述の質問の行はなく去勢避妊の次が最終計測(): void
     {
         $client = $this->makeClient('0001', '山田');
         $this->trainee($client, 'ポチ');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // ラベルの並び（2026-10 変更：トレーニーの備考をなくした。2026-10-19 変更：最終計測はいちばん下。同じ日に暮らしの様子の行を外した。
+        // ラベルの並び（2026-10 変更：トレーニーの備考をなくした。2026-10-19 変更：最終計測はいちばん下。同じ日に自由記述の質問の行を外した。
         // 愛犬性格診断は dl の外の行で、診断なしのラベルは dt ではないので、ここには入らない）
         // ラベルの文字（折り返しの印 <wbr> を除いたもの。2026-10-18 から「去勢・避妊」「最終計測」に印が入る）
         preg_match_all('/<dt class="col-4 fw-normal text-muted"[^>]*>(.+?)<\/dt>/u', $html, $m);
@@ -829,7 +829,7 @@ class ClientCountRenderingTest extends TestCase
     }
 
     /**
-     * 愛犬アンケートの回答。$answers は基本情報の列の値（2026-10-19 変更：暮らしの様子の 4 列は愛犬性格診断の結果へ移した）
+     * 愛犬アンケートの回答。$answers は基本情報の列の値（2026-10-19 変更：自由記述の質問の 4 列は愛犬性格診断の結果へ移した）
      */
     private function intakeResponse(int $traineeId, ?int $tokenId, string $answeredAt = '2026-10-16 14:32:00', array $answers = []): void
     {
@@ -842,7 +842,7 @@ class ClientCountRenderingTest extends TestCase
 
     /**
      * 「暮らしの様子」の行がないこと（2026-10-19 変更：4 問を愛犬性格診断へ移し、会員詳細の行を外した。その前は去勢・避妊の下に
-     * 「入力あり」〔ラベルはトレーニー詳細の暮らしの様子の欄 #intake-survey へのリンク〕／「入力なし」の行を出していた）
+     * 「入力あり」〔ラベルはトレーニー詳細の自由記述の質問の欄 #intake-survey へのリンク〕／「入力なし」の行を出していた）
      */
     private function assertNoLifeRow(string $html): void
     {
@@ -853,7 +853,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('入力なし', $html);
     }
 
-    public function test_未発行と回答待ちでは暮らしの様子のリンクを出さない(): void
+    public function test_未発行と回答待ちでは自由記述の質問のリンクを出さない(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1267,8 +1267,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 並びは 去勢・避妊 → 性格診断の行 → 最終計測（2026-10-19 変更：その前は 最終計測 → 性格診断の行 → 暮らしの様子
-        // 〔回答済みのときだけのリンク〕、次に 去勢・避妊 → 暮らしの様子 → 性格診断の行 → 最終計測。同じ日に暮らしの様子の行を外した）
+        // 並びは 去勢・避妊 → 性格診断の行 → 最終計測（2026-10-19 変更：その前は 最終計測 → 性格診断の行 → 自由記述の質問
+        // 〔回答済みのときだけのリンク〕、次に 去勢・避妊 → 自由記述の質問 → 性格診断の行 → 最終計測。同じ日に自由記述の質問の行を外した）
         // 愛犬アンケートに回答済みのトレーニー：属性の並び（dl。最後が去勢・避妊）のすぐ後ろに性格診断の行
         $this->assertMatchesRegularExpression(
             '/<\/dl>\s*<div class="row small mt-1 align-items-center" data-personality-diagnosis-row>\s*<div class="col-4">\s*'
@@ -1707,7 +1707,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression($this->issueButtonPattern($answered, 'ポチ'), $html);
         $this->assertMatchesRegularExpression($this->issueButtonPattern($tokenOnly, 'たま'), $html);
         $this->assertStringNotContainsString('data-survey-in-progress', $html);
-        // 回答があっても暮らしの様子の行は出さない（2026-10-19 変更）
+        // 回答があっても自由記述の質問の行は出さない（2026-10-19 変更）
         $this->assertNoLifeRow($html);
     }
 
@@ -2136,12 +2136,12 @@ class ClientCountRenderingTest extends TestCase
         $sorted = $positions;
         sort($sorted);
         $this->assertSame($sorted, $positions);
-        // 去勢・避妊が属性の並び（dl）の最後の行で、下の間隔は mb-0（2026-10-19 変更：暮らしの様子の行を外した）
+        // 去勢・避妊が属性の並び（dl）の最後の行で、下の間隔は mb-0（2026-10-19 変更：自由記述の質問の行を外した）
         $this->assertMatchesRegularExpression('/去勢・<wbr>避妊<\/dt>\s*<dd class="col-8 mb-0">(?:(?!<\/dd>).)*<\/dd>\s*(?:\{\{--)?(?:(?!<dt).)*?<\/dl>/us', $html);
         $this->assertNoLifeRow($html);
     }
 
-    public function test_暮らしの様子の行は愛犬アンケートの回答があってもなくても出さない(): void
+    public function test_自由記述の質問の行は愛犬アンケートの回答があってもなくても出さない(): void
     {
         // 2026-10-19 変更：4 問を愛犬性格診断へ移し、診断ごとの答えは愛犬性格診断詳細（S-0313）で見る
         $this->fakeMediaDisk();
@@ -2385,7 +2385,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('with_mypage_registration" value', $html());
     }
 
-    // ---- 愛犬アンケートの回答の読み込み（2026-10-19 変更：暮らしの様子の行を外したので、回答は愛犬アンケートの状態にだけ使う） ----
+    // ---- 愛犬アンケートの回答の読み込み（2026-10-19 変更：自由記述の質問の行を外したので、回答は愛犬アンケートの状態にだけ使う） ----
 
     public function test_愛犬アンケートの回答の読み込みでトレーニーごとに問い合わせは増えない(): void
     {
@@ -2461,7 +2461,7 @@ class ClientCountRenderingTest extends TestCase
         $filledBlock = substr($filledBlock, 0, strpos($filledBlock, '</dl>'));
         $this->assertStringNotContainsString('data-trainee-value-empty', $filledBlock);
         $this->assertStringContainsString('柴犬', $filledBlock);
-        // 去勢・避妊が属性の並びの最後（2026-10-19 変更：その下の暮らしの様子の行〔「入力なし」〕を外した）。
+        // 去勢・避妊が属性の並びの最後（2026-10-19 変更：その下の自由記述の質問の行〔「入力なし」〕を外した）。
         // 愛犬性格診断・最終計測には印を使わない（「診断なし」「計測なし」のまま）
         $this->assertMatchesRegularExpression('/<dd class="col-8 mb-0">\s*'.preg_quote(self::EMPTY_VALUE, '/').'\s*<\/dd>/u', $emptyBlock);
         $this->assertStringNotContainsString('data-intake-survey-status', $emptyBlock);

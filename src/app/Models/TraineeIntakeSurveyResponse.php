@@ -29,7 +29,7 @@ class TraineeIntakeSurveyResponse extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | 暮らしの様子の 4 問（2026-10-19 に愛犬性格診断へ移した）
+    | 自由記述の質問（4 問）（2026-10-19 に愛犬性格診断へ移した）
     |--------------------------------------------------------------------------
     | 自由記述 4 欄（wish・recent_events・ideal_days・health_concerns）は、愛犬性格診断の回答（D-1200）へ移した
     | （設問文は PersonalityDiagnosisQuestions::lifeQuestions()、空の判定は TraineePersonalityDiagnosisResult::hasLifeAnswers()）。
