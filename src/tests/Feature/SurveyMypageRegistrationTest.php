@@ -96,7 +96,6 @@ class SurveyMypageRegistrationTest extends TestCase
     /** 発行の送信先（種類ごと） */
     private const STORE_ROUTES = [
         'intake' => 'trainee-intake-survey-tokens.store',
-        'personality' => 'trainee-personality-diagnosis-tokens.store',
         'combined' => 'trainee-combined-survey-tokens.store',
     ];
 
@@ -122,9 +121,10 @@ class SurveyMypageRegistrationTest extends TestCase
 
     // ---- 発行 ----
 
-    public function test_オンで発行するとマイページ登録の案内ができる3つの種類とも(): void
+    public function test_オンで発行するとマイページ登録の案内ができる2つの種類とも(): void
     {
-        $names = ['intake' => '愛犬アンケート', 'personality' => '愛犬性格診断', 'combined' => '愛犬アンケート＆愛犬性格診断'];
+        // 2026-10-19 変更：単独の愛犬性格診断の案内は新しく発行しない（発行のモーダルは 2 択）
+        $names = ['intake' => '愛犬アンケート', 'combined' => '愛犬アンケート＆愛犬性格診断'];
         foreach ($names as $kind => $name) {
             DB::table('trainee_intake_survey_tokens')->delete();
             DB::table('trainee_personality_diagnosis_tokens')->delete();
@@ -148,7 +148,7 @@ class SurveyMypageRegistrationTest extends TestCase
     {
         $this->registrationToken('expiredexpiredexpiredexpiredexpi', '2026-10-18 23:59:59');
 
-        $this->issue('personality')->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。マイページ登録の案内も発行しました。');
+        $this->issue('combined')->assertSessionHas('success', 'モモの愛犬アンケート＆愛犬性格診断の案内を発行しました。マイページ登録の案内も発行しました。');
 
         // 今の発行し直しと同じく、期限切れの案内は消して 1 件作る
         $rows = $this->registrationRows();
@@ -197,9 +197,20 @@ class SurveyMypageRegistrationTest extends TestCase
     {
         $this->issue('intake', withMypage: false);
 
-        $this->issue('personality')->assertSessionHas('error');
+        $this->issue('combined')->assertSessionHas('error');
 
         $this->assertCount(0, $this->registrationRows());
+    }
+
+    public function test_単独の愛犬性格診断の発行を送られてもマイページ登録の案内は作らない(): void
+    {
+        // 2026-10-19 変更：単独の愛犬性格診断の案内は新しく発行しない（作らずエラーの知らせ）。オンで送られてもマイページ登録の案内は作らない
+        $this->actingAsTrainer();
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee), ['with_mypage_registration' => '1'])
+            ->assertSessionHas('error');
+
+        $this->assertCount(0, $this->registrationRows());
+        $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->count());
     }
 
     public function test_操作の記録は案内の発行の1件だけ(): void

@@ -151,12 +151,40 @@ class TraineeCombinedSurveyTokenControllerTest extends TestCase
     {
         $this->issue();
 
-        foreach (['trainee-intake-survey-tokens.store', 'trainee-personality-diagnosis-tokens.store', 'trainee-combined-survey-tokens.store'] as $route) {
+        foreach (['trainee-intake-survey-tokens.store', 'trainee-combined-survey-tokens.store'] as $route) {
             $this->post(route($route, $this->trainee))
                 ->assertSessionHas('error', 'モモには、すでに案内中の案内があります。');
         }
+        // 単独の愛犬性格診断は、回答待ちの有無にかかわらず新しく発行しない（2026-10-19 変更）
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
+            ->assertSessionHas('error', '愛犬性格診断だけの案内は、新しく発行できません。「愛犬アンケート＆愛犬性格診断」の案内を発行してください。');
         $this->assertCount(1, $this->intakeRows());
         $this->assertCount(1, $this->personalityRows());
+    }
+
+    public function test_愛犬アンケートだけ答えたあとの残りの愛犬性格診断は表示と取消ができ単独では発行し直せない(): void
+    {
+        // 2026-10-19 変更：単独の愛犬性格診断は新しく発行しないが、組み合わせの残りは今までどおり使える
+        $this->issue()->assertSessionHas('success');
+        DB::table('trainee_intake_survey_tokens')->update(['answered_at' => '2026-10-19 11:00:00']);
+        $remaining = $this->personalityRows()->sole();
+
+        // 残りは有効な単独の愛犬性格診断の案内として扱われ、ご案内の画面（S-0312）が出る
+        $this->assertSame($remaining->id, $this->trainee->fresh()->activePersonalityDiagnosisToken?->id);
+        $html = $this->get(route('trainee-personality-diagnosis-tokens.print', $this->trainee))->assertOk()->getContent();
+        $this->assertStringContainsString(route('client-portal.personality-diagnosis.show', ['token' => $remaining->token]), $html);
+
+        // 単独の発行は受け付けない（残りの案内はそのまま）
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
+            ->assertSessionHas('error', '愛犬性格診断だけの案内は、新しく発行できません。「愛犬アンケート＆愛犬性格診断」の案内を発行してください。');
+        $this->assertSame([$remaining->id], $this->personalityRows()->pluck('id')->all());
+
+        // 取消は今までどおり（単独の愛犬性格診断の取消）
+        $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionHas('success', '愛犬性格診断の案内を取り消しました。');
+        $this->assertCount(0, $this->personalityRows());
+        $this->assertCount(1, $this->intakeRows());
     }
 
     public function test_期限が切れた組み合わせの案内があっても発行し直せる(): void

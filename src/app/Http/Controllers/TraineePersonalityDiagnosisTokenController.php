@@ -3,12 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Trainee;
-use App\Services\SurveyMypageRegistrationService;
-use App\Services\TraineePersonalityDiagnosisTokenService;
+use App\Support\CombinedSurveyName;
 use App\Support\InvitationMessage;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -25,32 +22,19 @@ use Illuminate\View\View;
 class TraineePersonalityDiagnosisTokenController extends Controller
 {
     /**
-     * 性格診断の案内を発行する（POST /trainees/{trainee}/personality-diagnosis-tokens）。
-     * 発行のあとは会員詳細に戻り、完了メッセージ「{表示名}の性格診断の案内を発行しました。」を出す（2026-10-17 変更）。
-     * 有効な案内がすでにある（愛犬アンケートの回答待ちも含む。二重送信・古い画面から押し直したなど）ときは、新しく作らず、
-     * 会員詳細に戻ってエラーの知らせ「{表示名}には、すでに案内中の案内があります。」を出す（2026-10-19 変更：その前は知らせなし）
+     * 単独の愛犬性格診断の案内の発行（POST /trainees/{trainee}/personality-diagnosis-tokens）は受け付けない（2026-10-19 変更）。
+     * ユーザーレビューで、トレーナーさんの元の仕組みと同じく、愛犬性格診断をするときは改めて愛犬アンケート（基本情報）も答えてもらうことに
+     * したため、新しく発行できるのは愛犬アンケートと「愛犬アンケート＆愛犬性格診断」（TraineeCombinedSurveyTokenController）の 2 つだけ。
+     * 会員詳細の発行のモーダル（S-0305-M08）からは選べないが、直接送られても案内を作らず（マイページ登録の案内も作らない）、会員詳細に戻って
+     * エラーの知らせを出す（今の「すでに案内中の案内があります。」と同じ出し方）。アクセスログには記録しない（LogAccess の対応表から外した）。
+     * 組み合わせの残りの愛犬性格診断・発行済みの単独の案内の取消（destroy）とご案内の画面（print）は今のまま。
+     * その前は TraineePersonalityDiagnosisTokenService::issue() で発行していた
      */
-    public function store(Request $request, Trainee $trainee, TraineePersonalityDiagnosisTokenService $service, SurveyMypageRegistrationService $mypage): RedirectResponse
+    public function store(Trainee $trainee): RedirectResponse
     {
-        // 「マイページ登録の案内も発行する」がオンなら、同じトランザクションでマイページ登録の案内も発行する（2026-10-19 追加。
-        // 要件定義書 6-16-18。有効な案内がある会員〔登録待ち〕・登録待ち（初回設定）・利用中なら何もしない）
-        [$token, $mypageIssued] = DB::transaction(function () use ($request, $trainee, $service, $mypage) {
-            $token = $service->issue($trainee, $request->user());
-            $mypageIssued = $token !== null && $request->boolean('with_mypage_registration')
-                && $mypage->issueFor($trainee, $request->user());
-
-            return [$token, $mypageIssued];
-        });
-
-        $redirect = redirect()->route('clients.show', $trainee->client_id);
-
-        if ($token === null) {
-            // 回答待ちの案内（同じ種類・もう一方の種類とも）があって発行しなかったときは、エラーの知らせを出す
-            // （2026-10-19 変更：何も言わずに戻ると、発行できなかったことが分からないため。その前は知らせなしで戻った）
-            return $redirect->with('error', $trainee->display_name.'には、すでに案内中の案内があります。');
-        }
-
-        return $redirect->with('success', $trainee->display_name.'の'.__('messages.personality_diagnosis_name').'の案内を発行しました。'.SurveyMypageRegistrationService::completionNote($mypageIssued));
+        return redirect()->route('clients.show', $trainee->client_id)
+            ->with('error', __('messages.personality_diagnosis_name').'だけの案内は、新しく発行できません。「'
+                .CombinedSurveyName::name().'」の案内を発行してください。');
     }
 
     /**

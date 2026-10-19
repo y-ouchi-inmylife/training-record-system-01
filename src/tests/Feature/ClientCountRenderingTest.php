@@ -1194,11 +1194,12 @@ class ClientCountRenderingTest extends TestCase
         // 2026-10-17 変更：発行のあとは案内の画面を開かず、会員詳細（ページの上）に戻る。
         // マイページ登録案内の発行のリダイレクトと完了メッセージは ClientEmailRegistrationTokenStoreTest で確かめる
         // （このテストの表はトークンの列を持たないため）。出し方はトレーニーの案内と同じ session('success')
-        // 1 頭に出しておける案内は 1 つまで（2026-10-19 変更）なので、愛犬性格診断は別のトレーニーで確かめる
+        // 1 頭に出しておける案内は 1 つまで（2026-10-19 変更）なので、組み合わせは別のトレーニーで確かめる
+        // （2026-10-19 変更：単独の愛犬性格診断は新しく発行しないので、2 つ目は組み合わせにした）
         $other = $this->trainee($client, 'たま');
         $cases = [
             [route('trainee-intake-survey-tokens.store', $traineeId), 'ポチの愛犬アンケートの案内を発行しました。', 'href="'.route('trainee-intake-survey-tokens.print', $traineeId).'"'],
-            [route('trainee-personality-diagnosis-tokens.store', $other), 'たまの愛犬性格診断の案内を発行しました。', 'href="'.route('trainee-personality-diagnosis-tokens.print', $other).'"'],
+            [route('trainee-combined-survey-tokens.store', $other), 'たまの愛犬アンケート＆愛犬性格診断の案内を発行しました。', 'href="'.route('trainee-combined-survey-tokens.print', $other).'"'],
         ];
         foreach ($cases as [$url, $message, $printLink]) {
             $response = $this->post($url);
@@ -1847,15 +1848,18 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'id="surveyIssueModal"'));
         $this->assertMatchesRegularExpression('/<h5 class="modal-title" id="surveyIssueModalLabel"><span data-survey-issue-name><\/span>の案内を発行<\/h5>/u', $html);
-        // 種類は 2 つのラジオボタン。開いたときはどちらも選ばない
+        // 種類は 2 つのラジオボタン（愛犬アンケート → 愛犬アンケート＆愛犬性格診断。2026-10-19 変更：単独の愛犬性格診断を外した）。開いたときはどちらも選ばない
         $this->assertMatchesRegularExpression('/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindIntake" value="intake">\s*<label class="form-check-label" for="surveyIssueKindIntake">愛犬アンケート'.preg_quote('<span class="form-text d-inline ms-1 mt-0" data-survey-issue-intake-note>（名前・犬種・誕生日など）</span>', '/').'<\/label>/u', $html);
-        $this->assertMatchesRegularExpression('/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindPersonality" value="personality">\s*<label class="form-check-label" for="surveyIssueKindPersonality">愛犬性格診断<\/label>/u', $html);
+        $this->assertStringNotContainsString('surveyIssueKindPersonality', $html);
+        $this->assertStringNotContainsString('value="personality"', $html);
         $this->assertStringNotContainsString('name="survey_kind" id="surveyIssueKindIntake" value="intake" checked', $html);
         // ［キャンセル］（グレーの白抜き）と［発行する］（塗り。選ぶまで押せない）
         $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル<\/button>\s*<button type="submit" class="btn btn-primary" id="surveyIssueSubmit" disabled>発行する<\/button>/u', $html);
         // 送り先は種類ごとの今の発行のルート（トレーニーの id を JS で入れる）
         $this->assertStringContainsString(json_encode(route('trainee-intake-survey-tokens.store', ['trainee' => '__ID__'])), $html);
-        $this->assertStringContainsString(json_encode(route('trainee-personality-diagnosis-tokens.store', ['trainee' => '__ID__'])), $html);
+        $this->assertStringContainsString(json_encode(route('trainee-combined-survey-tokens.store', ['trainee' => '__ID__'])), $html);
+        // 単独の愛犬性格診断の発行の送り先は持たない（同じ URL の取消〔DELETE〕のひな形は取消の確認 M07 にあるので、発行のひな形のキーで確かめる）
+        $this->assertStringNotContainsString('personality: '.json_encode(route('trainee-personality-diagnosis-tokens.store', ['trainee' => '__ID__'])), $html);
         $this->assertStringContainsString('data-survey-issue-trainee-id="'.$a.'"', $html);
         $this->assertStringContainsString('data-survey-issue-trainee-id="'.$b.'"', $html);
         // 二重送信を防ぐ
@@ -1934,11 +1938,11 @@ class ClientCountRenderingTest extends TestCase
         DB::table('trainee_intake_survey_tokens')->update(['expires_at' => '2026-10-26 23:59:59']);
         $this->assertNotNull($this->expiredRow($this->get(route('clients.show', $client))->assertOk()->getContent(), 'ポチ'));
 
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $id))->assertSessionHas('success');
+        $this->post(route('trainee-combined-survey-tokens.store', $id))->assertSessionHas('success');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
         $this->assertNull($this->expiredRow($html, 'ポチ'));
-        $this->assertStringContainsString('<span class="trainee-survey-line">愛犬性格診断</span>', (string) $this->inProgressRow($html, 'ポチ'));
+        $this->assertStringContainsString('愛犬アンケート＆', (string) $this->inProgressRow($html, 'ポチ'));
     }
 
     public function test_いちばん新しい案内が回答済みや期限が空なら期限切れの行を出さない(): void
@@ -2266,7 +2270,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression($this->issueButtonPattern($one, 'タマ'), $html);
     }
 
-    public function test_案内の発行のモーダルは3つの種類から選び組み合わせの送信先を持つ(): void
+    public function test_案内の発行のモーダルは2つの種類から選び組み合わせの送信先を持つ(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -2274,7 +2278,11 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertSame(3, substr_count($html, 'type="radio" name="survey_kind"'));
+        // 2026-10-19 変更：選択肢は 愛犬アンケート → 愛犬アンケート＆愛犬性格診断 の 2 つ（この順）。単独の「愛犬性格診断」はない
+        $this->assertSame(2, substr_count($html, 'type="radio" name="survey_kind"'));
+        preg_match_all('/name="survey_kind" id="[^"]+" value="([^"]+)"/', $html, $m);
+        $this->assertSame(['intake', 'combined'], $m[1]);
+        $this->assertStringNotContainsString('<label class="form-check-label" for="surveyIssueKindPersonality">', $html);
         $this->assertMatchesRegularExpression(
             '/<input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindCombined" value="combined">\s*'
             .'<label class="form-check-label" for="surveyIssueKindCombined">愛犬アンケート＆愛犬性格診断<\/label>/u',
@@ -2513,9 +2521,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 補足は 1 か所（愛犬アンケートの選択肢のラベルの中）だけ。ほかの 2 つの選択肢には付かない
+        // 補足は 1 か所（愛犬アンケートの選択肢のラベルの中）だけ。もう 1 つの選択肢（組み合わせ）には付かない
         $this->assertSame(1, substr_count($html, '（名前・犬種・誕生日など）'));
-        $this->assertStringContainsString('for="surveyIssueKindPersonality">愛犬性格診断</label>', $html);
         $this->assertStringContainsString('for="surveyIssueKindCombined">愛犬アンケート＆愛犬性格診断</label>', $html);
         // ほかの所の愛犬アンケートの名前（案内中の行・取消の確認）には付かない
         $this->assertStringContainsString('<span class="trainee-survey-line">愛犬アンケート</span>', (string) $this->inProgressRow($html, 'ポチ'));

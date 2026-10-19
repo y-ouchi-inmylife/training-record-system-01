@@ -21,9 +21,11 @@ use Tests\TestCase;
  * 性格診断の案内の発行・取消・表示（POST／DELETE /trainees/{trainee}/personality-diagnosis-tokens、
  * GET …/print〔S-0312〕。2026-10 追加。性格診断 段階2）と、案内の URL で開くお客様の回答の画面（S-1415）。
  *
- * - 愛犬アンケート案内と同じ作り。違いは、前の結果（回答済みの案内）があっても発行できること
- * - 発行のあとは S-0312 を開き、完了メッセージは載せない。取消のあとは会員詳細に戻り、上端の success
- * - アクセスログに create_／delete_trainee_personality_diagnosis_token（target_type='Trainee'）が残る
+ * - 2026-10-19 変更：単独の愛犬性格診断の案内は新しく発行しない（発行のモーダルは愛犬アンケートと「愛犬アンケート＆愛犬性格診断」の
+ *   2 択。サーバーでも、POST を送られても作らず、会員詳細に戻ってエラーの知らせ。アクセスログにも記録しない）。
+ *   その前は、愛犬アンケート案内と同じ作りで発行でき、前の結果があっても発行できた
+ * - 発行済みの案内（組み合わせの残り・前に発行した単独の案内）の取消・案内の画面（S-0312）は今のまま。取消のあとは会員詳細に戻り、上端の success
+ * - アクセスログに delete_trainee_personality_diagnosis_token（target_type='Trainee'）が残る
  *
  * ミドルウェア（auth・practitioners・LogAccess など）は外さず、実際の HTTP で確かめる。
  */
@@ -102,73 +104,62 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         return html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5);
     }
 
-    // ---- 発行 ----
+    // ---- 発行（2026-10-19 変更：単独の愛犬性格診断の案内は新しく発行しない） ----
 
-    public function test_有効な案内がなければ作り会員詳細に戻って完了メッセージを出しアクセスログが1件残る(): void
+    private const SINGLE_REFUSED = '愛犬性格診断だけの案内は、新しく発行できません。「愛犬アンケート＆愛犬性格診断」の案内を発行してください。';
+
+    public function test_単独の発行を送られても作らず会員詳細に戻ってエラーの知らせを出しアクセスログも残さない(): void
     {
-        $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
+        $this->travelTo(Carbon::parse('2026-10-19 10:00:00'));
 
-        // 発行のあとは会員詳細（ページの上）に戻る。S-0312 には移らない（2026-10-17 変更）
-        $response->assertRedirect(route('clients.show', $this->client));
-        $response->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。');
-
-        $token = TraineePersonalityDiagnosisToken::query()->sole();
-        $this->assertSame($this->trainee->id, (int) $token->trainee_id);
-        $this->assertSame(200, (int) $token->created_by);
-        $this->assertNull($token->answered_at);
-        $this->assertSame(32, strlen($token->token));
-
-        $logs = $this->logs();
-        $this->assertCount(1, $logs);
-        $this->assertSame('create_trainee_personality_diagnosis_token', $logs[0]->action);
-        $this->assertSame('Trainee', $logs[0]->target_type);
-        $this->assertSame($this->trainee->id, (int) $logs[0]->target_id);
-        $this->assertSame('愛犬性格診断案内発行', AccessLog::actionLabels()[$logs[0]->action]);
-    }
-
-    public function test_名前がないトレーニーは完了メッセージで名前未登録と出す(): void
-    {
-        $this->trainee->forceFill(['name' => null])->save();
-
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertRedirect(route('clients.show', $this->client))
-            ->assertSessionHas('success', '名前未登録の愛犬性格診断の案内を発行しました。');
-    }
-
-    public function test_有効な案内があれば作らず完了メッセージも出さずに会員詳細に戻る(): void
-    {
-        $tokenId = $this->insertToken();
-
-        $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
+        $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee), ['with_mypage_registration' => '1']);
 
         $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionMissing('success');
-        $this->assertSame([$tokenId], TraineePersonalityDiagnosisToken::query()->pluck('id')->all());
+        $response->assertSessionHas('error', self::SINGLE_REFUSED);
+        $this->assertSame(0, TraineePersonalityDiagnosisToken::query()->count());
+        $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
+        $this->assertSame([], $this->logs());
+        // 今までの記録の表示名は残す
+        $this->assertSame('愛犬性格診断案内発行', AccessLog::actionLabels()['create_trainee_personality_diagnosis_token']);
     }
 
-    public function test_二重に送っても有効な案内は1つのまま(): void
+    public function test_回答済みや期限切れや発行済みの案内があっても単独の案内は増えない(): void
     {
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
-        $this->flushSession();
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertRedirect(route('clients.show', $this->client))
-            ->assertSessionMissing('success');
-
-        $this->assertSame(1, TraineePersonalityDiagnosisToken::query()->count());
-    }
-
-    public function test_回答済みの案内と結果があっても新しく発行できる(): void
-    {
+        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
         $answered = $this->insertToken('2026-10-15 09:00:00');
         $this->insertResult($answered);
+        DB::table('trainee_personality_diagnosis_tokens')->insert([
+            'token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
+            'created_at' => '2026-10-19 10:00:00', 'updated_at' => '2026-10-19 10:00:00',
+        ]);
+        $before = TraineePersonalityDiagnosisToken::query()->orderBy('id')->pluck('id')->all();
 
-        $response = $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee));
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('error', self::SINGLE_REFUSED);
+        $this->assertSame($before, TraineePersonalityDiagnosisToken::query()->orderBy('id')->pluck('id')->all());
 
-        $response->assertRedirect(route('clients.show', $this->client));
-        $response->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。');
-        $this->assertSame(2, TraineePersonalityDiagnosisToken::query()->count());
+        // 発行済みの有効な単独の案内があっても増えず、その案内は残る
+        $active = $this->insertToken();
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('error', self::SINGLE_REFUSED);
+        $this->assertSame([...$before, $active], TraineePersonalityDiagnosisToken::query()->orderBy('id')->pluck('id')->all());
         $this->assertNotNull($this->trainee->fresh()->activePersonalityDiagnosisToken);
-        $this->assertSame(1, TraineePersonalityDiagnosisResult::query()->count());
+    }
+
+    public function test_名前がないトレーニーや管理者でも単独の案内は作らない(): void
+    {
+        $this->trainee->forceFill(['name' => null])->save();
+        $this->actingAsRole('admin');
+
+        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionHas('error', self::SINGLE_REFUSED);
+        $this->assertSame(0, TraineePersonalityDiagnosisToken::query()->count());
+    }
+
+    public function test_単独の発行のURLをGETで開くと今までどおり会員詳細に移る(): void
+    {
+        $this->get('/trainees/'.$this->trainee->id.'/personality-diagnosis-tokens')->assertRedirect(route('clients.show', $this->client));
+        $this->assertSame(0, TraineePersonalityDiagnosisToken::query()->count());
     }
 
     // ---- 取消 ----
@@ -183,7 +174,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
         $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionHas('success', '愛犬性格診断の案内を取り消しました。');
-        $this->assertSame([$answered], TraineePersonalityDiagnosisToken::query()->pluck('id')->all());
+        $this->assertSame([$answered], TraineePersonalityDiagnosisToken::query()->orderBy('id')->pluck('id')->all());
         $this->assertFalse(TraineePersonalityDiagnosisToken::query()->whereKey($active)->exists());
         // 回答済みの案内と結果は消えない
         $this->assertSame($answered, (int) TraineePersonalityDiagnosisResult::query()->findOrFail($resultId)->trainee_personality_diagnosis_token_id);
@@ -206,12 +197,11 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     // ---- 権限 ----
 
-    public function test_管理者も発行と取消ができる(): void
+    public function test_管理者も発行済みの案内を取り消せる(): void
     {
         $this->actingAsRole('admin');
+        $this->insertToken();
 
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertRedirect(route('clients.show', $this->client));
         $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
             ->assertRedirect(route('clients.show', $this->client));
     }
@@ -420,8 +410,8 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     public function test_完了メッセージと操作の記録の表示も愛犬性格診断(): void
     {
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertSessionHas('success', 'モモの愛犬性格診断の案内を発行しました。');
+        // 発行済みの単独の案内を用意する（2026-10-19 から単独では新しく発行しない）
+        $this->insertToken();
         $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))
             ->assertSessionHas('success', '愛犬性格診断の案内を取り消しました。');
 
@@ -449,36 +439,6 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
 
     // ---- 有効期限（2026-10-19 追加：案内に 1 週間の有効期限を付けた。「今日」を固定する） ----
 
-    public function test_発行した案内の有効期限は発行した日から7日後の日の終わり(): void
-    {
-        $this->assertSame(7, config('client_tokens.personality_diagnosis_expires_days'));
-        foreach (['2026-10-19 10:00:00', '2026-10-19 23:30:00'] as $now) {
-            $this->travelTo(Carbon::parse($now));
-            DB::table('trainee_personality_diagnosis_tokens')->delete();
-
-            $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('success');
-
-            $this->assertSame('2026-10-26 23:59:59', TraineePersonalityDiagnosisToken::query()->sole()->expires_at->format('Y-m-d H:i:s'), $now);
-            $this->assertSame('2026-10-26 23:59:59', DB::table('trainee_personality_diagnosis_tokens')->value('expires_at'), $now);
-        }
-    }
-
-    public function test_期限が切れた案内しかなければ発行でき期限が切れた行は残す(): void
-    {
-        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
-        $expired = DB::table('trainee_personality_diagnosis_tokens')->insertGetId([
-            'token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
-            'created_at' => '2026-10-19 10:00:00', 'updated_at' => '2026-10-19 10:00:00',
-        ]);
-
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('success');
-
-        $tokens = TraineePersonalityDiagnosisToken::query()->orderBy('id')->get();
-        $this->assertCount(2, $tokens);
-        $this->assertSame($expired, $tokens[0]->id);
-        $this->assertSame('2026-11-03 23:59:59', $tokens[1]->expires_at->format('Y-m-d H:i:s'));
-    }
-
     public function test_期限が切れた案内は取消の対象にせず行も残す(): void
     {
         $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
@@ -491,7 +451,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         $this->assertSame(1, DB::table('trainee_personality_diagnosis_tokens')->count());
     }
 
-    public function test_期限が空の前からの案内は今までどおり有効で新しく作らない(): void
+    public function test_期限が空の前からの案内は今までどおり有効で取り消せる(): void
     {
         $this->travelTo(Carbon::parse('2030-01-01 10:00:00'));
         $old = DB::table('trainee_personality_diagnosis_tokens')->insertGetId([
@@ -499,9 +459,8 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
             'created_at' => '2026-10-01 10:00:00', 'updated_at' => '2026-10-01 10:00:00',
         ]);
 
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionMissing('success');
-
-        $this->assertSame([$old], TraineePersonalityDiagnosisToken::query()->pluck('id')->all());
+        $this->assertNotNull($this->trainee->fresh()->activePersonalityDiagnosisToken);
+        $this->assertSame([$old], TraineePersonalityDiagnosisToken::query()->orderBy('id')->pluck('id')->all());
         $this->delete(route('trainee-personality-diagnosis-tokens.destroy', $this->trainee))->assertSessionHas('success');
         $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->count());
     }
@@ -537,49 +496,5 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
         ]);
 
         $this->assertStringContainsString('<strong>有効な愛犬性格診断の案内がありません。</strong>', $this->printPage());
-    }
-
-    // ---- 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（2026-10-19 変更） ----
-
-    public function test_愛犬アンケートが回答待ちなら発行せず会員詳細に戻ってエラーの知らせを出す(): void
-    {
-        $this->travelTo(Carbon::parse('2026-10-20 10:00:00'));
-        DB::table('trainee_intake_survey_tokens')->insert([
-            'token' => str_repeat('o', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59',
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        // 画面からではなく直接送られても、今の「有効な案内がすでにある」ときと同じ返し方
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertRedirect(route('clients.show', $this->trainee->client_id))
-            ->assertSessionMissing('success')
-            // 何も言わずに戻らず、エラーの知らせを出す（2026-10-19 変更）
-            ->assertSessionHas('error', 'モモには、すでに案内中の案内があります。');
-
-        $this->assertSame(0, DB::table('trainee_personality_diagnosis_tokens')->count());
-    }
-
-    public function test_愛犬アンケートの期限が切れた案内や回答済みの案内なら発行できる(): void
-    {
-        $this->travelTo(Carbon::parse('2026-10-27 00:00:00'));
-        DB::table('trainee_intake_survey_tokens')->insert([
-            ['token' => str_repeat('e', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => '2026-10-26 23:59:59', 'answered_at' => null,
-                'created_at' => now(), 'updated_at' => now()],
-            ['token' => str_repeat('a', 32), 'trainee_id' => $this->trainee->id, 'expires_at' => null, 'answered_at' => '2026-10-21 10:00:00',
-                'created_at' => now(), 'updated_at' => now()],
-        ]);
-
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))->assertSessionHas('success');
-
-        $this->assertSame(1, TraineePersonalityDiagnosisToken::query()->count());
-    }
-
-    public function test_同じ種類の回答待ちがあって発行しなかったときもエラーの知らせを出す(): void
-    {
-        $this->insertToken();
-
-        $this->post(route('trainee-personality-diagnosis-tokens.store', $this->trainee))
-            ->assertSessionHas('error', 'モモには、すでに案内中の案内があります。');
-        $this->assertSame(1, TraineePersonalityDiagnosisToken::query()->count());
     }
 }

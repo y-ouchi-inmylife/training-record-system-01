@@ -4,6 +4,9 @@
      ［案内を発行］1 つとこのモーダルにまとめた。1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（サーバーでも守る）。
      2026-10-19 追加：選択肢に「愛犬アンケート＆愛犬性格診断」（2 つの案内を同時に作って結び付け、1 つのリンクで続けて答えてもらう）を
      足して 3 つにした（運用上、2 つを同時に送りたいことがあるため）。組み合わせは 1 つの案内として数える。
+     2026-10-19 変更：選択肢を「愛犬アンケート」「愛犬アンケート＆愛犬性格診断」の 2 つ（この順）にした。単独の「愛犬性格診断」は外した
+     （ユーザーレビューで、トレーナーさんの元の仕組みと同じく、診断のたびに基本情報も答えてもらうため。サーバーでも単独の発行は受け付けない。
+     TraineePersonalityDiagnosisTokenController::store）。組み合わせの残りの愛犬性格診断・発行済みの単独の案内の［表示］［取消］は今のまま。
 
      - 開き方：ボタンに data-bs-toggle="modal" data-bs-target="#surveyIssueModal" と、data-survey-issue-trainee-id
        （トレーニーの id）・data-survey-issue-trainee-name（表示名）を付ける。トレーニーが何頭いてもモーダルは 1 つにし、
@@ -16,7 +19,7 @@
      - 「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18）：会員に有効なマイページ登録の案内がない
        「未登録」「登録待ち（期限切れ）」のときだけ、選択肢の下に出す。最初はオン（2026-10-19 変更）（2026-10-19 変更：発行済みの「登録待ち」にも出ていて、
        もう 1 件発行されるように見えて分かりにくかったため）（$client は会員詳細の会員。状態は ClientController::show で読み込み済み）。開くたびにオフに戻す。
-       オンで発行すると、マイページ登録の案内も発行する（お客様が回答を終えた完了の画面で、有効な案内があればマイページの登録へ誘導する）。3 つの種類のどれでも使える --}}
+       オンで発行すると、マイページ登録の案内も発行する（お客様が回答を終えた完了の画面で、有効な案内があればマイページの登録へ誘導する）。2 つの種類のどちらでも使える --}}
 <div class="modal fade" id="surveyIssueModal" tabindex="-1"
      aria-labelledby="surveyIssueModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -36,10 +39,6 @@
                                  補足はチェックボックスの下の説明と同じ form-text の大きさ・色。label の中に入れて、文字を押しても選べるようにする。
                                  form-check は padding-left でラジオボタンの横に文字を置くので、折り返しても 2 行目は文字の頭にそろう --}}
                             <label class="form-check-label" for="surveyIssueKindIntake">{{ __('messages.intake_survey_name') }}<span class="form-text d-inline ms-1 mt-0" data-survey-issue-intake-note>{{ __('messages.survey_issue_intake_note') }}</span></label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindPersonality" value="personality">
-                            <label class="form-check-label" for="surveyIssueKindPersonality">{{ __('messages.personality_diagnosis_name') }}</label>
                         </div>
                         <div class="form-check mb-0">
                             <input class="form-check-input" type="radio" name="survey_kind" id="surveyIssueKindCombined" value="combined">
@@ -75,7 +74,6 @@
     // 種類ごとの発行の送信先の URL のひな形。プレースホルダを、開いたボタンのトレーニーの id で置き換える
     const STORE_URL_TEMPLATES = {
         intake: @json(route('trainee-intake-survey-tokens.store', ['trainee' => '__ID__'])),
-        personality: @json(route('trainee-personality-diagnosis-tokens.store', ['trainee' => '__ID__'])),
         combined: @json(route('trainee-combined-survey-tokens.store', ['trainee' => '__ID__'])),
     };
     const modalEl = document.getElementById('surveyIssueModal');
