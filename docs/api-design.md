@@ -96,7 +96,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/unpublish` | アドバイスの公開取消（下書きに戻す。ルート名 `trainee-personality-diagnosis-results.unpublish`。**2026-10-18 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | DELETE | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}` | 愛犬性格診断の結果を 1 件削除する（物理削除。公開済みのアドバイスも一緒に消え、会員様の画面からも消える。ルート名 `trainee-personality-diagnosis-results.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック。**2026-10 追加**。**2026-10-18 変更**：送信元を S-0309 から S-0313 に移した） | auth | 管理者 |
 | トレーニー管理 | S-0313 愛犬性格診断詳細画面 | PUT | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/staff-memo` | **2026-10-19 に外した**（アドバイスの保存 `PUT …/{personalityDiagnosisResult}` で両方を受け取るようにしたため）。スタッフ用メモを保存していた（ルート名 `trainee-personality-diagnosis-results.staff-memo.update`。**2026-10-19 追加**） | auth | 一般・管理者 |
-| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft` | アドバイスとスタッフ用メモを AI で自動生成し（2026-10-19 変更：その前の呼び名は「下書き」） JSON で返す（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**） | auth | 一般・管理者 |
+| トレーニー管理 | S-0313 愛犬性格診断詳細画面 | POST | `/trainees/{trainee}/personality-diagnosis-results/{personalityDiagnosisResult}/evaluation-draft` | アドバイスとスタッフ用メモを AI で自動生成し（2026-10-19 変更：その前の呼び名は「下書き」） JSON で返す（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**。**2026-10-20 変更**：`provider` で AI を選ぶ） | auth | 一般・管理者 |
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
@@ -2579,19 +2579,30 @@ POST /training-records に以下を追加する。
 
 **概要**: アドバイスとスタッフ用メモを AI で自動生成する（ルート名 `trainee-personality-diagnosis-results.evaluation-draft`。**2026-10-19 追加**。requirements.md 6-16-19）。S-0313 の［AIで自動生成］から JS で呼ぶ（**2026-10-19 変更**：ボタン名と呼び名を［AIで下書き］から変えた。ルート名は変えない）。**何も保存しない**。
 
+**リクエスト**（**2026-10-20 追加**：2026-10-20 のユーザーレビューで、しばらく Claude・OpenAI・Gemini の 3 社を比べながら使い、最終的に 1 つに絞るため。その前はパラメータなしで、Claude だけを呼んでいた）:
+
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| provider | string | ● | `claude`・`openai`・`gemini` のどれかで、キーとモデルの設定がそろっているもの | 使う AI。S-0313 の 3 つのボタンのどれを押したか |
+
 **処理**:
 - `{personalityDiagnosisResult}` は `{trainee}` の結果に限る（`scopeBindings`。別のトレーニーの結果は 404）。権限はアドバイスの保存と同じ（一般・管理者）
+- `provider` から実装を選ぶ（`App\Services\EvaluationDraft\EvaluationDraftProviders`。AI の名前 → 実装の対応表の 1 か所）。決まった 3 つ以外・キーかモデルの設定が空の AI のときは、AI を呼ばずに 422 で今の失敗のときと同じ文を返す（**2026-10-20 追加**）
 - 指示文（`system_settings` の `evaluation_prompt_current`。なければ既定の文）の差し込みの印を、愛犬の名前・タイプ・点数・自由記述の質問 4 問に置き換える（`App\Services\EvaluationDraft\PersonalityEvaluationPrompt`）。暮らしの様子は**その診断の結果に保存した 4 問**（`trainee_personality_diagnosis_results` の `wish` など。**2026-10-19 変更**：その前は、愛犬アンケートの回答のうち診断の日以前でいちばん新しいもの〔なければいちばん新しいもの〕を探して使っていた）
-- AI を 1 回呼ぶ（`App\Services\EvaluationDraft\EvaluationDraftGenerator`。今の実装は Claude の `ClaudeEvaluationDraftGenerator`：モデルは `config('services.anthropic.model')`、出す長さの上限 3000 トークン、待ち時間の上限 60 秒、再試行しない）
+- 選んだ AI を 1 回呼ぶ（`App\Services\EvaluationDraft\EvaluationDraftGenerator` の実装。**2026-10-20 変更**：3 社の実装にした。その前は Claude の `ClaudeEvaluationDraftGenerator` だけ）。3 社とも、出す長さの上限 3000 トークン、待ち時間の上限 60 秒、再試行しない。会社ごとの呼び方は architecture.md 2-5-1
+  - `claude`：`ClaudeEvaluationDraftGenerator`（Messages API。モデルは `config('services.anthropic.model')`。今のまま）
+  - `openai`：`OpenAiEvaluationDraftGenerator`（Chat Completions。モデルは `config('services.openai.evaluation_model')`）
+  - `gemini`：`GeminiEvaluationDraftGenerator`（generateContent。モデルは `config('services.gemini.model')`）
 - 返事を最初の「#####」で分ける（前をアドバイス、後ろをスタッフ用メモ。前後の空白・改行は取る。「#####」がなければ全部をアドバイスにし、`staff_memo_missing` を true）。返事が空なら失敗
-- 書式の決まり（`PersonalityEvaluationPrompt::FORMAT_RULES`。Markdown の記号を使わず普通の文章で書く）を system（システムプロンプト）に入れて渡す。指示文はユーザーの発言（**2026-10-19 追加**：2026-10-19 のユーザーレビューで、AI が見出しや太字を Markdown の記号（`#`・`**`・`---` など）で書いて返し、アドバイスの欄に記号がそのまま入り、公開すると会員様の画面（S-1418）にも記号が出てしまうため。要件定義書 6-16-19）
+- 書式の決まり（`PersonalityEvaluationPrompt::FORMAT_RULES`。Markdown の記号を使わず普通の文章で書く）を、その AI のシステム側の指示（Claude は `system`、OpenAI は `system` の発言、Gemini は `systemInstruction`。**2026-10-20 変更**：3 社とも同じ決まりを渡す）に入れて渡す。指示文はユーザーの発言（**2026-10-19 追加**：2026-10-19 のユーザーレビューで、AI が見出しや太字を Markdown の記号（`#`・`**`・`---` など）で書いて返し、アドバイスの欄に記号がそのまま入り、公開すると会員様の画面（S-1418）にも記号が出てしまうため。要件定義書 6-16-19）
 - 分けたあと、アドバイス・スタッフ用メモのそれぞれに念のための後始末をする（`EvaluationDraft::stripMarkdown()`。行の頭の `#`〜`######`＋空白（見出しの記号）を外す／`**` の組を外す（中の文字は残す）／`---`・`***`・`___` だけの行を外す／行の頭の `- `・`* `（箇条書きの記号）を `・` に置き換える。文の中の普通の記号（「3*4」・文中の「-」など）は変えない（行の頭と `**` の組だけを対象にする））。**区切りで分けるのは後始末の前**（区切りを消さないように）。後始末のあとに前後の空白・改行を取る（**2026-10-19 追加**。理由は上と同じ）
 - Markdown の後始末のあと、それぞれの最初の行が呼び名（「お客様用レポート」「お客様用」「スタッフ用指示書」「スタッフ用メモ」）**だけ**の行なら、その行を外す（呼び名の前後の飾り【】・「」・『』・＜＞・<>・:・：・空白は許す。例「【お客様用レポート】」「お客様用レポート：」）。最初の行だけを見る。本文の途中の呼び名・呼び名のあとに文が続く行（「お客様用レポートとして、…」）・2 行目以降の呼び名は外さない。外したあとに先頭に残った空の行も取る（`EvaluationDraft::stripMarkdown()` の中。**2026-10-19 追加**：2026-10-19 のユーザーレビューで、AI が指示文の呼び名（「お客様用レポート」「スタッフ用指示書」「スタッフ用メモ」）を見出しとしてそのまま書き、アドバイスの欄が「お客様用レポート」の行から始まり、公開すると会員様の画面にも出てしまうため。要件定義書 6-16-19）。**順番は、区切りで分ける → Markdown の後始末 → 呼び名の行を外す → 前後の空白を取る**（`#` や `**` が付いた見出しでも外れるように）
-- ログ（laravel.log）に、結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由を残す。送った文・返ってきた文・名前は残さない。失敗のときはエラーの内容を残す
+- ログ（laravel.log）に、結果の id・**AI の名前**（**2026-10-20 追加**）・モデル・入力と出力のトークン数・かかった時間・止まった理由を残す。送った文・返ってきた文・名前・API キーは残さない。失敗のときはエラーの内容（API キーを伏せた形で）を残す
 - アクセスログには記録しない
 
 **レスポンス**（JSON）:
 - 成功（200）：`{ "evaluation": "…", "staff_memo": "…", "staff_memo_missing": false }`
+- 決まった 3 つ以外・設定が空の AI（422）：`{ "message": "AIで自動生成できませんでした。時間をおいてもう一度お試しください。" }`（AI は呼ばない。**2026-10-20 追加**）
 - AI の失敗・時間切れ・返事が空（502）：`{ "message": "AIで自動生成できませんでした。時間をおいてもう一度お試しください。" }`（**2026-10-19 変更**：その前は「AIの下書きを作れませんでした。…」）
 - 別のトレーニーの結果・存在しない結果：404。ログインしていない：ログインの画面へ（JSON の要求なら 401）
 

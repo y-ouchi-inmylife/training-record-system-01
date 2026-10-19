@@ -253,6 +253,9 @@ nano .env
 | `OPENAI_REQUEST_TIMEOUT` | `300` |
 | `ANTHROPIC_API_KEY` | 秘密情報 |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` |
+| `OPENAI_EVALUATION_MODEL` | 愛犬性格診断の［AIで自動生成（OpenAI）］で文を書くモデル（例：大内さんが決めるモデル名）。空なら［AIで自動生成（OpenAI）］を出さない（2026-10-20 追加。キーは `OPENAI_API_KEY` と同じ） |
+| `GEMINI_API_KEY` | 秘密情報（Google AI Studio の有料プランのキー）。空なら［AIで自動生成（Gemini）］を出さない（2026-10-20 追加） |
+| `GEMINI_MODEL` | ［AIで自動生成（Gemini）］のモデル（例：`gemini-2.5-pro`）。空なら［AIで自動生成（Gemini）］を出さない（2026-10-20 追加） |
 
 秘密情報は、サーバー上の `.env` にだけ記載する。`.env` を変更したら `sudo -u trs01 php artisan config:clear` を実行する。
 

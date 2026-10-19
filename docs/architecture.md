@@ -31,8 +31,9 @@ flowchart TD
     end
 
     subgraph External["外部サービス"]
-        OpenAI[OpenAI API<br/>Whisper（文字起こし）]
-        Anthropic[Anthropic API<br/>Claude（要約）]
+        OpenAI[OpenAI API<br/>Whisper（文字起こし）・愛犬性格診断の自動生成]
+        Anthropic[Anthropic API<br/>Claude（要約・愛犬性格診断の自動生成）]
+        Gemini[Google Gemini API<br/>愛犬性格診断の自動生成（2026-10-20 追加）]
         R2[Cloudflare R2<br/>バックアップ保管]
         SMTP[さくら SMTP<br/>メール送信]
     end
@@ -47,6 +48,7 @@ flowchart TD
     App -->|署名付きURL| Media
     App --> OpenAI
     App --> Anthropic
+    App --> Gemini
     App --> R2
     App --> SMTP
 ```
@@ -98,8 +100,9 @@ flowchart TD
 
 **外部サービス**
 
-- **OpenAI API**：音声ファイルの文字起こしに使用（Whisper）
-- **Anthropic API**：文字起こしの要約に使用（Claude）。愛犬性格診断のアドバイスとスタッフ用メモの自動生成（S-0313 の［AIで自動生成］。2026-10-19 変更：その前の呼び名は［AIで下書き］）にも使用（**2026-10-19 追加**。下の「外部の AI に送るデータ」）
+- **OpenAI API**：音声ファイルの文字起こしに使用（Whisper）。愛犬性格診断のアドバイスとスタッフ用メモの自動生成（S-0313 の［AIで自動生成（OpenAI）］）にも使用（**2026-10-20 追加**。下の「外部の AI に送るデータ」）
+- **Anthropic API**：文字起こしの要約に使用（Claude）。愛犬性格診断のアドバイスとスタッフ用メモの自動生成（S-0313 の［AIで自動生成］。2026-10-19 変更：その前の呼び名は［AIで下書き］）にも使用（**2026-10-19 追加**。2026-10-20 から［AIで自動生成（Claude）］。下の「外部の AI に送るデータ」）
+- **Google Gemini API**：愛犬性格診断のアドバイスとスタッフ用メモの自動生成（S-0313 の［AIで自動生成（Gemini）］）に使用（**2026-10-20 追加**：2026-10-20 のユーザーレビューで、しばらく 3 社を比べながら使い、最終的に 1 つに絞るため。下の「外部の AI に送るデータ」）
 - **メール送信**：さくらのレンタルサーバー SMTP（招待メール等の送信）
 
 **運用**
@@ -209,11 +212,15 @@ flowchart TD
 - **送るデータ**：愛犬の名前・タイプ・点数（7 つのカテゴリ）・**その愛犬性格診断で答えた自由記述の質問（4 問）**（その診断の結果に保存した答え。**2026-10-19 変更**：その前は「愛犬アンケートの暮らしの様子の 4 問」と書いていたが、2026-10-19 の `1b8c782` から送るのはその診断の結果の 4 問で、書き方が食い違っていたため直した）。指示文（`system_settings` の `evaluation_prompt_current`）に差し込んで送る
 - **送らないデータ**：会員様（飼い主様）の名前・住所・電話番号・メールアドレス、犬種・年齢・性別。組み立ては `App\Services\EvaluationDraft\PersonalityEvaluationPrompt::data()` の 1 か所で、ここに入れたものだけが送られる
 - 自由記述の質問の答えには、お客様が名前・住所などを書いている恐れがある（伏せ字の処理はしない。トレーナーが下書きを読んで直す）
-- **会社を差し替える作り**：コントローラーはインターフェイス `App\Services\EvaluationDraft\EvaluationDraftGenerator` だけを使う。会社ごとの実装を 1 つずつ持ち（今は Claude の `ClaudeEvaluationDraftGenerator`）、設定 `config('services.evaluation_draft.driver')`（`EVALUATION_DRAFT_DRIVER`。既定 `anthropic`）で `AppServiceProvider` が選ぶ。Gemini にするときは実装を 1 つ足して切り替える
-- 呼び出し：その場で呼ぶ（キューは使わない）。待ち時間の上限 60 秒（SDK 0.6.0 の timeout の指定は HTTP の呼び出しに使われないので、時間切れを付けた Guzzle を transporter として渡す）。再試行しない（SDK の既定は 2 回まで再試行する）。出す長さの上限 3000 トークン
+- **3 社の AI**（**2026-10-20 変更**：2026-10-20 のユーザーレビューで、しばらく Claude・OpenAI・Gemini の 3 社を比べながら使い、最終的に 1 つに絞るため。その前は Claude だけで、設定 `EVALUATION_DRAFT_DRIVER`〔既定 `anthropic`〕で `AppServiceProvider` が実装を選んでいた。この設定は外した）：送り先は **Anthropic（Claude）・OpenAI・Google（Gemini）**。**送るデータ・指示文・書式の決まり・返事の後始末は 3 社とも同じ**。コントローラーはインターフェイス `App\Services\EvaluationDraft\EvaluationDraftGenerator` だけを使い、S-0313 で押したボタンの `provider`（`claude`・`openai`・`gemini`）から、`App\Services\EvaluationDraft\EvaluationDraftProviders`（AI の名前 → 実装・ボタンの名前の対応表の 1 か所）が実装を選ぶ。キーかモデルの設定が空の AI は、ボタンを出さず、送られても呼ばない
+  - **Claude**（`ClaudeEvaluationDraftGenerator`。今のまま）：anthropic-ai/sdk の Messages API。書式の決まりを `system`、指示文をユーザーの発言に入れる。キーは SDK がヘッダーで送る
+  - **OpenAI**（`OpenAiEvaluationDraftGenerator`）：文字起こしで使っている openai-php（`OPENAI_API_KEY`）の Chat Completions。書式の決まりを `system` の発言、指示文を `user` の発言に入れる。出す長さの上限は `max_completion_tokens`。キーはクライアントが `Authorization` ヘッダーで送る。文字起こしとは別に、時間切れ 60 秒の HTTP クライアントで作る（文字起こしの `OPENAI_REQUEST_TIMEOUT` には左右されない）
+  - **Gemini**（`GeminiEvaluationDraftGenerator`）：SDK は入れず、Laravel の HTTP クライアントで `POST https://generativelanguage.googleapis.com/v1beta/models/{モデル}:generateContent`。書式の決まりを `systemInstruction`、指示文を `contents`（`role: user`）に入れる。出す長さの上限は `generationConfig.maxOutputTokens`。**API キーは URL に入れず、ヘッダー `x-goog-api-key` で送る**（URL がログに残っても漏れないように）
+  - 設定（`config/services.php`。`.env` から読む。キーの値はコードに書かない）：Claude は `ANTHROPIC_API_KEY`・`ANTHROPIC_MODEL`（今のまま）、OpenAI は `OPENAI_API_KEY`（文字起こしと同じ）・**`OPENAI_EVALUATION_MODEL`**（文を書くモデル。**既定の値は持たない**）、Gemini は **`GEMINI_API_KEY`**・**`GEMINI_MODEL`**（既定の値は持たない）。モデルの既定の値を持たないのは、会社を比べるために、使うモデルを本番の `.env` で必ず選んでもらうため（空ならボタンを出さない）
+- 呼び出し：その場で呼ぶ（キューは使わない）。**3 社とも**、待ち時間の上限 60 秒・再試行しない・出す長さの上限 3000 トークン（**2026-10-20 変更**：3 社にそろえた）。Claude は、SDK 0.6.0 の timeout の指定が HTTP の呼び出しに使われないので、時間切れを付けた Guzzle を transporter として渡す（SDK の既定は 2 回まで再試行するので 0 にする）。OpenAI は時間切れを付けた Guzzle を HTTP クライアントとして渡す（openai-php は再試行しない）。Gemini は Laravel の HTTP クライアントの timeout（再試行は付けない）
 - **AI に渡すもの**（**2026-10-19 追加**：2026-10-19 のユーザーレビューで、AI が見出しや太字を Markdown の記号（`#`・`**`・`---` など）で書いて返し、アドバイスの欄に記号がそのまま入り、公開すると会員様の画面（S-1418）にも記号が出てしまうため）：書式の決まり（Markdown の記号を使わず普通の文章で書く。要件定義書 6-16-19）を **system（システムプロンプト）**に、指示文（データを差し込んだもの）を今までどおり**ユーザーの発言**に入れる。決まりの文は AI の会社に依らない `PersonalityEvaluationPrompt::FORMAT_RULES` の 1 か所に持ち、会社ごとの実装はそれを渡すだけにする（Gemini を足すときも同じ決まりを使う）。返事は `EvaluationDraft::fromResponse()` で「#####」で分けたあと、`EvaluationDraft::stripMarkdown()` で念のため Markdown の記号を外す
-- ログ：結果の id・モデル・入力と出力のトークン数・かかった時間・止まった理由だけ（送った文・返ってきた文・名前は残さない）。アクセスログには記録しない
-- **未決事項**：本番で使い始める前に、プライバシーポリシーに外部の AI で分析することを書き足す必要がある
+- ログ：結果の id・**AI の名前**・モデル・入力と出力のトークン数・かかった時間・止まった理由だけ（送った文・返ってきた文・名前・API キーは残さない。失敗のときのエラーの内容は API キーを伏せる）。アクセスログには記録しない（**2026-10-20 変更**：AI の名前を足した）
+- **未決事項**：本番で使い始める前に、プライバシーポリシーに外部の AI（**Anthropic・OpenAI・Google の 3 社**。**2026-10-20 変更**：その前は Anthropic だけ）で分析することを書き足す必要がある。最終的に 1 社に絞ったら、その会社だけにしてよい
 
 ### 2-6. ログと個人情報の扱い
 
