@@ -39,6 +39,8 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->createAccessLogsTable();
         // 会員（案内の画面〔S-0311〕の文面に会員の氏名を入れる。2026-10-18 追加）
         $this->createClientsTable();
+        // ご案内の文面にマイページ登録の段を足すかを見るため（2026-10-20 追加。MypageRegistrationInvite::activeToken）
+        $this->createClientEmailRegistrationTokensTable();
         DB::table('clients')->insert(['id' => 7, 'internal_id' => '0007', 'last_name' => '山田', 'first_name' => '太郎']);
         Schema::create('trainees', function (Blueprint $table) {
             $table->id();

@@ -25,6 +25,21 @@ use Carbon\CarbonInterface;
  *   （空行）
  *   {有効期限の行｜1回かぎりの行}
  *   ご不明な点がございましたら、お気軽にお問い合わせください。
+ *
+ * 愛犬アンケート・愛犬性格診断・組み合わせの文面は、その会員に有効なマイページ登録の案内があるときだけ（MypageRegistrationInvite::activeToken。
+ * 完了の画面のお誘いと同じ判定）、有効期限の行と「ご不明な点が…」のあいだに、マイページ登録の段を足す（2026-10-20 追加：完了の画面の
+ * お誘いは画面を閉じるともう一度たどり着けないため。その前は、LINE・メールの文面のリンクは 1 つのまま）：
+ *   （空行）
+ *   ━━━━━━━━━━━━
+ *   あわせて、マイページへのご登録もお願いいたします。
+ *   マイページにご登録いただくと、パソコンやスマートフォンで、愛犬性格診断の結果をいつでもご覧いただけます。
+ *   （空行）
+ *   {マイページ登録のURL}
+ *   （空行）
+ *   リンクの有効期限：{マイページ登録の案内の有効期限}まで
+ *   ━━━━━━━━━━━━
+ *   （空行）
+ * 文面はご案内の画面を開いたときの状態で作る。QR コードの中身は変えない（呼ぶ側が渡す URL だけ）
  */
 class InvitationMessage
 {
@@ -58,6 +73,7 @@ class InvitationMessage
             __('messages.invitation_message.intake.body'),
             $url,
             self::expiresOrOnceLine($expiresAt),
+            self::mypageInviteLines($trainee),
         );
     }
 
@@ -73,6 +89,7 @@ class InvitationMessage
             __('messages.invitation_message.personality.body', ['count' => count(PersonalityDiagnosisQuestions::questions())]),
             $url,
             self::expiresOrOnceLine($expiresAt),
+            self::mypageInviteLines($trainee),
         );
     }
 
@@ -93,7 +110,36 @@ class InvitationMessage
             __('messages.invitation_message.combined.body', ['count' => count(PersonalityDiagnosisQuestions::questions()), ...$names]),
             $url,
             self::expiresOrOnceLine($expiresAt),
+            self::mypageInviteLines($trainee),
         );
+    }
+
+    /**
+     * マイページ登録の段の行（2026-10-20 追加）。その会員に有効なマイページ登録の案内がなければ空（今の文面のまま）。
+     * 判定は完了の画面のお誘いと同じ MypageRegistrationInvite::activeToken（判定を 2 つ持たない）
+     *
+     * @return list<string>
+     */
+    private static function mypageInviteLines(Trainee $trainee): array
+    {
+        $registration = MypageRegistrationInvite::activeToken($trainee->client);
+        if ($registration === null) {
+            return [];
+        }
+        $separator = __('messages.invitation_message.mypage_invite.separator');
+
+        return [
+            '',
+            $separator,
+            __('messages.invitation_message.mypage_invite.intro'),
+            __('messages.invitation_message.mypage_invite.body', ['diagnosis' => __('messages.personality_diagnosis_name')]),
+            '',
+            MypageRegistrationInvite::registrationUrl($registration),
+            '',
+            __('messages.invitation_message.expires', ['expires' => self::expiresLabel($registration->expires_at)]),
+            $separator,
+            '',
+        ];
     }
 
     /** 有効期限の行（期限があるとき）か、1 回かぎりの文（期限なしの案内。2026-10-19 より前に発行したもの） */
@@ -119,7 +165,8 @@ class InvitationMessage
         return $date->format('Y年n月j日').'（'.self::WEEKDAYS[$date->dayOfWeek].'）';
     }
 
-    private static function compose(Client $client, string $intro, string $body, string $url, string $lastLine): string
+    /** @param  list<string>  $mypageInviteLines  マイページ登録の段（2026-10-20 追加。なければ空。有効期限の行と closing のあいだに入れる） */
+    private static function compose(Client $client, string $intro, string $body, string $url, string $lastLine, array $mypageInviteLines = []): string
     {
         $company = config('app.client_portal_company');
         $lines = [
@@ -130,7 +177,8 @@ class InvitationMessage
         if (! blank($company)) {
             $lines[] = __('messages.invitation_message.from', ['company' => $company]);
         }
-        array_push($lines, $intro, '', $body, '', $url, '', $lastLine, __('messages.invitation_message.closing'));
+        array_push($lines, $intro, '', $body, '', $url, '', $lastLine, ...$mypageInviteLines);
+        $lines[] = __('messages.invitation_message.closing');
 
         return implode("\n", $lines);
     }

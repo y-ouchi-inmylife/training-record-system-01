@@ -43,6 +43,8 @@ class TraineeCombinedSurveyTokenControllerTest extends TestCase
         config(['app.client_portal_company' => 'テスト訓練所']);
 
         $this->createClientsTable();
+        // ご案内の文面にマイページ登録の段を足すかを見るため（2026-10-20 追加。MypageRegistrationInvite::activeToken）
+        $this->createClientEmailRegistrationTokensTable();
         $this->createAccessLogsTable();
         Schema::create('trainees', function (Blueprint $table) {
             $table->id();

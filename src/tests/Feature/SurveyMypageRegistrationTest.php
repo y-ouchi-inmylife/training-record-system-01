@@ -6,6 +6,7 @@ use App\Models\AccessLog;
 use App\Models\Client;
 use App\Models\Trainee;
 use App\Models\Trainer;
+use App\Support\MypageRegistrationInvite;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,9 @@ use Tests\TestCase;
  * - 作れるのは、有効なマイページ登録の案内がない会員（「未登録」「登録待ち（期限切れ）」）だけ（2026-10-19 変更）
  * - 完了の画面：答えた会員に有効なマイページ登録の案内があれば、お誘いと［マイページに登録する］（2026-10-19 変更：その前は、
  *   案内に結び付けたマイページ登録の案内があるときだけ）
+ *
+ * - ご案内の文面（S-0311・S-0312・S-0314）：会員に有効なマイページ登録の案内があれば、マイページ登録の段を足す（2026-10-20 追加。
+ *   判定は完了の画面のお誘いと同じ MypageRegistrationInvite::activeToken）
  *
  * 「今日」は 2026-10-19 に固定する（マイページ登録の案内の期限は 7 日後の日の終わり＝2026-10-26 23:59:59）。
  */
@@ -370,5 +374,176 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->assertStringNotContainsString('data-mypage-registration-invite', $html);
         $this->assertStringNotContainsString('次のことができます', $html);
         $this->assertStringContainsString('マイページへ戻る', $html);
+    }
+
+    // ---- ご案内の文面のマイページ登録の段（2026-10-20 追加：完了の画面のお誘いは画面を閉じるともう一度たどり着けないため） ----
+
+    /** ご案内の画面（種類ごと）と、その QR コードの中身（愛犬アンケート・愛犬性格診断のリンク） */
+    private const PRINT_PAGES = [
+        'intake' => ['route' => 'trainee-intake-survey-tokens.print', 'qr' => ['client-portal.intake-survey.show', self::INTAKE]],
+        'personality' => ['route' => 'trainee-personality-diagnosis-tokens.print', 'qr' => ['client-portal.personality-diagnosis.show', self::PERSONALITY]],
+        'combined' => ['route' => 'trainee-combined-survey-tokens.print', 'qr' => ['client-portal.intake-survey.show', self::INTAKE]],
+    ];
+
+    /** 種類ごとの愛犬アンケート・愛犬性格診断の案内を入れる（組み合わせは 2 つを結び付ける。単独の愛犬性格診断は愛犬アンケートを消す） */
+    private function invitationTokens(string $kind): void
+    {
+        DB::table('trainee_intake_survey_tokens')->delete();
+        DB::table('trainee_personality_diagnosis_tokens')->delete();
+        $this->surveyTokens($kind === 'combined');
+        if ($kind === 'personality') {
+            DB::table('trainee_intake_survey_tokens')->delete();
+        }
+    }
+
+    /**
+     * ご案内の画面を開き、画面に出す文面・コピーする文面・QR コードの中身を返す
+     *
+     * @return array{screen: string, copy: string, qr: string}
+     */
+    private function invitationPage(string $kind): array
+    {
+        $this->actingAsTrainer();
+        $html = $this->get(route(self::PRINT_PAGES[$kind]['route'], $this->trainee))->assertOk()->getContent();
+        $this->assertSame(1, preg_match('/data-copy-text="([^"]*)"/u', $html, $copy));
+        $this->assertSame(1, preg_match('/<div class="invitation-message" data-invitation-message>(.*?)<\/div>/su', $html, $screen));
+        $this->assertSame(1, preg_match('/data-qr-url="([^"]*)"/u', $html, $qr));
+
+        return [
+            'screen' => html_entity_decode($screen[1], ENT_QUOTES),
+            'copy' => html_entity_decode($copy[1], ENT_QUOTES),
+            'qr' => html_entity_decode($qr[1], ENT_QUOTES),
+        ];
+    }
+
+    /** マイページ登録の段（有効期限の行から「ご不明な点が…」まで） */
+    private function mypageInviteTail(string $token = 'regtokenregtokenregtokenregtoken', string $expires = '2026年10月26日（月）'): string
+    {
+        return "リンクの有効期限：2026年10月26日（月）まで\n"
+            ."\n"
+            ."━━━━━━━━━━━━\n"
+            ."あわせて、マイページへのご登録もお願いいたします。\n"
+            ."マイページにご登録いただくと、パソコンやスマートフォンで、愛犬性格診断の結果をいつでもご覧いただけます。\n"
+            ."\n"
+            .route('client-portal.email-registration.show', ['token' => $token])."\n"
+            ."\n"
+            ."リンクの有効期限：{$expires}まで\n"
+            ."━━━━━━━━━━━━\n"
+            ."\n"
+            .'ご不明な点がございましたら、お気軽にお問い合わせください。';
+    }
+
+    /** 段がないときの終わり（今の文面のまま：有効期限の行のすぐあとに「ご不明な点が…」） */
+    private const PLAIN_TAIL = "リンクの有効期限：2026年10月26日（月）まで\nご不明な点がございましたら、お気軽にお問い合わせください。";
+
+    public function test_有効なマイページ登録の案内があれば3つのご案内の文面に段を足し画面とコピーが同じでQRコードは今のまま(): void
+    {
+        $this->registrationToken(expiresAt: '2026-10-25 23:59:59');
+
+        foreach (array_keys(self::PRINT_PAGES) as $kind) {
+            $this->invitationTokens($kind);
+            $page = $this->invitationPage($kind);
+
+            $this->assertSame($page['copy'], $page['screen'], $kind);
+            $this->assertStringEndsWith($this->mypageInviteTail(expires: '2026年10月25日（日）'), $page['copy'], $kind);
+            $this->assertSame(1, substr_count($page['copy'], '━━━━━━━━━━━━'."\n".'あわせて'), $kind);
+            // QR コードの中身は今のまま（愛犬アンケート・愛犬性格診断のリンクだけ）
+            [$qrRoute, $qrToken] = self::PRINT_PAGES[$kind]['qr'];
+            $this->assertSame(route($qrRoute, ['token' => $qrToken]), $page['qr'], $kind);
+        }
+    }
+
+    public function test_有効なマイページ登録の案内がないときは今の文面のまま(): void
+    {
+        $cases = [
+            '案内なし' => fn () => null,
+            '期限切れ' => fn () => $this->registrationToken(expiresAt: '2026-10-18 23:59:59'),
+            '使用済み' => fn () => $this->registrationToken(used: true),
+            '取消済み' => fn () => DB::table('client_email_registration_tokens')->where('id', $this->registrationToken())->delete(),
+            '利用中' => function () {
+                $this->registrationToken();
+                DB::table('clients')->where('id', $this->client->id)->update(['email' => 'yamada@example.com', 'password' => 'hashed']);
+            },
+            '登録待ち（初回設定）' => function () {
+                $this->registrationToken();
+                DB::table('clients')->where('id', $this->client->id)->update(['email' => 'yamada@example.com']);
+            },
+        ];
+        foreach ($cases as $name => $prepare) {
+            DB::table('client_email_registration_tokens')->delete();
+            DB::table('clients')->where('id', $this->client->id)->update(['email' => null, 'password' => null]);
+            $prepare();
+            foreach (array_keys(self::PRINT_PAGES) as $kind) {
+                $this->invitationTokens($kind);
+                $page = $this->invitationPage($kind);
+                $this->assertStringEndsWith(self::PLAIN_TAIL, $page['copy'], $name.' '.$kind);
+                $this->assertStringNotContainsString('━', $page['copy'], $name.' '.$kind);
+                $this->assertStringNotContainsString('マイページ', $page['copy'], $name.' '.$kind);
+                $this->assertSame($page['copy'], $page['screen'], $name.' '.$kind);
+            }
+        }
+    }
+
+    public function test_チェックボックスで一緒に発行したときも会員詳細から別に発行したときも段を足す(): void
+    {
+        // チェックボックスで一緒に発行
+        $this->issue('intake')->assertSessionHasNoErrors();
+        $token = $this->registrationRows()->first()->token;
+        $this->assertStringEndsWith($this->mypageInviteTail($token), $this->invitationPage('intake')['copy']);
+
+        // 会員詳細の［マイページ登録の案内を発行］で別に発行し、チェックボックスを付けずに案内を発行
+        $this->resetTokens();
+        $this->actingAsTrainer();
+        $this->post(route('client-email-registration-tokens.store', $this->client));
+        $this->assertCount(1, $this->registrationRows());
+        $this->issue('combined', false)->assertSessionHasNoErrors();
+        $this->assertCount(1, $this->registrationRows());
+        $token = $this->registrationRows()->first()->token;
+        $this->assertStringEndsWith($this->mypageInviteTail($token), $this->invitationPage('combined')['copy']);
+    }
+
+    public function test_呼び名が空のときと組み合わせのときも崩れない(): void
+    {
+        $this->trainee->update(['name' => null]);
+        $this->registrationToken();
+        $this->invitationTokens('combined');
+
+        $copy = $this->invitationPage('combined')['copy'];
+
+        $company = config('app.client_portal_company');
+        $expected = "山田 太郎 様\n\n"
+            .(blank($company) ? '' : $company."です。\n")
+            ."愛犬アンケートと愛犬性格診断のご案内をお送りします。\n\n"
+            ."下のリンクから、続けてご回答をお願いいたします。（愛犬性格診断は全50問です）\n\n"
+            .route('client-portal.intake-survey.show', ['token' => self::INTAKE])."\n\n"
+            .$this->mypageInviteTail();
+        $this->assertSame($expected, $copy);
+    }
+
+    public function test_段を足すかの判定は完了の画面のお誘いと同じ(): void
+    {
+        $cases = [
+            '有効' => fn () => $this->registrationToken(),
+            '期限切れ' => fn () => $this->registrationToken(expiresAt: '2026-10-18 23:59:59'),
+            '使用済み' => fn () => $this->registrationToken(used: true),
+            '利用中' => function () {
+                $this->registrationToken();
+                DB::table('clients')->where('id', $this->client->id)->update(['email' => 'yamada@example.com', 'password' => 'hashed']);
+            },
+        ];
+        foreach ($cases as $name => $prepare) {
+            DB::table('client_email_registration_tokens')->delete();
+            DB::table('clients')->where('id', $this->client->id)->update(['email' => null, 'password' => null]);
+            $prepare();
+            $this->invitationTokens('intake');
+            $copy = $this->invitationPage('intake')['copy'];
+            // 完了の画面のお誘い（会員のログインなし）と、文面の段の有無・リンクがそろう（同じ MypageRegistrationInvite::activeToken）
+            auth('web')->logout();
+            $inviteUrl = MypageRegistrationInvite::url($this->trainee->id);
+            $this->assertSame($inviteUrl !== null, str_contains($copy, '━━━━━━━━━━━━'), $name);
+            if ($inviteUrl !== null) {
+                $this->assertStringContainsString("\n".$inviteUrl."\n", $copy, $name);
+            }
+        }
     }
 }

@@ -155,6 +155,15 @@ return [
             'intro_unnamed' => ':surveyと:diagnosisのご案内をお送りします。',
             'body' => '下のリンクから、続けてご回答をお願いいたします。（:diagnosisは全:count問です）',
         ],
+        // 愛犬アンケート・愛犬性格診断・組み合わせの文面に足す、マイページ登録の段（2026-10-20 追加。要件定義書 6-16-18、設計書 S-0307
+        // 「LINE・メールで送る文面」の「マイページ登録の段」）。その会員に有効なマイページ登録の案内があるときだけ、有効期限の行と closing の
+        // あいだに、separator で囲んで出す。body は完了の画面のお誘いの 1 つ目の項目（client_mypage_registration_invite.items）と言い方をそろえた。
+        // separator は全角の太い罫線 12 個（LINE の吹き出し・スマートフォンのメールでも 1 行に収まるように）。:diagnosis＝愛犬性格診断の名前
+        'mypage_invite' => [
+            'separator' => '━━━━━━━━━━━━',
+            'intro' => 'あわせて、マイページへのご登録もお願いいたします。',
+            'body' => 'マイページにご登録いただくと、パソコンやスマートフォンで、:diagnosisの結果をいつでもご覧いただけます。',
+        ],
         'personality' => [
             // :diagnosis＝愛犬性格診断の名前（personality_diagnosis_name。InvitationMessage が渡す。名前を差し替えたときも文面に出るように）
             'intro' => ':callNameの:diagnosisのご案内をお送りします。',
