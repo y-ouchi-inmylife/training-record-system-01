@@ -667,7 +667,8 @@ class Trainee extends Model
     /**
      * 指定した結果だけのレーダーチャートの値（2026-10-19 追加。会員側の愛犬性格診断の画面 S-1418 用）。形は personality_radar_data と同じで、
      * series は今回（key = current）の 1 つだけ（前回・初回は重ねない）。記録の画面はその回の結果を見る画面で、前の回と比べるのは
-     * マイページの愛犬のカード（personality_radar_data）で行うため。指定した結果がこのトレーニーの結果でなければ null
+     * マイページの愛犬のカード（personality_radar_data）で行うため。指定した結果がこのトレーニーの結果でなければ null。
+     * 作り方は結果の personalityRadarDataOnly()（2026-10-20 変更：マイページの記録の一覧のアドバイスのカードと 1 か所にまとめた）
      *
      * @return array{labels: string[], keys: string[], series: array{key: string, date: string, values: (string|null)[]}[]}|null
      */
@@ -677,16 +678,17 @@ class Trainee extends Model
             return null;
         }
 
-        return self::buildPersonalityRadarData(collect([$result]));
+        return $result->personalityRadarDataOnly();
     }
 
     /**
      * 新しい順の結果から、レーダーチャートの値を組み立てる（いちばん前が今回。2026-10-18 に personality_radar_data から切り出し、
-     * 指定した結果の時点の組み立て〔personalityRadarDataAsOf〕と共通にした）。結果がなければ null
+     * 指定した結果の時点の組み立て〔personalityRadarDataAsOf〕と共通にした）。結果がなければ null。
+     * 2026-10-20 変更：結果だけのグラフ（TraineePersonalityDiagnosisResult::personalityRadarDataOnly）からも呼ぶので public にした
      *
      * @param  Collection<int, TraineePersonalityDiagnosisResult>  $results  新しい順（キーは 0 から）
      */
-    private static function buildPersonalityRadarData(Collection $results): ?array
+    public static function buildPersonalityRadarData(Collection $results): ?array
     {
         if ($results->isEmpty()) {
             return null;

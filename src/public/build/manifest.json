@@ -62,7 +62,7 @@
     ]
   },
   "resources/js/personality-radar.js": {
-    "file": "assets/personality-radar-nqNTUFB7.js",
+    "file": "assets/personality-radar-DPOEA33R.js",
     "name": "personality-radar",
     "src": "resources/js/personality-radar.js",
     "isEntry": true,
@@ -125,7 +125,7 @@
     ]
   },
   "resources/sass/client.scss": {
-    "file": "assets/client-ChKoqSBW.css",
+    "file": "assets/client-BbFvLHm8.css",
     "src": "resources/sass/client.scss",
     "isEntry": true,
     "name": "client",

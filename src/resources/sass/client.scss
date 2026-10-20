@@ -757,6 +757,73 @@ input[type="tel"] {
     line-height: 1.75;
 }
 
+// アドバイスのカードの、その回のグラフとタイプ（2026-10-20 追加。設計書 S-1402「その回のグラフとタイプ」）
+// - スマホの幅（sm 未満。カードの日付が上の横帯になる幅）：タイプ → グラフ → アドバイスのはじめ → 続きを読む の縦並び。
+//   タイプはタイトルのすぐ下に左寄せ、グラフはカードの幅に合わせた正方形で、一辺の上限は 240px（真ん中に置く）
+// - sm 以上（カードの日付が左の縦帯になる幅。今のカードの切り替えの幅に合わせる）：グラフ（一辺 180px）とタイプを左、
+//   アドバイスのはじめと続きを読むを右に横に並べる。タイプはグラフの下に、グラフの幅の中で真ん中に置く
+// グラフは Chart.js が枠の高さいっぱいに描く（compact・card の設定。枠は正方形）
+.c-session-personality {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    @include media-breakpoint-up(sm) {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 1.25rem;
+    }
+}
+.c-session-personality-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    @include media-breakpoint-up(sm) {
+        flex: 0 0 180px;
+        width: 180px;
+        gap: 0.25rem;
+    }
+}
+// タイプ名：小さな太字。「・」のあとでだけ折り返す（S-1418 と同じ。ビューで <wbr> を入れる）
+.c-session-personality-type {
+    margin: 0;
+    color: $ink;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1.4;
+    word-break: keep-all;
+
+    @include media-breakpoint-up(sm) {
+        order: 1;
+        text-align: center;
+    }
+}
+.c-session-radar {
+    position: relative;
+    width: 100%;
+    max-width: 240px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
+
+    @include media-breakpoint-up(sm) {
+        width: 180px;
+        height: 180px;
+        margin: 0;
+    }
+}
+// アドバイスのはじめと続きを読む（カードの中身と同じ間で縦に並べる）
+.c-session-personality-text {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+.c-session--hero .c-session-personality-text {
+    gap: 1rem;
+}
+
 // 「続きを読む →」CTA
 // カード末尾に単独で置く文字リンクは、本文中リンクと同じ手がかり
 // （brand-bright + 常時下線・hover 時 ink）で識別を担保する

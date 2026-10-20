@@ -554,8 +554,10 @@
 @if(!empty($weightCharts))
     @vite('resources/js/measurement-chart.js')
 @endif
-{{-- 性格診断のレーダーチャート用スクリプト（トレーナー側 S-0309 と共有。結果のあるトレーニーがいるときだけ読み込む。2026-10 追加） --}}
-@if(collect($weightCharts)->contains(fn ($chart) => ($chart['personality'] ?? null) !== null))
+{{-- 性格診断のレーダーチャート用スクリプト（トレーナー側 S-0309 と共有。結果のあるトレーニーがいるときだけ読み込む。2026-10 追加）。
+     2026-10-20 変更：記録の一覧のアドバイスのカードにもその回のグラフを出すので、アドバイスのカードがあるときも読み込む --}}
+@if(collect($weightCharts)->contains(fn ($chart) => ($chart['personality'] ?? null) !== null)
+    || $timeline->contains(fn ($entry) => $entry['type'] === \App\Support\RecordTimeline::EVALUATION))
     @vite('resources/js/personality-radar.js')
 @endif
 @endsection

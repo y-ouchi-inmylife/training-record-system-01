@@ -13,8 +13,13 @@ describe('性格診断のレーダーチャートの共有（トレーナー側�
         const entry = read('../../resources/js/personality-radar.js');
 
         expect(entry).toMatch(/import \{ buildRadarConfig, legendItems, legendSwatchSvg \} from '\.\/personality-radar-config';/);
-        // data-personality-radar-compact が付いた canvas（会員側）だけ、小さなグラフの設定にする（2026-10 追加）
-        expect(entry).toContain("new Chart(canvas, buildRadarConfig(data, { compact: 'personalityRadarCompact' in canvas.dataset }))");
+        // data-personality-radar-compact が付いた canvas（会員側）だけ、小さなグラフの設定にする（2026-10 追加）。
+        // data-personality-radar-card が付いた canvas（記録の一覧のアドバイスのカード）は、さらに小さな文字にする（2026-10-20 追加）
+        expect(entry).toContain("compact: 'personalityRadarCompact' in canvas.dataset,");
+        expect(entry).toContain("card: 'personalityRadarCard' in canvas.dataset,");
+        // data-personality-radar-lazy が付いた canvas は、画面に入ってから描く（2026-10-20 追加）
+        expect(entry).toContain("'personalityRadarLazy' in canvas.dataset");
+        expect(entry).toContain('new IntersectionObserver(');
         // canvas の data-personality-radar と、凡例の枠 data-personality-radar-legend="{canvas の id}" で見つける（画面に依らない）
         expect(entry).toContain("document.querySelectorAll('canvas[data-personality-radar]')");
         expect(entry).toContain('[data-personality-radar-legend="${canvas.id}"]');
@@ -84,5 +89,43 @@ describe('性格診断のレーダーチャートの共有（トレーナー側�
 
         expect(trainerView).not.toContain('data-personality-radar-compact');
         expect(clientView).toContain('data-personality-radar-compact');
+    });
+
+    it('記録の一覧のアドバイスのカード（card）は、凡例なし・線 1 本で、compact の文字の大きさだけを小さくする（2026-10-20 追加）', () => {
+        // カードの canvas に入る値の形（TraineePersonalityDiagnosisResult::personalityRadarDataOnly。今回の 1 つだけ）
+        const data = {
+            labels: ['対人', '対犬', '所有欲', '分離不安', '恐怖心', '訓練性能', '興奮性'],
+            keys: ['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'],
+            series: [{ key: 'current', date: '2026/06/01', values: ['2.0', '1.9', '1.0', '1.4', '2.7', '0.9', '1.0'] }],
+        };
+        const compact = buildRadarConfig(data, { compact: true });
+        const card = buildRadarConfig(data, { compact: true, card: true });
+
+        // 線は 1 本（今回）・凡例は出さない
+        expect(card.data.datasets).toHaveLength(1);
+        expect(card.data.datasets[0].borderColor).toBe('#0a4fa8');
+        expect(card.options.plugins.legend.display).toBe(false);
+        // 文字の大きさ（項目名 10px・目盛り 8px）と項目名の間のほかは S-1418（compact）と同じ
+        expect(card.options.scales.r.pointLabels).toEqual({ font: { size: 10 }, padding: 2 });
+        expect(card.options.scales.r.ticks).toEqual({ stepSize: 1, font: { size: 8 }, backdropPadding: 1 });
+        const strip = (config) => ({ ...config, options: { ...config.options, scales: { r: { ...config.options.scales.r, pointLabels: null, ticks: null } } } });
+        expect(strip(card)).toEqual(strip(compact));
+        // 訓練性能が真上（先頭）
+        expect(card.data.labels[0]).toBe('訓練性能');
+        // card だけ（compact なし）は、トレーナー側の設定のまま
+        expect(buildRadarConfig(data, { card: true })).toEqual(buildRadarConfig(data));
+    });
+
+    it('記録の一覧のアドバイスのカードの canvas には card と lazy の印を付ける。愛犬のカードと S-1418 には付けない', () => {
+        const card = read('../../resources/views/client/_evaluation-session.blade.php');
+        const dashboard = read('../../resources/views/client/dashboard.blade.php');
+        const s1418 = read('../../resources/views/client/personality-diagnosis-results/show.blade.php');
+
+        expect(card).toContain('data-personality-radar-compact data-personality-radar-card data-personality-radar-lazy');
+        expect(card).not.toContain('data-personality-radar-legend');
+        expect(dashboard).not.toContain('data-personality-radar-card');
+        expect(dashboard).not.toContain('data-personality-radar-lazy');
+        expect(s1418).not.toContain('data-personality-radar-card');
+        expect(s1418).not.toContain('data-personality-radar-lazy');
     });
 });

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
+use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\Trainer;
 use Carbon\Carbon;
@@ -21,6 +22,8 @@ use Tests\TestCase;
  * - 件数（「これまでの記録（N件）」「全 N 回」）は記録だけ
  * - トレーナー側の記録の一覧（S-0402）・ダッシュボードの最近の記録（S-0201）・記録数の推移（S-1101）には混ぜない
  * - S-1418 は自分のトレーニーの公開済みのアドバイスだけ（それ以外は 404）。グラフはその結果の時点
+ * - マイページのアドバイスのカードに、その回のグラフ（その結果だけの線 1 本）とタイプを出す（2026-10-20 追加。設計書 S-1402
+ *   「その回のグラフとタイプ」）。データはカードの結果から作り（S-1418 と同じ作り方）、カードの数だけ問い合わせを増やさない
  */
 class PublishedEvaluationTimelineTest extends TestCase
 {
@@ -501,7 +504,7 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertCount(7, $radar['keys']);
 
         // マイページ（S-1402）の愛犬のカードのグラフは今のまま今回・前回・初回
-        $dashboard = $this->radarData($this->mypage());
+        $dashboard = $this->dogCardRadarData($this->mypage());
         $this->assertSame(['current', 'previous', 'initial'], array_column($dashboard['series'], 'key'));
         $this->assertSame(['2026/10/13', '2026/09/01', '2026/06/01'], array_column($dashboard['series'], 'date'));
     }
@@ -607,6 +610,190 @@ class PublishedEvaluationTimelineTest extends TestCase
         $this->assertSame(1, preg_match('/data-personality-radar="([^"]+)"/', $html, $m));
 
         return json_decode(html_entity_decode($m[1]), true);
+    }
+
+    /** マイページの愛犬のカードのグラフのデータ（2026-10-20 追加：アドバイスのカードにもグラフが出るので、canvas の id で取る） */
+    private function dogCardRadarData(string $html, ?int $traineeId = null): array
+    {
+        $id = 'personality-radar-'.($traineeId ?? $this->traineeId);
+        $this->assertSame(1, preg_match('/<canvas id="'.$id.'"[^>]*?data-personality-radar="([^"]+)"/s', $html, $m));
+
+        return json_decode(html_entity_decode($m[1]), true);
+    }
+
+    // ---- マイページのアドバイスのカードの、その回のグラフとタイプ（2026-10-20 追加） ----
+
+    /** カードのグラフのデータ（ないときは null） */
+    private function cardRadarData(string $card): ?array
+    {
+        if (preg_match('/data-personality-radar="([^"]+)"/', $card, $m) !== 1) {
+            return null;
+        }
+
+        return json_decode(html_entity_decode($m[1]), true);
+    }
+
+    /** 記録のカード（印の属性がないので、日付のブロックで始まる <article class="c-session…"> のうち、アドバイスのカード以外を集める。愛犬のカードは日付のブロックがない） */
+    private function recordCards(string $html): array
+    {
+        preg_match_all('/<article class="c-session[^"]*">\s*<div class="c-date-block".*?<\/article>/su', $html, $m);
+
+        return $m[0];
+    }
+
+    public function test_マイページのアドバイスのカードにその回のグラフの置き場所とタイプを出しデータはその回だけ(): void
+    {
+        // 前の回（初回・前回）がある会員でも、カードのグラフはその回だけ
+        $this->addResult('2026-06-01 09:00:00', null, null, null, 'calm', '1.00');
+        $this->addResult('2026-09-01 09:00:00', null, null, null, 'calm', '1.50');
+        $e = $this->addResult('2026-10-13 09:00:00', 'アドバイス', '2026-10-14 11:30:00', null, 'guardian', '2.25');
+        $this->record('2026-10-20');
+
+        $html = $this->mypage();
+        $card = $this->evaluationCard($html, $e->id);
+
+        // タイプ（S-1418 と同じ名前・同じ折り返し）
+        $this->assertStringContainsString('data-session-personality-type>'.str_replace('・', '・<wbr>', e($e->personality_type_label)).'</p>', $card);
+        $this->assertStringContainsString('慎重派・<wbr>しっかり番犬タイプ', $card);
+        // グラフの置き場所（小さなグラフ・カードの大きさ・画面に入ってから描く）。読み上げは S-1418 と同じ
+        $this->assertStringContainsString('<canvas id="session-personality-radar-'.$e->id.'" role="img" aria-label="アイちゃんの愛犬性格診断のグラフ"', $card);
+        $this->assertStringContainsString('data-personality-radar-compact data-personality-radar-card data-personality-radar-lazy></canvas>', $card);
+        // 凡例は出さない
+        $this->assertStringNotContainsString('data-personality-radar-legend', $card);
+        // データはその回だけ（前回・初回は入らない）
+        $radar = $this->cardRadarData($card);
+        $this->assertSame([['key' => 'current', 'date' => '2026/10/13', 'values' => array_fill(0, 7, '2.3')]], $radar['series']);
+        $this->assertSame(['対人', '対犬', '所有欲', '分離不安', '恐怖心', '訓練性能', '興奮性'], $radar['labels']);
+        $this->assertSame(['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'], $radar['keys']);
+        // S-1418 のグラフと同じデータ
+        $this->assertSame($this->radarData($this->evaluationPage($e)->assertOk()->getContent()), $radar);
+        // アドバイスのはじめ・続きを読むは今のまま
+        $this->assertStringContainsString('<p class="c-session-note">アドバイス</p>', $card);
+        $this->assertStringContainsString('class="c-session-cta"', $card);
+        // 上の愛犬のカードのグラフは今のまま（今回・前回・初回）
+        $this->assertSame(['current', 'previous', 'initial'], array_column($this->dogCardRadarData($html)['series'], 'key'));
+        // グラフの部品を読み込む
+        $this->assertStringContainsString('personality-radar', $html);
+    }
+
+    public function test_マイページの最新のカードがアドバイスでもグラフとタイプを出す(): void
+    {
+        $this->record('2026-10-01');
+        $e = $this->addResult('2026-10-13 09:00:00', 'アドバイス', '2026-10-14 11:30:00', null, 'calm', '1.00');
+
+        $card = $this->evaluationCard($this->mypage(), $e->id);
+
+        $this->assertStringStartsWith('<article class="c-session c-session--hero" data-session-evaluation="'.$e->id.'">', $card);
+        $this->assertStringContainsString('data-session-personality-type>'.str_replace('・', '・<wbr>', e($e->personality_type_label)).'</p>', $card);
+        $this->assertSame(['2026/10/13'], array_column($this->cardRadarData($card)['series'], 'date'));
+    }
+
+    public function test_マイページのアドバイスのカードが複数あればそれぞれの結果のデータとタイプを持つ(): void
+    {
+        $other = $this->trainee($this->client, 'ハナ');
+        $a = $this->addResult('2026-08-01 09:00:00', 'アドバイスA', '2026-08-02 10:00:00', null, 'calm', '1.00');
+        $b = $this->addResult('2026-09-01 09:00:00', 'アドバイスB', '2026-09-02 10:00:00', null, 'guardian', '2.00');
+        $c = $this->addResult('2026-10-01 09:00:00', 'アドバイスC', '2026-10-02 10:00:00', $other, 'calm', '3.50');
+        // 下書きはカードに出ない（グラフも出ない）
+        $this->addResult('2026-10-10 09:00:00', '下書き', null, null, 'calm', '4.00');
+        $this->record('2026-10-20');
+        $this->record('2026-08-15');
+
+        $html = $this->mypage();
+
+        foreach ([[$a, '2026/08/01', '1.0', 'アイ'], [$b, '2026/09/01', '2.0', 'アイ'], [$c, '2026/10/01', '3.5', 'ハナ']] as [$result, $date, $value, $name]) {
+            $card = $this->evaluationCard($html, $result->id);
+            $this->assertSame([['key' => 'current', 'date' => $date, 'values' => array_fill(0, 7, $value)]], $this->cardRadarData($card)['series'], $date);
+            $this->assertStringContainsString('data-session-personality-type>'.str_replace('・', '・<wbr>', e($result->personality_type_label)).'</p>', $card, $date);
+            $this->assertStringContainsString('aria-label="'.$name.'ちゃんの愛犬性格診断のグラフ"', $card, $date);
+        }
+        // カードのグラフは公開済みの 3 つだけ（下書きの結果のカードは出ない。下書きの値 4.0 は愛犬のカードの今回のグラフにだけ出る）
+        $this->assertSame(3, substr_count($html, 'data-personality-radar-card'));
+        $this->assertStringNotContainsString('下書き', $html);
+        preg_match_all('/data-personality-radar="([^"]+)"[^>]*data-personality-radar-card/', $html, $m);
+        $this->assertCount(3, $m[1]);
+        foreach ($m[1] as $json) {
+            $this->assertNotContains('4.0', json_decode(html_entity_decode($json), true)['series'][0]['values']);
+        }
+    }
+
+    public function test_マイページのトレーニング記録のカードにはグラフもタイプも出さない(): void
+    {
+        $this->record('2026-10-20');
+        $this->record('2026-10-01');
+        $this->record('2026-09-01');
+        $this->addResult('2026-10-13 09:00:00', 'アドバイス', '2026-10-14 11:30:00');
+
+        $html = $this->mypage();
+
+        $records = $this->recordCards($html);
+        $this->assertCount(3, $records);
+        foreach ($records as $card) {
+            $this->assertStringNotContainsString('<canvas', $card);
+            $this->assertStringNotContainsString('data-session-personality', $card);
+        }
+        $this->assertSame(1, substr_count($html, 'data-personality-radar-card'));
+        $this->assertSame(1, substr_count($html, 'data-session-personality-type'));
+    }
+
+    public function test_マイページはアドバイスのカードが増えても問い合わせの数が増えない(): void
+    {
+        $count = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->mypage();
+            $queries = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $queries;
+        };
+        $this->record('2026-10-20');
+        $this->addResult('2026-08-01 09:00:00', 'アドバイス1', '2026-08-02 10:00:00', null, 'calm', '1.00');
+        $one = $count();
+        $this->assertSame(1, substr_count($this->mypage(), 'data-personality-radar-card'));
+
+        foreach (range(2, 6) as $i) {
+            $this->addResult('2026-09-0'.$i.' 09:00:00', 'アドバイス'.$i, '2026-09-0'.$i.' 10:00:00', null, 'guardian', '2.00');
+        }
+        $six = $count();
+        $this->assertSame(6, substr_count($this->mypage(), 'data-personality-radar-card'));
+
+        $this->assertSame($one, $six);
+    }
+
+    public function test_アドバイスのカードを使う一覧の画面はマイページだけ(): void
+    {
+        // 同じカード（client/_evaluation-session）を使う一覧の画面があれば、そこにもグラフとタイプが出る（部品が 1 つのため）。
+        // 2026-10-20 の時点で使っているのはマイページ（S-1402）の最新の記録とこれまでの記録だけ
+        $users = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('views'))) as $file) {
+            if ($file->isFile() && str_contains(file_get_contents($file->getPathname()), 'client._evaluation-session')) {
+                $users[] = str_replace(resource_path('views').DIRECTORY_SEPARATOR, '', $file->getPathname());
+            }
+        }
+        $this->assertSame(['client'.DIRECTORY_SEPARATOR.'dashboard.blade.php'], $users);
+        $this->assertSame(2, substr_count(file_get_contents(resource_path('views/client/dashboard.blade.php')), "@include('client._evaluation-session'"));
+    }
+
+    public function test_S1418のグラフのデータは作り方をまとめても今と同じ(): void
+    {
+        $this->addResult('2026-06-01 09:00:00', null, null, null, 'calm', '1.00');
+        $e = $this->addResult('2026-10-13 09:00:00', 'アドバイス', '2026-10-14 11:30:00', null, 'calm', '1.95');
+        $e->update(['score_fear' => null]);
+        $e->refresh();
+        $trainee = Trainee::query()->findOrFail($this->traineeId);
+
+        $expected = [
+            'labels' => ['対人', '対犬', '所有欲', '分離不安', '恐怖心', '訓練性能', '興奮性'],
+            'keys' => ['people', 'dogs', 'possessiveness', 'separation', 'fear', 'trainability', 'excitability'],
+            'series' => [['key' => 'current', 'date' => '2026/10/13', 'values' => ['2.0', '2.0', '2.0', '2.0', null, '2.0', '2.0']]],
+        ];
+        // S-1418（Trainee::personalityRadarDataOnly）とカード（結果の personalityRadarDataOnly）は同じ
+        $this->assertSame($expected, $trainee->personalityRadarDataOnly($e));
+        $this->assertSame($expected, $e->personalityRadarDataOnly());
+        $this->assertSame($expected, $this->radarData($this->evaluationPage($e)->assertOk()->getContent()));
+        // ほかのトレーニーの結果を渡せば null（今のまま）
+        $this->assertNull(Trainee::query()->findOrFail($this->trainee($this->client, 'ハナ'))->personalityRadarDataOnly($e));
     }
 
     // ---- 混ぜない画面 ----

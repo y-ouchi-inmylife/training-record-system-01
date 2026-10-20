@@ -82,13 +82,15 @@ export const SERIES_STYLES = {
  * @param {{labels: string[], keys?: string[], series: {key: 'current'|'previous'|'initial', date: string, values: (string|null)[]}[]}} data
  *   canvas の data-personality-radar に入れた JSON（labels はカテゴリの表示名、keys はカテゴリの値〔labels と同じ並び〕、
  *   series は重ねる回。date は回答日 Y/m/d、values は表示の値）
- * @param {{compact?: boolean}} [options]
+ * @param {{compact?: boolean, card?: boolean}} [options]
  *   compact：会員側のマイページ（S-1402）の小さなグラフ用（2026-10 追加）。枠の縦横比に合わせず（maintainAspectRatio: false）、
  *   枠の高さいっぱいに描き、項目名と目盛りの文字を小さくし、周りの余白をなくす。指定しなければ（トレーナー側 S-0309）
  *   今までと同じ設定を返す（トレーナー側の見た目を変えないため）
+ *   card：マイページの記録の一覧のアドバイスのカードの、さらに小さなグラフ用（2026-10-20 追加。compact と一緒に指定する）。
+ *   compact の設定のうち、項目名と目盛りの文字の大きさだけを小さくする（色・軸・目盛りの作りは S-1418 と同じ）
  * @returns {object} Chart.js の設定（type・data・options）
  */
-export function buildRadarConfig(data, { compact = false } = {}) {
+export function buildRadarConfig(data, { compact = false, card = false } = {}) {
     // 訓練性能が先頭（真上）になるように並べ直す（上の rotateToTop）
     const rotated = rotateToTop(data);
     const datasets = rotated.series.map((series) => {
@@ -141,6 +143,11 @@ export function buildRadarConfig(data, { compact = false } = {}) {
         config.options.layout = { padding: 0 };
         config.options.scales.r.pointLabels = { font: { size: COMPACT_POINT_LABEL_SIZE }, padding: 4 };
         config.options.scales.r.ticks = { stepSize: 1, font: { size: COMPACT_TICK_SIZE }, backdropPadding: 1 };
+        if (card) {
+            // 一辺 180px ほどの枠でも項目名が欠けないよう、文字の大きさと項目名の間だけを詰める（2026-10-20 追加）
+            config.options.scales.r.pointLabels = { font: { size: CARD_POINT_LABEL_SIZE }, padding: 2 };
+            config.options.scales.r.ticks = { stepSize: 1, font: { size: CARD_TICK_SIZE }, backdropPadding: 1 };
+        }
     }
 
     return config;
@@ -149,6 +156,10 @@ export function buildRadarConfig(data, { compact = false } = {}) {
 /** 会員側の小さなグラフ（compact）の項目名と目盛りの文字の大きさ（px）。トレーナー側は Chart.js の既定（12px） */
 export const COMPACT_POINT_LABEL_SIZE = 11;
 export const COMPACT_TICK_SIZE = 9;
+
+/** 記録の一覧のアドバイスのカードのグラフ（card）の項目名と目盛りの文字の大きさ（px。2026-10-20 追加） */
+export const CARD_POINT_LABEL_SIZE = 10;
+export const CARD_TICK_SIZE = 8;
 
 /**
  * 凡例の文（「今回（2026/06/01）」など）

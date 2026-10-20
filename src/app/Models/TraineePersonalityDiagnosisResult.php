@@ -112,6 +112,19 @@ class TraineePersonalityDiagnosisResult extends Model
     }
 
     /**
+     * この結果だけのレーダーチャートの値（2026-10-20 追加。形は Trainee::personality_radar_data と同じで、series は今回〔key = current〕の 1 つだけ）。
+     * 会員側の愛犬性格診断の画面（S-1418。Trainee::personalityRadarDataOnly から呼ぶ）と、マイページ（S-1402）の記録の一覧の
+     * アドバイスのカード（client/_evaluation-session）で同じ作り方にするため、ここ 1 か所で作る。
+     * この結果の点数だけから作るので、問い合わせはしない（一覧で結果をまとめて読めば、カードの数だけ問い合わせが増えない）
+     *
+     * @return array{labels: string[], keys: string[], series: array{key: string, date: string, values: (string|null)[]}[]}
+     */
+    public function personalityRadarDataOnly(): array
+    {
+        return Trainee::buildPersonalityRadarData(collect([$this]));
+    }
+
+    /**
      * 7 カテゴリの平均の表示の値（カテゴリの値 → 小数第1位の文字列。例 "1.1"）。
      *
      * 保存の値（小数第2位）から四捨五入する（ちょうど半分は切り上げ。設計書 S-0309「性格診断の欄」・要件定義書 6-16）。
