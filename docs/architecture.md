@@ -246,6 +246,16 @@ flowchart TD
 - **戻り先**：`Referer` が同じスキーム・ホストで、GET のルートに当たるときだけ。当たったルートのミドルウェアに `auth`・`auth:client` があり、その側でログインしていなければ、
   `url.intended` に戻り先を入れてその側のログイン画面へ。戻り先がなければ送った URL（GET で開けるとき）、それもなければ `ErrorPageSide` でその側のログイン画面へ
 - リダイレクトは例外の処理の中で返すが、セッション（StartSession）の中なので、フラッシュ・入力の値（`withInput`）・ログアウトのセッションの作り直しはふだんどおり保存される
+- **トークンの取り直し**（**2026-10-21 追加**：2026-10-21：録音のアップロードが 419 になると、画面のトークンが古いままで［もう一度送る］が失敗し続け、読み込み直すとブラウザのメモリにある録音が消えたため）：GET `/csrf-token`（ルート名 `csrf-token`。トレーナー側のログインの要るグループ）が `{"token": "…", "user_id": …}` を返す。
+  ログインが切れていれば `auth` のミドルウェアが JSON の 401 を返す。画面の JS は `resources/js/csrf-token.js` の `fetchWithCsrfRetry`（419 なら取り直して 1 回だけ送り直す）・`refreshCsrfToken` を使う。
+  今使っているのは録音の送信（S-0502）だけ。AI の自動生成（S-0313）・メディアの更新・削除・登録（S-1302）・音声記録一覧の保存・文字起こし（S-0505）にも使える
+- **ブラウザに画面を残さない**（**2026-10-21 追加**：2026-10-21：ログアウトのあとにブラウザの［戻る］を押すと、ログイン中の古い画面が入力ごとそのまま出たため。共用の端末や家族のスマホで、会員様・愛犬の情報が見えないようにする。古い画面から送って 419 になることも減らす）：`App\Http\Middleware\PreventPageCache` を `web` のグループに足し（`bootstrap/app.php`）、`Cache-Control: no-store, private` を付ける。
+  ファイルを返すレスポンス（`BinaryFileResponse`・`StreamedResponse`。音声の再生の Range のリクエストなど）と、`Cache-Control` を意図して付けたレスポンス（既定の `no-cache, private` 以外。今はない）には付けない。
+  どのルートにも当たらない 404 と、ログインしていないときのログイン画面へのリダイレクト（`auth` が先に返す）には届かない（どちらも個人情報を出さない）。
+  ブラウザが［戻る］で画面をそのまま戻した（bfcache）ときは、`layouts.app`・`layouts.client` の `pageshow`（`event.persisted`）で読み込み直す。録音実行（S-0502）は読み込み直さない
+- **録音の一時保存**（**2026-10-21 追加**）：ブラウザの IndexedDB（データベース `trs01-pending-recordings`・ストア `recordings`）に、録音（Blob）・形式・録音した日時・送り先の会員（ID・名前）・録音したトレーナーの ID を保存する。
+  保存するのは録音を止めて送る前（送信中に画面が閉じても残るように）。消すのは送信に成功したときと、［破棄する］を押したとき。読むときはログイン中のトレーナーの ID で絞る。
+  IndexedDB が使えない（開けない・3 秒で開けない）ときは保存せず、メモリだけで動く。サーバーには何も足さない（録音はアップロードに成功するまでサーバーにない）
 - **セッションの設定**（調べた結果。コードは変えていない）：セッションの長さは `SESSION_LIFETIME` ではなく、役割ごとの `TRAINER_SESSION_LIFETIME`（既定 120 分）・
   `CLIENT_SESSION_LIFETIME`（既定 60 分）が使われる（`ConfigureSessionByRole` が上書きする。config/session_roles.php）。`SESSION_SAME_SITE` は既定の `lax`、
   `SESSION_EXPIRE_ON_CLOSE` は既定の false。「ログインしたままにする」はない
