@@ -63,6 +63,9 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
     Route::middleware('auth')->group(function () {
         Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
 
+        // CSRF トークンの取り直し（2026-10-21 追加。録音の送信が 419 のとき、録音を失わずに送り直すため。設計書 architecture.md 2-7）
+        Route::get('/csrf-token', \App\Http\Controllers\CsrfTokenController::class)->name('csrf-token');
+
         // パスワード変更（初回ログイン時の強制変更対応）
         Route::get('/password/change', [ChangePasswordController::class, 'show'])->name('password.change');
         Route::post('/password/change', [ChangePasswordController::class, 'update'])->name('password.update');

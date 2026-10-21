@@ -5,5 +5,13 @@
 // （ビューのスクリプトが `new bootstrap.Modal(...)` の形で使っている）。
 import 'bootstrap/dist/css/bootstrap.min.css';
 import * as bootstrap from 'bootstrap';
+import { currentCsrfToken, refreshCsrfToken } from './csrf-token';
+import { openPendingRecordingStore } from './pending-recordings';
+import { sendRecording } from './recording-upload';
 
 window.bootstrap = bootstrap;
+
+// 録音を失わないための一時保存とトークンの取り直し（2026-10-21 追加。設計書 screen-design.md S-0502）。
+// ビューのスクリプト（ふつうの <script>）から使えるように window に置く。この入口は module なので、ビューのスクリプトより後に動く
+// （ビューでは DOMContentLoaded 以降・利用者の操作のときに使う）
+window.RecordingUpload = { currentCsrfToken, refreshCsrfToken, openPendingRecordingStore, sendRecording };

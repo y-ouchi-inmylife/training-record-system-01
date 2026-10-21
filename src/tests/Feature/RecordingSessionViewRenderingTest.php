@@ -139,7 +139,7 @@ class RecordingSessionViewRenderingTest extends TestCase
         // 停止（onstop）で立て、アップロードの成功の経路で下ろす
         $this->assertStringContainsString("isRecording = false;\n                    uploadPending = true;", $html);
         $this->assertSame(1, substr_count($html, 'uploadPending = true;'));
-        $this->assertSame(1, substr_count($html, 'uploadPending = false;', strpos($html, 'uploadedAudioRecordId = data.data.id;')));
+        $this->assertSame(1, substr_count($html, 'uploadPending = false;', strpos($html, 'uploadedAudioRecordId = result.data.data.id;')));
     }
 
     public function test_録音の前は_停止中_と_録音開始_を出しメーターを動かさない(): void

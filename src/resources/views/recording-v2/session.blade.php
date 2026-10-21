@@ -138,11 +138,23 @@
             color: #6c757d;
         }
 
+        /* 未送信の録音の帯（2026-10-21 追加）。録音の画面のいちばん上。録音を始めたら隠す */
+        #pending-recordings {
+            width: 100%;
+            max-width: 560px;
+            text-align: left;
+        }
+
     </style>
 </head>
 <body>
     <!-- 録音画面（最初から表示） -->
     <div id="recording-container">
+        {{-- 未送信の録音（2026-10-21 追加。設計書 S-0502「未送信の録音」）。この端末に、ログイン中のトレーナーの送れていない録音があれば、
+             1 件ずつ「未送信の録音があります（{録音した日時}の録音）」［送る］［破棄する］を出す。会員名は出さない（録音実行の画面には会員名を出さないため）。
+             中身はスクリプトの renderPendingRecordings が作る --}}
+        <div id="pending-recordings" class="mb-3" aria-live="polite"></div>
+
         <h2 class="recording-title waiting-warning" id="recording-title">停止中</h2>
 
         <!-- タイマー -->
@@ -173,7 +185,10 @@
     </div>
 
     {{-- モーダル0: アップロード失敗（失敗した時点で音声はブラウザのメモリにしかないため、
-         閉じるボタンは付けず「もう一度送る」だけを置く） --}}
+         閉じるボタンは付けず「もう一度送る」だけを置く）。
+         2026-10-21 変更：本文を失敗のわけで出し分け（通信の失敗など・ログインが切れていた・別のトレーナーでログインしていた）、
+         ログインが切れていた・別のトレーナーのときは［ログイン画面を開く］（別のタブ）を出す。一時保存できない端末では、画面を閉じないように添える。
+         文はスクリプトの UPLOAD_FAILED_MESSAGES（設計書 S-0502「アップロード失敗モーダル」） --}}
     <div class="modal fade" id="modal-upload-failed" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -181,9 +196,11 @@
                     <h5 class="modal-title">アップロードに失敗しました</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-0">音声ファイルのアップロードに失敗しました。通信の状態を確かめて、もう一度送ってください。</p>
+                    <p class="mb-0" id="upload-failed-message">音声ファイルのアップロードに失敗しました。通信の状態を確かめて、もう一度送ってください。</p>
+                    <p class="mt-2 mb-0 text-danger d-none" id="upload-failed-no-store"></p>
                 </div>
                 <div class="modal-footer">
+                    <a href="{{ route('login') }}" target="_blank" rel="noopener" class="btn btn-outline-primary d-none" id="btn-open-login">ログイン画面を開く</a>
                     <button type="button" class="btn btn-primary" id="btn-retry-upload">もう一度送る</button>
                 </div>
             </div>
@@ -370,6 +387,8 @@
         let animationId = null;
         let uploadedAudioRecordId = null;
         let recordingStartTime = null; // 録音開始時刻（トレーニング記録の training_time 用）
+        let recordedAt = null; // 録音を止めた日時（一時保存の recordedAt。2026-10-21 追加）
+        let pendingRecordingId = null; // この録音の一時保存の ID（保存できなかったら null。2026-10-21 追加）
 
         // Dateオブジェクトを「HH:MM」形式の文字列に変換（nullの場合は空文字）
         function formatTimeHHMM(date) {
@@ -383,7 +402,11 @@
         const clientName = @json($client->internal_id . ' ' . $client->display_name);
 
         // 認証情報
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        // CSRF トークンは送るときに <meta name="csrf-token"> から読む（2026-10-21 変更：録音の送信が 419 のときにトークンを取り直して
+        // <meta> を替えるので、画面を開いたときの値を持ち続けない。その前は const csrfToken に入れたまま使っていた）
+        function csrfToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        }
         const currentUserId = {{ Auth::id() }};
         const currentDate = '{{ date("Y-m-d") }}';
 
@@ -563,6 +586,7 @@
                 };
 
                 mediaRecorder.onstop = async function() {
+                    recordedAt = new Date();
                     stopTimer();
                     stopLevelMeter();
                     isRecording = false;
@@ -624,7 +648,29 @@
         // アップロード
         // ========================================
 
-        async function uploadRecording() {
+        // 録音を失わないための一時保存とトークンの取り直し（2026-10-21 追加。設計書 S-0502「録音を失わないための一時保存とトークンの取り直し」）。
+        // 送る前に録音をこの端末（IndexedDB）に一時保存し、成功したら消す。419 ならトークンを取り直して自動で 1 回だけ送り直す
+        // （resources/js/recording-upload.js。window.RecordingUpload は head の recording-session.js が置く）
+        const UPLOAD_URL = '{{ route("audio-records.recording.store") }}';
+        const UPLOAD_FAILED_MESSAGES = {
+            failed: '音声ファイルのアップロードに失敗しました。通信の状態を確かめて、もう一度送ってください。',
+            'login-expired': 'ログインの有効期限が切れたため、送信できませんでした。録音はこの端末に一時保存しています。［ログイン画面を開く］から別のタブでログインしてから、［もう一度送る］を押してください。',
+            'login-expired-no-store': 'ログインの有効期限が切れたため、送信できませんでした。この端末には録音を一時保存できないため、この画面を閉じないでください。［ログイン画面を開く］から別のタブでログインしてから、［もう一度送る］を押してください。',
+            'other-user': '録音したトレーナーとは別のトレーナーでログインしているため、送信できませんでした。録音したトレーナーでログインし直してから、［もう一度送る］を押してください。',
+            'no-store': 'この端末には録音を一時保存できないため、この画面を閉じると録音が消えます。画面を閉じずに［もう一度送る］を押してください。',
+        };
+
+        // 一時保存の保管場所（開くのは 1 回だけ。使えない端末では available が false の何もしない保管場所）
+        let pendingStorePromise = null;
+        function pendingStore() {
+            if (!pendingStorePromise) {
+                pendingStorePromise = window.RecordingUpload.openPendingRecordingStore();
+            }
+            return pendingStorePromise;
+        }
+
+        // refreshFirst：送る前にトークンを取り直す（［もう一度送る］。別のタブでログインし直したあとかもしれないため）
+        async function uploadRecording({ refreshFirst = false } = {}) {
             try {
                 const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
 
@@ -643,38 +689,38 @@
                     String(now.getMinutes()).padStart(2, '0') +
                     String(now.getSeconds()).padStart(2, '0') + '.' + extension;
 
-                const formData = new FormData();
-                formData.append('file', blob, fileName);
-                formData.append('client_id', clientId);
-
                 // 録音画面を非表示
                 document.getElementById('recording-container').style.display = 'none';
 
-                const response = await fetch('{{ route("audio-records.recording.store") }}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: formData
+                const store = await pendingStore();
+                const result = await window.RecordingUpload.sendRecording({
+                    uploadUrl: UPLOAD_URL,
+                    blob: blob,
+                    fileName: fileName,
+                    mimeType: mediaRecorder.mimeType,
+                    recordedAt: (recordedAt || new Date()).toISOString(),
+                    clientId: clientId,
+                    trainerId: currentUserId,
+                    store: store,
+                    pendingId: pendingRecordingId,
+                    refreshFirst: refreshFirst,
                 });
+                pendingRecordingId = result.pendingId;
 
-                if (response.ok) {
-                    const data = await response.json();
-                    uploadedAudioRecordId = data.data.id;
+                if (result.status === 'ok' && result.data && result.data.data) {
+                    uploadedAudioRecordId = result.data.data.id;
                     // 音声はサーバーに保存できたので、離脱警告を外す（このあとの自動ログアウトで警告を出さない）
                     uploadPending = false;
 
                     showRecordingCompleteModal();
                 } else {
-                    const errorData = await response.json();
-                    console.error('アップロードエラー:', errorData);
-                    showUploadFailedModal();
+                    console.error('アップロードエラー:', result.status);
+                    showUploadFailedModal(result.status === 'ok' ? 'failed' : result.status, store.available);
                 }
 
             } catch (error) {
                 console.error('アップロードエラー:', error);
-                showUploadFailedModal();
+                showUploadFailedModal('failed', false);
             }
         }
 
@@ -688,10 +734,18 @@
         let uploadFailedModal = null;
         const btnRetryUpload = document.getElementById('btn-retry-upload');
 
-        function showUploadFailedModal() {
+        // reason：'failed'（通信の失敗など）・'login-expired'（ログインが切れていた）・'other-user'（別のトレーナーでログインしていた）。
+        // stored：録音をこの端末に一時保存できたか（できない端末では、画面を閉じないように添える）
+        function showUploadFailedModal(reason, stored) {
             if (!uploadFailedModal) {
                 uploadFailedModal = new bootstrap.Modal(document.getElementById('modal-upload-failed'));
             }
+            const messageKey = reason === 'login-expired' && !stored ? 'login-expired-no-store' : reason;
+            document.getElementById('upload-failed-message').textContent = UPLOAD_FAILED_MESSAGES[messageKey] || UPLOAD_FAILED_MESSAGES.failed;
+            const noStoreEl = document.getElementById('upload-failed-no-store');
+            noStoreEl.textContent = UPLOAD_FAILED_MESSAGES['no-store'];
+            noStoreEl.classList.toggle('d-none', stored || reason === 'login-expired');
+            document.getElementById('btn-open-login').classList.toggle('d-none', reason !== 'login-expired' && reason !== 'other-user');
             // 送り直しが失敗したときは、ボタンを押せる状態に戻す（モーダルは開いたまま）
             btnRetryUpload.disabled = false;
             btnRetryUpload.textContent = 'もう一度送る';
@@ -703,7 +757,8 @@
             btnRetryUpload.disabled = true;
             btnRetryUpload.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>送信中...';
 
-            await uploadRecording();
+            // 送る前にトークンを取り直す（別のタブでログインし直したあとでも送れるように。2026-10-21 変更）
+            await uploadRecording({ refreshFirst: true });
 
             // 成功したら（音声記録の ID が入る）、このモーダルを閉じる。
             // 「録音完了」のモーダルは uploadRecording の成功の経路で開かれる。
@@ -851,7 +906,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
+                            'X-CSRF-TOKEN': csrfToken(),
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest'
                         },
@@ -912,8 +967,123 @@
         }
 
         // ========================================
+        // 未送信の録音（2026-10-21 追加。設計書 S-0502「未送信の録音」）
+        // ========================================
+
+        // この端末に一時保存した、ログイン中のトレーナーの送れていない録音を、画面の上に 1 件ずつ出す（録音開始前だけ）。
+        // ［送る］は保存したときの会員に送る（今の画面の会員ではない）。成功しても録音完了以降のモーダル・自動ログアウトには進まない。
+        // ほかのトレーナーの録音は出さない（listFor がログイン中のトレーナーの ID で絞る）
+        const PENDING_MESSAGES = {
+            sent: '送信しました。音声記録一覧から、文字起こし・トレーニング記録の作成ができます。',
+            failed: '送信できませんでした。通信の状態を確かめて、もう一度［送る］を押してください。',
+            'login-expired': 'ログインの有効期限が切れたため、送信できませんでした。［ログイン画面を開く］から別のタブでログインしてから、もう一度［送る］を押してください。',
+            'other-user': '録音したトレーナーとは別のトレーナーでログインしているため、送信できませんでした。',
+        };
+
+        function formatRecordedAt(iso) {
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            return d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + ' ' + formatTimeHHMM(d);
+        }
+
+        async function renderPendingRecordings() {
+            const container = document.getElementById('pending-recordings');
+            const store = await pendingStore();
+            const recordings = await store.listFor(currentUserId);
+            container.replaceChildren();
+            recordings.forEach(function (recording) {
+                container.appendChild(pendingRecordingItem(store, recording));
+            });
+        }
+
+        function pendingRecordingItem(store, recording) {
+            const item = document.createElement('div');
+            item.className = 'alert alert-warning mb-2';
+            item.setAttribute('data-pending-recording', String(recording.id));
+
+            const text = document.createElement('p');
+            text.className = 'mb-2';
+            text.textContent = '未送信の録音があります（' + formatRecordedAt(recording.recordedAt) + ' の録音）';
+            item.appendChild(text);
+
+            const status = document.createElement('p');
+            status.className = 'mb-2 small d-none';
+            item.appendChild(status);
+
+            const buttons = document.createElement('div');
+            buttons.className = 'd-flex flex-wrap gap-2';
+            const sendBtn = document.createElement('button');
+            sendBtn.type = 'button';
+            sendBtn.className = 'btn btn-primary btn-sm';
+            sendBtn.textContent = '送る';
+            const discardBtn = document.createElement('button');
+            discardBtn.type = 'button';
+            discardBtn.className = 'btn btn-outline-secondary btn-sm';
+            discardBtn.textContent = '破棄する';
+            const loginLink = document.createElement('a');
+            loginLink.href = '{{ route('login') }}';
+            loginLink.target = '_blank';
+            loginLink.rel = 'noopener';
+            loginLink.className = 'btn btn-outline-primary btn-sm d-none';
+            loginLink.textContent = 'ログイン画面を開く';
+            buttons.append(sendBtn, discardBtn, loginLink);
+            item.appendChild(buttons);
+
+            const showStatus = function (message, ok) {
+                status.textContent = message;
+                status.className = 'mb-2 small ' + (ok ? 'text-success' : 'text-danger');
+            };
+
+            sendBtn.addEventListener('click', async function () {
+                sendBtn.disabled = true;
+                discardBtn.disabled = true;
+                loginLink.classList.add('d-none');
+                const result = await window.RecordingUpload.sendRecording({
+                    uploadUrl: UPLOAD_URL,
+                    blob: recording.blob,
+                    fileName: recording.fileName,
+                    mimeType: recording.mimeType,
+                    recordedAt: recording.recordedAt,
+                    clientId: recording.clientId,
+                    trainerId: currentUserId,
+                    store: store,
+                    pendingId: recording.id,
+                    refreshFirst: true,
+                });
+                if (result.status === 'ok') {
+                    item.className = 'alert alert-success mb-2';
+                    text.textContent = PENDING_MESSAGES.sent;
+                    status.classList.add('d-none');
+                    buttons.remove();
+                    return;
+                }
+                showStatus(PENDING_MESSAGES[result.status] || PENDING_MESSAGES.failed, false);
+                loginLink.classList.toggle('d-none', result.status !== 'login-expired' && result.status !== 'other-user');
+                sendBtn.disabled = false;
+                discardBtn.disabled = false;
+            });
+
+            discardBtn.addEventListener('click', async function () {
+                if (!confirm('この録音を破棄します。元に戻せません。よろしいですか？')) {
+                    return;
+                }
+                await store.remove(recording.id);
+                item.remove();
+            });
+
+            return item;
+        }
+
+        // ========================================
         // 初期化
         // ========================================
+
+        // 未送信の録音を出す（window.RecordingUpload は module の recording-session.js が置くので、読み込みのあとに呼ぶ）
+        document.addEventListener('DOMContentLoaded', function () {
+            renderPendingRecordings().catch(function (error) {
+                console.error('未送信の録音を読めませんでした:', error);
+            });
+        });
 
         // ページ読み込み時にマイクを初期化（レベルメーター表示用）
         initMicrophone();
@@ -927,7 +1097,8 @@
 
                 // 録音開始
                 startRecording().then(() => {
-                    // UIを録音中状態に切り替え
+                    // UIを録音中状態に切り替え（未送信の録音の帯は隠す。2026-10-21 追加）
+                    document.getElementById('pending-recordings').classList.add('d-none');
                     const titleEl = document.getElementById('recording-title');
                     titleEl.textContent = '録音中';
                     titleEl.classList.remove('waiting-warning');

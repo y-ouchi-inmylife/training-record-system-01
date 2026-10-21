@@ -253,7 +253,7 @@ flowchart TD
   ファイルを返すレスポンス（`BinaryFileResponse`・`StreamedResponse`。音声の再生の Range のリクエストなど）と、`Cache-Control` を意図して付けたレスポンス（既定の `no-cache, private` 以外。今はない）には付けない。
   `auth` のミドルウェアより外側で動かす（`prependToPriorityList`）ので、ログインしていないときのログイン画面へのリダイレクト・JSON の 401 にも付く。どのルートにも当たらない 404 には届かない（個人情報を出さない）。
   ブラウザが［戻る］で画面をそのまま戻した（bfcache）ときは、`layouts.app`・`layouts.client` の `pageshow`（`event.persisted`）で読み込み直す。録音実行（S-0502）は読み込み直さない
-- **録音の一時保存**（**2026-10-21 追加**）：ブラウザの IndexedDB（データベース `trs01-pending-recordings`・ストア `recordings`）に、録音（Blob）・形式・録音した日時・送り先の会員（ID・名前）・録音したトレーナーの ID を保存する。
+- **録音の一時保存**（**2026-10-21 追加**）：ブラウザの IndexedDB（データベース `trs01-pending-recordings`・ストア `recordings`）に、録音（Blob）・形式・ファイル名・録音した日時・送り先の会員の ID・録音したトレーナーの ID を保存する（会員名は保存しない）。
   保存するのは録音を止めて送る前（送信中に画面が閉じても残るように）。消すのは送信に成功したときと、［破棄する］を押したとき。読むときはログイン中のトレーナーの ID で絞る。
   IndexedDB が使えない（開けない・3 秒で開けない）ときは保存せず、メモリだけで動く。サーバーには何も足さない（録音はアップロードに成功するまでサーバーにない）
 - **セッションの設定**（調べた結果。コードは変えていない）：セッションの長さは `SESSION_LIFETIME` ではなく、役割ごとの `TRAINER_SESSION_LIFETIME`（既定 120 分）・
