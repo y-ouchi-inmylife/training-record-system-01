@@ -56,8 +56,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'system-admin-only' => \App\Http\Middleware\SystemAdminOnlyMiddleware::class,
             'practitioners' => \App\Http\Middleware\PractitionersMiddleware::class,
             'check-ip' => \App\Http\Middleware\CheckIpRestriction::class,
-            // トレーナーがログインしてから 12 時間でログアウトさせる（2026-10-21 追加。トレーナー側のログインの要るルートに付ける）
-            'session.absolute' => \App\Http\Middleware\EnforceAbsoluteSessionLifetime::class,
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {

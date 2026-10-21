@@ -36,9 +36,6 @@ class ClientEmailRegistrationExpiryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // ログインしてからの長さ（トレーナー 12 時間。EnforceAbsoluteSessionLifetime）は数えない（2026-10-21 追加）。このテストは「今日」を
-        // 何日も進めて同じログインのまま開くが、見たいのは日付の決まりのため。ログインしてからの長さは EnforceAbsoluteSessionLifetimeTest で確かめる
-        config(['session_roles.trainer.absolute_lifetime' => 0]);
         Carbon::setTestNow('2026-10-18 10:00:00');
 
         $this->createClientsTable();

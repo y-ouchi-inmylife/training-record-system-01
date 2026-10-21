@@ -78,9 +78,6 @@ class LoginController extends Controller
 
             Auth::login($trainer);
             $request->session()->regenerate();
-            // ログインした時刻（2026-10-21 追加。ログインしてから 12 時間でログアウトさせるため。EnforceAbsoluteSessionLifetime）。
-            // セッションに入れるので、端末ごとにその端末でログインした時刻から数える
-            $request->session()->put(\App\Http\Middleware\EnforceAbsoluteSessionLifetime::SESSION_KEY, now()->getTimestamp());
 
             // システム管理者は音声ファイル一覧（S-0701）、それ以外はダッシュボード（S-0101）へ
             $home = $trainer->isSystemAdmin() ? '/usage-stats' : '/dashboard';

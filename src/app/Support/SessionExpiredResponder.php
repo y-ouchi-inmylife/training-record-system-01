@@ -69,15 +69,6 @@ class SessionExpiredResponder
     }
 
     /**
-     * 戻り先の URL（送る前の画面か、送った URL。GET で開けるものだけ）。なければ null。
-     * ログインしてから 12 時間を過ぎたときの戻り先にも使う（EnforceAbsoluteSessionLifetime。2026-10-21 追加）
-     */
-    public static function backUrl(Request $request): ?string
-    {
-        return self::backTarget($request)[0];
-    }
-
-    /**
      * 戻り先の URL と、その URL に当たる GET のルート。送る前の画面（Referer）が同じサイトで GET で開ければそこ、
      * なければ送った URL（GET で開けるとき。初回設定・メールアドレス登録など、送る URL と画面の URL が同じもの）。どちらもなければ [null, null]
      *

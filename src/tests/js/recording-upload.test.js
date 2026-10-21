@@ -142,8 +142,8 @@ describe('録音の送信（recording-upload.js）', () => {
         expect(idb.rows(DB_NAME, STORE_NAME)).toEqual([]);
     });
 
-    it('送信そのものが 401（ログインしてから 12 時間を過ぎた）なら、一時保存したままログインの案内（login-expired）', async () => {
-        // 2026-10-21 追加：EnforceAbsoluteSessionLifetime は、ログインしてから 12 時間を過ぎた JSON の呼び出しに 401 を返す
+    it('送信そのものが 401（ログインが切れていた）なら、一時保存したままログインの案内（login-expired）', async () => {
+        // 2026-10-21 追加：ログインが切れていると、JSON の呼び出しは auth のミドルウェアから 401 になる
         const idb = createFakeIndexedDB();
         const store = await openPendingRecordingStore({ idbFactory: idb });
         const fetchImpl = fakeFetch({ token: [], upload: [response(401, { message: 'Unauthenticated.' })] });

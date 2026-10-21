@@ -2,9 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Models\Client;
-use App\Models\Trainer;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Env;
@@ -19,7 +17,7 @@ use Tests\TestCase;
  * セッションの長さ（2026-10-21 変更。設計書 requirements.md 11-2-3・architecture.md 2-7）。
  *
  * - 会員様側：最後に使ってから 30 日（43200 分）。使うたびに Cookie の期限が延びる
- * - トレーナー側：最後に使ってから 12 時間（720 分）、ログインしてからも 12 時間（EnforceAbsoluteSessionLifetime）
+ * - トレーナー側：最後に使ってから 8 時間（480 分。2026-10-21 に「ログインしてから 12 時間」でも切る仕組みを足したが、取りやめた）
  * - 期限切れのセッションの掃除は、長いほう（会員様側）のリクエストでだけ行う
  * - 会員様側：パスワードが変わったら、ほかの端末をログアウトさせる（auth.session。変えた端末・再設定した同じブラウザはログインしたまま）
  *
@@ -29,10 +27,6 @@ class SessionLifetimeTest extends TestCase
 {
     use CreatesClientCountTables;
 
-    private const MSG_ABSOLUTE = 'ログインしてから時間がたったため、ログアウトしました。もう一度ログインしてください。';
-
-    private int $trainerId;
-
     private int $clientId;
 
     protected function setUp(): void
@@ -41,35 +35,12 @@ class SessionLifetimeTest extends TestCase
         Carbon::setTestNow('2026-10-21 09:00:00');
         // この中の値で確かめる（開発の .env の 1 分に左右されないように）
         config([
-            'session_roles.trainer.lifetime' => 720,
-            'session_roles.trainer.absolute_lifetime' => 720,
+            'session_roles.trainer.lifetime' => 480,
             'session_roles.client.lifetime' => 43200,
         ]);
 
         $this->createClientsTable();
         $this->createAccessLogsTable();
-        Schema::create('trainers', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->nullable();
-            $table->string('login_id')->nullable();
-            $table->string('password')->nullable();
-            $table->string('role')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->boolean('is_locked')->default(false);
-            $table->boolean('must_change_password')->default(false);
-            $table->timestamp('last_login_at')->nullable();
-            $table->integer('display_order')->default(0);
-            $table->timestamps();
-        });
-        Schema::create('login_attempts', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('trainer_id')->nullable();
-            $table->string('login_id_input')->nullable();
-            $table->string('ip_address')->nullable();
-            $table->timestamp('attempted_at')->nullable();
-            $table->boolean('success')->default(false);
-            $table->timestamps();
-        });
         Schema::create('client_password_reset_tokens', function (Blueprint $table) {
             $table->id();
             $table->string('token');
@@ -79,9 +50,6 @@ class SessionLifetimeTest extends TestCase
             $table->timestamps();
         });
 
-        $this->trainerId = DB::table('trainers')->insertGetId([
-            'name' => '村山', 'login_id' => 'murayama', 'password' => Hash::make('Trainer-secret1'), 'role' => 'admin',
-        ]);
         $this->clientId = DB::table('clients')->insertGetId([
             'internal_id' => '0001', 'last_name' => '山田', 'first_name' => '太郎',
             'email' => 'yamada@example.com', 'password' => Hash::make('Client-secret1'),
@@ -92,13 +60,6 @@ class SessionLifetimeTest extends TestCase
     {
         Carbon::setTestNow();
         parent::tearDown();
-    }
-
-    private function loginTrainer(): void
-    {
-        // 行き先はダッシュボードか、ログインが切れる前の画面（url.intended）
-        $this->post('/login', ['login_id' => 'murayama', 'password' => 'Trainer-secret1'])->assertRedirect();
-        $this->assertAuthenticated('web');
     }
 
     /** 会員様のログイン（本当にログインして、セッションにログインの印を入れる。actingAs はセッションに書かないため） */
@@ -121,9 +82,9 @@ class SessionLifetimeTest extends TestCase
 
     // ---- 既定の値 ----
 
-    public function test_既定の値は会員様30日とトレーナー12時間とログインしてから12時間(): void
+    public function test_既定の値は会員様30日とトレーナー8時間(): void
     {
-        $keys = ['CLIENT_SESSION_LIFETIME', 'TRAINER_SESSION_LIFETIME', 'TRAINER_SESSION_ABSOLUTE_LIFETIME'];
+        $keys = ['CLIENT_SESSION_LIFETIME', 'TRAINER_SESSION_LIFETIME'];
         $saved = [];
         foreach ($keys as $key) {
             $saved[$key] = Env::get($key);
@@ -140,8 +101,9 @@ class SessionLifetimeTest extends TestCase
         }
 
         $this->assertSame(43200, $roles['client']['lifetime']);
-        $this->assertSame(720, $roles['trainer']['lifetime']);
-        $this->assertSame(720, $roles['trainer']['absolute_lifetime']);
+        $this->assertSame(480, $roles['trainer']['lifetime']);
+        // ログインしてからの長さ（absolute_lifetime）は取りやめた（2026-10-21）
+        $this->assertArrayNotHasKey('absolute_lifetime', $roles['trainer']);
     }
 
     // ---- 会員様側：最後に使ってから 30 日 ----
@@ -162,132 +124,38 @@ class SessionLifetimeTest extends TestCase
         $this->assertSame(43200, config('session.lifetime'));
     }
 
-    public function test_トレーナーのCookieは最後に使ってから12時間(): void
+    public function test_トレーナーのCookieは最後に使ってから8時間(): void
     {
         $response = $this->get('/login')->assertOk();
         $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === config('session_roles.trainer.cookie'));
-        $this->assertSame(Carbon::parse('2026-10-21 21:00:00')->getTimestamp(), $cookie->getExpiresTime());
-        $this->assertSame(720, config('session.lifetime'));
+        $this->assertSame(Carbon::parse('2026-10-21 17:00:00')->getTimestamp(), $cookie->getExpiresTime());
+        $this->assertSame(480, config('session.lifetime'));
+
+        // 使うたびに延びる（最後に使ってから 8 時間）
+        Carbon::setTestNow('2026-10-21 16:00:00');
+        $response = $this->get('/login')->assertOk();
+        $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === config('session_roles.trainer.cookie'));
+        $this->assertSame(Carbon::parse('2026-10-22 00:00:00')->getTimestamp(), $cookie->getExpiresTime());
     }
 
     public function test_期限切れのセッションの掃除は会員様側のリクエストでだけ行う(): void
     {
+        // 会員様 30 日（43200 分）とトレーナー 8 時間（480 分）。短いトレーナー側で掃除すると、8 時間使っていない会員様のセッションが消える
+        $this->assertSame(43200, config('session_roles.client.lifetime'));
+        $this->assertSame(480, config('session_roles.trainer.lifetime'));
         $default = config('session.lottery');
         $this->get('/login');
         $this->assertSame([0, 100], config('session.lottery'), 'トレーナー側（短いほう）は掃除しない');
         $this->get('/client-portal/login');
         $this->assertSame($default, config('session.lottery'), '会員様側（長いほう）は今までどおり');
         $this->assertNotSame([0, 100], $default);
-    }
 
-    // ---- トレーナー側：ログインしてから 12 時間 ----
-
-    public function test_ログインすると時刻が入り720分までは開ける(): void
-    {
-        $this->loginTrainer();
-        $this->assertSame(Carbon::parse('2026-10-21 09:00:00')->getTimestamp(), session(EnforceAbsoluteSessionLifetime::SESSION_KEY));
-
-        // 使い続けても（最後に使ってからは短い）、ちょうど 720 分までは開ける
-        foreach (['2026-10-21 13:00:00', '2026-10-21 17:00:00', '2026-10-21 21:00:00'] as $now) {
-            Carbon::setTestNow($now);
-            $this->get('/profile')->assertOk();
-        }
-        $this->assertAuthenticated('web');
-    }
-
-    public function test_ログインしてから720分を過ぎるとログアウトしてログイン画面へ移り案内を出しログインのあと元の画面へ戻る(): void
-    {
-        $this->loginTrainer();
-        foreach (['2026-10-21 13:00:00', '2026-10-21 17:00:00', '2026-10-21 21:00:00'] as $now) {
-            Carbon::setTestNow($now);
-            $this->get('/profile')->assertOk();
-        }
-
-        Carbon::setTestNow('2026-10-21 21:00:01');
-        $this->get('/profile?tab=1')
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['login' => self::MSG_ABSOLUTE]);
-        $this->assertGuest('web');
-        $this->assertSame(url('/profile?tab=1'), session('url.intended'));
-
-        // ログイン画面に案内が出る
-        $this->get('/login')->assertOk()->assertSee(self::MSG_ABSOLUTE);
-        // ログインすると元の画面へ戻り、時刻が新しくなる
-        $this->post('/login', ['login_id' => 'murayama', 'password' => 'Trainer-secret1'])->assertRedirect(url('/profile?tab=1'));
-        $this->assertSame(Carbon::parse('2026-10-21 21:00:01')->getTimestamp(), session(EnforceAbsoluteSessionLifetime::SESSION_KEY));
-    }
-
-    public function test_時刻がないセッションは時刻を入れて開ける(): void
-    {
-        // この仕組みを入れる前からログインしている人（セッションに時刻がない）
-        $this->actingAs(Trainer::query()->findOrFail($this->trainerId), 'web');
-        $this->assertNull(session(EnforceAbsoluteSessionLifetime::SESSION_KEY));
-
-        $this->get('/profile')->assertOk();
-        $this->assertSame(Carbon::parse('2026-10-21 09:00:00')->getTimestamp(), session(EnforceAbsoluteSessionLifetime::SESSION_KEY));
-
-        // そこから 720 分を過ぎると切れる
-        Carbon::setTestNow('2026-10-21 21:00:01');
-        $this->get('/profile')->assertRedirect(route('login'));
-        $this->assertGuest('web');
-    }
-
-    public function test_過ぎていたときのフォームの送信は送る前の画面へ戻れるようにしJSONは401(): void
-    {
-        $this->loginTrainer();
-        Carbon::setTestNow('2026-10-21 21:00:01');
-
-        // フォームの送信：保存はしない。ログインのあとは送る前の画面へ戻る（入力は残さない）
-        $this->put('/profile', ['name' => '村山 次郎'], ['Referer' => url('/profile')])
-            ->assertRedirect(route('login'))
-            ->assertSessionHasErrors(['login' => self::MSG_ABSOLUTE]);
-        $this->assertSame(url('/profile'), session('url.intended'));
-        $this->assertSame('村山', DB::table('trainers')->where('id', $this->trainerId)->value('name'));
-        $this->assertGuest('web');
-
-        // JSON の呼び出し（トークンの取り直し・録音の送信）は 401
-        $this->loginTrainer();
-        Carbon::setTestNow('2026-10-22 09:00:02');
-        $this->getJson(route('csrf-token'))->assertUnauthorized()->assertExactJson(['message' => 'Unauthenticated.']);
-        $this->assertGuest('web');
-
-        $this->loginTrainer();
-        Carbon::setTestNow('2026-10-22 21:00:03');
-        $this->postJson(route('audio-records.recording.store'), ['client_id' => $this->clientId])->assertUnauthorized();
-        $this->assertGuest('web');
-    }
-
-    public function test_ほかの端末でログインしても今の端末の時刻は変わらない(): void
-    {
-        // 端末 A で 9:00 にログイン
-        $this->loginTrainer();
-        $deviceA = session()->all();
-
-        // 端末 B（別のブラウザ。別のセッション）で 15:00 にログイン
-        $this->switchDevice([]);
-        Carbon::setTestNow('2026-10-21 15:00:00');
-        $this->loginTrainer();
-        $deviceB = session()->all();
-        $this->assertSame(Carbon::parse('2026-10-21 15:00:00')->getTimestamp(), $deviceB[EnforceAbsoluteSessionLifetime::SESSION_KEY]);
-        // 時刻はセッションに入れるので、端末 A の時刻は 9:00 のまま（トレーナーの行などには入れない）
-        $this->assertSame(Carbon::parse('2026-10-21 09:00:00')->getTimestamp(), $deviceA[EnforceAbsoluteSessionLifetime::SESSION_KEY]);
-
-        // 21:00 を過ぎると、端末 A は切れ、端末 B は開ける
-        Carbon::setTestNow('2026-10-21 21:30:00');
-        $this->switchDevice($deviceA);
-        $this->get('/profile')->assertRedirect(route('login'));
-
-        $this->switchDevice($deviceB);
-        $this->get('/profile')->assertOk();
-    }
-
-    public function test_会員様にはログインしてからの長さはない(): void
-    {
-        $this->actingAs(Client::query()->findOrFail($this->clientId), 'client');
-        $this->get(route('client-portal.settings.password.edit'))->assertOk();
-        Carbon::setTestNow('2026-11-15 09:00:00');
-        $this->get(route('client-portal.settings.password.edit'))->assertOk();
-        $this->assertNull(session(EnforceAbsoluteSessionLifetime::SESSION_KEY));
+        // 決めているのは値の大小なので、トレーナー側のほうが長ければ、トレーナー側で掃除し会員様側では掃除しない
+        config(['session_roles.trainer.lifetime' => 50000]);
+        $this->get('/login');
+        $this->assertSame($default, config('session.lottery'));
+        $this->get('/client-portal/login');
+        $this->assertSame([0, 100], config('session.lottery'));
     }
 
     // ---- 会員様側：ほかの端末をログアウトさせる ----
