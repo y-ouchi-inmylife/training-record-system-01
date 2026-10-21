@@ -8,7 +8,7 @@ use Tests\TestCase;
 /**
  * 愛犬アンケートからの送信がセッション切れ（419）になったときの画面（2026-10 追加。設計書 S-1413 備考
  * 「入力中にセッションが切れたとき」）。愛犬アンケートの画面からの送信のときだけお客様向けの文言にし、
- * ほかの画面の 419 は今のまま。
+ * ほかの画面の 419 は共通のエラーページ（2026-10-21 変更：ふだんの画面と同じ見た目と［ログイン画面へ］。ErrorPagesTest）。
  *
  * テストでは Laravel が CSRF トークンの確認を飛ばす（ValidateCsrfToken::runningUnitTests()）ため、
  * 確認を飛ばさないように差し替えた ValidateCsrfToken をコンテナに登録して、トークンなしの POST で 419 を起こす。
@@ -42,21 +42,23 @@ class ClientIntakeSurveySessionExpiredTest extends TestCase
         $this->assertStringNotContainsString('419 Page Expired', $html);
     }
 
-    public function test_ほかの画面の419は今のまま(): void
+    public function test_ほかの画面の419は共通のエラーページ(): void
     {
         $response = $this->post('/login', ['login_id' => 'x', 'password' => 'y']);
 
         $response->assertStatus(419);
-        $response->assertSee('しばらく操作がなかったため、セッションの有効期限が切れました。再度ログインしてください。');
+        $response->assertSee('お手数ですが、もう一度ログインしてください。');
+        $response->assertSee('data-error-side="trainer"', false);
         $response->assertDontSee('時間がたったため送信できませんでした');
     }
 
-    public function test_会員側のほかの画面の419も今のまま(): void
+    public function test_会員側のほかの画面の419も共通のエラーページ(): void
     {
         $response = $this->post('/client-portal/setup/abcdefghijklmnopqrstuvwxyz012345', []);
 
         $response->assertStatus(419);
-        $response->assertSee('再度ログインしてください。');
+        $response->assertSee('お手数ですが、もう一度ログインしてください。');
+        $response->assertSee('data-error-side="client"', false);
         $response->assertDontSee('時間がたったため送信できませんでした');
     }
 }

@@ -1,19 +1,2 @@
-@extends('layouts.error')
-
-@section('title', 'アクセス拒否')
-
-@section('content')
-<div class="container">
-    <div class="row justify-content-center mt-5">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-danger text-white">アクセス拒否</div>
-                <div class="card-body">
-                    <h4>403 Forbidden</h4>
-                    <p>{{ $exception->getMessage() ?: 'このページへのアクセスは許可されていません。' }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-@endsection
+{{-- エラーページ（403）。作りは layouts/error.blade.php（2026-10-21 変更。設計書 screen-design.md「エラーページの共通の作り」） --}}
+@include('layouts.error', ['status' => 403])
