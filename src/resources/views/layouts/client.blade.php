@@ -68,6 +68,15 @@
             });
         });
     </script>
+    {{-- ブラウザが［戻る］で画面をそのまま戻した（bfcache）ときは読み込み直す（2026-10-21 追加。設計書 screen-design.md「ブラウザに画面を残さない（no-store）」）。
+         Cache-Control: no-store を付けても、Chrome などは戻すことがあるため。ログインが切れていれば、読み込み直したときにふだんどおりログイン画面へ移る --}}
+    <script>
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
     @stack('scripts')
 </body>
 </html>

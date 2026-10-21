@@ -40,7 +40,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\CheckPasswordChange::class,
             \App\Http\Middleware\LogAccess::class,
+            // 画面をブラウザに残さない（Cache-Control: no-store。2026-10-21 追加）。ログインの要る画面・ログイン画面・公開の画面・回答の画面の
+            // すべてが web のグループにあるので、ルートのグループ（トレーナー側・会員様側の 2 つのドメインのグループ）ごとに付けずに、ここでまとめて付ける
+            \App\Http\Middleware\PreventPageCache::class,
         ]);
+        // PreventPageCache は auth のミドルウェアより外側で動かす（auth が返すログイン画面へのリダイレクト・JSON の 401 にも no-store を付けるため）
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\PreventPageCache::class,
+        );
         // ミドルウェアエイリアス
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
