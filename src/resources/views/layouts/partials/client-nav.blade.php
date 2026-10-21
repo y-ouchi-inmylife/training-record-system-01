@@ -6,7 +6,7 @@
     左のブランド位置：
       - config('app.client_portal_logo') が設定されていれば <img> を出力（alt はプロダクト名。画像が読み込めないときも名前が分かる）。
         width・height は画像のファイルから読む（App\Support\ClientPortalLogo。読み込み中に画面がずれないように）。
-        表示の高さは client.scss の .c-nav-brand-img（パソコン 40px・スマホ 38px〔360px 未満は 32px〕。横幅は縦横比のまま）
+        表示の高さは client.scss の .c-nav-brand-img（パソコン 48px・スマホ 38px〔360px 未満は 34px〕。横幅は縦横比のまま）
       - なければテキスト（config('app.client_portal_name')）を出力
       - 2026-10-18 変更：ユーザーレビューで、Mirai Dog Wellness のロゴ画像（public/images/mirai-dog-wellness-logo.png）を
         既定にした（config/app.php）。その前は設定がなく、文字を出していた
