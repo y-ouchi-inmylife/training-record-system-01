@@ -234,6 +234,22 @@ flowchart TD
   - 伏せ字の判定は、一般的なメール形式（`ローカル部@ドメイン.トップレベル`）を拾う正規表現で、過剰に拾いすぎない（URL のクエリ・SSH の `user@host`〔TLD なし〕・`@mention`〔ドットなし〕は対象外）。
 - **メールアドレス以外の個人情報・トークンは、現状のコードでは直接ログに書いていない**：各 `Log::…` の context は `client_id`／`trainee_id`／`media_record_id`／`audio_record_id` などの ID と、`$e->getMessage()`／`'exception' => $e`／ファイルパス（UUID）／`exit_code`／`stderr` などに限られる（調査時に全呼び出しを棚卸し。2026-10）。新規に `Log::…` を書くときも、この方針を守る。
 
+### 2-7. 例外の扱い（ページの有効期限切れ 419。2026-10-21 追加）
+
+- **理由**：2026-10-21：本番で会員様が 419 のエラーページで迷ったため。タブを 2 つ開いていた・ログイン画面を長く開いたまま・ログアウト後の［戻る］などで起きる。419 は、送ったフォームの CSRF トークンが今のセッションのトークンと違うときに出る
+- **場所**：`bootstrap/app.php` の `withExceptions` の `render`。Laravel が `TokenMismatchException` を 419 の `HttpException` に置き換えたあとに来る。
+  1. 愛犬アンケートの送信（`client-portal/intake-survey/*`）：専用のページ（2026-10 から）
+  2. 愛犬性格診断の送信（POST `client-portal/personality-diagnosis/*`）：回答を入れたまま画面を出し直す（2026-10 から）
+  3. そのほか：`App\Support\SessionExpiredResponder::respond()`。前の例外が `TokenMismatchException` で、JSON を求めていない（`expectsJson()` でない）ときだけ扱い、
+     ログアウト・ログイン・そのほかのフォームで分けてリダイレクトする（screen-design.md「419（ページの有効期限切れ）のときの戻し方」）。扱わないときは null を返し、Laravel の既定（JSON の 419・エラーページ S-0103）になる
+- **送ったものの見分け方**：ログアウトはルートの名前（`logout`・`client-portal.logout`）、ログインは URL（POST `login`・`client-portal/login`。トレーナーの POST のルートには名前がないため）
+- **戻り先**：`Referer` が同じスキーム・ホストで、GET のルートに当たるときだけ。当たったルートのミドルウェアに `auth`・`auth:client` があり、その側でログインしていなければ、
+  `url.intended` に戻り先を入れてその側のログイン画面へ。戻り先がなければ送った URL（GET で開けるとき）、それもなければ `ErrorPageSide` でその側のログイン画面へ
+- リダイレクトは例外の処理の中で返すが、セッション（StartSession）の中なので、フラッシュ・入力の値（`withInput`）・ログアウトのセッションの作り直しはふだんどおり保存される
+- **セッションの設定**（調べた結果。コードは変えていない）：セッションの長さは `SESSION_LIFETIME` ではなく、役割ごとの `TRAINER_SESSION_LIFETIME`（既定 120 分）・
+  `CLIENT_SESSION_LIFETIME`（既定 60 分）が使われる（`ConfigureSessionByRole` が上書きする。config/session_roles.php）。`SESSION_SAME_SITE` は既定の `lax`、
+  `SESSION_EXPIRE_ON_CLOSE` は既定の false。「ログインしたままにする」はない
+
 ## 3. 設定値
 
 コード中にハードコードしないアプリケーション設定値。すべて `config/` 配下の PHP 設定ファイルに定数として集約し、コントローラやサービスからは `config()` ヘルパー経由で参照する。
