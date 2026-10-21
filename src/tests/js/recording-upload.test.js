@@ -142,6 +142,21 @@ describe('録音の送信（recording-upload.js）', () => {
         expect(idb.rows(DB_NAME, STORE_NAME)).toEqual([]);
     });
 
+    it('送信そのものが 401（ログインしてから 12 時間を過ぎた）なら、一時保存したままログインの案内（login-expired）', async () => {
+        // 2026-10-21 追加：EnforceAbsoluteSessionLifetime は、ログインしてから 12 時間を過ぎた JSON の呼び出しに 401 を返す
+        const idb = createFakeIndexedDB();
+        const store = await openPendingRecordingStore({ idbFactory: idb });
+        const fetchImpl = fakeFetch({ token: [], upload: [response(401, { message: 'Unauthenticated.' })] });
+
+        const result = await sendRecording({ ...recordingArgs(), store, fetchImpl, doc: fakeDocument('old') });
+
+        expect(result.status).toBe('login-expired');
+        expect(result.pendingId).not.toBeNull();
+        expect(idb.rows(DB_NAME, STORE_NAME)).toHaveLength(1);
+        // 401 は 419 ではないので、トークンの取り直しはしない（そのまま案内に進む）
+        expect(fetchImpl.calls.map((c) => c.url)).toEqual([UPLOAD]);
+    });
+
     it('別のトレーナーでログインし直していたら送らない（other-user）', async () => {
         const store = await openPendingRecordingStore({ idbFactory: createFakeIndexedDB() });
         const fetchImpl = fakeFetch({ token: [response(200, { token: 'other', user_id: 9 })], upload: [] });

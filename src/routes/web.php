@@ -60,7 +60,8 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware('auth')->group(function () {
+    // session.absolute：ログインしてから 12 時間でログアウトさせる（2026-10-21 追加。EnforceAbsoluteSessionLifetime）
+    Route::middleware(['auth', 'session.absolute'])->group(function () {
         Route::post('/logout', [LogoutController::class, 'logout'])->name('logout');
 
         // CSRF トークンの取り直し（2026-10-21 追加。録音の送信が 419 のとき、録音を失わずに送り直すため。設計書 architecture.md 2-7）
@@ -374,7 +375,9 @@ Route::domain(config('subdomain.client_host'))->group(function () {
         });
 
         // 認証必須（auth:client）。未認証は redirectGuestsTo により /client-portal/login へ振り分けられる。
-        Route::middleware('auth:client')->group(function () {
+        // auth.session：パスワードが変わったら、ほかの端末のセッションをログアウトさせる（2026-10-21 追加。Laravel の AuthenticateSession。
+        // auth:client が既定の guard を会員様側に切り替えたあとに動くので、会員様側の guard で比べる。設計書 architecture.md 2-7）
+        Route::middleware(['auth:client', 'auth.session'])->group(function () {
             Route::post('/logout', [ClientLogoutController::class, 'logout'])->name('logout');
             Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
             // ご利用回数（S-1412、6-15-16）— ログイン中の会員自身の契約・利用を見るだけ。

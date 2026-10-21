@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\ClientPasswordResetToken;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -156,6 +157,17 @@ class PasswordResetController extends Controller
             ]);
             $tokenRecord->update(['is_used' => true]);
         });
+
+        // 2026-10-21 追加：パスワードが変わったので、その会員様がログインしているほかの端末は、次に開いたときに AuthenticateSession
+        // （会員様側のログインの要るルートの auth.session）がログアウトさせる。このブラウザでその会員様がログインしていれば、
+        // 新しいパスワードの印をセッションに入れて、ログインしたままにする（下の「認証状態は変えない」のとおり。この画面はログインの要らない
+        // 画面で auth.session が動かないため、ここで入れる。キーは AuthenticateSession と同じ password_hash_client）
+        $client = $tokenRecord->client->fresh();
+        $guard = Auth::guard('client');
+        if ($guard->check() && (int) $guard->id() === (int) $client->id) {
+            $guard->setUser($client);
+            $request->session()->put('password_hash_client', $guard->hashPasswordForCookie($client->getAuthPassword()));
+        }
 
         // 認証状態は変えない。ログイン中だった場合もそのまま維持する。
         // 未ログインの場合はログイン画面へ、ログイン中の場合もログイン画面に遷移するが

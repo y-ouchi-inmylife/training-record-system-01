@@ -44,6 +44,9 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // ログインしてからの長さ（トレーナー 12 時間。EnforceAbsoluteSessionLifetime）は数えない（2026-10-21 追加）。このテストは「今日」を
+        // 何日も進めて同じログインのまま開くが、見たいのは日付の決まりのため。ログインしてからの長さは EnforceAbsoluteSessionLifetimeTest で確かめる
+        config(['session_roles.trainer.absolute_lifetime' => 0]);
         // ［AIで自動生成］の 3 社のキーとモデル（2026-10-20 追加）。開発の .env に左右されないよう、テストの値を入れる（空ならボタンを出さない）
         config([
             'services.anthropic.api_key' => 'test-anthropic-key', 'services.anthropic.model' => 'claude-test',

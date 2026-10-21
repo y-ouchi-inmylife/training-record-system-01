@@ -7,7 +7,8 @@
  *
  * 結果の status：
  * - 'ok'：送れた（data はサーバーの応答の JSON）
- * - 'login-expired'：トークンの取り直しが 401（ログインが切れていた）。別のタブでログインしてから送り直す
+ * - 'login-expired'：トークンの取り直しが 401、または送信そのものが 401（ログインが切れていた。トレーナーがログインしてから 12 時間を
+ *   過ぎたとき〔EnforceAbsoluteSessionLifetime。2026-10-21 追加〕は、送信が 401 になる）。別のタブでログインしてから送り直す
  * - 'other-user'：録音したトレーナーと別の人でログインしていた。送っていない
  * - 'failed'：そのほか（通信の失敗・送り直しも 419・サーバーのエラー）
  * どの場合も pendingId（一時保存の ID。保存できなかったら null）を返す。送り直すときは同じ pendingId を渡す（二重に保存しない）
@@ -71,6 +72,9 @@ export async function sendRecording({
         return { status: 'failed', pendingId: id };
     }
 
+    if (response.status === 401) {
+        return { status: 'login-expired', pendingId: id };
+    }
     if (!response.ok) {
         return { status: 'failed', pendingId: id };
     }
