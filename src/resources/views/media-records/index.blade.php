@@ -310,6 +310,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const updateBtn = document.getElementById('mediaUpdateBtn');
     const deleteBtn = document.getElementById('mediaDeleteBtn');
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    // ページの有効期限切れ（419）のときの知らせ（2026-10-21 追加。lang/ja/messages.php の session_expired.fetch）
+    const SESSION_EXPIRED_MESSAGE = @json(__('messages.session_expired.fetch'));
 
     // 編集中のメディアID（モーダル close 時にクリア）
     let currentMediaId = null;
@@ -476,6 +478,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.reload();
                 return;
             }
+            // ページの有効期限切れ（419）：英語の既定の文ではなく、読み込み直すように伝える（2026-10-21 追加）
+            if (res.status === 419) {
+                window.FormErrors.showFormMessage(detailFormErrorEl, SESSION_EXPIRED_MESSAGE);
+                return;
+            }
             if (res.status === 422) {
                 const body = await res.json();
                 // 入力エラーは欄の下に出す（表示名の欄）。欄が見つからないキーはモーダル先頭に回す
@@ -614,6 +621,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (res.ok) {
                 modal.hide();
                 window.location.reload();
+                return;
+            }
+            // ページの有効期限切れ（419）：読み込み直すように伝える（2026-10-21 追加）
+            if (res.status === 419) {
+                window.FormErrors.showFormMessage(detailFormErrorEl, SESSION_EXPIRED_MESSAGE);
                 return;
             }
             // 削除の失敗は入力エラーではないため、モーダルの先頭に出す（§2-7「非同期の保存（fetch）」。段階 5-3a）

@@ -24,6 +24,22 @@ class ErrorPageSide
     /** トレーナー側の見た目 */
     public const TRAINER = 'trainer';
 
+    /**
+     * 回答の画面（会員様がログインせずに、トレーナーから受け取った案内のリンクで開く画面）か（2026-10-21 追加）。
+     * 愛犬アンケート（S-1413・S-1414）・愛犬性格診断（S-1415・S-1416）・初回設定（S-1403）・メールアドレス登録（S-1405）。
+     * ここで出たエラーページは［ログイン画面へ］を出さず、案内のリンクを開き直すように書く。
+     * パスワード再設定・メールアドレスの変更の確認は、マイページを使っている会員様の画面なので含めない
+     */
+    public static function isAnswerPage(Request $request): bool
+    {
+        return $request->is(
+            'client-portal/intake-survey/*',
+            'client-portal/personality-diagnosis/*',
+            'client-portal/setup/*',
+            'client-portal/email-registration/*',
+        );
+    }
+
     public static function resolve(Request $request): string
     {
         if (SessionRoleResolver::isClient($request)) {

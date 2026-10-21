@@ -329,6 +329,10 @@
     // `{"error": {...}}` 形式をやめて Laravel 標準の 422（`{message, errors: {キー: [文言…]}}`）に
     // 揃えたため、`body.errors` と `body.message` だけを読む。
     async function readErrorMessage(res, fallback) {
+        // ページの有効期限切れ（419）：英語の既定の文ではなく、読み込み直すように伝える（2026-10-21 追加）
+        if (res.status === 419) {
+            return @json(__('messages.session_expired.fetch'));
+        }
         try {
             const body = await res.json();
             if (body && body.errors) {

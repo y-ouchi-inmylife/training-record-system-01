@@ -19,6 +19,14 @@
 
     <main class="py-4">
         <div class="container">
+            {{-- 失敗の知らせ（2026-10-21 追加：ページの有効期限切れ〔419〕で初回設定・メールアドレス登録・パスワード再設定の画面へ戻したときの案内。
+                 layouts.client の session('error') と同じ作り） --}}
+            @if (session('error'))
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ session('error') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
             @yield('content')
         </div>
     </main>

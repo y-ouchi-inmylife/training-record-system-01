@@ -1498,7 +1498,10 @@ class TraineePersonalityDiagnosisResultShowTest extends TestCase
         // 緑だけ data-auto-dismiss を付けて 5 秒で消す。赤は消さない
         $this->assertMatchesRegularExpression("/if \\(ok\\) \\{\\s*(?:\\/\\/[^\\n]*\\s*)?alertEl\\.setAttribute\\('data-auto-dismiss', ''\\);\\s*window\\.autoDismissAlert\\(alertEl\\);\\s*\\}/u", $html);
         $this->assertSame(1, substr_count($html, 'window.autoDismissAlert(alertEl)'));
-        $this->assertStringContainsString("showNotice(false, 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');", $html);
+        $this->assertStringContainsString(": 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');", $html);
+        // ページの有効期限切れ（419）は、時間をおいても直らないので、読み込み直すように伝える（2026-10-21 追加）
+        $this->assertStringContainsString('if (response.status === 419) {', $html);
+        $this->assertStringContainsString('? '.json_encode('画面を開いてから時間がたったため、送信できませんでした。画面を読み込み直してから、もう一度お試しください。', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT), $html);
         // 出すたび・押すたびに前のお知らせを外す（閉じると要素ごと外れるので作り直す）
         $this->assertSame(2, substr_count($html, 'notice.replaceChildren();'));
         // 文は textContent で入れる（innerHTML は使わない）

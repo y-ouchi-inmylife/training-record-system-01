@@ -70,7 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // 愛犬アンケート（S-1413）からの送信がセッション切れ（419。CSRF トークンの不一致）になったときだけ、
         // お客様向けの文言の画面を出す（2026-10 追加。設計書 S-1413 備考「入力中にセッションが切れたとき」）。
-        // ほかの画面の 419 は今のまま（resources/views/errors/419.blade.php）。
+        // ほかの画面の 419 は、下の SessionExpiredResponder で元の画面へ戻す（2026-10-21 変更：その前は errors/419.blade.php のエラーページ）。
         // ここに来る例外は、Laravel が TokenMismatchException を 419 の HttpException に置き換えたあとのもの。
         // 愛犬アンケートはログインしない画面のため、「再度ログインしてください」の文言では伝わらない。
         //
@@ -109,6 +109,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response(\App\Http\Controllers\Client\PersonalityDiagnosisController::showForm($token, $restored, true), 200);
             }
 
-            return null;
+            // そのほかの 419（CSRF トークンの不一致）は、エラーページを出さずに元の画面（ログイン画面など）へ戻す（2026-10-21 追加。
+            // 設計書 screen-design.md「419（ページの有効期限切れ）のときの戻し方」）。上の 2 つの専用の扱いが先に効く。
+            // JSON を求める呼び出し・CSRF の不一致ではない 419 は null が返り、今までどおり（JSON の 419・エラーページ S-0103）
+            return \App\Support\SessionExpiredResponder::respond($e, $request);
         });
     })->create();

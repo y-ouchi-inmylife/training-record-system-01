@@ -7,6 +7,8 @@
        （フォームがないため。セッションを読まない）。500・503 のときに、ここでまたエラーにならないように
      - 見出し・本文は日本語（lang/ja/messages.php の error_pages）。カードの下の端に小さく薄く「エラー番号：{番号}」
      - ボタンは［ログイン画面へ］の 1 つだけ（ふだんの主ボタン）。ログインしているかどうかで出し分けない。503（メンテナンス中）は出さない
+     - 回答の画面（ErrorPageSide::isAnswerPage。2026-10-21 追加）では［ログイン画面へ］を出さず、本文の終わりに案内のリンクを開き直す文を足す。
+       419 だけは本文を回答の画面用の文にする（会員様がログインしていないことが多いため）
      - 403 は、トレーナー側で abort(403, '…') の理由の文（日本語）があれば、本文の下にその文も出す（IP アドレスの制限・管理者だけの操作など。
        Laravel の英語の既定の文〔This action is unauthorized. など〕は出さない）
      その前（2026-10-21 まで）は、ヘッダーのない中立のレイアウトに、色の付いた帯と英語の見出しを出し、ボタンはなかった --}}
@@ -17,14 +19,20 @@
     $pageKey = \Illuminate\Support\Facades\Lang::has('messages.error_pages.pages.'.$status)
         ? (string) $status
         : ($status >= 500 ? '5xx' : '4xx');
+    $isAnswerPage = $isClient && \App\Support\ErrorPageSide::isAnswerPage(request());
     $heading = __('messages.error_pages.pages.'.$pageKey.'.title');
     $body = __('messages.error_pages.pages.'.$pageKey.'.body');
+    if ($isAnswerPage) {
+        $body = $status === 419
+            ? __('messages.error_pages.answer_419')
+            : $body.__('messages.error_pages.answer_suffix');
+    }
     $reason = null;
     if (! $isClient && $status === 403 && isset($exception)) {
         $message = (string) $exception->getMessage();
         $reason = preg_match('/[^\x00-\x7F]/u', $message) === 1 ? $message : null;
     }
-    $showButton = $status !== 503;
+    $showButton = $status !== 503 && ! $isAnswerPage;
     $loginUrl = $isClient ? route('client-portal.login') : route('login');
     $portalName = $isClient ? config('app.client_portal_name', 'トレーニング記録') : config('app.trainer_portal_name');
 @endphp

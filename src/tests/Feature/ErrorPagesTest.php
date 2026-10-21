@@ -54,6 +54,10 @@ class ErrorPagesTest extends TestCase
 
         Route::middleware('web')->get('/__error/{status}', fn (string $status) => abort((int) $status, request('message', '')));
         Route::middleware('web')->get('/client-portal/__error/{status}', fn (string $status) => abort((int) $status, request('message', '')));
+        // 回答の画面の URL（2026-10-21 追加。ErrorPageSide::isAnswerPage）
+        foreach (['intake-survey', 'personality-diagnosis', 'setup', 'email-registration', 'password-reset'] as $prefix) {
+            Route::middleware('web')->get('/client-portal/'.$prefix.'/__error/{status}', fn (string $status) => abort((int) $status));
+        }
         Route::middleware('web')->get('/__error-db', fn () => DB::table('clients')->count());
         Route::middleware('web')->get('/client-portal/__error-db', fn () => DB::table('clients')->count());
     }
@@ -147,8 +151,10 @@ class ErrorPagesTest extends TestCase
         }
     }
 
-    public function test_本物の419も新しいページ(): void
+    public function test_本物の419はエラーページを出さずにログイン画面へ戻す(): void
     {
+        // 2026-10-21 変更：CSRF の不一致の 419 は、エラーページを出さずに元の画面へ戻す（SessionExpiredTest）。
+        // その前（2026-10-21 の前回の変更）は、ここで 419 のエラーページを確かめていた。419 のページそのものは上の abort(419) で確かめる
         // テストでは CSRF の確認が飛ばされるため、飛ばさないものに差し替えてトークンなしで送る
         $this->app->instance(ValidateCsrfToken::class, new class($this->app, $this->app['encrypter']) extends ValidateCsrfToken
         {
@@ -158,13 +164,8 @@ class ErrorPagesTest extends TestCase
             }
         });
 
-        $trainer = $this->post('/login', ['login_id' => 'x', 'password' => 'y'])->assertStatus(419)->getContent();
-        $this->assertErrorPage($trainer, 419, 'trainer');
-        $this->assertTrainerLook($trainer, 419);
-
-        $client = $this->post('/client-portal/login', ['email' => 'a@example.com', 'password' => 'y'])->assertStatus(419)->getContent();
-        $this->assertErrorPage($client, 419, 'client');
-        $this->assertClientLook($client, 419);
+        $this->post('/login', ['login_id' => 'x', 'password' => 'y'])->assertRedirect(route('login'));
+        $this->post('/client-portal/login', ['email' => 'a@example.com', 'password' => 'y'])->assertRedirect(route('client-portal.login'));
     }
 
     public function test_どのルートにも当たらない404は会員様側で会員様側のURLの404も会員様側(): void
@@ -264,5 +265,40 @@ class ErrorPagesTest extends TestCase
         $request = Request::create('http://localhost/dashboard');
         $request->setRouteResolver(fn () => Route::getRoutes()->match($request));
         $this->assertSame(ErrorPageSide::TRAINER, ErrorPageSide::resolve($request));
+    }
+
+    public function test_回答の画面のエラーページはボタンを出さず案内のリンクを開き直す文を足す(): void
+    {
+        $suffix = 'お手数ですが、もう一度、案内のリンク（QR コード）を開いてください。';
+        foreach (['intake-survey', 'personality-diagnosis', 'setup', 'email-registration'] as $prefix) {
+            foreach ([403, 404, 500, 503] as $status) {
+                $html = $this->get('/client-portal/'.$prefix.'/__error/'.$status)->assertStatus($status)->getContent();
+                [$title, $body] = self::PAGES[$status];
+                $this->assertStringContainsString('data-error-heading>'.$title.'</h1>', $html, $prefix.' '.$status);
+                $this->assertStringContainsString('<p class="mb-0" data-error-body>'.$body.$suffix.'</p>', $html, $prefix.' '.$status);
+                $this->assertStringContainsString('data-error-code>エラー番号：'.$status.'</p>', $html, $prefix.' '.$status);
+                $this->assertStringContainsString('data-error-side="client"', $html, $prefix.' '.$status);
+                $this->assertStringNotContainsString('data-error-login', $html, $prefix.' '.$status);
+                $this->assertStringNotContainsString('ログイン画面へ', $html, $prefix.' '.$status);
+            }
+            // 419 は本文を回答の画面用の文にする（見出しは同じ）。愛犬アンケートの URL の 419 は、今までどおり専用のページ（先に効く）
+            $html = $this->get('/client-portal/'.$prefix.'/__error/419')->assertStatus(419)->getContent();
+            if ($prefix === 'intake-survey') {
+                $this->assertStringContainsString('時間がたったため送信できませんでした', $html);
+
+                continue;
+            }
+            $this->assertStringContainsString('data-error-heading>ページの有効期限が切れました</h1>', $html, $prefix);
+            $this->assertStringContainsString('<p class="mb-0" data-error-body>時間がたったため、ページの有効期限が切れました。もう一度、案内のリンクを開いてください。</p>', $html, $prefix);
+            $this->assertStringNotContainsString('ログインしてください', $html, $prefix);
+            $this->assertStringNotContainsString('data-error-login', $html, $prefix);
+        }
+
+        // パスワード再設定（マイページを使っている会員様の画面）・ほかの会員様の画面は今までどおり
+        foreach (['/client-portal/password-reset/__error/404', '/client-portal/__error/404'] as $url) {
+            $html = $this->get($url)->getContent();
+            $this->assertStringContainsString('data-error-login', $html, $url);
+            $this->assertStringNotContainsString($suffix, $html, $url);
+        }
     }
 }

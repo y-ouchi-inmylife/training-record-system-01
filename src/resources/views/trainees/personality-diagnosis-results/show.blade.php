@@ -473,6 +473,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 body: JSON.stringify({ provider: button.getAttribute('data-provider') }),
             }).then(function (response) {
+                // ページの有効期限切れ（419）は、時間をおいても直らないので、読み込み直すように伝える（2026-10-21 追加）
+                if (response.status === 419) {
+                    var expired = new Error('session expired');
+                    expired.sessionExpired = true;
+                    throw expired;
+                }
                 return response.json().catch(function () { return {}; }).then(function (body) {
                     if (!response.ok || typeof body.evaluation !== 'string') {
                         throw new Error('draft failed');
@@ -489,8 +495,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     ? 'AIでアドバイスを自動生成しました。スタッフ用メモは自動生成できませんでした。'
                     : 'AIでアドバイスとスタッフ用メモを自動生成しました。';
                 showNotice(true, message);
-            }).catch(function () {
-                showNotice(false, 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');
+            }).catch(function (error) {
+                showNotice(false, error && error.sessionExpired
+                    ? @json(__('messages.session_expired.fetch'))
+                    : 'AIで自動生成できませんでした。時間をおいてもう一度お試しください。');
             }).finally(function () {
                 button.textContent = label;
                 draftButtons.forEach(function (b) { b.disabled = false; });
