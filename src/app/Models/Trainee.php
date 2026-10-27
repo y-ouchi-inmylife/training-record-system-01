@@ -412,6 +412,30 @@ class Trainee extends Model
     }
 
     /**
+     * 会員側のマイページ（S-1402）の愛犬のカードで、写真の下の 3 行目に出す最新体重（2026-10-27 追加）。
+     *
+     * 「体重 5.00 kg（2026/10/15）」の 1 行を、折り返してよい位置で分けた文字の並び（「体重 5.00 kg」と「（2026/10/15）」）で返す。
+     * 体重は小数第 2 位まで（グラフのツールチップとそろえる）、日付はゼロ埋めの yyyy/MM/dd（誕生日の行とそろえる）。時刻と前回比は出さない。
+     * 最新は measurements（計測日・計測時刻の降順）の先頭。計測値が 0 件なら空の配列（行を出さない）。
+     * client_profile_parts（犬種・性別・誕生日）とは関心事が違うので分け、マイページのコントローラーでうしろにつなぐ。
+     * measurements は呼ぶ側で先に読み込んでおく（グラフ用に読み込み済み。N+1 にしないため）
+     *
+     * @return list<list<string>>
+     */
+    public function getClientLatestWeightPartsAttribute(): array
+    {
+        $latest = $this->measurements->first();
+        if ($latest === null) {
+            return [];
+        }
+
+        return [[
+            '体重 '.number_format((float) $latest->weight_kg, 2, '.', '').' kg',
+            '（'.$latest->measured_date->format('Y/m/d').'）',
+        ]];
+    }
+
+    /**
      * 会員詳細の「期限切れ」の行に出す案内の種類（'intake'／'personality'／'combined'。出さないなら null。2026-10-19 追加。
      * 設計書 S-0305 セクション3「案内の操作」）。
      * 'combined'（2026-10-19 追加）：いちばん新しい案内が「愛犬アンケート＆愛犬性格診断」で、2 つとも未回答で期限切れのとき。

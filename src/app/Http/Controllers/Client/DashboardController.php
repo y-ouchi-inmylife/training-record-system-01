@@ -129,8 +129,9 @@ class DashboardController extends Controller
                 'radar' => $trainee->personality_radar_data,
             ],
             'surveyNotices' => $this->surveyNotices($trainee),
-            // 写真の下に出す 2 行（犬種（性別）と誕生日。値がない行は入らない。2026-10-18 追加。Trainee::client_profile_parts）
-            'profileParts' => $trainee->client_profile_parts,
+            // 写真の下に出す最大 3 行（犬種（性別）と誕生日。値がない行は入らない。2026-10-18 追加。Trainee::client_profile_parts）。
+            // 3 行目は最新体重（計測値 0 件なら入らない。2026-10-27 追加。Trainee::client_latest_weight_parts。読み込み済みの measurements を使う）
+            'profileParts' => array_merge($trainee->client_profile_parts, $trainee->client_latest_weight_parts),
         ])->all();
     }
 

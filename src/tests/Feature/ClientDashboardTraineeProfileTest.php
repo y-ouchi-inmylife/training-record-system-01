@@ -111,7 +111,7 @@ class ClientDashboardTraineeProfileTest extends TestCase
         return substr($html, $start, strpos($html, '</article>', $heading) - $start);
     }
 
-    /** 写真の下の 2 行（行ごとの HTML。なければ null） */
+    /** 写真の下の行（最大 3 行。行ごとの HTML。なければ null） */
     private function profileLines(string $html, string $callName): ?array
     {
         $card = $this->card($html, $callName);
@@ -251,12 +251,83 @@ class ClientDashboardTraineeProfileTest extends TestCase
         $this->assertStringNotContainsString('ハナちゃん', $html);
     }
 
+    /** 計測値を 1 件入れる（2026-10-27 追加。最新体重の行のテスト用） */
+    private function measurement(int $traineeId, string $date, string $time, float $weight): void
+    {
+        DB::table('trainee_measurements')->insert([
+            'trainee_id' => $traineeId, 'measured_date' => $date, 'measured_time' => $time, 'weight_kg' => $weight,
+        ]);
+    }
+
+    public function test_最新体重_計測値が0件なら体重の行を出さない(): void
+    {
+        $this->trainee('アイ', self::FULL);
+
+        $html = $this->open();
+
+        $this->assertSame(['トイ・プードル<wbr>（女の子）', '2020/05/01生<wbr>（6歳5ヶ月）'], $this->profileLines($html, 'アイちゃん'));
+        $this->assertStringNotContainsString('体重', implode('', $this->profileLines($html, 'アイちゃん')));
+    }
+
+    public function test_最新体重_計測値が1件ならその値と日付を3行目に出す(): void
+    {
+        $id = $this->trainee('アイ', self::FULL);
+        $this->measurement($id, '2026-10-05', '08:00:00', 5);
+
+        $html = $this->open();
+
+        // 小数第 2 位まで・日付はゼロ埋め・時刻は出さない。「体重 5.00 kg」と「（日付）」の間でだけ折り返す
+        $this->assertSame([
+            'トイ・プードル<wbr>（女の子）',
+            '2020/05/01生<wbr>（6歳5ヶ月）',
+            '体重 5.00 kg<wbr>（2026/10/05）',
+        ], $this->profileLines($html, 'アイちゃん'));
+    }
+
+    public function test_最新体重_同じ日に2件なら時刻が遅いほうを出す(): void
+    {
+        $id = $this->trainee('アイ', self::FULL);
+        // 入れる順は時刻の逆にしておく（id の順ではなく時刻で決まることを確かめる）
+        $this->measurement($id, '2026-10-15', '18:00:00', 5.25);
+        $this->measurement($id, '2026-10-15', '08:00:00', 5.1);
+
+        $lines = $this->profileLines($this->open(), 'アイちゃん');
+
+        $this->assertSame('体重 5.25 kg<wbr>（2026/10/15）', end($lines));
+    }
+
+    public function test_最新体重_別の日に複数件なら日付が新しいほうを出す(): void
+    {
+        $id = $this->trainee('アイ', self::FULL);
+        // 新しい日の時刻のほうが早くても、日付が新しいほうが最新
+        $this->measurement($id, '2026-10-15', '07:00:00', 5.4);
+        $this->measurement($id, '2026-09-30', '20:00:00', 4.95);
+        $this->measurement($id, '2026-10-01', '12:00:00', 5);
+
+        $lines = $this->profileLines($this->open(), 'アイちゃん');
+
+        $this->assertSame('体重 5.40 kg<wbr>（2026/10/15）', end($lines));
+        $this->assertCount(3, $lines);
+    }
+
+    public function test_最新体重_犬種性別誕生日がすべてなくても体重の行だけで欄を出す(): void
+    {
+        $id = $this->trainee('モモ', ['sex' => 'unknown']);
+        $this->measurement($id, '2026-10-15', '08:00:00', 3.5);
+
+        $html = $this->open();
+
+        $this->assertSame(['体重 3.50 kg<wbr>（2026/10/15）'], $this->profileLines($html, 'モモちゃん'));
+        $this->assertStringContainsString('data-client-trainee-profile', $html);
+    }
+
     public function test_トレーニーの数でクエリが増えない(): void
     {
         $count = function (int $trainees): int {
             DB::table('trainees')->delete();
             for ($i = 1; $i <= $trainees; $i++) {
-                $this->trainee('犬'.$i, self::FULL);
+                // 計測値もある（最新体重の行でもクエリが増えないことを確かめる。2026-10-27 追加）
+                $this->measurement($this->trainee('犬'.$i, self::FULL), '2026-10-15', '08:00:00', 5);
             }
             DB::flushQueryLog();
             DB::enableQueryLog();
