@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
     createPinLatest,
     handleOutsidePointerDown,
@@ -36,6 +36,23 @@ function fakeChart(points, active = []) {
 }
 
 const latestOf = (chart) => [{ datasetIndex: 0, index: chart.data.datasets[0].data.length - 1 }];
+
+/** グラフごとの部品を作り、Chart.js の初期化（afterInit）まで済ませる */
+function initialized(chart) {
+    const pin = createPinLatest();
+    pin.plugin.afterInit(chart);
+
+    return pin;
+}
+
+// テストは node で動かすので、document の pointerdown の登録先だけ用意する
+beforeAll(() => {
+    vi.stubGlobal('document', { addEventListener: vi.fn() });
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 
 describe('最新点の位置', () => {
     it('y が null でない最後の要素', () => {
@@ -99,7 +116,7 @@ describe('最新点に戻す', () => {
 describe('グラフごとの部品（createPinLatest）', () => {
     it('初回の初期アニメーションが終わるまでは出さず、終わったら最新点を出して描き直す（初回だけ）', () => {
         const chart = fakeChart(pts(5, 5.1));
-        const { plugin, onAnimationComplete } = createPinLatest();
+        const { plugin, onAnimationComplete } = initialized(chart);
         const args = {};
 
         plugin.afterEvent(chart, args);
@@ -118,7 +135,7 @@ describe('グラフごとの部品（createPinLatest）', () => {
 
     it('初期アニメーションの間にホバーされていたら、その点のまま', () => {
         const chart = fakeChart(pts(5, 5.1, 5.2), [{ datasetIndex: 0, index: 0 }]);
-        const { onAnimationComplete } = createPinLatest();
+        const { onAnimationComplete } = initialized(chart);
 
         onAnimationComplete({ chart });
 
@@ -128,7 +145,7 @@ describe('グラフごとの部品（createPinLatest）', () => {
 
     it('イベントのあと点が選ばれていなければ最新点に戻し、描き直させる。点が選ばれていれば何もしない', () => {
         const chart = fakeChart(pts(5, 5.1, 5.2));
-        const { plugin, onAnimationComplete } = createPinLatest();
+        const { plugin, onAnimationComplete } = initialized(chart);
         onAnimationComplete({ chart });
 
         // ほかの点にホバー → そのまま（Chart.js 標準の切り替え）
@@ -155,7 +172,7 @@ describe('グラフごとの部品（createPinLatest）', () => {
 
     it('リサイズによる更新のあと、選ばれている点で位置を計算し直す（なければ最新点）。リサイズでない更新では何もしない', () => {
         const chart = fakeChart(pts(5, 5.1, 5.2));
-        const { plugin, onAnimationComplete } = createPinLatest();
+        const { plugin, onAnimationComplete } = initialized(chart);
         onAnimationComplete({ chart });
         chart.tooltip.setActiveElements.mockClear();
 
@@ -176,8 +193,8 @@ describe('グラフごとの部品（createPinLatest）', () => {
     it('グラフごとに状態を持つ（1 つ目の初期アニメーションが終わっても、2 つ目は出さない）', () => {
         const first = fakeChart(pts(5, 5.1));
         const second = fakeChart(pts(3));
-        const a = createPinLatest();
-        const b = createPinLatest();
+        const a = initialized(first);
+        const b = initialized(second);
 
         a.onAnimationComplete({ chart: first });
         b.plugin.afterEvent(second, {});
@@ -187,13 +204,129 @@ describe('グラフごとの部品（createPinLatest）', () => {
     });
 });
 
+describe('初期化の前の呼び出しと例外の封じ込め（2026-10-27 不具合修正：DPR が端数の端末）', () => {
+    it('afterInit より前の onAnimationComplete は無視され、ready も立たない（ツールチップがまだ無い）', () => {
+        const chart = fakeChart(pts(5, 5.1, 5.2));
+        const tooltip = chart.tooltip;
+        delete chart.tooltip;
+        const { plugin, onAnimationComplete } = createPinLatest();
+
+        // コンストラクタの中のリサイズからの呼び出し（chart.tooltip が無い）
+        expect(() => onAnimationComplete({ chart })).not.toThrow();
+        expect(chart.setActiveElements).not.toHaveBeenCalled();
+
+        // ready が立っていないので、afterInit のあとのイベントでも最新点は出さない
+        chart.tooltip = tooltip;
+        plugin.afterInit(chart);
+        const args = {};
+        plugin.afterEvent(chart, args);
+        expect(args.changed).toBeUndefined();
+        expect(tooltip.setActiveElements).not.toHaveBeenCalled();
+    });
+
+    it('afterInit のあとの最初の onAnimationComplete で最新点が選ばれる', () => {
+        const chart = fakeChart(pts(5, 5.1, 5.2));
+        const { plugin, onAnimationComplete } = createPinLatest();
+
+        onAnimationComplete({ chart }); // 初期化の前：無視
+        plugin.afterInit(chart);
+        expect(chart.tooltip.setActiveElements).not.toHaveBeenCalled();
+
+        onAnimationComplete({ chart }); // 初期アニメーションの終わり
+        expect(chart.tooltipActive).toEqual(latestOf(chart));
+        expect(chart.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('chart.tooltip が無いグラフでは、どのフックも例外を出さず何もしない', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const chart = fakeChart(pts(5, 5.1, 5.2), [{ datasetIndex: 0, index: 0 }]);
+        delete chart.tooltip;
+        const { plugin, onAnimationComplete } = createPinLatest();
+        const args = {};
+
+        expect(() => {
+            plugin.afterInit(chart);
+            onAnimationComplete({ chart });
+            plugin.afterEvent(chart, args);
+            plugin.resize(chart);
+            plugin.afterUpdate(chart);
+            handleOutsidePointerDown({ target: {} }, new Map([[chart, (fn) => fn()]]));
+        }).not.toThrow();
+        expect(pinLatestIfIdle(chart)).toBe(false);
+        expect(resetToLatest(chart)).toBe(false);
+        expect(chart.setActiveElements).not.toHaveBeenCalled();
+        expect(args.changed).toBeUndefined();
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('フックの中で例外が出たら warn を 1 回だけ出し、そのグラフの常時表示をやめる（以後は何もしない。ほかのグラフは続ける）', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const broken = fakeChart(pts(5, 5.1, 5.2));
+        const other = fakeChart(pts(4, 4.1));
+        const a = initialized(broken);
+        const b = initialized(other);
+        a.onAnimationComplete({ chart: broken });
+        b.onAnimationComplete({ chart: other });
+        broken.tooltip.getActiveElements = () => {
+            throw new Error('boom');
+        };
+
+        // afterEvent で例外 → Chart.js には伝えない
+        broken.tooltipActive = [];
+        expect(() => a.plugin.afterEvent(broken, {})).not.toThrow();
+        expect(warn).toHaveBeenCalledTimes(1);
+
+        // 以後このグラフでは何もしない（ほかのフックも、document の pointerdown も）
+        const setActive = broken.setActiveElements.mock.calls.length;
+        expect(() => {
+            a.plugin.afterEvent(broken, {});
+            a.plugin.resize(broken);
+            a.plugin.afterUpdate(broken);
+            a.onAnimationComplete({ chart: broken });
+        }).not.toThrow();
+        expect(broken.setActiveElements.mock.calls.length).toBe(setActive);
+        expect(warn).toHaveBeenCalledTimes(1);
+
+        // ほかのグラフはそのまま動く
+        other.tooltipActive = [];
+        const args = {};
+        b.plugin.afterEvent(other, args);
+        expect(args.changed).toBe(true);
+        expect(other.tooltipActive).toEqual(latestOf(other));
+    });
+
+    it('document の pointerdown で例外が出ても、ほかのグラフの処理は続け、例外を外に出さない', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const broken = fakeChart(pts(5, 5.1), [{ datasetIndex: 0, index: 0 }]);
+        const other = fakeChart(pts(4, 4.1), [{ datasetIndex: 0, index: 0 }]);
+        broken.render = () => {
+            throw new Error('boom');
+        };
+        initialized(broken);
+        initialized(other);
+
+        // afterInit で登録された、グラフごとの guard で動かす（既定の引数）
+        expect(() => handleOutsidePointerDown({ target: {} })).not.toThrow();
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(other.tooltipActive).toEqual(latestOf(other));
+        expect(other.render).toHaveBeenCalledTimes(1);
+
+        // 例外が出たグラフは対象から外れる（2 回目は warn も出ない）
+        handleOutsidePointerDown({ target: {} });
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('canvas の外のタップ', () => {
+    // 例外を封じ込めずにそのまま動かす guard
+    const run = (fn) => fn();
+
     it('タップした場所がその canvas の外のグラフだけ最新点に戻して描き直す', () => {
         const tapped = fakeChart(pts(5, 5.1, 5.2), [{ datasetIndex: 0, index: 0 }]);
         const other = fakeChart(pts(4, 4.1), [{ datasetIndex: 0, index: 0 }]);
 
         // tapped の canvas の中をタップ → tapped はそのまま、other は外なので最新点に戻る
-        handleOutsidePointerDown({ target: tapped.canvas }, new Set([tapped, other]));
+        handleOutsidePointerDown({ target: tapped.canvas }, new Map([[tapped, run], [other, run]]));
 
         expect(tapped.tooltipActive).toEqual([{ datasetIndex: 0, index: 0 }]);
         expect(tapped.render).not.toHaveBeenCalled();
@@ -205,7 +338,7 @@ describe('canvas の外のタップ', () => {
         const chart = fakeChart(pts(5));
         chart.tooltipActive = latestOf(chart);
 
-        handleOutsidePointerDown({ target: {} }, new Set([chart]));
+        handleOutsidePointerDown({ target: {} }, new Map([[chart, run]]));
 
         expect(chart.render).not.toHaveBeenCalled();
     });
