@@ -23,17 +23,19 @@ class DashboardController extends Controller
      */
     public function index(Request $request): View
     {
-        // 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約が済んだのに住所・電話番号が入っていない会員に気づけるように）。
-        // 対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissingWithContract）。
-        // 状態バッジ（Client::statusBadge）の判定に要る値は会員一覧と同じく withStatusData で、最新の契約日はサブクエリでまとめて取る。
-        // 並びは最新の契約日の新しい順、同じ日なら id の大きい順。絞り込み・ページ送りはなし（全件）。役割で変えない
-        $contactMissingClients = Client::contactMissingWithContract()
+        // 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約か利用があるのに住所・電話番号が入っていない会員に気づけるように）。
+        // 対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissing。契約か利用がある会員。2026-10-28 変更：その前は契約がある会員だけ）。
+        // 状態バッジ（Client::statusBadge）の判定に要る値は会員一覧と同じく withStatusData で、最新の契約日はサブクエリでまとめて取る（契約がなければ NULL）。
+        // 並びは契約がない（利用だけの）会員が先（すでに預かっているのに契約がなく、いちばん急ぐため。IS NULL DESC は MySQL・SQLite で同じ結果）、
+        // 次に最新の契約日の新しい順、同じ日なら id の大きい順。絞り込み・ページ送りはなし（全件）。役割で変えない
+        $contactMissingClients = Client::contactMissing()
             ->withStatusData()
             ->addSelect([
                 'latest_contracted_on' => ClientContract::selectRaw('MAX(contracted_on)')
                     ->whereColumn('client_id', 'clients.id'),
             ])
             ->withCasts(['latest_contracted_on' => 'date'])
+            ->orderByRaw('latest_contracted_on IS NULL DESC')
             ->orderBy('latest_contracted_on', 'desc')
             ->orderBy('clients.id', 'desc')
             ->get();

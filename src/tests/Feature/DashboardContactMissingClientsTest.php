@@ -14,9 +14,10 @@ use Tests\TestCase;
 /**
  * トレーナー側のダッシュボード（S-0201）の「連絡先が未入力の会員」（2026-10-28 追加。要件定義書 6-2-1）。
  *
- * - 対象は会員側の「ご連絡先の登録のお願い」と同じ（契約が 1 件以上かつ、住所〔都道府県・市区町村・町名番地のどれか〕か電話番号が空）
+ * - 対象は会員側の「ご連絡先の登録のお願い」と同じ（契約か利用が 1 件以上かつ、住所〔都道府県・市区町村・町名番地のどれか〕か電話番号が空。
+ *   2026-10-28 変更：その前は契約が 1 件以上）
  * - 0 件ならセクションごと出さない
- * - 並びは最新の契約日の新しい順、同じ日なら id の大きい順
+ * - 並びは契約がない（利用だけの）会員が先、次に最新の契約日の新しい順、同じ日なら id の大きい順。契約がない会員の最新の契約日は空欄
  * - マイページの列は会員一覧と同じ列見出し・同じバッジ、未入力は「住所」「電話番号」のバッジ
  * - 行全体は押せないので table-hover は付けない（2026-10-28 変更）
  */
@@ -78,12 +79,15 @@ class DashboardContactMissingClientsTest extends TestCase
         parent::tearDown();
     }
 
-    /** 会員を作り、$contractedOn の日付ごとに契約を入れる */
-    private function makeClient(string $lastName, array $contact, array $contractedOn = []): Client
+    /** 会員を作り、$contractedOn の日付ごとに契約を、$usedOn の日付ごとに「契約なし」の利用を入れる */
+    private function makeClient(string $lastName, array $contact, array $contractedOn = [], array $usedOn = []): Client
     {
         $client = Client::query()->create(['internal_id' => $lastName, 'last_name' => $lastName, ...$contact]);
         foreach ($contractedOn as $date) {
             DB::table('client_contracts')->insert(['client_id' => $client->id, 'contracted_on' => $date, 'count' => 4]);
+        }
+        foreach ($usedOn as $date) {
+            DB::table('client_usages')->insert(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => $date]);
         }
 
         return $client;
@@ -108,8 +112,9 @@ class DashboardContactMissingClientsTest extends TestCase
 
     public function test_対象がいなければセクションごと出さない(): void
     {
-        // 契約がない会員は未入力でも出さない。契約があっても入力済みなら出さない
-        $this->makeClient('契約なし', []);
+        // 契約も利用もない会員は未入力でも出さない。契約か利用があっても入力済みなら出さない
+        $this->makeClient('契約も利用もなし', []);
+        $this->makeClient('利用だけ入力済み', self::FILLED, [], ['2026-10-01']);
         $this->makeClient('入力済み', self::FILLED, ['2026-10-01']);
 
         $html = $this->get(route('dashboard'))->assertOk()->getContent();
@@ -123,14 +128,14 @@ class DashboardContactMissingClientsTest extends TestCase
         $this->makeClient('任意だけ空', [...self::FILLED, 'postal_code' => null, 'address4' => null, 'phone2' => null], ['2026-10-01']);
         $noPhone = $this->makeClient('電話空文字', [...self::FILLED, 'phone1' => ''], ['2026-10-02']);
         $noCity = $this->makeClient('市区町村なし', [...self::FILLED, 'address2' => null], ['2026-10-03']);
-        $this->makeClient('契約なし', []);
+        $this->makeClient('契約も利用もなし', []);
 
         $rows = $this->rows($this->section());
         $this->assertCount(2, $rows);
         $this->assertStringContainsString('市区町村なし', $rows[0]);
         $this->assertStringContainsString('電話空文字', $rows[1]);
         foreach ([$noPhone, $noCity] as $client) {
-            $this->assertTrue($client->hasContracts());
+            $this->assertTrue($client->requiresContactDetails());
             $this->assertNotSame([], $client->fresh()->missingContactDetails());
         }
     }
@@ -202,5 +207,38 @@ class DashboardContactMissingClientsTest extends TestCase
             '/<h4 class="mb-2" data-contact-missing-heading><i class="bi bi-exclamation-circle-fill text-danger me-1" aria-hidden="true"><\/i>連絡先が未入力の会員<\/h4>/',
             $this->lastHtml,
         );
+    }
+
+    public function test_契約がなく利用だけの会員も出し最新の契約日は空欄で一番上(): void
+    {
+        // 2026-10-28 追加：契約を消して利用だけが「契約なし」で残った会員（すでに犬を預かっているのに契約がなく、いちばん急ぐ）
+        $this->makeClient('新しい契約', [], ['2026-10-20']);
+        $usageOnly = $this->makeClient('利用だけ', [...self::FILLED, 'phone1' => null], [], ['2026-10-01', '2026-10-08']);
+        $this->makeClient('古い契約', [], ['2026-09-01']);
+
+        $rows = $this->rows($this->section());
+        $this->assertCount(3, $rows);
+        $this->assertStringContainsString('利用だけ', $rows[0]);
+        $this->assertStringContainsString('新しい契約', $rows[1]);
+        $this->assertStringContainsString('古い契約', $rows[2]);
+
+        // 最新の契約日（4 列目）は空欄。未入力は電話番号だけ
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $rows[0], $cells);
+        $this->assertSame('', trim($cells[1][3]));
+        $this->assertStringContainsString('>電話番号</span>', $cells[1][4]);
+        $this->assertStringNotContainsString('>住所</span>', $cells[1][4]);
+        $this->assertTrue($usageOnly->requiresContactDetails());
+    }
+
+    public function test_契約がない会員どうしはidの大きい順(): void
+    {
+        $this->makeClient('先に登録', [], [], ['2026-10-01']);
+        $this->makeClient('後に登録', [], [], ['2026-10-01']);
+        $this->makeClient('契約あり', [], ['2026-10-25']);
+
+        $rows = $this->rows($this->section());
+        $this->assertStringContainsString('後に登録', $rows[0]);
+        $this->assertStringContainsString('先に登録', $rows[1]);
+        $this->assertStringContainsString('契約あり', $rows[2]);
     }
 }

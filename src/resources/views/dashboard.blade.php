@@ -8,8 +8,9 @@
         （権限: {{ Auth::user()->role_display_name }}）
     </div>
 
-    {{-- 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約が済んだのに住所・電話番号が入っていない会員に気づけるように）。
-         対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissingWithContract）。
+    {{-- 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約か利用があるのに住所・電話番号が入っていない会員に気づけるように）。
+         対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissing。契約か利用がある会員。2026-10-28 変更：その前は契約がある会員だけ）。
+         契約がない（利用だけの）会員は最新の契約日が空欄で、一番上に並ぶ（並びはコントローラで決める）。
          気づかせるための表示なので、対象が 0 件ならセクションごと出さない（見出しも 0 件の帯も出さない）。
          見た目は最近の愛犬性格診断に合わせるが、table-hover は付けない（行全体は押せず、押せるのは会員名のリンクだけのため。2026-10-28 変更）。
          絞り込み・ページ送りはなし。マイページの列は会員一覧と同じ列見出し・同じバッジ（Client::statusBadge。2026-10-28 変更：列見出しは「状態」だった）、
@@ -37,7 +38,8 @@
                             <td class="text-nowrap">{{ $client->internal_id }}</td>
                             <td class="text-nowrap"><a href="{{ route('clients.show', $client) }}">{{ $client->display_name }}</a></td>
                             <td class="text-nowrap"><span class="badge {{ $client->statusBadge()['class'] }}">{{ $client->statusBadge()['label'] }}</span></td>
-                            <td class="text-nowrap">{{ $client->latest_contracted_on->format('Y/m/d') }}</td>
+                            {{-- 契約がない（利用だけの）会員は最新の契約日が NULL なので空欄（§2-4。2026-10-28 追加） --}}
+                            <td class="text-nowrap">{{ $client->latest_contracted_on?->format('Y/m/d') }}</td>
                             <td class="text-nowrap">
                                 @foreach($client->missingContactDetails() as $missing)
                                     <span class="badge bg-warning text-dark">{{ \App\Models\Client::MISSING_CONTACT_LABELS[$missing] }}</span>

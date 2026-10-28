@@ -138,7 +138,8 @@ class DashboardController extends Controller
     /**
      * ご連絡先の登録のお願い（2026-10-18 追加。設計書 S-1402「ご連絡先の登録のお願い」）。
      *
-     * 出すのは、契約が 1 件以上ある（有効期限切れ・回数を使い切ったものも含む）会員で、住所（都道府県・市区町村・町名番地のどれか）か
+     * 出すのは、契約か利用が 1 件以上ある（Client::requiresContactDetails。有効期限切れ・回数を使い切った契約も含む。
+     * 2026-10-28 変更：その前は契約が 1 件以上ある会員だけ）会員で、住所（都道府県・市区町村・町名番地のどれか）か
      * 電話番号が空のとき。マイページを開くたびに出す（閉じるボタンはない。入力が済めば出ない）。
      * text は足りないものだけを書いた文（lang/ja/messages.php の client_contact_notice）、url は登録情報の変更（S-1411）
      *
@@ -146,7 +147,7 @@ class DashboardController extends Controller
      */
     private function contactNotice($client): ?array
     {
-        if (! $client->hasContracts()) {
+        if (! $client->requiresContactDetails()) {
             return null;
         }
         $missing = $client->missingContactDetails();

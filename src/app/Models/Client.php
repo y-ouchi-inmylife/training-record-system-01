@@ -259,17 +259,29 @@ class Client extends Authenticatable
     }
 
     /**
-     * 利用（D-1000）
+     * 住所・電話番号を入れてもらう会員か（契約か利用が 1 件以上ある。2026-10-28 追加）。
+     * 有効期限切れ・回数を使い切った契約も、契約を消して「契約なし」で残った利用も数える。
+     * 契約か利用がある会員は、トレーニングを実施している、または予定があるので、緊急時の連絡先が要る。
+     * 使う場所：S-1402「ご連絡先の登録のお願い」・S-1411 の必須（サーバー側と画面の必須の印）。S-0201 は下のスコープ。
+     * 条件が変わっても直すのはここだけにする（その前は契約が 1 件以上〔hasContracts〕で、4 か所がそれぞれ呼んでいた）
      *
-     * 並び順は割り当てルールと同じ利用日の昇順（同じ日は `id` の昇順）。
+     * 条件は scopeRequiresContactDetails と互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる）
      */
-    /**
-     * 契約が 1 件以上あるか（2026-10-18 追加）。有効期限切れ・回数を使い切った契約も数える。
-     * 契約がある会員は預かりが決まっているので、住所・電話番号を入れてもらう（登録情報の変更で必須・マイページで入力を促す）
-     */
-    public function hasContracts(): bool
+    public function requiresContactDetails(): bool
     {
-        return $this->relationLoaded('contracts') ? $this->contracts->isNotEmpty() : $this->contracts()->exists();
+        return $this->contracts()->exists() || $this->usages()->exists();
+    }
+
+    /**
+     * 住所・電話番号を入れてもらう会員に絞る（契約か利用が 1 件以上ある。2026-10-28 追加）。
+     *
+     * 条件は requiresContactDetails() と互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる）
+     */
+    public function scopeRequiresContactDetails(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereHas('contracts')->orWhereHas('usages');
+        });
     }
 
     /**
@@ -277,7 +289,7 @@ class Client extends Authenticatable
      * 'address'：都道府県・市区町村・町名番地のどれかが空。'phone'：電話番号が空。並びは住所 → 電話番号（入力欄の並びと同じ）。
      * 郵便番号・建物名・部屋番号・緊急連絡先は見ない（任意のため）
      *
-     * 見る項目は scopeContactMissingWithContract（トレーナー側のダッシュボード S-0201「連絡先が未入力の会員」の対象）と
+     * 見る項目は scopeContactMissing（トレーナー側のダッシュボード S-0201「連絡先が未入力の会員」の対象）と
      * 互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる。2026-10-28）
      *
      * @return list<'address'|'phone'>
@@ -296,16 +308,17 @@ class Client extends Authenticatable
     }
 
     /**
-     * 契約が 1 件以上あり、住所か電話番号が空の会員に絞る（2026-10-28 追加。設計書 S-0201「連絡先が未入力の会員」）。
-     * 会員側の「ご連絡先の登録のお願い」（hasContracts() と missingContactDetails()）と同じ条件。
+     * 住所・電話番号を入れてもらう会員（契約か利用がある）で、住所か電話番号が空の会員に絞る（2026-10-28 追加。設計書 S-0201「連絡先が未入力の会員」）。
+     * 会員側の「ご連絡先の登録のお願い」（requiresContactDetails() と missingContactDetails()）と同じ条件。
      * 空は NULL と空文字の両方（missingContactDetails() の blank() に合わせる）。
+     * 2026-10-28 変更：その前は scopeContactMissingWithContract で、契約が 1 件以上（whereHas('contracts')）だけを見ていた
      *
-     * 見る項目は missingContactDetails() と互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる）
+     * 住所・電話番号の見る項目は missingContactDetails() と互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる）
      */
-    public function scopeContactMissingWithContract(Builder $query): Builder
+    public function scopeContactMissing(Builder $query): Builder
     {
         return $query
-            ->whereHas('contracts')
+            ->requiresContactDetails()
             ->where(function (Builder $q) {
                 foreach (['phone1', 'address1', 'address2', 'address3'] as $column) {
                     $q->orWhere(fn (Builder $q) => $q->whereNull($column)->orWhere($column, ''));
@@ -313,6 +326,11 @@ class Client extends Authenticatable
             });
     }
 
+    /**
+     * 利用（D-1000）
+     *
+     * 並び順は割り当てルールと同じ利用日の昇順（同じ日は `id` の昇順）。
+     */
     public function usages(): HasMany
     {
         return $this->hasMany(ClientUsage::class)

@@ -12,9 +12,10 @@ use Illuminate\Foundation\Http\FormRequest;
  * 郵便番号は任意（住所検索の入口という位置づけで、DB も NULL 許容。設計書 S-1411 備考参照）。
  *
  * 2026-10-18 変更：住所・電話番号の必須は、ログイン中の会員に契約があるかで決める（ClientContactRules）。
- * - 契約がある：電話番号・都道府県・市区町村・町名番地が必須（預かりが決まっているので入れてもらう）
- * - 契約がない：初回設定と同じく任意（住所は一部だけ入れたらそろえて入れてもらう）
- * その前は、契約の有無にかかわらず必須だった。
+ * 2026-10-28 変更：契約か利用があるかで決める（Client::requiresContactDetails。その前は契約があるかだけ）。
+ * - 契約か利用がある：電話番号・都道府県・市区町村・町名番地が必須（トレーニングを実施している、または予定があるので、緊急時の連絡先が要る）
+ * - どちらもない：初回設定と同じく任意（住所は一部だけ入れたらそろえて入れてもらう）
+ * 2026-10-18 より前は、契約の有無にかかわらず必須だった。
  */
 class ClientProfileRequest extends FormRequest
 {
@@ -27,8 +28,8 @@ class ClientProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        // ルートは auth:client の中なので会員はいる。会員がいない（ルールだけを取り出すテストなど）ときは契約なしとして扱う
-        return $this->contactRules(required: $this->user('client')?->hasContracts() ?? false);
+        // ルートは auth:client の中なので会員はいる。会員がいない（ルールだけを取り出すテストなど）ときは任意（必須にしない）として扱う
+        return $this->contactRules(required: $this->user('client')?->requiresContactDetails() ?? false);
     }
 
     // messages() は段階 2 で削除。文言は lang/ja/validation.php に集約（設計書 §2-8）。

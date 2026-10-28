@@ -64,8 +64,9 @@ class SettingsController extends Controller
 
         return view('client.settings.edit', [
             'client' => $client,
-            // 住所・電話番号を必須にするか（契約がある会員だけ。2026-10-18 追加。ClientProfileRequest と同じ決まり）
-            'contactRequired' => $client->hasContracts(),
+            // 住所・電話番号を必須にするか（契約か利用がある会員だけ。2026-10-18 追加。ClientProfileRequest と同じ決まり。
+            // 2026-10-28 変更：その前は契約がある会員だけ）
+            'contactRequired' => $client->requiresContactDetails(),
         ]);
     }
 
