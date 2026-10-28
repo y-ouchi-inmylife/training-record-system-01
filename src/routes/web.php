@@ -12,6 +12,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientEmailController;
 use App\Http\Controllers\ClientEmailRegistrationTokenController;
 use App\Http\Controllers\ClientUsageController;
+use App\Http\Controllers\ContractController;
 use App\Http\Controllers\TrainingRecordController;
 use App\Http\Controllers\TrainerController;
 use App\Http\Controllers\DashboardController;
@@ -201,6 +202,9 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
                 ->name('client-usages.update');
             Route::delete('client-usages/{usage}', [ClientUsageController::class, 'destroy'])
                 ->name('client-usages.destroy');
+            // 契約一覧（S-0315。2026-10-28 追加）。会員をまたいで契約を出す、見るだけの画面（登録・編集・削除は上の会員詳細のモーダルのまま）。
+            // 参照なのでアクセスログは記録しない（LogAccess の対象にしない）
+            Route::get('contracts', [ContractController::class, 'index'])->name('contracts.index');
 
             Route::resource('training-records', TrainingRecordController::class);
 

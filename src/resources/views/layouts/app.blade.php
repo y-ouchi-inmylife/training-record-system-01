@@ -59,6 +59,13 @@
                                 <li><a class="dropdown-item" href="{{ route('clients.create') }}">会員登録</a></li>
                             </ul>
                         </li>
+                        {{-- 契約：契約一覧（S-0315）への直接リンク（2026-10-28 追加）。強調は /contracts… のときだけ。
+                             会員詳細から契約・利用を操作する URL（/client-contracts/…）は対象にしない（そのときは「会員」が強調のまま。設計書 §2-1-1「契約」） --}}
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('contracts*') ? 'active' : '' }}" href="{{ route('contracts.index') }}">
+                                契約
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link {{ request()->is('training-records*') ? 'active' : '' }}" href="{{ route('training-records.index') }}">
                                 トレーニング記録

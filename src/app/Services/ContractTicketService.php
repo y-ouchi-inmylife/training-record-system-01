@@ -122,7 +122,7 @@ class ContractTicketService
                 'remaining' => $remaining,
                 'usedUp' => $usedUp,
                 'usageCount' => count($assigned),
-                'expired' => self::isExpired($contract, $usedUp, $today),
+                'expired' => $contract->isExpiredWithRemaining($usedUp, $today),
             ];
 
             $contractOptions[] = [
@@ -150,26 +150,6 @@ class ContractTicketService
             'contractOptions' => $contractOptions,
             'defaultContractId' => $defaultContractId,
         ];
-    }
-
-    /**
-     * 有効期限を過ぎていて残りがあるか（回数カードで有効期限の日付を赤字にする条件。
-     * 設計書 screen-design.md S-0305 セクション5「契約の見出し」）。
-     *
-     * - 有効期限が設定されている
-     * - 有効期限の日付が今日より前（当日はまだ有効なので偽）
-     * - その契約に残りがある（使い切った契約は、期限を過ぎていても偽）
-     *
-     * 表示のためだけの判定で、残り回数の計算・利用の割り当て・選択肢の選べるかどうかには使わない。
-     * 日付どうしを Y-m-d の文字列で比べ、時刻やタイムゾーンの差を持ち込まない。
-     */
-    private static function isExpired(ClientContract $contract, bool $usedUp, string $today): bool
-    {
-        if ($contract->expires_on === null || $usedUp) {
-            return false;
-        }
-
-        return $contract->expires_on->format('Y-m-d') < $today;
     }
 
     /**
