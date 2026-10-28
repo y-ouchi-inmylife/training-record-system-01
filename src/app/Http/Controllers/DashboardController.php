@@ -6,6 +6,8 @@ use App\Models\Client;
 use App\Models\ClientContract;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\TrainingRecord;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -46,16 +48,9 @@ class DashboardController extends Controller
             ->orderByRaw('latest_contracted_on IS NULL DESC')
             ->orderBy('latest_contracted_on', 'desc')
             ->orderBy('clients.id', 'desc');
-        $contactMissingClients = (clone $contactMissingQuery)
-            ->paginate(self::CONTACT_MISSING_PER_PAGE, ['*'], 'contacts_page')
-            ->withQueryString();
-        // ページが範囲外（連絡先が入力されて対象が減り、開いていたページが最後のページより後になった）なら、最後のページで取り直す。
+        // ページが範囲外（連絡先が入力されて対象が減り、開いていたページが最後のページより後になった）なら、最後のページを出す。
         // セクションが消えたり、空の表が出たりしないように（全体が 0 件ならビューはセクションを出さない）
-        if ($contactMissingClients->currentPage() > $contactMissingClients->lastPage()) {
-            $contactMissingClients = $contactMissingQuery
-                ->paginate(self::CONTACT_MISSING_PER_PAGE, ['*'], 'contacts_page', $contactMissingClients->lastPage())
-                ->withQueryString();
-        }
+        $contactMissingClients = $this->paginateWithinRange($contactMissingQuery, self::CONTACT_MISSING_PER_PAGE, 'contacts_page');
 
         // 最近のトレーニング記録（S-0201 セクション「最近のトレーニング記録」、2026-09 追加）。
         // 過去 1 週間（今日を含む 7 日間、未来日は含めない）を日付の新しい順で取得。
@@ -93,15 +88,33 @@ class DashboardController extends Controller
         // （公開した日時がないもの。状態の判定 evaluation_status と同じ基準）。recent とは別のパラメータ（ぶつからないように）。
         // 見せる範囲は最近のトレーニング記録と同じ（役割で変えない。recent の絞り込みは効かない）。ページの番号は diagnoses_page で、
         // withQueryString でページを送っても diagnoses と recent が外れない。トレーニーと会員はまとめて読み込む。
-        // 2026-10-20 変更：見出しの「（未公開 n件）」を外したので、未公開の件数は数えない
+        // 2026-10-20 変更：見出しの「（未公開 n件）」を外したので、未公開の件数は数えない。
+        // ページが範囲外なら最後のページを出す（2026-10-28 変更：評価文を公開すると未公開が減り、開いていたページが範囲外になるため。
+        // その前は範囲外のページをそのまま取り、件数があっても「〜はありません。」の帯が出ていた。全体が 0 件なら今までどおり帯）
         $diagnosesFilter = $request->query('diagnoses') === 'all' ? 'all' : 'unpublished';
-        $recentDiagnoses = TraineePersonalityDiagnosisResult::with('trainee.client')
+        $recentDiagnosesQuery = TraineePersonalityDiagnosisResult::with('trainee.client')
             ->when($diagnosesFilter === 'unpublished', fn ($query) => $query->evaluationNotPublished())
             ->orderBy('answered_at', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(self::DIAGNOSES_PER_PAGE, ['*'], 'diagnoses_page')
-            ->withQueryString();
+            ->orderBy('id', 'desc');
+        $recentDiagnoses = $this->paginateWithinRange($recentDiagnosesQuery, self::DIAGNOSES_PER_PAGE, 'diagnoses_page');
 
         return view('dashboard', compact('contactMissingClients', 'recentRecords', 'recentFilter', 'recentDiagnoses', 'diagnosesFilter'));
+    }
+
+    /**
+     * ページ送りで取り、ページが範囲外（最後のページより後）なら最後のページで取り直す（2026-10-28 追加）。
+     * 連絡先が未入力の会員（contacts_page）と最近の愛犬性格診断（diagnoses_page）で使う。どちらも、入力・公開で対象が減ると
+     * 開いていたページが範囲外になるため。全体が 0 件なら最後のページは 1 ページ目で、空のページが返る（ビューは 0 件の扱い）。
+     * 取り直したページは、ページ送りのリンクにも、ほかのフォームの hidden（currentPage()）にも入る。
+     * withQueryString で、ほかの欄の絞り込み・ページを外さない
+     */
+    private function paginateWithinRange(Builder $query, int $perPage, string $pageName): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage, ['*'], $pageName)->withQueryString();
+        if ($paginator->currentPage() > $paginator->lastPage()) {
+            $paginator = $query->paginate($perPage, ['*'], $pageName, $paginator->lastPage())->withQueryString();
+        }
+
+        return $paginator;
     }
 }

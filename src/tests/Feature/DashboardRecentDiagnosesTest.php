@@ -23,6 +23,7 @@ use Tests\TestCase;
  *   2026-10-20 変更：その前は過去 30 日のものだけ。同じ日に、ページ送りを 20 件ずつから 5 件ずつにした
  * - 並びは回答日時の新しい順。アドバイスの状態は S-0313 と同じバッジ（列の名前は「アドバイス」）
  * - 見せる範囲は最近のトレーニング記録と同じ（役割で変えない。「主担当のみ」は効かない）。2 つの絞り込みは互いに外れない
+ * - ページが範囲外（評価文を公開して未公開が減ったときなど）なら最後のページを出す。全体が 0 件なら帯（2026-10-28 変更）
  * 「今日」は 2026-10-20 12:00 に固定する。
  */
 class DashboardRecentDiagnosesTest extends TestCase
@@ -508,5 +509,69 @@ class DashboardRecentDiagnosesTest extends TestCase
         $this->assertLessThan(strpos($html, 'data-recent-diagnoses-heading'), strpos($html, 'ようこそ、'));
         // 最近のトレーニング記録は今のまま
         $this->assertStringContainsString('過去1週間のトレーニング記録はありません。', $html);
+    }
+
+    // ---- ページが範囲外のとき（2026-10-28 変更：その前は件数があっても「〜はありません。」の帯が出た） ----
+
+    public function test_未公開のみで範囲外のページなら最後のページを出し帯は出さない(): void
+    {
+        // 未公開が 6 件で 2 ページ目を開いていたが、2 ページ目の 1 件を公開して 5 件になった
+        $results = $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1);
+        $results[5]->update(['evaluation_text' => 'アドバイス', 'evaluation_published_at' => '2026-10-20 10:00:00', 'evaluation_published_by' => 201]);
+        $this->actingAsRole();
+
+        $html = $this->dashboard('?diagnoses_page=2');
+        $this->assertCount(5, $this->rows($html));
+        $this->assertStringNotContainsString('data-recent-diagnoses-empty', $html);
+        $this->assertStringNotContainsString('ありません。', substr($html, strpos($html, 'data-recent-diagnoses-heading'), strpos($html, '<h4 class="mb-0">最近のトレーニング記録</h4>') - strpos($html, 'data-recent-diagnoses-heading')));
+    }
+
+    public function test_すべてで範囲外のページなら最後のページを出す(): void
+    {
+        $results = $this->addMany(DashboardController::DIAGNOSES_PER_PAGE * 2 + 1, 'published');
+        $this->actingAsRole();
+
+        $html = $this->dashboard('?diagnoses=all&diagnoses_page=9');
+        $rows = $this->rows($html);
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString($this->showUrl($results[10]), $rows[0]);
+        $this->assertStringContainsString('全11件中 11〜11件', $html);
+        $this->assertStringNotContainsString('data-recent-diagnoses-empty', $html);
+        // ページ送りのリンクは実際に出しているページ（3）が今のページで、絞り込み（all）も残る
+        $this->assertMatchesRegularExpression('/<li class="page-item active" aria-current="page"><span class="page-link">3<\/span><\/li>/u', $html);
+        $this->assertStringContainsString('diagnoses=all&amp;diagnoses_page=2', $html);
+    }
+
+    public function test_範囲外で1ページに収まるならそのページを出しページ送りは出さない(): void
+    {
+        $this->addMany(3);
+        $this->actingAsRole();
+
+        $html = $this->dashboard('?diagnoses_page=2');
+        $this->assertCount(3, $this->rows($html));
+        $this->assertStringNotContainsString('data-recent-diagnoses-pagination', $html);
+        $this->assertStringNotContainsString('data-recent-diagnoses-empty', $html);
+    }
+
+    public function test_全体が0件なら範囲外のページでも帯を出す(): void
+    {
+        $this->addResult('2026-10-17 09:00:00', 'published');
+        $this->actingAsRole();
+
+        $html = $this->dashboard('?diagnoses_page=3');
+        $this->assertMatchesRegularExpression('/<div class="alert alert-secondary mb-4" data-recent-diagnoses-empty>\s*未公開の愛犬性格診断はありません。\s*<\/div>/u', $html);
+        $this->assertStringNotContainsString('data-recent-diagnoses>', $html);
+        // 取り直したページは 1 ページ目なので、記録の絞り込みのフォームは diagnoses_page を持たない
+        $this->assertStringNotContainsString('name="diagnoses_page"', $this->recentForm($html));
+    }
+
+    public function test_範囲外から取り直したとき記録の絞り込みのフォームのdiagnoses_pageは実際のページ(): void
+    {
+        $this->addMany(DashboardController::DIAGNOSES_PER_PAGE + 1);
+        $this->actingAsRole();
+
+        $html = $this->dashboard('?diagnoses_page=7');
+        $this->assertStringContainsString('<input type="hidden" name="diagnoses_page" value="2">', $this->recentForm($html));
+        $this->assertStringNotContainsString('value="7"', $this->recentForm($html));
     }
 }
