@@ -100,6 +100,11 @@ function renderChart(canvas, data) {
     const xMin = format(xMinDate, "yyyy-MM-dd'T'HH:mm:ss");
     const xMax = format(xMaxDate, "yyyy-MM-dd'T'HH:mm:ss");
 
+    // クリック・タップするとツールチップが出ることが分かるよう、カーソルを pointer にする（2026-10-28 追加。
+    // 設計書 S-1402「ツールチップはクリック・タップしたときだけ出す」）。会員側 S-1402・トレーナー側 S-0309 のどちらも
+    // この JS で描くので、Blade や CSS ではなくここで付ける
+    canvas.style.cursor = 'pointer';
+
     new Chart(canvas, {
         type: 'line',
         data: {
@@ -108,7 +113,7 @@ function renderChart(canvas, data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // ツールチップは、グラフ内のどこをホバー・タップしても、横方向（日時）にいちばん近い計測点について出す
+            // ツールチップは、グラフ内のどこをクリック・タップしても、横方向（日時）にいちばん近い計測点について出す
             // （2026-10-28 変更。設計書 S-1402「ツールチップはいちばん近い計測点に出す」）。
             // 以前は既定（intersect: true）で、点（半径 3px）に正確に触れたときしか出ず、スマートフォンで分かりにくかった。
             // 同じ日に朝・夕の 2 点があっても、時刻の分だけ横に離れているので近いほうを出し分けられる。
@@ -119,6 +124,12 @@ function renderChart(canvas, data) {
                 axis: 'x',
                 intersect: false,
             },
+            // ツールチップ（と点の強調）は、クリック（パソコン）・タップ（スマホ）したときだけ出す。ホバーでは出さない
+            // （2026-10-28 変更。設計書 S-1402「ツールチップはクリック・タップしたときだけ出す」）。
+            // - mousemove は入れない：入れるとマウスがグラフの上にあるあいだ常に出て、しつこい
+            // - touchstart・touchmove は入れない：入れるとグラフの上から指でスクロールしただけで出てしまう。スマホのタップは click として届く
+            // - mouseout は入れる：パソコンでクリックして出したツールチップを、マウスがグラフから離れたときに消すため
+            events: ['click', 'mouseout'],
             plugins: {
                 legend: { display: false },
                 tooltip: {

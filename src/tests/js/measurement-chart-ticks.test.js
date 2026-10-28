@@ -105,4 +105,12 @@ describe('体重推移グラフの横軸の目盛りの文字', () => {
         const tooltip = src.slice(src.indexOf('tooltip: {'), src.indexOf('scales: {'));
         expect(tooltip).not.toMatch(/\bmode:|\bintersect:/);
     });
+
+    it('ツールチップはクリック・タップしたときだけ出す。ホバー・スクロールでは出さない（2026-10-28 変更）', () => {
+        const src = readFileSync(new URL('../../resources/js/measurement-chart.js', import.meta.url), 'utf8');
+
+        expect(src).toContain("events: ['click', 'mouseout'],");
+        // クリックできることが分かるよう、canvas のカーソルを pointer にする（会員側・トレーナー側の両方）
+        expect(src).toContain("canvas.style.cursor = 'pointer';");
+    });
 });
