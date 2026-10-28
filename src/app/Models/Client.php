@@ -32,6 +32,14 @@ class Client extends Authenticatable
     public const STATUS_AWAITING_EMAIL = 'awaiting_email';    // メールアドレス登録待ち
     public const STATUS_NO_EMAIL = 'no_email';                // メールアドレスなし
 
+    /**
+     * missingContactDetails() の値の、トレーナー側の表示名（2026-10-28 追加。S-0201「連絡先が未入力の会員」の未入力のバッジ）
+     */
+    public const MISSING_CONTACT_LABELS = [
+        'address' => '住所',
+        'phone' => '電話番号',
+    ];
+
     use HasFactory;
 
     protected $fillable = [
@@ -269,6 +277,9 @@ class Client extends Authenticatable
      * 'address'：都道府県・市区町村・町名番地のどれかが空。'phone'：電話番号が空。並びは住所 → 電話番号（入力欄の並びと同じ）。
      * 郵便番号・建物名・部屋番号・緊急連絡先は見ない（任意のため）
      *
+     * 見る項目は scopeContactMissingWithContract（トレーナー側のダッシュボード S-0201「連絡先が未入力の会員」の対象）と
+     * 互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる。2026-10-28）
+     *
      * @return list<'address'|'phone'>
      */
     public function missingContactDetails(): array
@@ -282,6 +293,24 @@ class Client extends Authenticatable
         }
 
         return $missing;
+    }
+
+    /**
+     * 契約が 1 件以上あり、住所か電話番号が空の会員に絞る（2026-10-28 追加。設計書 S-0201「連絡先が未入力の会員」）。
+     * 会員側の「ご連絡先の登録のお願い」（hasContracts() と missingContactDetails()）と同じ条件。
+     * 空は NULL と空文字の両方（missingContactDetails() の blank() に合わせる）。
+     *
+     * 見る項目は missingContactDetails() と互いに一致させること（片方だけ変えると、会員側とトレーナー側で対象がずれる）
+     */
+    public function scopeContactMissingWithContract(Builder $query): Builder
+    {
+        return $query
+            ->whereHas('contracts')
+            ->where(function (Builder $q) {
+                foreach (['phone1', 'address1', 'address2', 'address3'] as $column) {
+                    $q->orWhere(fn (Builder $q) => $q->whereNull($column)->orWhere($column, ''));
+                }
+            });
     }
 
     public function usages(): HasMany

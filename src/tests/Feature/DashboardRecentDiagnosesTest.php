@@ -40,6 +40,8 @@ class DashboardRecentDiagnosesTest extends TestCase
 
         $this->createClientsTable();
         $this->createClientCountTables();
+        // 連絡先が未入力の会員（2026-10-28 追加）の状態バッジの判定（Client::withStatusData）で読む
+        $this->createClientEmailRegistrationTokensTable();
         $this->createAccessLogsTable();
         Schema::create('trainers', function (Blueprint $table) {
             $table->id();

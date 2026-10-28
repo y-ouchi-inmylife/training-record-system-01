@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
+use App\Models\ClientContract;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Models\TrainingRecord;
 use Illuminate\Http\Request;
@@ -21,6 +23,21 @@ class DashboardController extends Controller
      */
     public function index(Request $request): View
     {
+        // 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約が済んだのに住所・電話番号が入っていない会員に気づけるように）。
+        // 対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissingWithContract）。
+        // 状態バッジ（Client::statusBadge）の判定に要る値は会員一覧と同じく withStatusData で、最新の契約日はサブクエリでまとめて取る。
+        // 並びは最新の契約日の新しい順、同じ日なら id の大きい順。絞り込み・ページ送りはなし（全件）。役割で変えない
+        $contactMissingClients = Client::contactMissingWithContract()
+            ->withStatusData()
+            ->addSelect([
+                'latest_contracted_on' => ClientContract::selectRaw('MAX(contracted_on)')
+                    ->whereColumn('client_id', 'clients.id'),
+            ])
+            ->withCasts(['latest_contracted_on' => 'date'])
+            ->orderBy('latest_contracted_on', 'desc')
+            ->orderBy('clients.id', 'desc')
+            ->get();
+
         // 最近のトレーニング記録（S-0201 セクション「最近のトレーニング記録」、2026-09 追加）。
         // 過去 1 週間（今日を含む 7 日間、未来日は含めない）を日付の新しい順で取得。
         // 詳細な設計方針は screen-design.md S-0201「設計方針」参照。
@@ -66,6 +83,6 @@ class DashboardController extends Controller
             ->paginate(self::DIAGNOSES_PER_PAGE, ['*'], 'diagnoses_page')
             ->withQueryString();
 
-        return view('dashboard', compact('recentRecords', 'recentFilter', 'recentDiagnoses', 'diagnosesFilter'));
+        return view('dashboard', compact('contactMissingClients', 'recentRecords', 'recentFilter', 'recentDiagnoses', 'diagnosesFilter'));
     }
 }

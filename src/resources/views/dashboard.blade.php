@@ -8,6 +8,41 @@
         （権限: {{ Auth::user()->role_display_name }}）
     </div>
 
+    {{-- 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約が済んだのに住所・電話番号が入っていない会員に気づけるように）。
+         対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissingWithContract）。
+         気づかせるための表示なので、対象が 0 件ならセクションごと出さない（見出しも 0 件の帯も出さない）。
+         見た目は最近の愛犬性格診断に合わせる。絞り込み・ページ送りはなし。状態は会員一覧と同じバッジ（Client::statusBadge）、
+         未入力は行ごとの Client::missingContactDetails を「住所」「電話番号」のバッジで並べる --}}
+    @if($contactMissingClients->isNotEmpty())
+        <h4 class="mb-2" data-contact-missing-heading>連絡先が未入力の会員</h4>
+        <div class="table-responsive mb-4">
+            <table class="table table-hover" data-contact-missing>
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-nowrap">最新の契約日</th>
+                        <th class="text-nowrap">会員</th>
+                        <th class="text-nowrap">状態</th>
+                        <th class="text-nowrap">未入力</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($contactMissingClients as $client)
+                        <tr>
+                            <td class="text-nowrap">{{ $client->latest_contracted_on->format('Y/m/d') }}</td>
+                            <td class="text-nowrap"><a href="{{ route('clients.show', $client) }}">{{ $client->display_name }}</a></td>
+                            <td class="text-nowrap"><span class="badge {{ $client->statusBadge()['class'] }}">{{ $client->statusBadge()['label'] }}</span></td>
+                            <td class="text-nowrap">
+                                @foreach($client->missingContactDetails() as $missing)
+                                    <span class="badge bg-warning text-dark">{{ \App\Models\Client::MISSING_CONTACT_LABELS[$missing] }}</span>
+                                @endforeach
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
     {{-- 最近の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
          最近のトレーニング記録の上。見た目・行のリンク・0 件の出し方・狭い幅（横スクロール）は最近のトレーニング記録に合わせる。
          5 件ずつのページ送り（見た目はトレーニング記録一覧 S-0402 と同じ）。アドバイスの状態は S-0313 と同じバッジ。
