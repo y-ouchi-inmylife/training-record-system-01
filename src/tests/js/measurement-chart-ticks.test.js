@@ -94,4 +94,15 @@ describe('体重推移グラフの横軸の目盛りの文字', () => {
         expect(src).toContain("tooltipFormat: 'yyyy/M/d HH:mm'");
         expect(src).toContain('autoSkip: true');
     });
+
+    it('ツールチップはグラフ内のどこを触っても、横方向にいちばん近い点に出す（2026-10-28 変更）', () => {
+        const src = readFileSync(new URL('../../resources/js/measurement-chart.js', import.meta.url), 'utf8');
+
+        // グラフごとの options に置く（Chart.defaults は変えない。レーダーチャートに影響させない）
+        expect(src).toMatch(/interaction: \{\s*mode: 'nearest',\s*axis: 'x',\s*intersect: false,\s*\}/);
+        expect(src).not.toMatch(/Chart\.defaults\.[\w.]+\s*=/);
+        // tooltip 側で mode・intersect を指定して interaction を打ち消さない
+        const tooltip = src.slice(src.indexOf('tooltip: {'), src.indexOf('scales: {'));
+        expect(tooltip).not.toMatch(/\bmode:|\bintersect:/);
+    });
 });

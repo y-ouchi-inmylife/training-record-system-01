@@ -108,6 +108,17 @@ function renderChart(canvas, data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            // ツールチップは、グラフ内のどこをホバー・タップしても、横方向（日時）にいちばん近い計測点について出す
+            // （2026-10-28 変更。設計書 S-1402「ツールチップはいちばん近い計測点に出す」）。
+            // 以前は既定（intersect: true）で、点（半径 3px）に正確に触れたときしか出ず、スマートフォンで分かりにくかった。
+            // 同じ日に朝・夕の 2 点があっても、時刻の分だけ横に離れているので近いほうを出し分けられる。
+            // tooltip 側には mode・intersect を指定しない（指定するとこの interaction が打ち消される）。
+            // グラフごとの options に置き、Chart.defaults は変えない（同じ画面のレーダーチャートに影響させないため）
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false,
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
