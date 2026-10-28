@@ -253,13 +253,11 @@
                                             @else
                                                 {{-- data-measurement-chart は datasets のみを渡す（2026-09 変更。
                                                      時間軸化で labels / tooltips の別配列は廃止し、Chart.js は
-                                                     各点の {x, y} オブジェクトから軸・ツールチップを組み立てる）。
-                                                     data-measurement-chart-pin-latest：最新点のツールチップを常時表示する（2026-10-27 追加。
-                                                     会員側だけ。トレーナー側 S-0309 には付けない。measurement-chart-latest.js） --}}
+                                                     各点の {x, y} オブジェクトから軸・ツールチップを組み立てる）。 --}}
                                                 <div style="position: relative; height: {{ $chartHeight }};">
                                                     <canvas data-measurement-chart="{{ json_encode([
                                                         'datasets' => $chart['datasets'],
-                                                    ], JSON_UNESCAPED_UNICODE) }}" data-measurement-chart-pin-latest></canvas>
+                                                    ], JSON_UNESCAPED_UNICODE) }}"></canvas>
                                                 </div>
                                             @endif
                                         </div>

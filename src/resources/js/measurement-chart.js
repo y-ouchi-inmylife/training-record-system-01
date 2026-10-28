@@ -31,7 +31,6 @@ import {
 import 'chartjs-adapter-date-fns';
 import { format, addDays, parseISO } from 'date-fns';
 import { applyYearLabels, measurementTickLabelReserved } from './measurement-chart-ticks';
-import { createPinLatest } from './measurement-chart-latest';
 
 Chart.register(
     LineController,
@@ -101,22 +100,14 @@ function renderChart(canvas, data) {
     const xMin = format(xMinDate, "yyyy-MM-dd'T'HH:mm:ss");
     const xMax = format(xMaxDate, "yyyy-MM-dd'T'HH:mm:ss");
 
-    // 最新点のツールチップの常時表示（2026-10-27 追加。設計書 S-1402「最新点のツールチップを常時表示する」）。
-    // data-measurement-chart-pin-latest が付いた canvas（会員側 S-1402）だけ。付いていないトレーナー側 S-0309 は
-    // plugins・animation を足さず、今までと同じ設定のまま（measurement-chart-latest.js）
-    const pinLatest = 'measurementChartPinLatest' in canvas.dataset ? createPinLatest() : null;
-
     new Chart(canvas, {
         type: 'line',
         data: {
             datasets,
         },
-        ...(pinLatest ? { plugins: [pinLatest.plugin] } : {}),
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // 初期アニメーションは残し、初回の onComplete で最新点を出す（途中の座標にツールチップが取り残されないように）
-            ...(pinLatest ? { animation: { onComplete: pinLatest.onAnimationComplete } } : {}),
             plugins: {
                 legend: { display: false },
                 tooltip: {
