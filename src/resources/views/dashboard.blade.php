@@ -20,18 +20,22 @@
             <table class="table" data-contact-missing>
                 <thead class="table-light">
                     <tr>
-                        <th class="text-nowrap">最新の契約日</th>
+                        {{-- 内部ID は会員一覧（S-0304）の内部ID列と同じ（internal_id を書式なしで。リンクにしない）。2026-10-28 追加。
+                             同じ日に、最新の契約日を左端からマイページの右に移した --}}
+                        <th class="text-nowrap">内部ID</th>
                         <th class="text-nowrap">会員</th>
                         <th class="text-nowrap">マイページ</th>
+                        <th class="text-nowrap">最新の契約日</th>
                         <th class="text-nowrap">未入力</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($contactMissingClients as $client)
                         <tr>
-                            <td class="text-nowrap">{{ $client->latest_contracted_on->format('Y/m/d') }}</td>
+                            <td>{{ $client->internal_id }}</td>
                             <td class="text-nowrap"><a href="{{ route('clients.show', $client) }}">{{ $client->display_name }}</a></td>
                             <td class="text-nowrap"><span class="badge {{ $client->statusBadge()['class'] }}">{{ $client->statusBadge()['label'] }}</span></td>
+                            <td class="text-nowrap">{{ $client->latest_contracted_on->format('Y/m/d') }}</td>
                             <td class="text-nowrap">
                                 @foreach($client->missingContactDetails() as $missing)
                                     <span class="badge bg-warning text-dark">{{ \App\Models\Client::MISSING_CONTACT_LABELS[$missing] }}</span>

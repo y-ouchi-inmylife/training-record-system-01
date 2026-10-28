@@ -166,4 +166,25 @@ class DashboardContactMissingClientsTest extends TestCase
         $badge = $both->fresh()->statusBadge();
         $this->assertStringContainsString('<span class="badge '.$badge['class'].'">'.$badge['label'].'</span>', $rows[1]);
     }
+
+    public function test_列は内部idと会員とマイページと最新の契約日と未入力の順(): void
+    {
+        // 2026-10-28 変更：内部IDを足し、最新の契約日を左端からマイページの右に移した
+        $client = $this->makeClient('山田', [], ['2026-10-05']);
+        DB::table('clients')->where('id', $client->id)->update(['internal_id' => '1234']);
+
+        $section = $this->section();
+        preg_match_all('/<th class="text-nowrap">(.*?)<\/th>/', $section, $headings);
+        $this->assertSame(['内部ID', '会員', 'マイページ', '最新の契約日', '未入力'], $headings[1]);
+
+        // 内部ID は会員一覧（S-0304）と同じく internal_id を書式なしで出し、リンクにしない。セルの並びも列見出しと同じ
+        $row = $this->rows($section)[0];
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $row, $cells);
+        $this->assertCount(5, $cells[1]);
+        $this->assertSame('<td>1234</td>', $cells[0][0]);
+        $this->assertStringContainsString('<a href="'.route('clients.show', $client).'">', $cells[1][1]);
+        $this->assertStringContainsString('class="badge', $cells[1][2]);
+        $this->assertSame('2026/10/05', $cells[1][3]);
+        $this->assertStringContainsString('>住所</span>', $cells[1][4]);
+    }
 }
