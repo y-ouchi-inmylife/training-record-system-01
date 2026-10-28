@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\DashboardController;
 use App\Models\Client;
 use App\Models\Trainer;
 use Carbon\Carbon;
@@ -20,6 +21,7 @@ use Tests\TestCase;
  * - 並びは契約がない（利用だけの）会員が先、次に最新の契約日の新しい順、同じ日なら id の大きい順。契約がない会員の最新の契約日は空欄
  * - マイページの列は会員一覧と同じ列見出し・同じバッジ、未入力は「住所」「電話番号」のバッジ
  * - 行全体は押せないので table-hover は付けない（2026-10-28 変更）
+ * - 5 件ずつのページ送り（ページの番号は contacts_page。範囲外なら最後のページ。ほかの欄の絞り込み・ページと状態を受け渡す。2026-10-28 変更）
  */
 class DashboardContactMissingClientsTest extends TestCase
 {
@@ -93,10 +95,10 @@ class DashboardContactMissingClientsTest extends TestCase
         return $client;
     }
 
-    /** セクションの表の HTML（なければ null） */
-    private function section(): ?string
+    /** セクションの表の HTML（なければ null）。$query はダッシュボードのクエリ文字列（「?contacts_page=2」など） */
+    private function section(string $query = ''): ?string
     {
-        $html = $this->get(route('dashboard'))->assertOk()->getContent();
+        $html = $this->get(route('dashboard').$query)->assertOk()->getContent();
         $this->lastHtml = $html;
 
         return preg_match('/<table class="table" data-contact-missing>(.*?)<\/table>/s', $html, $m) ? $m[1] : null;
@@ -240,5 +242,118 @@ class DashboardContactMissingClientsTest extends TestCase
         $this->assertStringContainsString('後に登録', $rows[0]);
         $this->assertStringContainsString('先に登録', $rows[1]);
         $this->assertStringContainsString('契約あり', $rows[2]);
+    }
+
+    /** 対象の会員を $count 人作る（契約日は 2026-10-01 から 1 日ずつ新しく。並びは後に作った会員が上） */
+    private function makeMany(int $count): void
+    {
+        for ($i = 1; $i <= $count; $i++) {
+            $this->makeClient('会員'.$i, [], [sprintf('2026-10-%02d', $i)]);
+        }
+    }
+
+    /** 絞り込みのフォームの HTML（$marker はフォームを見分ける文字。診断は data-recent-diagnoses-filter、記録は name="recent"） */
+    private function form(string $marker): string
+    {
+        preg_match_all('/<form method="GET".*?<\/form>/s', $this->lastHtml, $forms);
+        $matched = array_values(array_filter($forms[0], fn ($form) => str_contains($form, $marker)));
+        $this->assertCount(1, $matched, $marker);
+
+        return $matched[0];
+    }
+
+    public function test_6件以上なら5件ずつのページ送りで並びどおりに分ける(): void
+    {
+        // 2026-10-28 追加：5 件ずつ（CONTACT_MISSING_PER_PAGE）。ページの番号は contacts_page
+        $this->assertSame(5, DashboardController::CONTACT_MISSING_PER_PAGE);
+        $this->makeMany(6);
+
+        $rows = $this->rows($this->section());
+        $this->assertCount(5, $rows);
+        foreach ([6, 5, 4, 3, 2] as $index => $number) {
+            $this->assertStringContainsString('>会員'.$number.'<', $rows[$index]);
+        }
+        // ページ送りは診断と同じ共通のビュー（「全N件中 a〜b件」とページの番号）。表の下に出す
+        $this->assertMatchesRegularExpression('/<div class="mb-4" data-contact-missing-pagination>\s*<nav [^>]*aria-label="ページ送り">\s*<p class="small text-muted mb-0">\s*全6件中 1〜5件/u', $this->lastHtml);
+        $this->assertStringContainsString('contacts_page=2', $this->lastHtml);
+        $this->assertStringNotContainsString('?page=2', $this->lastHtml);
+
+        $rows = $this->rows($this->section('?contacts_page=2'));
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('>会員1<', $rows[0]);
+        $this->assertStringContainsString('全6件中 6〜6件', $this->lastHtml);
+    }
+
+    public function test_5件以下ならページ送りを出さない(): void
+    {
+        $this->makeMany(5);
+
+        $this->assertCount(5, $this->rows($this->section()));
+        $this->assertStringNotContainsString('data-contact-missing-pagination', $this->lastHtml);
+    }
+
+    public function test_ページが範囲外なら最後のページを出す(): void
+    {
+        // 2 ページ目を見ていたが、連絡先が入力されて対象が減った（例：6 件 → 5 件以下）。セクションは消えず、空の表も出さない
+        $this->makeMany(6);
+        $rows = $this->rows($this->section('?contacts_page=9'));
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('>会員1<', $rows[0]);
+        $this->assertStringContainsString('全6件中 6〜6件', $this->lastHtml);
+        // 診断・記録のフォームが持つページも、実際に出しているページ（2）にそろう
+        $this->assertStringContainsString('<input type="hidden" name="contacts_page" value="2">', $this->form('data-recent-diagnoses-filter'));
+    }
+
+    public function test_ページが範囲外で1ページに収まるならそのページを出しページ送りは出さない(): void
+    {
+        $this->makeMany(3);
+
+        $rows = $this->rows($this->section('?contacts_page=2'));
+        $this->assertCount(3, $rows);
+        $this->assertStringNotContainsString('data-contact-missing-pagination', $this->lastHtml);
+        $this->assertStringNotContainsString('name="contacts_page"', $this->lastHtml);
+    }
+
+    public function test_対象が0件ならページが範囲外でもセクションを出さない(): void
+    {
+        $this->assertNull($this->section('?contacts_page=3'));
+        $this->assertStringNotContainsString('連絡先が未入力の会員', $this->lastHtml);
+    }
+
+    public function test_2ページ目以降なら診断と記録の絞り込みのフォームがcontacts_pageを持つ(): void
+    {
+        $this->makeMany(6);
+
+        $this->section();
+        $this->assertStringNotContainsString('name="contacts_page"', $this->form('data-recent-diagnoses-filter'));
+        $this->assertStringNotContainsString('name="contacts_page"', $this->form('name="recent"'));
+
+        $this->section('?contacts_page=2');
+        $this->assertStringContainsString('<input type="hidden" name="contacts_page" value="2">', $this->form('data-recent-diagnoses-filter'));
+        $this->assertStringContainsString('<input type="hidden" name="contacts_page" value="2">', $this->form('name="recent"'));
+    }
+
+    public function test_ページ送りのリンクはほかの欄の絞り込みとページを残し診断のリンクはcontacts_pageを残す(): void
+    {
+        $this->makeMany(6);
+        // 診断の結果を 6 件（未公開。2 ページになる）
+        $traineeId = DB::table('trainees')->insertGetId(['client_id' => Client::query()->value('id'), 'name' => 'アイ']);
+        for ($i = 0; $i < 6; $i++) {
+            DB::table('trainee_personality_diagnosis_results')->insert([
+                'trainee_id' => $traineeId, 'answered_at' => '2026-10-2'.$i.' 09:00:00', 'question_version' => 'v1', 'answers' => '{}',
+            ]);
+        }
+
+        $this->section('?recent=primary&diagnoses=all&diagnoses_page=2');
+        preg_match('/<div class="mb-4" data-contact-missing-pagination>.*?<\/nav>/s', $this->lastHtml, $contacts);
+        $this->assertMatchesRegularExpression('/href="[^"]*contacts_page=2[^"]*"/', $contacts[0]);
+        foreach (['recent=primary', 'diagnoses=all', 'diagnoses_page=2'] as $param) {
+            $this->assertStringContainsString($param, $contacts[0], $param);
+        }
+
+        $this->section('?contacts_page=2');
+        preg_match('/<div class="mb-4" data-recent-diagnoses-pagination>.*?<\/nav>/s', $this->lastHtml, $diagnoses);
+        $this->assertMatchesRegularExpression('/href="[^"]*diagnoses_page=2[^"]*"/', $diagnoses[0]);
+        $this->assertStringContainsString('contacts_page=2', $diagnoses[0]);
     }
 }

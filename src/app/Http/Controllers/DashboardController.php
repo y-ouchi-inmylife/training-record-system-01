@@ -19,6 +19,12 @@ class DashboardController extends Controller
     public const DIAGNOSES_PER_PAGE = 5;
 
     /**
+     * 連絡先が未入力の会員の 1 ページの件数（2026-10-28 追加。設計書・テストもこの 1 か所に合わせる）。
+     * 最近の愛犬性格診断と同じく、下の表が押し下げられすぎないように 5 件
+     */
+    public const CONTACT_MISSING_PER_PAGE = 5;
+
+    /**
      * ダッシュボード画面を表示
      */
     public function index(Request $request): View
@@ -27,8 +33,10 @@ class DashboardController extends Controller
         // 対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissing。契約か利用がある会員。2026-10-28 変更：その前は契約がある会員だけ）。
         // 状態バッジ（Client::statusBadge）の判定に要る値は会員一覧と同じく withStatusData で、最新の契約日はサブクエリでまとめて取る（契約がなければ NULL）。
         // 並びは契約がない（利用だけの）会員が先（すでに預かっているのに契約がなく、いちばん急ぐため。IS NULL DESC は MySQL・SQLite で同じ結果）、
-        // 次に最新の契約日の新しい順、同じ日なら id の大きい順。絞り込み・ページ送りはなし（全件）。役割で変えない
-        $contactMissingClients = Client::contactMissing()
+        // 次に最新の契約日の新しい順、同じ日なら id の大きい順。絞り込みはなし。役割で変えない。
+        // 5 件ずつ（CONTACT_MISSING_PER_PAGE）のページ送り（2026-10-28 変更：その前は全件）。ページの番号は contacts_page で、
+        // withQueryString でページを送ってもほかの欄の diagnoses・diagnoses_page・recent が外れない
+        $contactMissingQuery = Client::contactMissing()
             ->withStatusData()
             ->addSelect([
                 'latest_contracted_on' => ClientContract::selectRaw('MAX(contracted_on)')
@@ -37,8 +45,17 @@ class DashboardController extends Controller
             ->withCasts(['latest_contracted_on' => 'date'])
             ->orderByRaw('latest_contracted_on IS NULL DESC')
             ->orderBy('latest_contracted_on', 'desc')
-            ->orderBy('clients.id', 'desc')
-            ->get();
+            ->orderBy('clients.id', 'desc');
+        $contactMissingClients = (clone $contactMissingQuery)
+            ->paginate(self::CONTACT_MISSING_PER_PAGE, ['*'], 'contacts_page')
+            ->withQueryString();
+        // ページが範囲外（連絡先が入力されて対象が減り、開いていたページが最後のページより後になった）なら、最後のページで取り直す。
+        // セクションが消えたり、空の表が出たりしないように（全体が 0 件ならビューはセクションを出さない）
+        if ($contactMissingClients->currentPage() > $contactMissingClients->lastPage()) {
+            $contactMissingClients = $contactMissingQuery
+                ->paginate(self::CONTACT_MISSING_PER_PAGE, ['*'], 'contacts_page', $contactMissingClients->lastPage())
+                ->withQueryString();
+        }
 
         // 最近のトレーニング記録（S-0201 セクション「最近のトレーニング記録」、2026-09 追加）。
         // 過去 1 週間（今日を含む 7 日間、未来日は含めない）を日付の新しい順で取得。

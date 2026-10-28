@@ -13,13 +13,16 @@
          契約がない（利用だけの）会員は最新の契約日が空欄で、一番上に並ぶ（並びはコントローラで決める）。
          気づかせるための表示なので、対象が 0 件ならセクションごと出さない（見出しも 0 件の帯も出さない）。
          見た目は最近の愛犬性格診断に合わせるが、table-hover は付けない（行全体は押せず、押せるのは会員名のリンクだけのため。2026-10-28 変更）。
-         絞り込み・ページ送りはなし。マイページの列は会員一覧と同じ列見出し・同じバッジ（Client::statusBadge。2026-10-28 変更：列見出しは「状態」だった）、
+         絞り込みはなし。5 件ずつのページ送り（ページの番号は contacts_page。見た目は最近の愛犬性格診断と同じ。2026-10-28 変更：その前は全件）。
+         セクションを出すかは今のページの件数ではなく全体の件数（total）で決める（範囲外のページはコントローラで最後のページにそろえる）。
+         マイページの列は会員一覧と同じ列見出し・同じバッジ（Client::statusBadge。2026-10-28 変更：列見出しは「状態」だった）、
          未入力は行ごとの Client::missingContactDetails を「住所」「電話番号」のバッジで並べる --}}
-    @if($contactMissingClients->isNotEmpty())
+    @if($contactMissingClients->total() > 0)
         {{-- 見出しの先頭に警告マーク（赤い丸に白い「！」。対応が要る会員の一覧だとひと目で分かるように。2026-10-28 追加）。
              飾りなので読み上げない（aria-hidden）。大きさは見出しの文字なり --}}
         <h4 class="mb-2" data-contact-missing-heading><i class="bi bi-exclamation-circle-fill text-danger me-1" aria-hidden="true"></i>連絡先が未入力の会員</h4>
-        <div class="table-responsive mb-4">
+        {{-- ページ送りがあるときは、表とページ送りのあいだを最近の愛犬性格診断と同じにする（表の既定の下の空きだけ。mb-4 は付けない） --}}
+        <div class="table-responsive {{ $contactMissingClients->hasPages() ? '' : 'mb-4' }}">
             <table class="table" data-contact-missing>
                 <thead class="table-light">
                     <tr>
@@ -50,6 +53,13 @@
                 </tbody>
             </table>
         </div>
+        {{-- ページ送り（最近の愛犬性格診断と同じ共通のビューを、包まずにそのまま出す。5 件以下なら出さない。2026-10-28 追加）。
+             囲みの mb-4 は、下の最近の愛犬性格診断との空きを、ほかの欄のあいだと同じ 1.5rem にするため --}}
+        @if($contactMissingClients->hasPages())
+            <div class="mb-4" data-contact-missing-pagination>
+                {{ $contactMissingClients->links() }}
+            </div>
+        @endif
     @endif
 
     {{-- 最近の愛犬性格診断（S-0201。2026-10-20 追加：アドバイスの公開し忘れがひと目で分かるように）。
@@ -66,7 +76,8 @@
         <h4 class="mb-0" data-recent-diagnoses-heading>最近の愛犬性格診断</h4>
         {{-- 絞り込みセレクト：最近のトレーニング記録のセレクトと同じ作り（onchange で自動送信。ボタンは持たない）。
              diagnoses と、最近のトレーニング記録の絞り込み（recent。主担当のみのときだけ）を送る。
-             診断のページ（diagnoses_page）は送らない（絞り込みを変えたら 1 ページ目に戻す） --}}
+             診断のページ（diagnoses_page）は送らない（絞り込みを変えたら 1 ページ目に戻す）。
+             連絡先が未入力の会員のページ（contacts_page。2 ページ目以降のときだけ）も送る（2026-10-28 追加） --}}
         <form method="GET" action="{{ route('dashboard') }}" class="mb-0" data-recent-diagnoses-filter>
             <select name="diagnoses" class="form-select form-select-sm" style="width: auto;"
                     onchange="this.form.submit()">
@@ -75,6 +86,9 @@
             </select>
             @if($recentFilter === 'primary')
                 <input type="hidden" name="recent" value="primary">
+            @endif
+            @if($contactMissingClients->currentPage() > 1)
+                <input type="hidden" name="contacts_page" value="{{ $contactMissingClients->currentPage() }}">
             @endif
         </form>
     </div>
@@ -144,6 +158,10 @@
             @endif
             @if($recentDiagnoses->currentPage() > 1)
                 <input type="hidden" name="diagnoses_page" value="{{ $recentDiagnoses->currentPage() }}">
+            @endif
+            {{-- 連絡先が未入力の会員のページも外れないようにする（2 ページ目以降のときだけ。2026-10-28 追加） --}}
+            @if($contactMissingClients->currentPage() > 1)
+                <input type="hidden" name="contacts_page" value="{{ $contactMissingClients->currentPage() }}">
             @endif
         </form>
     </div>
