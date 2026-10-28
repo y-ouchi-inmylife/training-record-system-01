@@ -347,9 +347,9 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 
 **処理**:
 - **連絡先が未入力の会員**を取得（**2026-10-28 追加**。screen-design.md S-0201）
-  - 対象：`Client::contactMissingWithContract()` のスコープ（契約が 1 件以上〔`whereHas('contracts')`〕かつ、`phone1`・`address1`・`address2`・`address3` のどれかが NULL または空文字）。会員側の「ご連絡先の登録のお願い」（`Client::hasContracts()` と `Client::missingContactDetails()`）と同じ条件
-  - `withStatusData()` で状態バッジの判定に要る値を付け（会員一覧 S-0304 と同じ）、サブクエリ `latest_contracted_on`（その会員の `client_contracts.contracted_on` の MAX）で最新の契約日を付ける
-  - 並び順：`latest_contracted_on` の新しい順、同じなら `clients.id` の大きい順。ページングなし（全件）。クエリパラメータは使わない（絞り込みなし）
+  - 対象：`Client::contactMissing()` のスコープ（`Client::requiresContactDetails()` のスコープ〔契約か利用が 1 件以上。`whereHas('contracts')` または `whereHas('usages')`〕かつ、`phone1`・`address1`・`address2`・`address3` のどれかが NULL または空文字）。会員側の「ご連絡先の登録のお願い」（`Client::requiresContactDetails()` と `Client::missingContactDetails()`）と同じ条件（**2026-10-28 変更**：その前は契約が 1 件以上〔`whereHas('contracts')`〕で、スコープの名前は `contactMissingWithContract`）
+  - `withStatusData()` で状態バッジの判定に要る値を付け（会員一覧 S-0304 と同じ）、サブクエリ `latest_contracted_on`（その会員の `client_contracts.contracted_on` の MAX。契約がない会員は NULL）で最新の契約日を付ける
+  - 並び順：`latest_contracted_on` が NULL（契約がない・利用だけ）の会員が先（`orderByRaw('latest_contracted_on IS NULL DESC')`。MySQL・SQLite で同じ結果）、次に `latest_contracted_on` の新しい順、同じなら `clients.id` の大きい順（**2026-10-28 変更**：契約がない会員を一番上に）。ページングなし（全件）。クエリパラメータは使わない（絞り込みなし）
   - view には会員の一覧（`contactMissingClients`）を渡す。0 件ならビューはセクションごと出さない
 - **最近の愛犬性格診断**を取得（**2026-10-20 追加**：2026-10-20 のユーザーレビューで、愛犬性格診断のアドバイスを公開し忘れていないかを、ひと目で分かるようにするため。screen-design.md S-0201）（**2026-10-20 変更**：2026-10-20 のユーザーレビューで、30 日より前の未公開のアドバイスも見落とさないように。列は何の状態かが分かる名前に。経緯：同じ日に置いたときは「過去30日の愛犬性格診断」で、`answered_at` が今日の 29 日前の 0:00 〜今日の終わりのものだけを、ページングなしで取得していた）
   - 絞り込み（**2026-10-20 追加**：2026-10-20 のユーザーレビューで、やることの一覧として未公開だけを見たい。件数は一覧で分かるので見出しには要らない）：`diagnoses=all` ならすべての結果（公開済みも含める）、それ以外は未公開（なし・下書き）だけ（`evaluationNotPublished()`。公開した日時がないもの）。期間では絞らない。見せる範囲は最近のトレーニング記録と同じ（役割で変えない）。`recent` の絞り込みは効かない
@@ -1794,16 +1794,16 @@ POST /training-records に以下を追加する。
 
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
-| phone1 | string | △ | 契約あり：required／契約なし：nullable。string, max:20, regex:/^[0-9\-]+$/ | 電話番号（**2026-10-18 変更**：契約がある会員だけ必須。△ は以下同じ） |
+| phone1 | string | △ | 契約か利用あり：required／どちらもなし：nullable。string, max:20, regex:/^[0-9\-]+$/ | 電話番号（**2026-10-18 変更**：契約がある会員だけ必須。**2026-10-28 変更**：契約か利用がある会員だけ必須。△ は以下同じ） |
 | phone2 | string | | nullable, string, max:20, regex:/^[0-9\-]+$/ | 緊急連絡先（ご家族等）（**2026-10-17 変更**：その前は電話番号（予備）） |
 | emergency_contact_relationship | string | | nullable, string, max:20 | 続柄（**2026-10-17 追加**） |
 | postal_code | string |  | nullable, string, regex:/^\d{3}-?\d{4}$/ | 郵便番号（任意。入力された場合のみ形式チェック） |
-| address1 | string | △ | 契約あり：required／契約なし：nullable, required_with:address2,address3,address4。string, max:50 | 都道府県 |
-| address2 | string | △ | 契約あり：required／契約なし：nullable, required_with:address1,address3,address4。string, max:50 | 市区町村 |
-| address3 | string | △ | 契約あり：required／契約なし：nullable, required_with:address1,address2,address4。string, max:100 | 町名・番地 |
+| address1 | string | △ | 契約か利用あり：required／どちらもなし：nullable, required_with:address2,address3,address4。string, max:50 | 都道府県 |
+| address2 | string | △ | 契約か利用あり：required／どちらもなし：nullable, required_with:address1,address3,address4。string, max:50 | 市区町村 |
+| address3 | string | △ | 契約か利用あり：required／どちらもなし：nullable, required_with:address1,address2,address4。string, max:100 | 町名・番地 |
 | address4 | string | | nullable, string, max:100 | 建物名・部屋番号 |
 
-- **住所・電話番号の必須**（**2026-10-18 変更**）：ログイン中の会員に契約（`client_contracts`）が 1 件以上あれば必須、なければ初回設定（`POST /client-portal/setup/{token}`）と同じく任意（`ClientProfileRequest`・`App\Http\Requests\Concerns\ClientContactRules`）。2026-10-18 のユーザーレビューで、マイページの登録の時点ではまだ犬を預かるか決まっていない会員もいるため、住所・電話番号を任意にした。契約が登録された会員は預かりが決まっているので、入れてもらう（登録情報の変更で必須、マイページで入力を促す）。入力エラーの文は screen-design.md S-1411「バリデーションチェック」
+- **住所・電話番号の必須**（**2026-10-18 変更**）：ログイン中の会員に契約（`client_contracts`）か利用（`client_usages`）が 1 件以上あれば必須、どちらもなければ初回設定（`POST /client-portal/setup/{token}`）と同じく任意（`ClientProfileRequest`・`App\Http\Requests\Concerns\ClientContactRules`。判定は `Client::requiresContactDetails()`）（**2026-10-28 変更**：その前は契約が 1 件以上あれば必須）。2026-10-18 のユーザーレビューで、マイページの登録の時点ではまだ犬を預かるか決まっていない会員もいるため、住所・電話番号を任意にした。契約か利用がある会員は、トレーニングを実施している、または予定があるので、緊急時の連絡先が要る。入れてもらう（登録情報の変更で必須、マイページで入力を促す）。入力エラーの文は screen-design.md S-1411「バリデーションチェック」
 
 **処理**:
 - ログイン中クライアントの `clients` の該当カラムを更新する
