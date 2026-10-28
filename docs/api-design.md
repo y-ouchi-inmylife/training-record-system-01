@@ -62,6 +62,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント管理 | S-0301 クライアント登録画面 | GET | `/clients/create` | クライアント登録画面を表示する | auth | 管理者、一般 |
 | クライアント管理 | S-0301 クライアント登録画面 | POST | `/clients` | クライアントを登録する | auth | 管理者、一般 |
 | クライアント管理 | S-0304 クライアント一覧画面 | GET | `/clients` | クライアント一覧画面を表示する | auth | 管理者、一般 |
+| クライアント管理 | S-0315 契約一覧画面 | GET | `/contracts` | 契約一覧画面を表示する（ルート名 `contracts.index`。見るだけ。**2026-10-28 追加**） | auth | 管理者、一般 |
 | クライアント管理 | S-0305 クライアント詳細画面 | GET | `/clients/{id}` | クライアント詳細画面を表示する | auth | 管理者、一般 |
 | クライアント管理 | S-0305 クライアント詳細画面 | DELETE | `/clients/{id}` | クライアントを削除する | auth | 管理者、一般 |
 | クライアント管理 | S-0306 クライアント編集画面 | GET | `/clients/{id}/edit` | クライアント編集画面を表示する | auth | 管理者、一般 |
@@ -221,7 +222,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 - `return_to=trainee`（**既定**）：S-0309 トレーニー詳細画面の愛犬アンケートの欄（`redirect()->to(route('trainees.show', $trainee) . '#intake-survey')`）に戻す。愛犬アンケートの欄は画面の下のほうにあるため、状態が変わったことが目に入る位置に戻す
 - 値の扱い（上記以外・欠落時は既定にする、URL そのものは受け取らない）は当時の計測値エンドポイントと同じ
 
-**契約・利用エンドポイントのリダイレクト先**：`client-contracts.*` / `client-usages.*` の 6 メソッドは、処理後（成功時）は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', …)`）に戻す。送信元は S-0305 だけのため、`return_to` は持たない。認証・権限は計測値と同じ（`auth` ＋ `practitioners` ミドルウェア。一般トレーナーも削除まで可。管理者限定の操作はない）。バリデーションエラー時は `back()` で S-0305 に戻り、該当モーダルを開き直す（screen-design.md S-0305-M04 / M05 参照）。
+**契約・利用エンドポイントのリダイレクト先**：`client-contracts.*` / `client-usages.*` の 6 メソッドは、処理後（成功時）は**常に S-0305 会員詳細画面**（`redirect()->route('clients.show', …)`）に戻す。送信元は S-0305 だけのため、`return_to` は持たない（S-0315 契約一覧は参照のみで、ここへは送信しない）。認証・権限は計測値と同じ（`auth` ＋ `practitioners` ミドルウェア。一般トレーナーも削除まで可。管理者限定の操作はない）。バリデーションエラー時は `back()` で S-0305 に戻り、該当モーダルを開き直す（screen-design.md S-0305-M04 / M05 参照）。
 
 ---
 
@@ -444,6 +445,35 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 **レスポンス**:
 - view `clients.index`（各行に**クライアントの状態**〔メールアドレスなし／メールアドレス登録待ち／初回設定待ち／利用中〕を表示。状態は clients.email・clients.password と、対応する `client_email_registration_tokens` の有無から導出する。**期限判定の参照元は `client_email_registration_tokens.expires_at`**（ログイン用リンクの `expires_at` は参照しない）。判定順序と具体的なクエリ例は screen-design.md の S-0305 状態一覧を参照。**状態列は並び替え・絞り込みの対象にしない**）
 - 各行に**残り回数**（契約回数の合計 − 利用の件数。契約も利用も 0 件なら空欄）を表示する。状態と同じく、行ごとに個別のクエリを発行しない形で取得する（N+1 を避ける）。**残り回数列は並び替え・絞り込みの対象にしない**（screen-design.md S-0304 参照）
+
+---
+
+##### S-0315 契約一覧画面
+
+###### GET /contracts
+
+**概要**: 契約一覧画面を表示する（ルート名 `contracts.index`。見るだけ。**2026-10-28 追加**）。認証・権限は `auth` ＋ `practitioners`（一般・管理者。システム管理者は 403）。アクセスログは記録しない。
+
+**クエリパラメータ**（すべて任意）:
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| internal_id | string | 会員の内部ID（部分一致） |
+| keyword | string | 会員の姓名・かなの複合検索（4 項目を部分一致で OR 検索。S-0304 と同じ） |
+| date_from | date | 契約日（開始日） |
+| date_to | date | 契約日（終了日）。開始日以降（`after_or_equal:date_from`）。違反は入力エラーで一覧に戻す（文言は S-0304 と同じ） |
+| sort | string | ソートカラム（contracted_on, internal_id, last_name）。未指定時・不正値は contracted_on。internal_id は数値順、last_name は会員の姓の五十音順（S-0304 と同じ） |
+| direction | string | ソート方向（asc, desc）。asc 以外は desc。**sort が未指定・不正な値のときは、direction の指定にかかわらず desc** |
+| page | integer | ページ番号 |
+
+**処理**:
+- 契約（`client_contracts`）を、会員（`clients`）と結び付けて取得する。検索・並べ替えの条件は会員の列を使う
+- 会員は eager load（`with('client')`）、利用の件数は `withCount('usages')`（その契約に割り当てた利用の件数。未割り当ての利用は数えない）
+- 並び順：sort の列（と direction）、第 2 キーは `client_contracts.id`（第 1 キーと同じ方向）
+- `paginate(20)->withQueryString()`
+
+**レスポンス**:
+- view `contracts.index`。有効期限の赤字（期限切れで残りあり）は `ClientContract::isExpiredWithRemaining()`（会員詳細と同じ判定）
 
 ---
 
