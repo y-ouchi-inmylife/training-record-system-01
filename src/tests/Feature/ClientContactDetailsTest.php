@@ -210,13 +210,13 @@ class ClientContactDetailsTest extends TestCase
         $full = self::FULL_CONTACT;
 
         return [
-            '契約あり・住所が空' => [array_merge($full, ['address1' => null, 'address2' => null, 'address3' => null]), true, 'address', 'ご住所のご登録をお願いします。'],
-            '契約あり・町名番地だけ空' => [array_merge($full, ['address3' => null]), true, 'address', 'ご住所のご登録をお願いします。'],
-            '契約あり・電話番号が空' => [array_merge($full, ['phone1' => null]), true, 'phone', 'お電話番号のご登録をお願いします。'],
-            '契約あり・両方空' => [[], true, 'address phone', 'ご住所・お電話番号のご登録をお願いします。'],
+            '契約あり・住所が空' => [array_merge($full, ['address1' => null, 'address2' => null, 'address3' => null]), true, 'address', '住所のご登録をお願いします。'],
+            '契約あり・町名番地だけ空' => [array_merge($full, ['address3' => null]), true, 'address', '住所のご登録をお願いします。'],
+            '契約あり・電話番号が空' => [array_merge($full, ['phone1' => null]), true, 'phone', '電話番号のご登録をお願いします。'],
+            '契約あり・両方空' => [[], true, 'address phone', '住所・電話番号のご登録をお願いします。'],
             // 2026-10-28 追加：契約がなく利用だけ（「契約なし」の利用）の会員
-            '利用だけ・電話番号が空' => [array_merge($full, ['phone1' => null]), false, 'phone', 'お電話番号のご登録をお願いします。', true],
-            '利用だけ・両方空' => [[], false, 'address phone', 'ご住所・お電話番号のご登録をお願いします。', true],
+            '利用だけ・電話番号が空' => [array_merge($full, ['phone1' => null]), false, 'phone', '電話番号のご登録をお願いします。', true],
+            '利用だけ・両方空' => [[], false, 'address phone', '住所・電話番号のご登録をお願いします。', true],
         ];
     }
 
