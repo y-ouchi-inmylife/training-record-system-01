@@ -17,7 +17,8 @@ use Tests\TestCase;
  * - 対象は会員側の「ご連絡先の登録のお願い」と同じ（契約が 1 件以上かつ、住所〔都道府県・市区町村・町名番地のどれか〕か電話番号が空）
  * - 0 件ならセクションごと出さない
  * - 並びは最新の契約日の新しい順、同じ日なら id の大きい順
- * - 状態は会員一覧と同じバッジ、未入力は「住所」「電話番号」のバッジ
+ * - マイページの列は会員一覧と同じ列見出し・同じバッジ、未入力は「住所」「電話番号」のバッジ
+ * - 行全体は押せないので table-hover は付けない（2026-10-28 変更）
  */
 class DashboardContactMissingClientsTest extends TestCase
 {
@@ -90,7 +91,7 @@ class DashboardContactMissingClientsTest extends TestCase
     {
         $html = $this->get(route('dashboard'))->assertOk()->getContent();
 
-        return preg_match('/<table class="table table-hover" data-contact-missing>(.*?)<\/table>/s', $html, $m) ? $m[1] : null;
+        return preg_match('/<table class="table" data-contact-missing>(.*?)<\/table>/s', $html, $m) ? $m[1] : null;
     }
 
     /** 表の行（tbody の tr）ごとの HTML */
@@ -145,12 +146,17 @@ class DashboardContactMissingClientsTest extends TestCase
         $this->assertStringContainsString('2026/10/10', $rows[2]);
     }
 
-    public function test_会員のリンクと状態と未入力のバッジ(): void
+    public function test_会員のリンクとマイページと未入力のバッジ(): void
     {
         $both = $this->makeClient('両方', [], ['2026-10-01']);
         $this->makeClient('住所だけ', [...self::FILLED, 'address3' => ''], ['2026-10-02']);
 
-        $rows = $this->rows($this->section());
+        $section = $this->section();
+        // 列見出しは会員一覧にそろえて「マイページ」（2026-10-28 変更：その前は「状態」）
+        $this->assertStringContainsString('<th class="text-nowrap">マイページ</th>', $section);
+        $this->assertStringNotContainsString('<th class="text-nowrap">状態</th>', $section);
+
+        $rows = $this->rows($section);
         $this->assertStringContainsString('<span class="badge bg-warning text-dark">住所</span>', $rows[0]);
         $this->assertStringNotContainsString('電話番号', $rows[0]);
 

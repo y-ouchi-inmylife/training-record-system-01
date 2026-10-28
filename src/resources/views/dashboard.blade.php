@@ -11,17 +11,18 @@
     {{-- 連絡先が未入力の会員（S-0201。2026-10-28 追加：契約が済んだのに住所・電話番号が入っていない会員に気づけるように）。
          対象は会員側の「ご連絡先の登録のお願い」と同じ条件（Client::contactMissingWithContract）。
          気づかせるための表示なので、対象が 0 件ならセクションごと出さない（見出しも 0 件の帯も出さない）。
-         見た目は最近の愛犬性格診断に合わせる。絞り込み・ページ送りはなし。状態は会員一覧と同じバッジ（Client::statusBadge）、
+         見た目は最近の愛犬性格診断に合わせるが、table-hover は付けない（行全体は押せず、押せるのは会員名のリンクだけのため。2026-10-28 変更）。
+         絞り込み・ページ送りはなし。マイページの列は会員一覧と同じ列見出し・同じバッジ（Client::statusBadge。2026-10-28 変更：列見出しは「状態」だった）、
          未入力は行ごとの Client::missingContactDetails を「住所」「電話番号」のバッジで並べる --}}
     @if($contactMissingClients->isNotEmpty())
         <h4 class="mb-2" data-contact-missing-heading>連絡先が未入力の会員</h4>
         <div class="table-responsive mb-4">
-            <table class="table table-hover" data-contact-missing>
+            <table class="table" data-contact-missing>
                 <thead class="table-light">
                     <tr>
                         <th class="text-nowrap">最新の契約日</th>
                         <th class="text-nowrap">会員</th>
-                        <th class="text-nowrap">状態</th>
+                        <th class="text-nowrap">マイページ</th>
                         <th class="text-nowrap">未入力</th>
                     </tr>
                 </thead>
