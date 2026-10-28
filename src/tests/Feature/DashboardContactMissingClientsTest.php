@@ -24,6 +24,9 @@ class DashboardContactMissingClientsTest extends TestCase
 {
     use CreatesClientCountTables;
 
+    /** section() で最後に開いたダッシュボードの HTML（見出しの確認用） */
+    private string $lastHtml = '';
+
     private const FILLED = [
         'phone1' => '090-1234-5678', 'address1' => '東京都', 'address2' => '千代田区', 'address3' => '1-1',
     ];
@@ -90,6 +93,7 @@ class DashboardContactMissingClientsTest extends TestCase
     private function section(): ?string
     {
         $html = $this->get(route('dashboard'))->assertOk()->getContent();
+        $this->lastHtml = $html;
 
         return preg_match('/<table class="table" data-contact-missing>(.*?)<\/table>/s', $html, $m) ? $m[1] : null;
     }
@@ -181,10 +185,22 @@ class DashboardContactMissingClientsTest extends TestCase
         $row = $this->rows($section)[0];
         preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $row, $cells);
         $this->assertCount(5, $cells[1]);
-        $this->assertSame('<td>1234</td>', $cells[0][0]);
+        $this->assertSame('<td class="text-nowrap">1234</td>', $cells[0][0]);
         $this->assertStringContainsString('<a href="'.route('clients.show', $client).'">', $cells[1][1]);
         $this->assertStringContainsString('class="badge', $cells[1][2]);
         $this->assertSame('2026/10/05', $cells[1][3]);
         $this->assertStringContainsString('>住所</span>', $cells[1][4]);
+    }
+
+    public function test_見出しの先頭に警告マークを付ける(): void
+    {
+        // 2026-10-28 追加：赤い丸に白い「！」（bi-exclamation-circle-fill・text-danger）。飾りなので aria-hidden。見出しの文言は変えない
+        $this->makeClient('山田', [], ['2026-10-05']);
+        $this->section();
+
+        $this->assertMatchesRegularExpression(
+            '/<h4 class="mb-2" data-contact-missing-heading><i class="bi bi-exclamation-circle-fill text-danger me-1" aria-hidden="true"><\/i>連絡先が未入力の会員<\/h4>/',
+            $this->lastHtml,
+        );
     }
 }

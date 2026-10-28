@@ -15,12 +15,14 @@
          絞り込み・ページ送りはなし。マイページの列は会員一覧と同じ列見出し・同じバッジ（Client::statusBadge。2026-10-28 変更：列見出しは「状態」だった）、
          未入力は行ごとの Client::missingContactDetails を「住所」「電話番号」のバッジで並べる --}}
     @if($contactMissingClients->isNotEmpty())
-        <h4 class="mb-2" data-contact-missing-heading>連絡先が未入力の会員</h4>
+        {{-- 見出しの先頭に警告マーク（赤い丸に白い「！」。対応が要る会員の一覧だとひと目で分かるように。2026-10-28 追加）。
+             飾りなので読み上げない（aria-hidden）。大きさは見出しの文字なり --}}
+        <h4 class="mb-2" data-contact-missing-heading><i class="bi bi-exclamation-circle-fill text-danger me-1" aria-hidden="true"></i>連絡先が未入力の会員</h4>
         <div class="table-responsive mb-4">
             <table class="table" data-contact-missing>
                 <thead class="table-light">
                     <tr>
-                        {{-- 内部ID は会員一覧（S-0304）の内部ID列と同じ（internal_id を書式なしで。リンクにしない）。2026-10-28 追加。
+                        {{-- 内部ID は会員一覧（S-0304）の内部ID列と同じ（internal_id を書式なしで。リンクにしない）。ほかの列と同じく折り返さない（text-nowrap）。2026-10-28 追加。
                              同じ日に、最新の契約日を左端からマイページの右に移した --}}
                         <th class="text-nowrap">内部ID</th>
                         <th class="text-nowrap">会員</th>
@@ -32,7 +34,7 @@
                 <tbody>
                     @foreach($contactMissingClients as $client)
                         <tr>
-                            <td>{{ $client->internal_id }}</td>
+                            <td class="text-nowrap">{{ $client->internal_id }}</td>
                             <td class="text-nowrap"><a href="{{ route('clients.show', $client) }}">{{ $client->display_name }}</a></td>
                             <td class="text-nowrap"><span class="badge {{ $client->statusBadge()['class'] }}">{{ $client->statusBadge()['label'] }}</span></td>
                             <td class="text-nowrap">{{ $client->latest_contracted_on->format('Y/m/d') }}</td>
