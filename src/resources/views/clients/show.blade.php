@@ -295,7 +295,8 @@
                          ボタンの文字だけで分かるようにし、愛犬アンケートの案内のボタンと見分けるため。取消は隣の
                          「マイページ登録の案内を表示」と確認〔M03〕の文言で対象が分かる）。読み上げで何の取消かが
                          伝わるよう、案内のボタンが出るときはラッパーを role="group" にして
-                         「マイページ登録の案内」の名前を付ける（案内のボタンが出ない状態〔初回設定待ち・利用中〕では付けない） --}}
+                         「マイページ登録の案内」の名前を付ける（案内のボタンが出ない状態〔初回設定待ち・利用中〕では付けない）。
+                         初回設定待ち（期限内）では［初回設定メールを表示］（2026-11-10 追加）がここに 1 つ出る --}}
                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"
                          @if($showIssue || $showPrint || $showCancel) role="group" aria-label="マイページ登録の案内" @endif>
                         @if($showIssue)
@@ -320,6 +321,15 @@
                                     data-bs-toggle="modal" data-bs-target="#tokenCancellationModal">
                                 取消
                             </button>
+                        @endif
+                        @if($client->isAwaitingSetupWithinExpiry())
+                            {{-- 初回設定メールを表示（S-0316。2026-11-10 追加）：「登録待ち（初回設定）」（初回設定待ちで期限内）のときだけ。
+                                 お客様にメールが届かないとき、送ったメールの内容をトレーナーのメールから送るために開く。
+                                 条件はモデルの判定 Client::isAwaitingSetupWithinExpiry()（S-0316 のコントローラと同じ）。
+                                 見た目は［マイページ登録の案内を表示］と同じ白抜き・小さめ。同じタブで開く。
+                                 マイページ登録の案内のボタンではないので、ラッパーの role="group" の条件には入れない --}}
+                            <a href="{{ route('client-login-link-mail.show', $client) }}"
+                               class="btn btn-sm btn-outline-primary text-nowrap">初回設定メールを表示</a>
                         @endif
                     </div>
                 </div>

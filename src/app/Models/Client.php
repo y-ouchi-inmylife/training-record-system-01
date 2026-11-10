@@ -484,6 +484,18 @@ class Client extends Authenticatable
     }
 
     /**
+     * 初回設定待ちで、メールアドレス登録用 URL が期限内か（2026-11-10 追加。バッジが「登録待ち（初回設定）」になる条件と同じ）。
+     *
+     * 初回設定メールの表示（S-0316。要件定義書 6-3-9）を出せるかの判定。会員詳細（S-0305）の［初回設定メールを表示］の出し分けと、
+     * S-0316 のコントローラの両方で使う（判定を 2 か所に持たない）。期限切れ（「登録待ち（期限切れ）」）のときは false。
+     * show_expired_note を使うため、一覧は withStatusData、単体は loadStatusData() で派生値を先に埋めておくこと
+     */
+    public function isAwaitingSetupWithinExpiry(): bool
+    {
+        return $this->status === self::STATUS_AWAITING_SETUP && ! $this->show_expired_note;
+    }
+
+    /**
      * 状態バッジの表示用情報（文言と Bootstrap クラス）。
      *
      * 配色は screen-design.md §2-5 の「クライアント状態バッジの 4 状態対応」に従う。

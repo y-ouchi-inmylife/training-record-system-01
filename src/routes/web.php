@@ -11,6 +11,7 @@ use App\Http\Controllers\ClientContractController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientEmailController;
 use App\Http\Controllers\ClientEmailRegistrationTokenController;
+use App\Http\Controllers\ClientLoginLinkMailController;
 use App\Http\Controllers\ClientUsageController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\TrainingRecordController;
@@ -97,6 +98,10 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // マイページ登録案内の表示（印刷ページ S-0307、段階 4-2）
             Route::get('clients/{client}/email-registration-tokens/print', [ClientEmailRegistrationTokenController::class, 'print'])
                 ->name('client-email-registration-tokens.print');
+            // 初回設定メールの表示（S-0316、6-3-9。2026-11-10 追加）。見るだけ（ログイン用リンクは作り直さない・メールは送らない）。
+            // アクセスログは記録しない（LogAccess の ACTION_MAP に足さない。マイページ登録の案内の表示と同じ）
+            Route::get('clients/{client}/login-link-mail', [ClientLoginLinkMailController::class, 'show'])
+                ->name('client-login-link-mail.show');
             // メールアドレスの削除（6-3-8、段階 4-2）
             Route::delete('clients/{client}/email', [ClientEmailController::class, 'destroy'])
                 ->name('client-email.destroy');
