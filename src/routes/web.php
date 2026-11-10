@@ -348,7 +348,7 @@ Route::domain(config('subdomain.client_host'))->group(function () {
     Route::post('client-portal/personality-diagnosis/{token}', [\App\Http\Controllers\Client\PersonalityDiagnosisController::class, 'store'])
         ->name('client-portal.personality-diagnosis.store');
 
-    // メールアドレス確認リンク（S-1406 派生、公開URL、認証不要）。段階 4-3。
+    // メールアドレス確認リンク（S-1409 派生、公開URL、認証不要）。段階 4-3。
     // ログイン状態を問わず、切替 → ログアウト → ログイン画面へ遷移する。
     Route::get('client-portal/email-change/{token}', [\App\Http\Controllers\Client\EmailChangeController::class, 'confirm'])
         ->name('client-portal.email-change.confirm');
