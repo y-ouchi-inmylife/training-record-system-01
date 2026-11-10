@@ -13,7 +13,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 会員詳細（S-0305）のメールアドレス欄の［初回設定メールを表示］（2026-11-10 追加。設計書 S-0305「状態と状態別ボタンの対応」）。
+ * 会員詳細（S-0305）のメールアドレス欄の［メールが届かないとき］（2026-11-10 追加。設計書 S-0305「状態と状態別ボタンの対応」）。
  *
  * 「登録待ち（初回設定）」（初回設定待ちで期限内）のときだけ出し、S-0316 を同じタブで開く。期限切れ・ほかの状態では出さない。
  * 判定はモデルの Client::isAwaitingSetupWithinExpiry()（S-0316 のコントローラと同じ）。
@@ -22,7 +22,7 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
 {
     use CreatesClientCountTables;
 
-    private const BUTTON = '>初回設定メールを表示</a>';
+    private const BUTTON = '>メールが届かないとき</a>';
 
     private Client $client;
 
@@ -145,10 +145,10 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
         $this->assertStringContainsString('<span class="badge bg-warning text-dark">登録待ち（初回設定）</span>', $html);
         $this->assertSame(1, substr_count($html, self::BUTTON));
         $this->assertMatchesRegularExpression(
-            '/<a href="'.preg_quote(route('client-login-link-mail.show', $this->client), '/').'"\s+class="btn btn-sm btn-outline-primary text-nowrap">初回設定メールを表示<\/a>/u',
+            '/<a href="'.preg_quote(route('client-login-link-mail.show', $this->client), '/').'"\s+class="btn btn-sm btn-outline-primary text-nowrap">メールが届かないとき<\/a>/u',
             $html
         );
-        $this->assertDoesNotMatchRegularExpression('/<a [^>]*target="_blank"[^>]*>初回設定メールを表示/u', $html);
+        $this->assertDoesNotMatchRegularExpression('/<a [^>]*target="_blank"[^>]*>メールが届かないとき/u', $html);
         // マイページ登録の案内のボタンではないので、ボタンのまとまりに role="group" は付けない
         $this->assertStringNotContainsString('aria-label="マイページ登録の案内"', $html);
     }

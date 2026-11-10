@@ -17,7 +17,7 @@ use Illuminate\Contracts\View\View;
  *   削除は一切しない（作り直すと、送信済みのメールのリンクが無効になるため）
  * - 件名・本文は、実際に送る Mailable（ClientLoginLinkMail）そのものから取る（件名は envelope() の件名、本文は render()）。
  *   件名の書式（ClientMailEnvelope）・テンプレート（mail.client-login-link）・差し込む値をこの画面のために別に持たない
- * - 表示の条件は Client::isAwaitingSetupWithinExpiry()（会員詳細の［初回設定メールを表示］の出し分けと同じ判定）。
+ * - 表示の条件は Client::isAwaitingSetupWithinExpiry()（会員詳細の［メールが届かないとき］の出し分けと同じ判定）。
  *   条件に合わない・トークンがないときは、S-0307 と同じく「ない」表示にする（404 にしない）
  * - アクセスログは記録しない（LogAccess の ACTION_MAP に足さない。マイページ登録の案内の発行・表示を記録していない方針にそろえる）
  *
