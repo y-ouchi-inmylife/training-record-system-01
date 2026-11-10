@@ -68,6 +68,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント管理 | S-0306 クライアント編集画面 | GET | `/clients/{id}/edit` | クライアント編集画面を表示する | auth | 管理者、一般 |
 | クライアント管理 | S-0306 クライアント編集画面 | PUT | `/clients/{id}` | クライアント情報を更新する | auth | 管理者、一般 |
 | クライアント管理 | S-0307 メールアドレス登録用 URL 印刷画面 | GET | `/clients/{client}/email-registration-tokens/print` | メールアドレス登録用 URL の印刷用ページを表示する | auth | 管理者、一般 |
+| クライアント管理 | S-0316 初回設定メール表示画面 | GET | `/clients/{client}/login-link-mail` | 送った初回設定メール（ログイン用リンクのメール）の宛先・件名・本文を表示する（ルート名 `client-login-link-mail.show`。見るだけ。6-3-9。**2026-11-10 追加**） | auth | 管理者、一般 |
 | クライアント管理 | S-0305 クライアント詳細画面 | DELETE | `/clients/{client}/email-registration-tokens` | マイページ登録案内を取り消す（未使用のメールアドレス登録用トークンを物理削除する。6-3-7） | auth | 管理者、一般 |
 | クライアント管理 | S-0305 クライアント詳細画面 | DELETE | `/clients/{client}/email` | クライアントのメールアドレスとパスワードを削除し、送信済みのメールアドレス登録用 URL・ログイン用リンクを無効化する（6-3-8） | auth | 管理者、一般 |
 | トレーニー管理 | S-0308 トレーニー登録画面 | GET | `/clients/{client}/trainees/create` | トレーニー登録画面を表示する（会員は URL パラメータから取得。ルート名 `trainees.create`） | auth | 管理者、一般 |
@@ -581,6 +582,24 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 - **お客様の氏名は view に渡さない**（紙の紛失時に氏名と URL が同時に漏れることを避けるため。決定事項 #3）。**2026-10-18 変更**：印刷しなくなり、LINE・メールで送る文面に氏名を入れる（`InvitationMessage`）
 - QR コードは**ビルドに含める JS ライブラリでクライアントサイド生成**する（外部 CDN からの読み込みはしない）。ライブラリ名は architecture.md §2-1 に沿って決定する
 
+
+###### GET /clients/{client}/login-link-mail
+
+**概要**: 対象クライアントに送った初回設定メール（`ClientLoginLinkMail`。ログイン用リンク入り）の宛先・件名・本文を表示する（S-0316。6-3-9 初回設定メールの表示。**2026-11-10 追加**）。お客様にメールが届かないときに、トレーナーが自分のメールから同じ内容を送るためのページ。システムからは送らない。ルート名は `client-login-link-mail.show`（近くのルート `client-email-registration-tokens.print`・`client-email.destroy` の名前の付け方にそろえた）。コントローラは `ClientLoginLinkMailController@show`
+
+**処理**:
+- クライアントが初回設定待ちで、メールアドレス登録用 URL が期限内か確かめる（`Client::loadStatusData()` のあとの `Client::isAwaitingSetupWithinExpiry()`。バッジが「登録待ち（初回設定）」になる条件と同じ）
+- 条件に合えば、対象クライアントの `client_login_link_tokens` のうち `is_used=false` のトークンを、`id` の大きい順に 1 件取得する
+- トークンがあれば、`ClientLoginLinkMail` をそのトークンで作り、件名（`envelope()` の件名）と本文（`render()` の文字列）を取り出して view に渡す。宛先は `clients.email`。送信と同じ作りから取るので、件名・本文を別に組み立てない
+- **トークンの作成・更新・削除は一切しない**（読むだけ。作り直すと送信済みのメールのリンクが無効になるため）。メールも送らない
+
+**レスポンス**:
+- 表示できるメールあり：view `clients.login-link-mail-print`（`layouts.app`。S-0307 と同じ見た目）。変数は `client`・`to`・`subject`・`body`
+- 表示できるメールなし（条件に合わない・トークンがない）：同じ view で `to`・`subject`・`body` を null にし、「表示できる初回設定メールはありません。」を出す（404 にはしない）
+
+**備考**:
+- 権限は会員詳細と同じ（`auth`・`practitioners`。システム管理者は 403）
+- アクセスログは記録しない（`LogAccess` の `ACTION_MAP` に足さない。マイページ登録の案内の発行・表示を記録していない方針にそろえる）
 
 ###### DELETE /clients/{client}/email
 
