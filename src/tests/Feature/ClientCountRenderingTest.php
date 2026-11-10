@@ -906,6 +906,13 @@ class ClientCountRenderingTest extends TestCase
         return $m[0];
     }
 
+    /** 案内のボタンが出ない状態（初回設定待ち・利用中）では、右寄せのまとまりを出さない（2026-11-10 変更。空の要素が余白を作らないように） */
+    private function assertNoEmailButtons(string $html): void
+    {
+        $this->assertStringNotContainsString('<div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"', $html);
+        $this->assertStringNotContainsString('aria-label="マイページ登録の案内"', $html);
+    }
+
     private function emailRegToken(Client $client, string $expiresAt): void
     {
         DB::table('client_email_registration_tokens')->insert([
@@ -993,11 +1000,9 @@ class ClientCountRenderingTest extends TestCase
             .'<a href="[^"]+" class="btn btn-primary">編集<\/a>.*?<button type="submit" class="btn btn-danger">削除<\/button>/su',
             $top
         );
-        // メールアドレス（マイページ）の欄には削除のボタンを出さない。案内のまとまりの名前も付けない
-        $buttons = $this->emailButtons($html);
-        $this->assertStringNotContainsString('削除', $buttons);
-        $this->assertStringNotContainsString('<button', $buttons);
-        $this->assertStringNotContainsString('role="group"', $buttons);
+        // メールアドレス（マイページ）の欄には削除のボタンを出さない。案内のボタンがないので、右寄せのまとまりごと出さない
+        // （2026-11-10 変更：その前は空のまとまりを出し、role="group" だけを付けなかった）
+        $this->assertNoEmailButtons($html);
         // 「登録を削除」だけの古い名前のボタンはどこにもない
         $this->assertSame(0, preg_match('/>\s*登録を削除\s*</u', $html));
         // 確認のモーダル（M02）の文言は今までどおり
@@ -1018,7 +1023,8 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         $this->assertStringContainsString('マイページ登録を削除', $this->topButtons($html));
-        $this->assertStringNotContainsString('削除', $this->emailButtons($html));
+        // 案内のボタンがないので、右寄せのまとまりごと出さない（2026-11-10 変更）
+        $this->assertNoEmailButtons($html);
     }
 
     public function test_未登録と登録待ちでは上部にマイページ登録を削除を出さない(): void

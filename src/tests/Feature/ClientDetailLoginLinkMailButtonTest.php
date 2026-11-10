@@ -153,6 +153,28 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
         $this->assertStringNotContainsString('aria-label="マイページ登録の案内"', $html);
     }
 
+    public function test_ボタンはバッジのすぐ右に横並びで置き_右寄せのまとまりには入れない(): void
+    {
+        $this->issueRegistrationToken();
+        $this->registerEmail();
+
+        $html = $this->detailPage();
+
+        // メールアドレス → バッジ → ボタン の順に、同じ行（flex-wrap・align-items-center・gap-2）の中に並ぶ（2026-11-10 変更）。
+        // バッジとボタンのあいだにはコメントだけ（Blade のコメントは出力されない）
+        $url = preg_quote(route('client-login-link-mail.show', $this->client), '/');
+        $this->assertMatchesRegularExpression(
+            '/<div class="d-flex align-items-center flex-wrap gap-2" style="min-height: 1.5rem;">\s*'
+            .'<span>owner@example\.com<\/span>\s*'
+            .'<span class="badge bg-warning text-dark">登録待ち（初回設定）<\/span>\s*'
+            .'<a href="'.$url.'"\s+class="btn btn-sm btn-outline-primary text-nowrap">メールが届かないとき<\/a>\s*'
+            .'<\/div>/u',
+            $html
+        );
+        // 案内のボタンがないので、右寄せのまとまり（ms-auto）は出さない（空の要素が余白や空の行を作らないように）
+        $this->assertStringNotContainsString('<div class="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto"', $html);
+    }
+
     /**
      * @return array<string, array{0: string, 1: string}>
      */
