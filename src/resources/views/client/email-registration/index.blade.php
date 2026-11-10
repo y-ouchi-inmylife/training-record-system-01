@@ -20,9 +20,10 @@
                 {{-- 完了状態。
                      案内文（下）と「メールアドレス入力に戻る」ボタン（さらに下）の 2 経路で
                      入力し直しに戻れる。ボタンは同じトークンの GET ルートに戻る `<a>` タグで、
-                     押下時の挙動は EmailRegistrationController::showByToken() が
-                     `submittedEmail => null` を渡すことで入力状態を再描画する（未変更）。
-                     お客様が案内 URL を再アクセスした場合と同じ経路。 --}}
+                     押下時の挙動は EmailRegistrationController::showByToken() が、フラッシュ submittedEmail が
+                     ないので入力状態を再描画する（2026-11-10 変更：送信のあとは同じ URL の GET にリダイレクトし、
+                     フラッシュ submittedEmail があるときだけ完了状態にした。その前は submittedEmail => null を渡していた）。
+                     お客様が案内 URL を再アクセスした場合・完了状態で再読み込みした場合と同じ経路。 --}}
                 <h2 class="c-auth-heading">メールをお送りしました</h2>
                 <p class="c-auth-lead">
                     <strong class="c-auth-email">{{ $submittedEmail }}</strong> に

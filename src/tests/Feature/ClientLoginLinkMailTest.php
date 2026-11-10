@@ -171,7 +171,7 @@ class ClientLoginLinkMailTest extends TestCase
         Mail::fake();
 
         // お客様が S-1405 でメールアドレスを入れる（ログイン用リンクが作られ、メールが送られる）
-        $this->post(route('client-portal.email-registration.store', ['token' => self::REGISTRATION_TOKEN]), ['email' => 'first@example.com'])->assertOk();
+        $this->post(route('client-portal.email-registration.store', ['token' => self::REGISTRATION_TOKEN]), ['email' => 'first@example.com'])->assertRedirect();
         $sentBodies = [];
         Mail::assertSent(ClientLoginLinkMail::class, function (ClientLoginLinkMail $mail) use (&$sentBodies) {
             $sentBodies[] = [$mail->envelope()->subject, $mail->render()];
@@ -187,7 +187,7 @@ class ClientLoginLinkMailTest extends TestCase
         $this->assertStringContainsString($this->setupUrl($firstToken), $this->fieldText($html, 'body'));
 
         // 入れ直すと前のリンクは消え、新しいメールが送られる。画面は新しいメールの内容になる
-        $this->post(route('client-portal.email-registration.store', ['token' => self::REGISTRATION_TOKEN]), ['email' => 'second@example.com'])->assertOk();
+        $this->post(route('client-portal.email-registration.store', ['token' => self::REGISTRATION_TOKEN]), ['email' => 'second@example.com'])->assertRedirect();
         $secondToken = ClientLoginLinkToken::query()->sole()->token;
         $this->assertNotSame($firstToken, $secondToken);
 

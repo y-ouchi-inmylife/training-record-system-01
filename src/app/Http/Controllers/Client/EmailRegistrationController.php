@@ -27,6 +27,10 @@ class EmailRegistrationController extends Controller
 {
     /**
      * トークンを検証し、メールアドレス登録画面を表示（GET）
+     *
+     * 送信（POST）に成功したあとのリダイレクト先でもある（2026-11-10 変更）。フラッシュ submittedEmail
+     * （入力したメールアドレス）があれば完了の状態、なければ入力の状態を出す。フラッシュは 1 回で消えるので、
+     * 完了の状態で再読み込みすると入力の状態に戻る（POST は再送信されず、メールも送り直さない）。
      */
     public function showByToken(string $token): View
     {
@@ -55,7 +59,7 @@ class EmailRegistrationController extends Controller
 
         return view('client.email-registration.index', [
             'token' => $token,
-            'submittedEmail' => null,
+            'submittedEmail' => session('submittedEmail'),
         ]);
     }
 
@@ -121,11 +125,13 @@ class EmailRegistrationController extends Controller
                 ->withErrors(['form' => 'メールの送信に失敗しました。時間を置いて再度お試しください。']);
         }
 
-        // 完了状態：同画面に送信済みメールアドレスを表示
-        return view('client.email-registration.index', [
-            'token' => $token,
-            'submittedEmail' => $validated['email'],
-        ]);
+        // 完了状態：同じ URL の GET にリダイレクトし、送信済みメールアドレスをフラッシュで渡して同画面の完了の状態を出す
+        // （POST → リダイレクト → GET。2026-11-10 変更：その前は POST の応答としてそのまま完了の状態の view を返していたため、
+        //  完了の状態で再読み込みすると POST が再送信され、ログイン用リンクの作り直しとメールの送り直しが起き、
+        //  前に届いたメールのリンクが使えなくなっていた）。入力エラー・メール送信の失敗は今までどおり back()
+        return redirect()
+            ->route('client-portal.email-registration.show', ['token' => $token])
+            ->with('submittedEmail', $validated['email']);
     }
 
     private function invalidTokenView(string $title, string $message): View

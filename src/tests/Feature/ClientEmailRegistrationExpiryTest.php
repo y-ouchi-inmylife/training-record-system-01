@@ -185,7 +185,7 @@ class ClientEmailRegistrationExpiryTest extends TestCase
         // お客様がメールアドレスを入れたのが 10/20 でも、初回設定へのリンクの期限は案内の期限（10/25 23:59:59）のまま
         Carbon::setTestNow('2026-10-20 15:00:00');
         $this->post(route('client-portal.email-registration.store', ['token' => $token->token]), ['email' => 'taro@example.com'])
-            ->assertOk();
+            ->assertRedirect(route('client-portal.email-registration.show', ['token' => $token->token]));
 
         $loginLink = ClientLoginLinkToken::query()->sole();
         $this->assertSame('2026-10-25 23:59:59', $loginLink->expires_at->format('Y-m-d H:i:s'));
