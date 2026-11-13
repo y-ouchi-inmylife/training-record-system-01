@@ -30,7 +30,7 @@
              サムネイル生成済み（thumbnail_url あり）なら .ratio 内に <img>、
              それ以外（未生成・生成中・失敗・3b-2 未対応の動画）は今まで通りプレースホルダ表示。
 
-             日付グループ見出し：登録日時の日付が変わるところに Y/m/d の見出しを 1 行フル幅で挿入する
+             日付グループ見出し：登録日時の日付が変わるところに Y/m/d（曜）の見出しを 1 行フル幅で挿入する
              （設計書 S-1302 メディア一覧参照）。実装は Paginator の getCollection() を groupBy して
              2 段の @foreach にする。$mediaRecords は Paginator のまま維持し、下の $mediaRecords->links()
              を無傷にする。@php ディレクティブは一切使わない（既存 @php ... @endphp ブロックの直後に
@@ -40,9 +40,14 @@
                 {{-- 見出しは 1 行フル幅で占有する。col-12 は左右パディング（ガター）を維持する
                      ためで、幅は w-100 で確定させる。col-12 単体では md 以上のブレークポイントで
                      .row-cols-md-* > *（メディアクエリ内・後定義）に負けて 1 カラム分の幅になる
-                     ため、.w-100 の !important で強制上書きする。 --}}
-                <div class="col-12 w-100">
-                    <h6 class="text-muted mb-0">{{ $dateKey }}</h6>
+                     ため、.w-100 の !important で強制上書きする。
+                     見た目（日付の区切りを分かりやすくする）：見出しは本文色の太字＋下罫線（fw-bold border-bottom pb-1）、
+                     2 つ目以降の見出しだけ上に余白（pt-3）を空ける。クラスの組み合わせはメディア追加モーダル
+                     （training-records/_form.blade.php の renderGrid）と同じにすること。
+                     曜日は locale に左右されないよう配列＋dayOfWeek で出す（全角括弧。会員側と同じ方式）。
+                     新しい @php は足さない（上のコメントの事故のため）ので、配列は {{ }} の中に直接書く。 --}}
+                <div class="col-12 w-100{{ $loop->first ? '' : ' pt-3' }}">
+                    <h6 class="fw-bold mb-0 pb-1 border-bottom">{{ $dateKey }}（{{ ['日', '月', '火', '水', '木', '金', '土'][$items->first()->created_at->dayOfWeek] }}）</h6>
                 </div>
                 @foreach($items as $media)
                     <div class="col">

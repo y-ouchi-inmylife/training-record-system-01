@@ -779,10 +779,23 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // 日付見出しの曜日（Date#getDay() は 0＝日〜6＝土）。locale に左右されないよう配列で持つ
+    const DATE_HEADING_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+    // 'Y/m/d' の文字列から 'Y/m/d（曜）' を作る。
+    // new Date('2026/10/04') などの文字列パースはブラウザや UTC 解釈で日がずれる恐れがあるため使わず、
+    // 年・月・日を数値にしてローカル日付として組み立てる。形が想定外ならそのまま返す
+    function formatDateHeading(dateKey) {
+        var parts = dateKey.split('/').map(function (v) { return parseInt(v, 10); });
+        if (parts.length !== 3 || parts.some(isNaN)) return dateKey;
+        var weekday = DATE_HEADING_WEEKDAYS[new Date(parts[0], parts[1] - 1, parts[2]).getDay()];
+        return dateKey + '（' + weekday + '）';
+    }
+
     function renderGrid(items) {
         grid.innerHTML = '';
         // 日付グループ見出し（設計書 S-0401-M02 / S-0404-M01 参照）。
-        // items は API から登録日時降順で来ており、日付が変わるところに Y/m/d の
+        // items は API から登録日時降順で来ており、日付が変わるところに Y/m/d（曜）の
         // 見出しを 1 行フル幅（col-12）で挟む。ページ跨ぎで同じ日付の見出しが
         // 複数ページに出るのは許容仕様（各ページ先頭で必ず見出しが出る）。
         // 日付の取り出しは split(' ')[0] を使う：
@@ -795,13 +808,16 @@ document.addEventListener('DOMContentLoaded', function () {
             var dateKey = (m.created_at || '').split(' ')[0];
             if (dateKey !== prevDateKey) {
                 var headerCol = document.createElement('div');
-                // 一覧側（media-records/index.blade.php）と完全一致。
+                // クラスの組み合わせは一覧側（media-records/index.blade.php の日付見出し）と同じにする。
                 // col-12 は左右パディング（ガター）を維持するため、幅は w-100 で確定させる
                 // （md 以上で .row-cols-md-* > * に負けないよう !important で強制）。
-                headerCol.className = 'col-12 w-100';
+                // 2 つ目以降の見出しだけ上に余白（pt-3）を空けて、日付の区切りを分かりやすくする
+                // （prevDateKey が null ＝ このページの 1 つ目の見出し）。
+                headerCol.className = 'col-12 w-100' + (prevDateKey === null ? '' : ' pt-3');
                 var h6 = document.createElement('h6');
-                h6.className = 'text-muted mb-0';
-                h6.textContent = dateKey;
+                // 本文色の太字＋下罫線
+                h6.className = 'fw-bold mb-0 pb-1 border-bottom';
+                h6.textContent = formatDateHeading(dateKey);
                 headerCol.appendChild(h6);
                 grid.appendChild(headerCol);
                 prevDateKey = dateKey;
