@@ -170,7 +170,14 @@ class TraineeController extends Controller
         }
 
         $clientId = $trainee->client_id;
+        // 写真のファイルのキーは、行を消す前に控えておく（削除後のモデルにも属性は残るが、読みやすさのため）
+        $photoPaths = $trainee->photoFilePaths();
         $trainee->delete();
+
+        // 行の削除が成功したあとに、写真のファイルを消す（2026-11 追加。それまではファイルが残っていた）。
+        // ファイルの削除に失敗してもログに残すだけで、トレーニーの削除は取り消さない
+        // （設計書 requirements.md 6-16-4・db-schema.md D-0700「トレーニーの削除時」）
+        $trainee->deletePhotoFiles($photoPaths);
 
         return redirect()
             ->route('clients.show', $clientId)

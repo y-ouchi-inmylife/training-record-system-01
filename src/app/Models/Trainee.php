@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -542,6 +543,50 @@ class Trainee extends Model
         }
         return Storage::disk(self::STORAGE_DISK)
             ->temporaryUrl($this->photo_path, now()->addMinutes(self::PHOTO_URL_EXPIRES_MINUTES));
+    }
+
+    /**
+     * このトレーニーが持つ写真のファイルのキーを返す（未登録のものは含めない）。
+     *
+     * トレーニーの削除で、行を消す前にキーを控えておくために使う（deletePhotoFiles に渡す）。
+     * 今は会員さんの写真（photo_path）だけ。トレーナー用の写真（trainer_photo_path）を足すときは、
+     * ここに並べれば削除の対象になる（設計書 db-schema.md D-0700「トレーニーの削除時」）。
+     *
+     * @return list<string>
+     */
+    public function photoFilePaths(): array
+    {
+        return array_values(array_filter([
+            $this->photo_path,
+        ], fn ($path) => is_string($path) && $path !== ''));
+    }
+
+    /**
+     * 写真のファイルをストレージから消す（トレーニーの削除のあとに呼ぶ）。
+     *
+     * 削除に失敗しても例外は外に出さず、警告のログにトレーニー ID とキーを残して次のファイルへ進む
+     * （トレーニーの削除そのものは取り消さない。残ったファイルはキーの頭のフォルダで探して掃除できる。
+     * 設計書 requirements.md 6-16-4・db-schema.md D-0700「トレーニーの削除時」）。
+     * media ディスクは throw=>true のため、削除の失敗は例外で届く。
+     *
+     * モデルの deleted イベントにはしない：会員の削除で DB の CASCADE によって消える経路では
+     * イベントが動かず、動く経路と動かない経路が混ざって分かりにくいため、呼び出し側から明示的に呼ぶ。
+     *
+     * @param  list<string>  $paths  photoFilePaths() で控えたキー
+     */
+    public function deletePhotoFiles(array $paths): void
+    {
+        foreach ($paths as $path) {
+            try {
+                Storage::disk(self::STORAGE_DISK)->delete($path);
+            } catch (\Throwable $e) {
+                Log::warning('Trainee: 写真ファイルの削除に失敗（孤児ファイル発生の可能性）', [
+                    'trainee_id' => $this->id,
+                    'path' => $path,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
