@@ -78,7 +78,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0310 トレーニー編集画面 | PUT | `/trainees/{trainee}` | トレーニーを更新する（ルート名 `trainees.update`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。愛犬アンケート・愛犬性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック）。**会員写真・トレーナー用写真のファイルもストレージから消す**（**2026-11 追加**。db-schema.md D-0700「トレーニーの削除時」） | auth | 管理者 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/trainer-photo` | トレーナー用写真を設定する（メディア一覧から選んだ写真をコピーして持たせる。選び直しも同じ。ルート名 `trainee-trainer-photo.store`。**2026-11 追加**） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/trainer-photo` | トレーナー用写真を外す（ファイルも消す。ルート名 `trainee-trainer-photo.destroy`。**2026-11 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/trainer-photo` | トレーナー用写真を削除する（ファイルも消す。ルート名 `trainee-trainer-photo.destroy`。**2026-11 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。送信元は S-0309 だけ（**2026-10 変更**）。成功後は S-0309 に戻す（下の「計測値エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
@@ -2392,21 +2392,21 @@ POST /training-records に以下を追加する。
 
 ###### DELETE /trainees/{trainee}/trainer-photo
 
-**概要**: トレーナー用写真を外す（requirements.md 6-16-20。**2026-11 追加**）。ルート名 `trainee-trainer-photo.destroy`
+**概要**: トレーナー用写真を削除する（requirements.md 6-16-20。**2026-11 追加**）。ルート名 `trainee-trainer-photo.destroy`
 
 **リクエスト**: パラメータなし
 
 **処理**:
-- `trainer_photo_path` が NULL なら 404（外すものがない）
+- `trainer_photo_path` が NULL なら 404（削除するものがない）
 - `trainer_photo_path` を NULL に、`updated_by` を操作したトレーナーに更新 → ファイルを削除の順。ファイルの削除に失敗してもエラーにせず、警告のログ（トレーニー ID・キー・エラー）に残すだけで、成功と同じレスポンスを返す（**2026-11 変更**：当初は会員写真の削除と同じく「ファイルを先に削除 → NULL」の順で、削除に失敗したら 500 にして DB を変えないとしていた。トレーニーの削除・選び直しで古いファイルを消す処理と同じ考え方にそろえ、ストレージの一時的な不調でトレーナーの操作が失敗しないようにした。db-schema.md D-0700「トレーナー用写真の扱い」）
 - 会員写真（`photo_path`）と元のメディアには触らない
 - アクセスログに `delete_trainee_trainer_photo` を記録する（対象はトレーニー）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用写真を外しました。」
-- 押す前に確認ダイアログを出す（［外す］は S-0309-M02 のフッターに、設定済みのときだけ出す。screen-design.md S-0309-M02。**2026-11 変更**：当初は写真の枠の下）
+- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用写真を削除しました。」（**2026-11 変更**：当初の文は「トレーナー用写真を外しました。」。システム全体の言い方〔削除〕にそろえた）
+- 押す前に確認ダイアログを出す（［削除］は S-0309-M02 のフッターに、設定済みのときだけ出す。screen-design.md S-0309-M02。**2026-11 変更**：当初は写真の枠の下）
 
-**パス・ルート名の選定理由**: トレーニーにぶら下がる 1 つだけのもの（トレーナー用写真）を設定・外すため、ID を取らない単数形のリソース `/trainees/{trainee}/trainer-photo` に POST・DELETE する（会員写真の `/client-portal/trainees/{trainee}/photo` と同じ形）。ルート名は既存のトレーニー系（`trainee-measurements.*`・`trainee-intake-survey-tokens.*`）にそろえて `trainee-trainer-photo.*` とする
+**パス・ルート名の選定理由**: トレーニーにぶら下がる 1 つだけのもの（トレーナー用写真）を設定・削除するため、ID を取らない単数形のリソース `/trainees/{trainee}/trainer-photo` に POST・DELETE する（会員写真の `/client-portal/trainees/{trainee}/photo` と同じ形）。ルート名は既存のトレーニー系（`trainee-measurements.*`・`trainee-intake-survey-tokens.*`）にそろえて `trainee-trainer-photo.*` とする
 
 ##### S-0305 会員詳細画面
 
