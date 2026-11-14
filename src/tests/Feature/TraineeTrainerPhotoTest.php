@@ -314,6 +314,15 @@ class TraineeTrainerPhotoTest extends TestCase
         $this->getJson('/api/training-records/available-media?type=video')->assertUnprocessable();
     }
 
+    public function test_写真のボタンは枠の左下で会員写真は右下(): void
+    {
+        // 2026-11 変更：［写真］のボタンは右下の会員写真の反対側（左下）。枠の内側へ下・左から 6px（最初は右上）
+        $scss = file_get_contents(resource_path('sass/app.scss'));
+
+        $this->assertMatchesRegularExpression('/\.trainee-show-photo-action \{\s*position: absolute;\s*bottom: 6px;\s*left: 6px;/u', $scss);
+        $this->assertMatchesRegularExpression('/\.trainee-show-photo-overlay \{\s*position: absolute;\s*right: 6px;\s*bottom: 6px;/u', $scss);
+    }
+
     /** 写真の枠（.trainee-show-photo の div）の HTML */
     private function photoFrame(string $html): string
     {
@@ -338,7 +347,7 @@ class TraineeTrainerPhotoTest extends TestCase
     public function test_トレーニー詳細で4通りの写真の枠を出す(): void
     {
         $show = fn () => $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
-        // 写真の枠の右上に重ねる［写真］のボタン（2026-11 変更：当初は枠の下の［写真を選ぶ］／［変更］［外す］の行）
+        // 写真の枠の左下に重ねる［写真］のボタン（位置は app.scss。2026-11 変更：当初は枠の下の［写真を選ぶ］／［変更］［外す］の行）
         $actionButton = '/<button type="button" class="btn btn-sm btn-light border trainee-show-photo-action"\s*'
             .'data-trainer-photo-open aria-label="トレーナー用写真を選ぶ">\s*<i class="bi bi-camera" aria-hidden="true"><\/i> 写真\s*<\/button>\s*<\/div>/u';
 
