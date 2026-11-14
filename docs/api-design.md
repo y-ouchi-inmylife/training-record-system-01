@@ -76,9 +76,9 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 | GET | `/trainees/{trainee}` | トレーニー詳細画面を表示する（ルート名 `trainees.show`）。愛犬性格診断の結果（**2026-10 追加**。レーダーチャートの今回・前回・初回と、新しい順の結果の表に使う。**2026-10 変更**：当初は古い順の表）も渡す | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | GET | `/trainees/{trainee}/edit` | トレーニー編集画面を表示する（ルート名 `trainees.edit`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | PUT | `/trainees/{trainee}` | トレーニーを更新する（ルート名 `trainees.update`） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。愛犬アンケート・愛犬性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック）。**会員写真・トレーナー用の写真のファイルもストレージから消す**（**2026-11 追加**。db-schema.md D-0700「トレーニーの削除時」） | auth | 管理者 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/trainer-photo` | トレーナー用の写真を設定する（メディア一覧から選んだ写真をコピーして持たせる。選び直しも同じ。ルート名 `trainee-trainer-photo.store`。**2026-11 追加**） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/trainer-photo` | トレーナー用の写真を外す（ファイルも消す。ルート名 `trainee-trainer-photo.destroy`。**2026-11 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。愛犬アンケート・愛犬性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック）。**会員写真・トレーナー用写真のファイルもストレージから消す**（**2026-11 追加**。db-schema.md D-0700「トレーニーの削除時」） | auth | 管理者 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/trainer-photo` | トレーナー用写真を設定する（メディア一覧から選んだ写真をコピーして持たせる。選び直しも同じ。ルート名 `trainee-trainer-photo.store`。**2026-11 追加**） | auth | 管理者、一般 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/trainer-photo` | トレーナー用写真を外す（ファイルも消す。ルート名 `trainee-trainer-photo.destroy`。**2026-11 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。送信元は S-0309 だけ（**2026-10 変更**）。成功後は S-0309 に戻す（下の「計測値エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | PUT | `/trainee-measurements/{measurement}` | 計測値を更新する（ルート名 `trainee-measurements.update`）。**編集の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainee-measurements/{measurement}` | 計測値を削除する（物理削除。ルート名 `trainee-measurements.destroy`）。**削除の送信元は現在 S-0309 のみ**だが、コントローラは将来 S-0305 からも呼ばれる可能性を考えて `return_to` を受け付ける（同上） | auth | 管理者、一般 |
@@ -195,7 +195,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | クライアント管理 | （発行の URL を GET で開いたとき） | GET | `/clients/{client}/email-registration-tokens` | 発行せずに S-0305 会員詳細画面にリダイレクトする（405 にしない。**2026-10-17 追加**。下の「発行の URL を GET で開いたとき」参照） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/clients/search` | クライアントを検索する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/training-records/auto-create` | 音声記録の要約からトレーニング記録を作成する（**2026-10**：画面からは呼ばれなくなった。録音実行は `/api/audio-records/{id}/auto-create-training-record` を使う） | auth | 管理者、一般 |
-| 内部API | - | GET | `/api/training-records/available-media` | トレーニング記録に紐づけ可能なメディア一覧を取得する（`type=photo` を付けると、トレーナー用の写真に選べる写真だけを返す。**2026-11 追加**） | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/training-records/available-media` | トレーニング記録に紐づけ可能なメディア一覧を取得する（`type=photo` を付けると、トレーナー用写真に選べる写真だけを返す。**2026-11 追加**） | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/audio-records/{id}/transcribe` | 文字起こしを実行する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/audio-records/{id}/summarize` | 要約を実行する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/audio-records/{id}/status` | 文字起こし・要約の状態を返す（**2026-10 追加**） | auth | 管理者、一般 |
@@ -1585,7 +1585,7 @@ POST /training-records に以下を追加する。
 - ログイン中のクライアント自身のトレーニング記録の一覧を、日付の新しい順（降順）で取得し、view に渡す。同じ日は時刻の新しい順（時刻のない記録はその日のいちばん後ろ。**2026-10-18 追加**：S-0305 と並びをそろえるため）
 - **公開済みの愛犬性格診断のアドバイスを混ぜる**（**2026-10-18 追加**。requirements.md 6-15-6）：自分のトレーニーの結果のうち `evaluation_published_at` が NULL でないものを読み込み、記録と 1 本の並び（S-0305 と同じ並び。アドバイスは公開した日時。`App\Support\RecordTimeline::merge`）に組み立てて `timeline` として渡す。最新の記録のカード（hero）は、混ぜた並びの先頭。「全 N 回」は記録だけを数える（`recordCount`。0 のときは出さない）。ページ送りはない（今の記録と同じく全件）。下書き・公開を取り消したもの・ほかの会員のものは入れない
 - トレーニーごとの体重推移データ（6-15-14）と、**トレーニー写真の表示用 URL**（6-15-15）も view に渡す。写真 URL は `Storage::disk('media')->temporaryUrl($trainee->photo_path, ...)` で発行する（`photo_path` が NULL のトレーニーは URL を渡さず、Blade で「写真を登録」の案内に切り替える）
-- **トレーナー用の写真（`trainer_photo_path`）は view に渡さない**（URL も設定の有無も。**2026-11 追加**、requirements.md 6-16-20）。トレーナー側 S-0309 と共用している体重推移のデータ（`Trainee::getWeightChartDataAttribute()`）にも入れない
+- **トレーナー用写真（`trainer_photo_path`）は view に渡さない**（URL も設定の有無も。**2026-11 追加**、requirements.md 6-16-20）。トレーナー側 S-0309 と共用している体重推移のデータ（`Trainee::getWeightChartDataAttribute()`）にも入れない
 
 **レスポンス**:
 - view `client.dashboard`
@@ -2332,7 +2332,7 @@ POST /training-records に以下を追加する。
 
 #### 4-1-16. トレーニー管理
 
-トレーニー管理のエンドポイントのうち、愛犬アンケート（第1段階、**2026-10**）・愛犬性格診断（**2026-10 追加**）・トレーナー用の写真（**2026-11 追加**）で変わるもの・新しく設けるものの詳細。その他のトレーニー・計測値のエンドポイントは「3. エンドポイント一覧」を参照。
+トレーニー管理のエンドポイントのうち、愛犬アンケート（第1段階、**2026-10**）・愛犬性格診断（**2026-10 追加**）・トレーナー用写真（**2026-11 追加**）で変わるもの・新しく設けるものの詳細。その他のトレーニー・計測値のエンドポイントは「3. エンドポイント一覧」を参照。
 
 ##### S-0308 トレーニー登録画面 / S-0310 トレーニー編集画面
 
@@ -2368,7 +2368,7 @@ POST /training-records に以下を追加する。
 
 ###### POST /trainees/{trainee}/trainer-photo
 
-**概要**: トレーナー用の写真を設定する（新規・選び直し。requirements.md 6-16-20。**2026-11 追加**）。メディア一覧から選んだ写真 1 枚をもとに、トレーニーの写真と同じ形式の画像を作ってトレーニーに持たせる（コピー方式。db-schema.md D-0700「トレーナー用の写真の扱い」）。ルート名 `trainee-trainer-photo.store`。送信元は S-0309-M02（トレーナー用の写真の選択モーダル）
+**概要**: トレーナー用写真を設定する（新規・選び直し。requirements.md 6-16-20。**2026-11 追加**）。メディア一覧から選んだ写真 1 枚をもとに、トレーニーの写真と同じ形式の画像を作ってトレーニーに持たせる（コピー方式。db-schema.md D-0700「トレーナー用写真の扱い」）。ルート名 `trainee-trainer-photo.store`。送信元は S-0309-M02（トレーナー用写真の選択モーダル）
 
 **リクエスト**:
 
@@ -2386,27 +2386,27 @@ POST /training-records に以下を追加する。
 - アクセスログに `create_trainee_trainer_photo` を記録する（対象はトレーニー）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用の写真を設定しました。」
+- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用写真を設定しました。」
 - バリデーション失敗：S-0309 に戻り、S-0309-M02 を開き直して、グリッドの下に文言を出す（hidden の `_trainer_photo_modal` で開き直す。計測値モーダルの `_trainee_id` と同じ考え方）
-- 変換・保存の失敗：S-0309 に戻り、S-0309-M02 を開き直して、`form` のキーで「トレーナー用の写真の設定に失敗しました。時間をおいて試してみてください。」をモーダルの本文の上に出す（§2-7。DB は変えない）
+- 変換・保存の失敗：S-0309 に戻り、S-0309-M02 を開き直して、`form` のキーで「トレーナー用写真の設定に失敗しました。時間をおいて試してみてください。」をモーダルの本文の上に出す（§2-7。DB は変えない）
 
 ###### DELETE /trainees/{trainee}/trainer-photo
 
-**概要**: トレーナー用の写真を外す（requirements.md 6-16-20。**2026-11 追加**）。ルート名 `trainee-trainer-photo.destroy`
+**概要**: トレーナー用写真を外す（requirements.md 6-16-20。**2026-11 追加**）。ルート名 `trainee-trainer-photo.destroy`
 
 **リクエスト**: パラメータなし
 
 **処理**:
 - `trainer_photo_path` が NULL なら 404（外すものがない）
-- `trainer_photo_path` を NULL に、`updated_by` を操作したトレーナーに更新 → ファイルを削除の順。ファイルの削除に失敗してもエラーにせず、警告のログ（トレーニー ID・キー・エラー）に残すだけで、成功と同じレスポンスを返す（**2026-11 変更**：当初は会員写真の削除と同じく「ファイルを先に削除 → NULL」の順で、削除に失敗したら 500 にして DB を変えないとしていた。トレーニーの削除・選び直しで古いファイルを消す処理と同じ考え方にそろえ、ストレージの一時的な不調でトレーナーの操作が失敗しないようにした。db-schema.md D-0700「トレーナー用の写真の扱い」）
+- `trainer_photo_path` を NULL に、`updated_by` を操作したトレーナーに更新 → ファイルを削除の順。ファイルの削除に失敗してもエラーにせず、警告のログ（トレーニー ID・キー・エラー）に残すだけで、成功と同じレスポンスを返す（**2026-11 変更**：当初は会員写真の削除と同じく「ファイルを先に削除 → NULL」の順で、削除に失敗したら 500 にして DB を変えないとしていた。トレーニーの削除・選び直しで古いファイルを消す処理と同じ考え方にそろえ、ストレージの一時的な不調でトレーナーの操作が失敗しないようにした。db-schema.md D-0700「トレーナー用写真の扱い」）
 - 会員写真（`photo_path`）と元のメディアには触らない
 - アクセスログに `delete_trainee_trainer_photo` を記録する（対象はトレーニー）
 
 **レスポンス**:
-- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用の写真を外しました。」
-- 押す前に確認ダイアログを出す（screen-design.md S-0309「トレーナー用の写真の操作」）
+- 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用写真を外しました。」
+- 押す前に確認ダイアログを出す（［外す］は S-0309-M02 のフッターに、設定済みのときだけ出す。screen-design.md S-0309-M02。**2026-11 変更**：当初は写真の枠の下）
 
-**パス・ルート名の選定理由**: トレーニーにぶら下がる 1 つだけのもの（トレーナー用の写真）を設定・外すため、ID を取らない単数形のリソース `/trainees/{trainee}/trainer-photo` に POST・DELETE する（会員写真の `/client-portal/trainees/{trainee}/photo` と同じ形）。ルート名は既存のトレーニー系（`trainee-measurements.*`・`trainee-intake-survey-tokens.*`）にそろえて `trainee-trainer-photo.*` とする
+**パス・ルート名の選定理由**: トレーニーにぶら下がる 1 つだけのもの（トレーナー用写真）を設定・外すため、ID を取らない単数形のリソース `/trainees/{trainee}/trainer-photo` に POST・DELETE する（会員写真の `/client-portal/trainees/{trainee}/photo` と同じ形）。ルート名は既存のトレーニー系（`trainee-measurements.*`・`trainee-intake-survey-tokens.*`）にそろえて `trainee-trainer-photo.*` とする
 
 ##### S-0305 会員詳細画面
 
@@ -2802,7 +2802,7 @@ POST /training-records に以下を追加する。
 
 ##### GET /api/training-records/available-media
 
-**概要**: トレーニング記録に紐づけ可能な（まだ紐づいていない）メディアの一覧を取得する内部API。編集画面（S-0404）のメディア追加モーダル（S-0404-M01）および登録画面（S-0401）のメディア追加モーダル（S-0401-M02）で使用する。トレーニー詳細（S-0309）のトレーナー用の写真の選択モーダル（S-0309-M02）でも、`type=photo` を付けて使う（**2026-11 追加**。requirements.md 6-16-20）。
+**概要**: トレーニング記録に紐づけ可能な（まだ紐づいていない）メディアの一覧を取得する内部API。編集画面（S-0404）のメディア追加モーダル（S-0404-M01）および登録画面（S-0401）のメディア追加モーダル（S-0401-M02）で使用する。トレーニー詳細（S-0309）のトレーナー用写真の選択モーダル（S-0309-M02）でも、`type=photo` を付けて使う（**2026-11 追加**。requirements.md 6-16-20）。
 
 **リクエスト**（クエリパラメータ）:
 
@@ -2811,7 +2811,7 @@ POST /training-records に以下を追加する。
 | training_record_id | integer | | nullable, exists:training_records,id | 指定時、その記録に紐づけ済みのメディアを候補から除外する。未指定（登録画面）時は除外しない |
 | trainer_id | integer | | nullable, exists:trainers,id | 登録者で絞り込む。未指定時はログイン中のトレーナー、「全員」選択時は全件 |
 | page | integer | | nullable, integer, min:1 | ページ番号 |
-| type | string | | nullable, in:photo | **2026-11 追加**。`photo` を指定すると、トレーナー用の写真に選べるものだけに絞る（下の処理）。指定しなければ今までどおり（写真・動画とも、変換の状態によらず返す） |
+| type | string | | nullable, in:photo | **2026-11 追加**。`photo` を指定すると、トレーナー用写真に選べるものだけに絞る（下の処理）。指定しなければ今までどおり（写真・動画とも、変換の状態によらず返す） |
 
 **処理**:
 - type=photo が指定された場合、**写真（`type = photo`）で、表示用の画像があるもの（`conversion_status` が `not_required` か `done`）だけ**を候補とする（**2026-11 追加**。動画、変換が終わっていない HEIC など、変換に失敗したものは返さない。S-0309-M02 では training_record_id を付けない）
