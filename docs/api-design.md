@@ -76,7 +76,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | トレーニー管理 | S-0309 トレーニー詳細画面 | GET | `/trainees/{trainee}` | トレーニー詳細画面を表示する（ルート名 `trainees.show`）。愛犬性格診断の結果（**2026-10 追加**。レーダーチャートの今回・前回・初回と、新しい順の結果の表に使う。**2026-10 変更**：当初は古い順の表）も渡す | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | GET | `/trainees/{trainee}/edit` | トレーニー編集画面を表示する（ルート名 `trainees.edit`） | auth | 管理者、一般 |
 | トレーニー管理 | S-0310 トレーニー編集画面 | PUT | `/trainees/{trainee}` | トレーニーを更新する（ルート名 `trainees.update`） | auth | 管理者、一般 |
-| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。愛犬アンケート・愛犬性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック）。**会員さんの写真・トレーナー用の写真のファイルもストレージから消す**（**2026-11 追加**。db-schema.md D-0700「トレーニーの削除時」） | auth | 管理者 |
+| トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}` | トレーニーを削除する（物理削除。CASCADE で計測値も削除される。愛犬アンケート・愛犬性格診断の案内と回答・結果も一緒に削除される。ルート名 `trainees.destroy`。**管理者のみ**、コントローラ内で `auth()->user()->isAdmin()` チェック）。**会員写真・トレーナー用の写真のファイルもストレージから消す**（**2026-11 追加**。db-schema.md D-0700「トレーニーの削除時」） | auth | 管理者 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/trainer-photo` | トレーナー用の写真を設定する（メディア一覧から選んだ写真をコピーして持たせる。選び直しも同じ。ルート名 `trainee-trainer-photo.store`。**2026-11 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | DELETE | `/trainees/{trainee}/trainer-photo` | トレーナー用の写真を外す（ファイルも消す。ルート名 `trainee-trainer-photo.destroy`。**2026-11 追加**） | auth | 管理者、一般 |
 | トレーニー管理 | S-0309 トレーニー詳細画面 | POST | `/trainees/{trainee}/measurements` | 計測値を登録する（ルート名 `trainee-measurements.store`）。送信元は S-0309 だけ（**2026-10 変更**）。成功後は S-0309 に戻す（下の「計測値エンドポイントのリダイレクト先」参照） | auth | 管理者、一般 |
@@ -2379,9 +2379,9 @@ POST /training-records に以下を追加する。
 - 文言は screen-design.md S-0309-M02「バリデーションチェック」（§2-8 と `lang/ja/validation.php` に集約）
 
 **処理**:
-- 選んだメディアの表示用の画像（`display_path`）を `media` ディスクから一時ファイルに取り出し、`magick` で `-auto-orient`・`-resize 400x400>`・`-quality 85` の JPEG にする（会員さんの写真〔`POST /client-portal/trainees/{trainee}/photo`〕と同じ変換）。キューは使わず、リクエストの中で行う。一時ファイルは成功・失敗とも消す
+- 選んだメディアの表示用の画像（`display_path`）を `media` ディスクから一時ファイルに取り出し、`magick` で `-auto-orient`・`-resize 400x400>`・`-quality 85` の JPEG にする（会員写真〔`POST /client-portal/trainees/{trainee}/photo`〕と同じ変換）。キューは使わず、リクエストの中で行う。一時ファイルは成功・失敗とも消す
 - キー `trainee-trainer-photos/YYYYMM/{uuid}.jpg` で `media` ディスクに保存する
-- 順序：新しいファイルを保存 → `trainees.trainer_photo_path` を新しいキーに、`updated_by` を操作したトレーナーに更新 → 前のファイルがあれば削除（削除に失敗してもログに残して続ける。会員さんの写真の差し替えと同じ）
+- 順序：新しいファイルを保存 → `trainees.trainer_photo_path` を新しいキーに、`updated_by` を操作したトレーナーに更新 → 前のファイルがあれば削除（削除に失敗してもログに残して続ける。会員写真の差し替えと同じ）
 - **元のメディアには何も書かない**（ひも付けない。元のメディアの ID もトレーニーに持たせない）
 - アクセスログに `create_trainee_trainer_photo` を記録する（対象はトレーニー）
 
@@ -2398,15 +2398,15 @@ POST /training-records に以下を追加する。
 
 **処理**:
 - `trainer_photo_path` が NULL なら 404（外すものがない）
-- ファイルを先に削除 → `trainer_photo_path` を NULL に、`updated_by` を操作したトレーナーに更新（会員さんの写真の削除と同じ順。ファイルの削除に失敗したら 500 にし、DB は変えない）
-- 会員さんの写真（`photo_path`）と元のメディアには触らない
+- ファイルを先に削除 → `trainer_photo_path` を NULL に、`updated_by` を操作したトレーナーに更新（会員写真の削除と同じ順。ファイルの削除に失敗したら 500 にし、DB は変えない）
+- 会員写真（`photo_path`）と元のメディアには触らない
 - アクセスログに `delete_trainee_trainer_photo` を記録する（対象はトレーニー）
 
 **レスポンス**:
 - 成功：`redirect()->route('trainees.show', $trainee)`（S-0309）＋ フラッシュ `success` に「トレーナー用の写真を外しました。」
 - 押す前に確認ダイアログを出す（screen-design.md S-0309「トレーナー用の写真の操作」）
 
-**パス・ルート名の選定理由**: トレーニーにぶら下がる 1 つだけのもの（トレーナー用の写真）を設定・外すため、ID を取らない単数形のリソース `/trainees/{trainee}/trainer-photo` に POST・DELETE する（会員さんの写真の `/client-portal/trainees/{trainee}/photo` と同じ形）。ルート名は既存のトレーニー系（`trainee-measurements.*`・`trainee-intake-survey-tokens.*`）にそろえて `trainee-trainer-photo.*` とする
+**パス・ルート名の選定理由**: トレーニーにぶら下がる 1 つだけのもの（トレーナー用の写真）を設定・外すため、ID を取らない単数形のリソース `/trainees/{trainee}/trainer-photo` に POST・DELETE する（会員写真の `/client-portal/trainees/{trainee}/photo` と同じ形）。ルート名は既存のトレーニー系（`trainee-measurements.*`・`trainee-intake-survey-tokens.*`）にそろえて `trainee-trainer-photo.*` とする
 
 ##### S-0305 会員詳細画面
 
