@@ -15,15 +15,15 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * トレーナー用の写真の設定・外す（S-0309 / S-0309-M02。要件定義書 6-16-20。2026-11 追加）。
+ * トレーナー用写真の設定・外す（S-0309 / S-0309-M02。要件定義書 6-16-20。2026-11 追加）。
  *
- * トレーナーがメディア一覧（ライブラリ）から写真を 1 枚選び、そのトレーニーの「トレーナー用の写真」にする。
+ * トレーナーがメディア一覧（ライブラリ）から写真を 1 枚選び、そのトレーニーの「トレーナー用写真」にする。
  * 選んだメディアの表示用の画像（display_path）から、会員写真と同じ形式の画像（長辺 400px の JPEG 1 枚）を作って
  * トレーニーに持たせる（コピー方式。元のメディアの ID は持たない。設計書 db-schema.md D-0700
- * 「トレーナー用の写真の扱い」、api-design.md 4-1-16「S-0309 トレーニー詳細画面」）。
+ * 「トレーナー用写真の扱い」、api-design.md 4-1-16「S-0309 トレーニー詳細画面」）。
  *
  * - 一般トレーナーも管理者も操作できる（practitioners グループ。管理者の判定はしない）
- * - トレーナー用の写真は会員側に一切出さない（このコントローラは会員側から呼ばれない）
+ * - トレーナー用写真は会員側に一切出さない（このコントローラは会員側から呼ばれない）
  * - 処理は会員写真（Client\TraineePhotoController）と同じく、キューを使わずリクエストの中で行う
  * - アクセスログは LogAccess の ACTION_MAP（create_trainee_trainer_photo / delete_trainee_trainer_photo）
  */
@@ -34,7 +34,7 @@ class TraineeTrainerPhotoController extends Controller
     private const TMP_DIR = 'tmp/trainee-trainer-photo';
 
     /**
-     * トレーナー用の写真を設定する（新規・選び直し）。POST /trainees/{trainee}/trainer-photo
+     * トレーナー用写真を設定する（新規・選び直し）。POST /trainees/{trainee}/trainer-photo
      *
      * 順番：新しいファイルを保存 → DB を更新（updated_by も）→ 古いファイルを消す。
      * DB の更新に失敗したら新しいファイルを消す。古いファイルの削除に失敗してもエラーにせずログに残す。
@@ -85,7 +85,7 @@ class TraineeTrainerPhotoController extends Controller
                 'media_record_id' => $media->id,
             ]);
 
-            // キー：trainee-trainer-photos/YYYYMM/{uuid}.jpg（設計書 D-0700「トレーナー用の写真の扱い」）
+            // キー：trainee-trainer-photos/YYYYMM/{uuid}.jpg（設計書 D-0700「トレーナー用写真の扱い」）
             $newKey = sprintf('%s/%s/%s.jpg', Trainee::TRAINER_PHOTO_DIR, now()->format('Ym'), (string) Str::uuid());
             Storage::disk(Trainee::STORAGE_DISK)
                 ->putFileAs(pathinfo($newKey, PATHINFO_DIRNAME), new File($tmpOut), pathinfo($newKey, PATHINFO_BASENAME));
@@ -109,7 +109,7 @@ class TraineeTrainerPhotoController extends Controller
                 $this->deleteQuietly($oldKey, $trainee->id);
             }
         } catch (\Throwable $e) {
-            Log::error('TraineeTrainerPhotoController: トレーナー用の写真の設定でエラー', [
+            Log::error('TraineeTrainerPhotoController: トレーナー用写真の設定でエラー', [
                 'trainee_id' => $trainee->id,
                 'media_record_id' => $media->id,
                 'error' => $e->getMessage(),
@@ -120,7 +120,7 @@ class TraineeTrainerPhotoController extends Controller
             return redirect()
                 ->route('trainees.show', $trainee)
                 ->withInput()
-                ->withErrors(['form' => 'トレーナー用の写真の設定に失敗しました。時間をおいて試してみてください。']);
+                ->withErrors(['form' => 'トレーナー用写真の設定に失敗しました。時間をおいて試してみてください。']);
         } finally {
             // 一時ファイルは成功・失敗どちらでも必ず削除
             FileFacade::delete([$tmpIn, $tmpOut]);
@@ -128,11 +128,11 @@ class TraineeTrainerPhotoController extends Controller
 
         return redirect()
             ->route('trainees.show', $trainee)
-            ->with('success', 'トレーナー用の写真を設定しました。');
+            ->with('success', 'トレーナー用写真を設定しました。');
     }
 
     /**
-     * トレーナー用の写真を外す。DELETE /trainees/{trainee}/trainer-photo
+     * トレーナー用写真を外す。DELETE /trainees/{trainee}/trainer-photo
      *
      * 順番：DB を NULL に戻す（updated_by も）→ ファイルを消す（削除の失敗はログのみ）。
      * 会員写真と元のメディアには触らない。
@@ -154,11 +154,11 @@ class TraineeTrainerPhotoController extends Controller
 
         return redirect()
             ->route('trainees.show', $trainee)
-            ->with('success', 'トレーナー用の写真を外しました。');
+            ->with('success', 'トレーナー用写真を外しました。');
     }
 
     /**
-     * トレーナー用の写真に選べるメディアか（写真で、表示用の画像があるもの）。
+     * トレーナー用写真に選べるメディアか（写真で、表示用の画像があるもの）。
      * 候補の API（available-media の type=photo）と同じ条件
      */
     public static function isSelectable(MediaRecord $media): bool
@@ -176,7 +176,7 @@ class TraineeTrainerPhotoController extends Controller
         try {
             Storage::disk(Trainee::STORAGE_DISK)->delete($key);
         } catch (\Throwable $e) {
-            Log::warning('TraineeTrainerPhotoController: トレーナー用の写真ファイルの削除に失敗（孤児ファイル発生の可能性）', [
+            Log::warning('TraineeTrainerPhotoController: トレーナー用写真ファイルの削除に失敗（孤児ファイル発生の可能性）', [
                 'trainee_id' => $traineeId,
                 'path' => $key,
                 'error' => $e->getMessage(),

@@ -645,9 +645,9 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('写真なし', $html);
     }
 
-    public function test_トレーナー用の写真があればそれを出し会員写真は重ねない(): void
+    public function test_トレーナー用写真があればそれを出し会員写真は重ねない(): void
     {
-        // 2026-11 追加（要件定義書 6-16-20、設計書 S-0305「写真」）：トレーナー用の写真があればそれ、なければ会員写真。重ねない
+        // 2026-11 追加（要件定義書 6-16-20、設計書 S-0305「写真」）：トレーナー用写真があればそれ、なければ会員写真。重ねない
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $both = $this->trainee($client, 'ポチ', 'trainees/202610/member.jpg');
@@ -659,7 +659,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertStringContainsString('<img src="https://media.example.test/trainee-trainer-photos/202611/trainer.jpg?signed=1"', $html);
         $this->assertStringContainsString('<img src="https://media.example.test/trainee-trainer-photos/202611/only.jpg?signed=1"', $html);
-        // 会員写真は出さない（重ねない）。トレーナー用の写真だけのトレーニーも「写真なし」にしない
+        // 会員写真は出さない（重ねない）。トレーナー用写真だけのトレーニーも「写真なし」にしない
         $this->assertStringNotContainsString('trainees/202610/member.jpg', $html);
         $this->assertStringNotContainsString('trainee-show-photo-overlay', $html);
         $this->assertStringNotContainsString('写真なし', $html);

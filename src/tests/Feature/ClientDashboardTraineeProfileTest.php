@@ -129,10 +129,10 @@ class ClientDashboardTraineeProfileTest extends TestCase
 
     private const FULL = ['breed' => 'トイ・プードル', 'sex' => 'female', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1, 'neuter_status' => 'done'];
 
-    public function test_トレーナー用の写真はパスもURLもマイページに出さない(): void
+    public function test_トレーナー用写真はパスもURLもマイページに出さない(): void
     {
-        // 2026-11 追加（要件定義書 6-16-20、設計書 S-1402「トレーナー用の写真は出さない」）。
-        // 会員写真は今までどおり出し、トレーナー用の写真は設定の有無も分からないようにする
+        // 2026-11 追加（要件定義書 6-16-20、設計書 S-1402「トレーナー用写真は出さない」）。
+        // 会員写真は今までどおり出し、トレーナー用写真は設定の有無も分からないようにする
         Storage::fake('media');
         Storage::disk('media')->buildTemporaryUrlsUsing(fn (string $path) => 'https://media.example.test/'.$path.'?signed=1');
         $this->trainee('アイ', [
@@ -146,7 +146,7 @@ class ClientDashboardTraineeProfileTest extends TestCase
         $this->assertStringContainsString('https://media.example.test/trainees/202611/member.jpg?signed=1', $html);
         $this->assertStringNotContainsString('trainee-trainer-photos', $html);
         $this->assertStringNotContainsString('secret', $html);
-        $this->assertStringNotContainsString('トレーナー用の写真', $html);
+        $this->assertStringNotContainsString('トレーナー用写真', $html);
         $this->assertStringNotContainsString('trainer_photo', $html);
     }
 

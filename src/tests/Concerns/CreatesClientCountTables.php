@@ -67,7 +67,7 @@ trait CreatesClientCountTables
     }
 
     /**
-     * トレーナーの表（2026-11 追加）。トレーニー詳細（S-0309）がトレーナー用の写真の選択モーダル（S-0309-M02）の
+     * トレーナーの表（2026-11 追加）。トレーニー詳細（S-0309）がトレーナー用写真の選択モーダル（S-0309-M02）の
      * 登録者の選択肢を読むため、S-0309 を HTTP で開くテストで使う（Trainer::practitioners() の並びに要る列だけ）
      */
     protected function createTrainersTableForTraineeShow(): void

@@ -383,7 +383,7 @@ class TrainingRecordController extends Controller
             ? TrainingRecord::findOrFail($trainingRecordId)
             : null;
 
-        // type=photo（2026-11 追加。トレーナー用の写真の選択モーダル S-0309-M02 から使う）。
+        // type=photo（2026-11 追加。トレーナー用写真の選択モーダル S-0309-M02 から使う）。
         // 指定しなければ今までどおり（メディア追加モーダル S-0401-M02 / S-0404-M01 の動きは変えない）
         $request->validate([
             'type' => 'nullable|in:photo',
@@ -392,7 +392,7 @@ class TrainingRecordController extends Controller
         $query = MediaRecord::with(['trainer'])
             ->orderBy('created_at', 'desc');
 
-        // type=photo のときは、トレーナー用の写真に選べるものだけに絞る：写真で、表示用の画像があるもの
+        // type=photo のときは、トレーナー用写真に選べるものだけに絞る：写真で、表示用の画像があるもの
         // （変換が不要か、変換が終わったもの）。動画・変換が終わっていない HEIC・変換に失敗したものは返さない
         // （設計書 api-design.md available-media。条件は TraineeTrainerPhotoController::isSelectable と同じ）
         if ($request->query('type') === MediaRecord::TYPE_PHOTO) {

@@ -60,8 +60,8 @@ class TraineeShowPhotoMeasurementsLayoutTest extends TestCase
             'trainee' => $trainee,
             'weightChart' => ['id' => 1, 'callName' => 'モモ', 'photoUrl' => null, 'datasets' => $this->weightChartDatasets],
             'deleteConfirmMessage' => 'このトレーニーを削除しますか？',
-            // 写真の枠（2026-11 追加。トレーナー用の写真なし＝会員写真を大きく出す今までどおりの形）と、
-            // トレーナー用の写真の選択モーダル（S-0309-M02）の登録者の選択肢
+            // 写真の枠（2026-11 追加。トレーナー用写真なし＝会員写真を大きく出す今までどおりの形）と、
+            // トレーナー用写真の選択モーダル（S-0309-M02）の登録者の選択肢
             'photoFrame' => ['mainUrl' => null, 'mainAlt' => 'ポチの写真', 'overlayUrl' => null, 'hasTrainerPhoto' => false],
             'trainers' => collect(),
             'measurementCount' => $count,
@@ -83,7 +83,7 @@ class TraineeShowPhotoMeasurementsLayoutTest extends TestCase
         $this->assertNotFalse($start);
         // 2026-11 変更：終わりの目印の id="intake-survey"（暮らしの様子の欄）は 2026-10-19 に外したため、今は見つからない。
         // 見つからないとき strpos は false になり、長さが負の数になってページの末尾からバイト単位で切られ、
-        // 日本語の途中で切れると正規表現（/u）が失敗していた（トレーナー用の写真のモーダルを足して切れる位置が変わり表に出た）。
+        // 日本語の途中で切れると正規表現（/u）が失敗していた（トレーナー用写真のモーダルを足して切れる位置が変わり表に出た）。
         // 見つからなければページの終わりまでを使う
         $end = strpos($html, 'id="intake-survey"', $start);
         if ($end === false) {

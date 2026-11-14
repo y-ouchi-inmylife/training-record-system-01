@@ -17,13 +17,13 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーナー用の写真の設定・外す（要件定義書 6-16-20。2026-11 追加）と、候補の API の type=photo。
+ * トレーナー用写真の設定・外す（要件定義書 6-16-20。2026-11 追加）と、候補の API の type=photo。
  *
  * - 一般トレーナー（staff）も設定できる。写真のメディアを選ぶと trainee-trainer-photos/ にファイルができ、
  *   trainer_photo_path が入る（コピー方式。元のメディアは変わらない）。updated_by とアクセスログも残る
  * - 動画・変換の終わっていない HEIC・存在しないメディアは選べない（同じ文言）
  * - 選び直すと古いファイルが消える。外すと NULL に戻り、ファイルが消える（会員写真は残る）
- * - トレーニーを削除すると、会員写真とトレーナー用の写真の両方のファイルが消える
+ * - トレーニーを削除すると、会員写真とトレーナー用写真の両方のファイルが消える
  * - available-media は type を付けなければ今と同じ件数を返し、type=photo なら選べる写真だけを返す
  *
  * magick は使わない：テストの環境（Windows の開発機・CI）に magick がないことがあるため、Process::fake で
@@ -154,7 +154,7 @@ class TraineeTrainerPhotoTest extends TestCase
         $response = $this->setPhoto($media);
 
         $response->assertRedirect(route('trainees.show', $this->trainee));
-        $response->assertSessionHas('success', 'トレーナー用の写真を設定しました。');
+        $response->assertSessionHas('success', 'トレーナー用写真を設定しました。');
         $trainee = $this->trainee->fresh();
         $this->assertMatchesRegularExpression('#^trainee-trainer-photos/\d{6}/[0-9a-f-]{36}\.jpg$#', $trainee->trainer_photo_path);
         Storage::disk(Trainee::STORAGE_DISK)->assertExists($trainee->trainer_photo_path);
@@ -192,7 +192,7 @@ class TraineeTrainerPhotoTest extends TestCase
             $this->from(route('trainees.show', $this->trainee))
                 ->post(route('trainee-trainer-photo.store', $this->trainee), ['_trainer_photo_modal' => '1', 'media_record_id' => $id])
                 ->assertRedirect(route('trainees.show', $this->trainee))
-                ->assertSessionHasErrors(['media_record_id' => '選んだメディアはトレーナー用の写真に使えません。']);
+                ->assertSessionHasErrors(['media_record_id' => '選んだメディアはトレーナー用写真に使えません。']);
         }
         $this->assertNull($this->trainee->fresh()->trainer_photo_path);
         Process::assertNothingRan();
@@ -225,7 +225,7 @@ class TraineeTrainerPhotoTest extends TestCase
 
         $this->setPhoto($media)
             ->assertRedirect(route('trainees.show', $this->trainee))
-            ->assertSessionHasErrors(['form' => 'トレーナー用の写真の設定に失敗しました。時間をおいて試してみてください。']);
+            ->assertSessionHasErrors(['form' => 'トレーナー用写真の設定に失敗しました。時間をおいて試してみてください。']);
 
         $this->assertNull($this->trainee->fresh()->trainer_photo_path);
         $this->assertSame([], Storage::disk(Trainee::STORAGE_DISK)->allFiles(Trainee::TRAINER_PHOTO_DIR));
@@ -254,7 +254,7 @@ class TraineeTrainerPhotoTest extends TestCase
         $response = $this->delete(route('trainee-trainer-photo.destroy', $this->trainee));
 
         $response->assertRedirect(route('trainees.show', $this->trainee));
-        $response->assertSessionHas('success', 'トレーナー用の写真を外しました。');
+        $response->assertSessionHas('success', 'トレーナー用写真を外しました。');
         $trainee = $this->trainee->fresh();
         $this->assertNull($trainee->trainer_photo_path);
         $this->assertSame('trainees/202611/member.jpg', $trainee->photo_path);
@@ -268,7 +268,7 @@ class TraineeTrainerPhotoTest extends TestCase
         $this->delete(route('trainee-trainer-photo.destroy', $this->trainee))->assertNotFound();
     }
 
-    public function test_トレーニーを削除すると会員写真とトレーナー用の写真の両方のファイルが消える(): void
+    public function test_トレーニーを削除すると会員写真とトレーナー用写真の両方のファイルが消える(): void
     {
         Storage::disk(Trainee::STORAGE_DISK)->put('trainees/202611/member.jpg', 'member');
         $this->trainee->forceFill(['photo_path' => 'trainees/202611/member.jpg'])->save();
@@ -283,7 +283,7 @@ class TraineeTrainerPhotoTest extends TestCase
         Storage::disk(Trainee::STORAGE_DISK)->assertMissing($trainerKey);
     }
 
-    public function test_トレーナー用の写真は配列とjsonに出さず空の判定に入る(): void
+    public function test_トレーナー用写真は配列とjsonに出さず空の判定に入る(): void
     {
         $this->trainee->forceFill(['trainer_photo_path' => 'trainee-trainer-photos/202611/x.jpg'])->save();
         $trainee = $this->trainee->fresh();
@@ -314,38 +314,95 @@ class TraineeTrainerPhotoTest extends TestCase
         $this->getJson('/api/training-records/available-media?type=video')->assertUnprocessable();
     }
 
+    /** 写真の枠（.trainee-show-photo の div）の HTML */
+    private function photoFrame(string $html): string
+    {
+        $start = strpos($html, '<div class="trainee-show-photo position-relative');
+        $this->assertNotFalse($start);
+        // 写真の列の終わり（右のグラフの列の始まり）まで
+        $end = strpos($html, 'flex-grow-1 w-100', $start);
+
+        return substr($html, $start, $end - $start);
+    }
+
+    /** S-0309-M02 のフッターの HTML */
+    private function modalFooter(string $html): string
+    {
+        $modal = strpos($html, 'id="trainerPhotoModal"');
+        $this->assertNotFalse($modal);
+        $start = strpos($html, '<div class="modal-footer">', $modal);
+
+        return substr($html, $start, strpos($html, '</div>', $start) - $start);
+    }
+
     public function test_トレーニー詳細で4通りの写真の枠を出す(): void
     {
         $show = fn () => $this->get(route('trainees.show', $this->trainee))->assertOk()->getContent();
+        // 写真の枠の右上に重ねる［写真］のボタン（2026-11 変更：当初は枠の下の［写真を選ぶ］／［変更］［外す］の行）
+        $actionButton = '/<button type="button" class="btn btn-sm btn-light border trainee-show-photo-action"\s*'
+            .'data-trainer-photo-open aria-label="トレーナー用写真を選ぶ">\s*<i class="bi bi-camera" aria-hidden="true"><\/i> 写真\s*<\/button>\s*<\/div>/u';
 
-        // どちらもなし：写真なし・［写真を選ぶ］
+        // どちらもなし：写真なし。枠の中に［写真］のボタン。モーダルのフッターに［外す］は出さない
         $html = $show();
-        $this->assertStringContainsString('写真なし</span>', $html);
-        $this->assertStringContainsString('>写真を選ぶ</button>', $html);
-        $this->assertStringNotContainsString('trainee-show-photo-overlay"', $html);
+        $frame = $this->photoFrame($html);
+        $this->assertStringContainsString('写真なし</span>', $frame);
+        $this->assertMatchesRegularExpression($actionButton, $frame);
+        $this->assertStringNotContainsString('trainee-show-photo-overlay"', $frame);
+        $this->assertStringNotContainsString('>外す</button>', $html);
+        $this->assertStringNotContainsString('trainerPhotoRemoveForm', $html);
+        // 枠の下のボタンの行はない
+        $this->assertStringNotContainsString('>写真を選ぶ</button>', $html);
+        $this->assertStringNotContainsString('>変更</button>', $html);
+        // モーダルは［キャンセル］［更新］
+        $footer = $this->modalFooter($html);
+        $this->assertMatchesRegularExpression('/<button type="submit" class="btn btn-success" id="trainerPhotoSubmitBtn" disabled>更新<\/button>/u', $footer);
+        $this->assertStringNotContainsString('設定する', $html);
+        $this->assertStringContainsString('<h5 class="modal-title" id="trainerPhotoModalLabel">トレーナー用写真を選ぶ</h5>', $html);
 
-        // 会員写真だけ：会員写真を大きく、重ねない
+        // 会員写真だけ：会員写真を大きく、重ねない。［外す］はまだ出さない
         Storage::disk(Trainee::STORAGE_DISK)->put('trainees/202611/member.jpg', 'member');
         $this->trainee->forceFill(['photo_path' => 'trainees/202611/member.jpg'])->save();
         $html = $show();
-        $this->assertStringContainsString('alt="モモの写真"', $html);
-        $this->assertStringNotContainsString('trainee-show-photo-overlay"', $html);
-        $this->assertStringContainsString('>写真を選ぶ</button>', $html);
+        $frame = $this->photoFrame($html);
+        $this->assertStringContainsString('alt="モモの写真"', $frame);
+        $this->assertStringNotContainsString('trainee-show-photo-overlay"', $frame);
+        $this->assertMatchesRegularExpression($actionButton, $frame);
+        $this->assertStringNotContainsString('>外す</button>', $html);
 
-        // 両方：トレーナー用を大きく、会員写真を重ねる・［変更］［外す］
+        // 両方：トレーナー用を大きく、会員写真を重ねる。モーダルのフッターの左に［外す］が出る
         $this->setPhoto($this->makeMedia());
         $html = $show();
-        $this->assertStringContainsString('alt="モモのトレーナー用の写真"', $html);
-        $this->assertStringContainsString('<div class="trainee-show-photo-overlay">', $html);
-        $this->assertStringContainsString('alt="会員写真" title="会員写真"', $html);
-        $this->assertStringContainsString('>変更</button>', $html);
-        $this->assertStringContainsString('>外す</button>', $html);
-        $this->assertStringContainsString('会員写真と、選んだもとのメディアはそのまま残ります', $html);
+        $frame = $this->photoFrame($html);
+        $this->assertStringContainsString('alt="モモのトレーナー用写真"', $frame);
+        $this->assertStringContainsString('<div class="trainee-show-photo-overlay">', $frame);
+        $this->assertStringContainsString('alt="会員写真" title="会員写真"', $frame);
+        $this->assertMatchesRegularExpression($actionButton, $frame);
+        $footer = $this->modalFooter($html);
+        $this->assertMatchesRegularExpression(
+            '/<button type="submit" form="trainerPhotoRemoveForm" class="btn btn-outline-danger me-auto" id="trainerPhotoRemoveBtn">外す<\/button>\s*'
+            .'<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル<\/button>\s*'
+            .'<button type="submit" class="btn btn-success" id="trainerPhotoSubmitBtn" disabled>更新<\/button>/u',
+            $footer
+        );
+        // 外すフォーム（DELETE）は選ぶフォーム（POST）の外にあり、入れ子にしない。確認の文を出す
+        $postForm = strpos($html, 'id="trainerPhotoForm"');
+        $postFormEnd = strpos($html, '</form>', $postForm);
+        $removeForm = strpos($html, 'id="trainerPhotoRemoveForm"');
+        $this->assertGreaterThan($postFormEnd, $removeForm);
+        $this->assertStringNotContainsString('<form', substr($html, $postForm, $postFormEnd - $postForm));
+        $this->assertMatchesRegularExpression(
+            '/<form method="POST" action="'.preg_quote(route('trainee-trainer-photo.destroy', $this->trainee), '/').'" id="trainerPhotoRemoveForm" class="d-none"\s*'
+            .'onsubmit="return confirm\(\'トレーナー用写真を外しますか？（会員写真と、選んだもとのメディアはそのまま残ります）\'\);">\s*'
+            .'<input type="hidden" name="_token"[^>]*>\s*<input type="hidden" name="_method" value="DELETE">\s*<\/form>/u',
+            $html
+        );
 
-        // トレーナー用だけ：重ねない
+        // トレーナー用だけ：重ねない。［外す］は出る
         $this->trainee->forceFill(['photo_path' => null])->save();
         $html = $show();
-        $this->assertStringContainsString('alt="モモのトレーナー用の写真"', $html);
-        $this->assertStringNotContainsString('<div class="trainee-show-photo-overlay">', $html);
+        $frame = $this->photoFrame($html);
+        $this->assertStringContainsString('alt="モモのトレーナー用写真"', $frame);
+        $this->assertStringNotContainsString('<div class="trainee-show-photo-overlay">', $frame);
+        $this->assertStringContainsString('>外す</button>', $this->modalFooter($html));
     }
 }

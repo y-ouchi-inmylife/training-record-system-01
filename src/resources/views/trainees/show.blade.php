@@ -83,11 +83,11 @@
                              当初はどの幅でも 180px 四方のインライン style。会員側〔client.scss〕とは共有しない）。
                              トレーナー側は会員写真の登録・変更・削除の操作を置かない（要件定義書
                              6-15-15 は会員の機能）。枠はクリックしても何も起きない静的な枠にする。
-                             トレーナー用の写真（2026-11 追加）の操作は、枠の下のボタンで行う。 --}}
+                             トレーナー用写真（2026-11 追加）の操作は、枠の右上に重ねた［写真］のボタンで行う。 --}}
                         <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
                             {{-- 写真の枠（2026-11 変更。設計書 S-0309「写真の枠の表示」）。どの写真を大きく出し、どれを右下に重ねるかは
-                                 コントローラで決めた $photoFrame をそのまま出す（トレーナー用の写真があればそれを大きく、
-                                 会員写真もあれば右下に小さく重ねる。トレーナー用の写真がなければ今までどおり会員写真）。
+                                 コントローラで決めた $photoFrame をそのまま出す（トレーナー用写真があればそれを大きく、
+                                 会員写真もあれば右下に小さく重ねる。トレーナー用写真がなければ今までどおり会員写真）。
                                  重ねる写真の大きさ・縁取りは app.scss の .trainee-show-photo-overlay。枠はクリックしても何も起きない --}}
                             <div class="trainee-show-photo position-relative d-flex align-items-center justify-content-center"
                                  style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
@@ -108,22 +108,16 @@
                                          だが、トレーナー側は会員写真の登録操作をしないため文言を「写真なし」に変える。 --}}
                                     <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
                                 @endif
-                            </div>
-                            {{-- トレーナー用の写真の操作（2026-11 追加。要件定義書 6-16-20）。一般トレーナーも操作できる。
-                                 ［写真を選ぶ］［変更］は S-0309-M02 を開く。［外す］は確認ダイアログのあと DELETE を送る。
-                                 会員写真の操作はトレーナー側には置かない --}}
-                            <div class="d-flex justify-content-center justify-content-sm-start gap-2 mt-2">
-                                @if($photoFrame['hasTrainerPhoto'])
-                                    <button type="button" class="btn btn-sm btn-outline-primary" data-trainer-photo-open>変更</button>
-                                    <form method="POST" action="{{ route('trainee-trainer-photo.destroy', $trainee) }}" class="d-inline"
-                                          onsubmit="return confirm('トレーナー用の写真を外しますか？（会員写真と、選んだもとのメディアはそのまま残ります）');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">外す</button>
-                                    </form>
-                                @else
-                                    <button type="button" class="btn btn-sm btn-outline-primary" data-trainer-photo-open>写真を選ぶ</button>
-                                @endif
+                                {{-- トレーナー用写真の操作（2026-11 変更。設計書 S-0309「写真の枠の表示」）。枠の右上に小さなボタンを 1 つ重ねる
+                                     （右下は会員写真を重ねる場所）。未設定・設定済みに関係なく同じボタンで、押すと S-0309-M02 を開く。
+                                     いつも出す（タブレットで使うため、マウスを乗せたときだけ出す作りにしない）。写真がないときも同じ位置。
+                                     ［外す］は S-0309-M02 のフッター（設定済みのときだけ）。当初は枠の下にボタンの行を置いていたが、
+                                     体重推移グラフの下に空白ができ計測値のカードも高くなったため、枠の上に重ねた。
+                                     位置と大きさは app.scss の .trainee-show-photo-action。一般トレーナーも操作できる --}}
+                                <button type="button" class="btn btn-sm btn-light border trainee-show-photo-action"
+                                        data-trainer-photo-open aria-label="トレーナー用写真を選ぶ">
+                                    <i class="bi bi-camera" aria-hidden="true"></i> 写真
+                                </button>
                             </div>
                         </div>
 
@@ -332,8 +326,8 @@
          S-0309 に戻る。ID を一意化した辞書形式の経緯は設計書 S-0309「計測値モーダル」参照。 --}}
     @include('trainees._measurement-modal', ['trainee' => $trainee])
 
-    {{-- トレーナー用の写真の選択モーダル（S-0309-M02。2026-11 追加） --}}
-    @include('trainees._trainer-photo-modal', ['trainee' => $trainee, 'trainers' => $trainers])
+    {{-- トレーナー用写真の選択モーダル（S-0309-M02。2026-11 追加） --}}
+    @include('trainees._trainer-photo-modal', ['trainee' => $trainee, 'trainers' => $trainers, 'hasTrainerPhoto' => $photoFrame['hasTrainerPhoto']])
 </div>
 
 {{-- 性格診断のレーダーチャート用スクリプト（結果があるときだけ読み込む。2026-10 追加） --}}

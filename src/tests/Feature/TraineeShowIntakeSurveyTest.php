@@ -33,7 +33,7 @@ class TraineeShowIntakeSurveyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // S-0309 はトレーナー用の写真の選択モーダルの登録者の選択肢を読む（2026-11 追加）
+        // S-0309 はトレーナー用写真の選択モーダルの登録者の選択肢を読む（2026-11 追加）
         $this->createTrainersTableForTraineeShow();
 
         $this->createClientsTable();

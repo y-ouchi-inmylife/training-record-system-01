@@ -67,8 +67,8 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
                 'datasets' => [],
             ],
             'deleteConfirmMessage' => 'このトレーニーを削除しますか？',
-            // 写真の枠（2026-11 追加。トレーナー用の写真なし＝会員写真を大きく出す今までどおりの形）と、
-            // トレーナー用の写真の選択モーダル（S-0309-M02）の登録者の選択肢
+            // 写真の枠（2026-11 追加。トレーナー用写真なし＝会員写真を大きく出す今までどおりの形）と、
+            // トレーナー用写真の選択モーダル（S-0309-M02）の登録者の選択肢
             'photoFrame' => ['mainUrl' => $photoUrl, 'mainAlt' => 'ポチの写真', 'overlayUrl' => null, 'hasTrainerPhoto' => false],
             'trainers' => collect(),
             'measurementCount' => 0,

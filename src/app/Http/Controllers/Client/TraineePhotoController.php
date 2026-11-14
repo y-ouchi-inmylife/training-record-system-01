@@ -87,7 +87,7 @@ class TraineePhotoController extends Controller
             // 拡張子から適切なデコーダを選べる。
             $uploaded->move($tmpDir, $tmpId . '.' . $originalExt);
 
-            // magick でリサイズ・JPEG 変換（長辺 400px・品質 85。トレーナー用の写真と共通の
+            // magick でリサイズ・JPEG 変換（長辺 400px・品質 85。トレーナー用写真と共通の
             // TraineePhotoImageService に切り出した。失敗は RuntimeException で下の catch に落ちる）
             app(TraineePhotoImageService::class)->makeJpeg($tmpIn, $tmpOut, 'TraineePhotoController', [
                 'trainee_id' => $trainee->id,

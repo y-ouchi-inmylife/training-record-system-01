@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Process;
  * トレーニーの写真の画像を作る（長辺 400px の JPEG 1 枚）。
  *
  * 会員写真（Client\TraineePhotoController。要件定義書 6-15-15）の変換処理を切り出したもの。
- * トレーナー用の写真（要件定義書 6-16-20）も同じ形式で作るため、ここにまとめる
- * （設計書 db-schema.md D-0700「トレーナー用の写真の扱い」：会員写真と同じ形式）。
+ * トレーナー用写真（要件定義書 6-16-20）も同じ形式で作るため、ここにまとめる
+ * （設計書 db-schema.md D-0700「トレーナー用写真の扱い」：会員写真と同じ形式）。
  *
  * 変換ロジックは既存の MediaThumbnailService と同じ流儀：Process ファサードで CLI 呼び出し、
  * stderr は UTF-8 化してログのみ、例外は UTF-8 確定の固定文言。

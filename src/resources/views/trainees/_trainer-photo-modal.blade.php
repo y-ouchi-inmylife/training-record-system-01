@@ -1,6 +1,9 @@
-{{-- トレーナー用の写真の選択モーダル（S-0309-M02。2026-11 追加。要件定義書 6-16-20）。
-     写真の枠の下の［写真を選ぶ］［変更］（data-trainer-photo-open）で開く。メディア一覧（ライブラリ）から
-     写真を 1 枚だけ選び、POST /trainees/{trainee}/trainer-photo に送る（通常の form の送信）。
+{{-- トレーナー用写真の選択モーダル（S-0309-M02。2026-11 追加。要件定義書 6-16-20）。
+     写真の枠の右上に重ねた［写真］のボタン（data-trainer-photo-open）で開く。メディア一覧（ライブラリ）から
+     写真を 1 枚だけ選び、［更新］で POST /trainees/{trainee}/trainer-photo に送る（通常の form の送信）。
+     トレーナー用写真を設定済み（$hasTrainerPhoto）のときだけ、フッターの左に［外す］を出す（2026-11 変更：当初は
+     写真の枠の下に置いていた）。外すフォーム（DELETE）は選ぶフォーム（POST）と入れ子にできないため、モーダルの外に置き、
+     ［外す］のボタンを form 属性で結ぶ。
 
      見た目はメディア追加モーダル（S-0401-M02 / S-0404-M01。training-records/_form.blade.php の #mediaAddModal）に
      そろえる。JS は記録のフォームと一体なので共通化せず、次を複製して 1 枚だけ選ぶ形に変えた：
@@ -22,7 +25,7 @@
             <input type="hidden" name="_trainer_photo_modal" value="1">
             <input type="hidden" name="media_record_id" id="trainerPhotoMediaId" value="">
             <div class="modal-header">
-                <h5 class="modal-title" id="trainerPhotoModalLabel">トレーナー用の写真を選ぶ</h5>
+                <h5 class="modal-title" id="trainerPhotoModalLabel">トレーナー用写真を選ぶ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
             </div>
             <div class="modal-body">
@@ -58,13 +61,28 @@
                 </nav>
             </div>
             <div class="modal-footer">
+                @if($hasTrainerPhoto ?? false)
+                    {{-- 設定済みのときだけ左に［外す］。モーダルの中の削除なので白抜きの赤（設計書 4-4）。
+                         このモーダルのフォーム（POST）ではなく、外のフォーム（DELETE）を送る --}}
+                    <button type="submit" form="trainerPhotoRemoveForm" class="btn btn-outline-danger me-auto" id="trainerPhotoRemoveBtn">外す</button>
+                @endif
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                {{-- 保存の操作なので緑（設計書 4-4「データ保存」）。写真を選ぶまでは押せない --}}
-                <button type="submit" class="btn btn-success" id="trainerPhotoSubmitBtn" disabled>設定する</button>
+                {{-- 保存の操作なので緑（設計書 4-4「データ保存」。ほかの画面の［更新］と同じ btn-success。2026-11 変更：当初の名前は［設定する］）。
+                     写真を選ぶまでは押せない --}}
+                <button type="submit" class="btn btn-success" id="trainerPhotoSubmitBtn" disabled>更新</button>
             </div>
         </form>
     </div>
 </div>
+@if($hasTrainerPhoto ?? false)
+    {{-- トレーナー用写真を外すフォーム（DELETE）。選ぶフォームの外に置き、モーダルのフッターの［外す］（form="trainerPhotoRemoveForm"）で送る。
+         送る前に確認ダイアログを出す（設計書 S-0309-M02「外す」） --}}
+    <form method="POST" action="{{ route('trainee-trainer-photo.destroy', $trainee) }}" id="trainerPhotoRemoveForm" class="d-none"
+          onsubmit="return confirm('トレーナー用写真を外しますか？（会員写真と、選んだもとのメディアはそのまま残ります）');">
+        @csrf
+        @method('DELETE')
+    </form>
+@endif
 
 @push('scripts')
 <script>

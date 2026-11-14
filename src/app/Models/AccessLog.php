@@ -42,9 +42,9 @@ class AccessLog extends Model
             'create_trainee' => 'トレーニー登録',
             'edit_trainee' => 'トレーニー編集',
             'delete_trainee' => 'トレーニー削除',
-            // トレーナー用の写真（2026-11 追加。設計書 db-schema.md のアクション表）
-            'create_trainee_trainer_photo' => 'トレーナー用の写真の設定',
-            'delete_trainee_trainer_photo' => 'トレーナー用の写真を外す',
+            // トレーナー用写真（2026-11 追加。設計書 db-schema.md のアクション表）
+            'create_trainee_trainer_photo' => 'トレーナー用写真の設定',
+            'delete_trainee_trainer_photo' => 'トレーナー用写真を外す',
             'create_trainee_measurement' => '計測値登録',
             'edit_trainee_measurement' => '計測値編集',
             'delete_trainee_measurement' => '計測値削除',

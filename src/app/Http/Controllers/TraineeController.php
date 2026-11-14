@@ -78,19 +78,19 @@ class TraineeController extends Controller
         //   トレーナー用 あり・会員写真 なし → トレーナー用だけ
         //   トレーナー用 なし・会員写真 あり → 会員写真を大きく（今までどおり）
         //   どちらもなし                       → 「写真なし」（mainUrl が null）
-        // トレーナー用の写真の URL は、会員側と共用の weight_chart_data には入れず、トレーナー側だけのアクセサから取る
+        // トレーナー用写真の URL は、会員側と共用の weight_chart_data には入れず、トレーナー側だけのアクセサから取る
         $trainerPhotoUrl = $trainee->trainer_photo_url;
         $memberPhotoUrl = $weightChart['photoUrl'];
         $photoFrame = [
             'mainUrl' => $trainerPhotoUrl ?? $memberPhotoUrl,
             'mainAlt' => $trainerPhotoUrl !== null
-                ? $trainee->display_name.'のトレーナー用の写真'
+                ? $trainee->display_name.'のトレーナー用写真'
                 : $trainee->display_name.'の写真',
             'overlayUrl' => $trainerPhotoUrl !== null ? $memberPhotoUrl : null,
             'hasTrainerPhoto' => $trainerPhotoUrl !== null,
         ];
 
-        // トレーナー用の写真の選択モーダル（S-0309-M02）の登録者の選択肢。メディア追加モーダル（S-0401-M02）と同じ
+        // トレーナー用写真の選択モーダル（S-0309-M02）の登録者の選択肢。メディア追加モーダル（S-0401-M02）と同じ
         // （システム管理者を除く。表示順・名前順）
         $trainers = Trainer::practitioners()
             ->orderBy('display_order')
