@@ -75,6 +75,7 @@ class ClientCountRenderingTest extends TestCase
             $table->unsignedBigInteger('client_id');
             $table->string('name')->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
             // 空のトレーニーかの判定（会員の削除の確認。2026-10-18 追加）に使う登録内容の列
             $table->string('breed', 100)->nullable();
             $table->string('sex', 20)->nullable();
@@ -642,6 +643,27 @@ class ClientCountRenderingTest extends TestCase
             .'style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">/u';
         $this->assertMatchesRegularExpression($pattern, $html);
         $this->assertStringNotContainsString('写真なし', $html);
+    }
+
+    public function test_トレーナー用の写真があればそれを出し会員写真は重ねない(): void
+    {
+        // 2026-11 追加（要件定義書 6-16-20、設計書 S-0305「写真」）：トレーナー用の写真があればそれ、なければ会員写真。重ねない
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $both = $this->trainee($client, 'ポチ', 'trainees/202610/member.jpg');
+        DB::table('trainees')->where('id', $both)->update(['trainer_photo_path' => 'trainee-trainer-photos/202611/trainer.jpg']);
+        $onlyTrainer = $this->trainee($client, 'たま');
+        DB::table('trainees')->where('id', $onlyTrainer)->update(['trainer_photo_path' => 'trainee-trainer-photos/202611/only.jpg']);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<img src="https://media.example.test/trainee-trainer-photos/202611/trainer.jpg?signed=1"', $html);
+        $this->assertStringContainsString('<img src="https://media.example.test/trainee-trainer-photos/202611/only.jpg?signed=1"', $html);
+        // 会員写真は出さない（重ねない）。トレーナー用の写真だけのトレーニーも「写真なし」にしない
+        $this->assertStringNotContainsString('trainees/202610/member.jpg', $html);
+        $this->assertStringNotContainsString('trainee-show-photo-overlay', $html);
+        $this->assertStringNotContainsString('写真なし', $html);
+        $this->assertStringContainsString('alt="たまの写真"', $html);
     }
 
     public function test_写真がないトレーニーには同じ枠に写真なしを出しトレーニー詳細へのリンクにする(): void

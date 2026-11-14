@@ -211,6 +211,38 @@ h2 {
     }
 }
 
+// トレーニー詳細（S-0309）の写真の枠に、会員写真を右下に小さく重ねる（ワイプ。2026-11 追加。設計書 S-0309「写真の枠の表示」）。
+// トレーナー用の写真と会員写真が両方あるときだけ出す。大きさは大きい枠の一辺のおよそ 3 分の 1
+// （スマホの幅の 180px の枠で 60px、sm 以上の 224px の枠で 72px）。白い縁取りと薄い影で大きい写真と見分ける。
+// 中の写真は大きい写真と同じく縦横比を保って収める（切り抜かない。余白は白）。枠（.trainee-show-photo）に position-relative を付けて使う
+.trainee-show-photo-overlay {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff;
+    border: 3px solid #ffffff;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 4px rgba(15, 26, 46, 0.35);
+    overflow: hidden;
+
+    img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        display: block;
+    }
+
+    @include media-breakpoint-up(sm) {
+        width: 72px;
+        height: 72px;
+    }
+}
+
 // トレーニー詳細（S-0309）の計測値の一覧のスクロールの枠（2026-10 追加）。
 // - 縦に積むとき（xl 未満）：最大の高さ（約 10 件分）を決め、超えたら中でスクロールする
 // - xl 以上（写真とグラフのカードの右に並べたとき）：カード（h-100。.card は flex の縦並び）の残りの高さを埋める。

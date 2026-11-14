@@ -64,6 +64,7 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
             $table->unsignedBigInteger('client_id');
             $table->string('name')->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
             $table->string('breed', 100)->nullable();
             $table->string('sex', 20)->nullable();
             $table->unsignedSmallInteger('birth_year')->nullable();

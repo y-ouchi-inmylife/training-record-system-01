@@ -67,6 +67,10 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
                 'datasets' => [],
             ],
             'deleteConfirmMessage' => 'このトレーニーを削除しますか？',
+            // 写真の枠（2026-11 追加。トレーナー用の写真なし＝会員写真を大きく出す今までどおりの形）と、
+            // トレーナー用の写真の選択モーダル（S-0309-M02）の登録者の選択肢
+            'photoFrame' => ['mainUrl' => $photoUrl, 'mainAlt' => 'ポチの写真', 'overlayUrl' => null, 'hasTrainerPhoto' => false],
+            'trainers' => collect(),
             'measurementCount' => 0,
         ]);
 
@@ -82,8 +86,9 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
         $this->assertStringNotContainsString('c-trainee-photo-col', $html);
 
         // トレーナー側は app.scss の .trainee-show-photo で大きさを決める（2026-10 変更：当初は 180px 四方の
+        // 2026-11 追加：会員写真を右下に重ねるため position-relative を付けた）
         // インライン style）。写真なし時も同じ枠に「写真なし」のプレースホルダ
-        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<span class="text-muted" style="font-size: 0.875rem;">写真なし<\/span>/u', $html);
+        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo position-relative d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<span class="text-muted" style="font-size: 0.875rem;">写真なし<\/span>/u', $html);
         $this->assertStringNotContainsString('width: 180px; height: 180px;', $html);
     }
 
@@ -93,7 +98,7 @@ class TraineeShowPhotoFrameRenderingTest extends TestCase
 
         $this->assertStringNotContainsString('c-trainee-photo-frame', $html);
         $this->assertStringNotContainsString('c-trainee-photo-col', $html);
-        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<img src="https:\/\/example.com\/photo.jpg"/u', $html);
+        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo position-relative d-flex align-items-center justify-content-center"\s*style="background-color: #ffffff;[^"]*">\s*<img src="https:\/\/example.com\/photo.jpg"/u', $html);
     }
 
     public function test_写真の枠の大きさはsm以上224pxでスマホは180px(): void

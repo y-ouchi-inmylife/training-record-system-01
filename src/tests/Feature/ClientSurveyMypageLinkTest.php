@@ -49,6 +49,7 @@ class ClientSurveyMypageLinkTest extends TestCase
             $table->unsignedTinyInteger('birth_day')->nullable();
             $table->string('neuter_status', 20)->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });

@@ -59,6 +59,7 @@ class ClientContractNavRenderingTest extends TestCase
             $table->unsignedBigInteger('client_id');
             $table->string('name')->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
         });
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();

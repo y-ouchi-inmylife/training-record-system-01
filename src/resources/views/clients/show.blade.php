@@ -588,13 +588,16 @@
                                          手元で作る。外部ストレージへの問い合わせはしない）。photo_path は trainees の列なので、
                                          ClientController::show の trainees の読み込みで足り、追加のクエリは出ない。
                                          枠の見た目はトレーニー詳細（trainees/show.blade.php）の写真の枠と同じ指定で、
-                                         大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。 --}}
+                                         大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。
+                                         出す写真（2026-11 追加。要件定義書 6-16-20、設計書 S-0305「写真」）：トレーナー用の写真があればそれ、
+                                         なければ会員写真。重ねない（ワイプは S-0309 だけ）。Trainee::trainer_side_photo_url が選ぶ。
+                                         trainer_photo_path も trainees の列なので、追加のクエリは出ない（N+1 にならない）。 --}}
                                     <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0 text-decoration-none"
-                                       @if(! $trainee->photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーニー詳細へ" @endif>
+                                       @if(! $trainee->photo_path && ! $trainee->trainer_photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーニー詳細へ" @endif>
                                         <div class="d-flex align-items-center justify-content-center"
                                              style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
-                                            @if($trainee->photo_path)
-                                                <img src="{{ $trainee->photo_url }}"
+                                            @if($trainee->photo_path || $trainee->trainer_photo_path)
+                                                <img src="{{ $trainee->trainer_side_photo_url }}"
                                                      alt="{{ $trainee->display_name }}の写真"
                                                      style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
                                             @else

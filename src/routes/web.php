@@ -31,6 +31,7 @@ use App\Http\Controllers\TraineeIntakeSurveyTokenController;
 use App\Http\Controllers\TraineePersonalityDiagnosisResultController;
 use App\Http\Controllers\TraineePersonalityDiagnosisTokenController;
 use App\Http\Controllers\TraineeMeasurementController;
+use App\Http\Controllers\TraineeTrainerPhotoController;
 use App\Http\Controllers\UsageStatsController;
 use Illuminate\Support\Facades\Route;
 
@@ -121,6 +122,12 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
                 ->name('trainees.update');
             Route::delete('trainees/{trainee}', [TraineeController::class, 'destroy'])
                 ->name('trainees.destroy');
+            // トレーナー用の写真の設定・外す（S-0309 / S-0309-M02。要件定義書 6-16-20。2026-11 追加）。
+            // 一般トレーナーも操作できる（管理者に限らない）。会員側のルート（client-portal.trainee-photo.*）とは別
+            Route::post('trainees/{trainee}/trainer-photo', [TraineeTrainerPhotoController::class, 'store'])
+                ->name('trainee-trainer-photo.store');
+            Route::delete('trainees/{trainee}/trainer-photo', [TraineeTrainerPhotoController::class, 'destroy'])
+                ->name('trainee-trainer-photo.destroy');
 
             // 計測値（D-0800、段階②）。create / edit / show の画面遷移は持たない
             // （モーダル内で登録・編集するため。設計書 S-0309）

@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -65,6 +66,7 @@ class ClientDashboardTraineeProfileTest extends TestCase
             $table->tinyInteger('birth_day')->nullable();
             $table->string('neuter_status', 10)->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
         });
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();
@@ -126,6 +128,27 @@ class ClientDashboardTraineeProfileTest extends TestCase
     }
 
     private const FULL = ['breed' => 'トイ・プードル', 'sex' => 'female', 'birth_year' => 2020, 'birth_month' => 5, 'birth_day' => 1, 'neuter_status' => 'done'];
+
+    public function test_トレーナー用の写真はパスもURLもマイページに出さない(): void
+    {
+        // 2026-11 追加（要件定義書 6-16-20、設計書 S-1402「トレーナー用の写真は出さない」）。
+        // 会員写真は今までどおり出し、トレーナー用の写真は設定の有無も分からないようにする
+        Storage::fake('media');
+        Storage::disk('media')->buildTemporaryUrlsUsing(fn (string $path) => 'https://media.example.test/'.$path.'?signed=1');
+        $this->trainee('アイ', [
+            'photo_path' => 'trainees/202611/member.jpg',
+            'trainer_photo_path' => 'trainee-trainer-photos/202611/secret.jpg',
+        ]);
+        $this->trainee('ハル', ['trainer_photo_path' => 'trainee-trainer-photos/202611/secret2.jpg']);
+
+        $html = $this->open();
+
+        $this->assertStringContainsString('https://media.example.test/trainees/202611/member.jpg?signed=1', $html);
+        $this->assertStringNotContainsString('trainee-trainer-photos', $html);
+        $this->assertStringNotContainsString('secret', $html);
+        $this->assertStringNotContainsString('トレーナー用の写真', $html);
+        $this->assertStringNotContainsString('trainer_photo', $html);
+    }
 
     public function test_写真の下に犬種と性別の1行と誕生日の1行を中央揃えで出す(): void
     {

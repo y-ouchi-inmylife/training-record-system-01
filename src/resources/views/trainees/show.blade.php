@@ -81,21 +81,48 @@
                         {{-- 左：トレーニー写真（縦横比を保つ）。大きさは app.scss の .trainee-show-photo（2026-10 変更：
                              sm 以上はグラフと同じ 224px 四方、写真の下にグラフを置くスマホの幅〔sm 未満〕は今までどおり 180px 四方。
                              当初はどの幅でも 180px 四方のインライン style。会員側〔client.scss〕とは共有しない）。
-                             トレーナー側は登録・変更・削除の操作を置かない（要件定義書
-                             6-15-15 は会員の機能）。クリックしても何も起きない静的な枠にする。 --}}
+                             トレーナー側は会員写真の登録・変更・削除の操作を置かない（要件定義書
+                             6-15-15 は会員の機能）。枠はクリックしても何も起きない静的な枠にする。
+                             トレーナー用の写真（2026-11 追加）の操作は、枠の下のボタンで行う。 --}}
                         <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
-                            <div class="trainee-show-photo d-flex align-items-center justify-content-center"
+                            {{-- 写真の枠（2026-11 変更。設計書 S-0309「写真の枠の表示」）。どの写真を大きく出し、どれを右下に重ねるかは
+                                 コントローラで決めた $photoFrame をそのまま出す（トレーナー用の写真があればそれを大きく、
+                                 会員写真もあれば右下に小さく重ねる。トレーナー用の写真がなければ今までどおり会員写真）。
+                                 重ねる写真の大きさ・縁取りは app.scss の .trainee-show-photo-overlay。枠はクリックしても何も起きない --}}
+                            <div class="trainee-show-photo position-relative d-flex align-items-center justify-content-center"
                                  style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
-                                @if($weightChart['photoUrl'])
+                                @if($photoFrame['mainUrl'])
                                     {{-- object-fit: contain で枠を超えず、余白は白で埋まる（切り抜かない）。
                                          会員側 S-1402 と同じ扱い。 --}}
-                                    <img src="{{ $weightChart['photoUrl'] }}"
-                                         alt="{{ $trainee->display_name }}の写真"
+                                    <img src="{{ $photoFrame['mainUrl'] }}"
+                                         alt="{{ $photoFrame['mainAlt'] }}"
                                          style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
+                                    @if($photoFrame['overlayUrl'])
+                                        {{-- 会員写真（右下に小さく重ねる。何の写真か分かるよう alt・title を「会員写真」にする） --}}
+                                        <div class="trainee-show-photo-overlay">
+                                            <img src="{{ $photoFrame['overlayUrl'] }}" alt="会員写真" title="会員写真">
+                                        </div>
+                                    @endif
                                 @else
                                     {{-- 写真なしのプレースホルダ。会員側は「写真を登録」（登録操作への案内）
-                                         だが、トレーナー側は登録操作をしないため文言を「写真なし」に変える。 --}}
+                                         だが、トレーナー側は会員写真の登録操作をしないため文言を「写真なし」に変える。 --}}
                                     <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
+                                @endif
+                            </div>
+                            {{-- トレーナー用の写真の操作（2026-11 追加。要件定義書 6-16-20）。一般トレーナーも操作できる。
+                                 ［写真を選ぶ］［変更］は S-0309-M02 を開く。［外す］は確認ダイアログのあと DELETE を送る。
+                                 会員写真の操作はトレーナー側には置かない --}}
+                            <div class="d-flex justify-content-center justify-content-sm-start gap-2 mt-2">
+                                @if($photoFrame['hasTrainerPhoto'])
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-trainer-photo-open>変更</button>
+                                    <form method="POST" action="{{ route('trainee-trainer-photo.destroy', $trainee) }}" class="d-inline"
+                                          onsubmit="return confirm('トレーナー用の写真を外しますか？（会員写真と、選んだもとのメディアはそのまま残ります）');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">外す</button>
+                                    </form>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-trainer-photo-open>写真を選ぶ</button>
                                 @endif
                             </div>
                         </div>
@@ -304,6 +331,9 @@
     {{-- 計測値の登録・編集モーダル（登録・編集で共用。この画面だけで使う）。登録・編集・削除の後は
          S-0309 に戻る。ID を一意化した辞書形式の経緯は設計書 S-0309「計測値モーダル」参照。 --}}
     @include('trainees._measurement-modal', ['trainee' => $trainee])
+
+    {{-- トレーナー用の写真の選択モーダル（S-0309-M02。2026-11 追加） --}}
+    @include('trainees._trainer-photo-modal', ['trainee' => $trainee, 'trainers' => $trainers])
 </div>
 
 {{-- 性格診断のレーダーチャート用スクリプト（結果があるときだけ読み込む。2026-10 追加） --}}

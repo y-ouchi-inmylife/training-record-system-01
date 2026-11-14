@@ -13,7 +13,7 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * トレーニーの削除で、会員さんの写真のファイルもストレージから消すことの確認（2026-11 追加。
+ * トレーニーの削除で、会員写真のファイルもストレージから消すことの確認（2026-11 追加。
  * 要件定義書 6-16-4・DB 設計書 D-0700「トレーニーの削除時」）。
  *
  * それまでは、トレーニーを削除しても photo_path のファイルが media ディスクに残っていた。
@@ -42,6 +42,7 @@ class TraineeDestroyPhotoFileTest extends TestCase
             $table->unsignedBigInteger('client_id');
             $table->string('name', 50)->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });
@@ -57,7 +58,7 @@ class TraineeDestroyPhotoFileTest extends TestCase
         $this->actingAs($trainer, 'web');
     }
 
-    /** 会員さんの写真のファイルを置き、そのキーを持つトレーニーを作る */
+    /** 会員写真のファイルを置き、そのキーを持つトレーニーを作る */
     private function makeTraineeWithPhoto(): Trainee
     {
         $path = 'trainees/202611/'.fake()->uuid().'.jpg';

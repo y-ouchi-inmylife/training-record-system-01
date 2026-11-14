@@ -92,6 +92,11 @@ class Trainee extends Model
     // 既存の MediaRecordController::PLAY_URL_EXPIRES_MINUTES と揃える。
     const PHOTO_URL_EXPIRES_MINUTES = 15;
 
+    // トレーナー用の写真（trainer_photo_path）の保存先のキーの頭のフォルダ（2026-11 追加。要件定義書 6-16-20）。
+    // 会員写真（trainees/YYYYMM/{uuid}.jpg）とストレージ上で見分けられるよう、フォルダを分ける
+    // （設計書 db-schema.md D-0700「トレーナー用の写真の扱い」）
+    const TRAINER_PHOTO_DIR = 'trainee-trainer-photos';
+
     protected $fillable = [
         'client_id',
         'name',
@@ -103,6 +108,20 @@ class Trainee extends Model
         'neuter_status',
         'photo_path',
         'updated_by',
+    ];
+
+    // トレーナー用の写真（trainer_photo_path）は fillable に入れない（2026-11 追加）。
+    // 会員側のフォーム（愛犬の情報の変更・愛犬アンケート）から書き換えられないよう、
+    // 設定・外すはトレーナー側の TraineeTrainerPhotoController で forceFill して保存する。
+
+    /**
+     * 配列・JSON にしたときに出さない列（2026-11 追加）。
+     *
+     * トレーナー用の写真は会員側に一切出さない（要件定義書 6-16-20）。モデルを丸ごと配列・JSON に
+     * したときにも漏れないよう隠す（設計書 db-schema.md D-0700「会員側には一切出さない」）。
+     */
+    protected $hidden = [
+        'trainer_photo_path',
     ];
 
     protected function casts(): array
@@ -239,9 +258,10 @@ class Trainee extends Model
 
     /**
      * トレーニーの項目のうち、どれかが入っていれば「空でない」とみなす列（2026-10-18 追加。要件定義書 6-3-5）。
-     * 名前・犬種・性別・誕生日（年・月・日）・去勢避妊・写真。client_id・updated_by・日時は登録内容ではないので見ない
+     * 名前・犬種・性別・誕生日（年・月・日）・去勢避妊・写真（会員写真とトレーナー用の写真。トレーナー用の写真は
+     * 2026-11 追加）。client_id・updated_by・日時は登録内容ではないので見ない
      */
-    public const CONTENT_COLUMNS = ['name', 'breed', 'sex', 'birth_year', 'birth_month', 'birth_day', 'neuter_status', 'photo_path'];
+    public const CONTENT_COLUMNS = ['name', 'breed', 'sex', 'birth_year', 'birth_month', 'birth_day', 'neuter_status', 'photo_path', 'trainer_photo_path'];
 
     /**
      * トレーニーに結び付く表（2026-10-18 追加。要件定義書 6-3-5）。どれかに 1 行でもあれば「空でない」とみなす。
@@ -546,11 +566,41 @@ class Trainee extends Model
     }
 
     /**
+     * トレーナー用の写真の presigned 表示 URL を返す（2026-11 追加。要件定義書 6-16-20）。
+     *
+     * `trainer_photo_path` が NULL のとき（未設定）は null。作り方は photo_url と同じ
+     * （media ディスクの署名付き一時 URL を手元で作る。クエリもストレージへの問い合わせもしない）。
+     *
+     * **トレーナー側の画面だけで使う**。会員側と共用している getWeightChartDataAttribute() には入れない
+     * （入れると会員側 S-1402 にもトレーナー用の写真が出てしまう。設計書 S-0309 設計方針）。
+     */
+    public function getTrainerPhotoUrlAttribute(): ?string
+    {
+        if (! $this->trainer_photo_path) {
+            return null;
+        }
+
+        return Storage::disk(self::STORAGE_DISK)
+            ->temporaryUrl($this->trainer_photo_path, now()->addMinutes(self::PHOTO_URL_EXPIRES_MINUTES));
+    }
+
+    /**
+     * トレーナー側で写真を 1 枚だけ出すときの URL（2026-11 追加。会員詳細 S-0305 のトレーニー欄）。
+     *
+     * トレーナー用の写真があればそれ、なければ会員写真、どちらもなければ null（重ねない）。
+     * 会員側では使わない。
+     */
+    public function getTrainerSidePhotoUrlAttribute(): ?string
+    {
+        return $this->trainer_photo_url ?? $this->photo_url;
+    }
+
+    /**
      * このトレーニーが持つ写真のファイルのキーを返す（未登録のものは含めない）。
      *
      * トレーニーの削除で、行を消す前にキーを控えておくために使う（deletePhotoFiles に渡す）。
-     * 今は会員さんの写真（photo_path）だけ。トレーナー用の写真（trainer_photo_path）を足すときは、
-     * ここに並べれば削除の対象になる（設計書 db-schema.md D-0700「トレーニーの削除時」）。
+     * 会員写真（photo_path）とトレーナー用の写真（trainer_photo_path。2026-11 追加）の 2 つ
+     * （設計書 db-schema.md D-0700「トレーニーの削除時」）。
      *
      * @return list<string>
      */
@@ -558,6 +608,7 @@ class Trainee extends Model
     {
         return array_values(array_filter([
             $this->photo_path,
+            $this->trainer_photo_path,
         ], fn ($path) => is_string($path) && $path !== ''));
     }
 

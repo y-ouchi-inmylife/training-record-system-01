@@ -38,6 +38,8 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // S-0309 はトレーナー用の写真の選択モーダルの登録者の選択肢を読む（2026-11 追加）
+        $this->createTrainersTableForTraineeShow();
 
         $this->createClientsTable();
         $this->createAccessLogsTable();
@@ -52,6 +54,7 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             $table->unsignedTinyInteger('birth_day')->nullable();
             $table->string('neuter_status', 20)->nullable();
             $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });

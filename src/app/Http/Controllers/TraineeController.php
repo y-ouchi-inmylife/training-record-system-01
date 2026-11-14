@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\TraineeRequest;
 use App\Models\Client;
 use App\Models\Trainee;
+use App\Models\Trainer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -71,6 +72,31 @@ class TraineeController extends Controller
         // measurements は上の $trainee->load(['client', 'measurements']) で既に読み込み済み。
         $weightChart = $trainee->weight_chart_data;
 
+        // 写真の枠（2026-11 追加。設計書 S-0309「写真の枠の表示」・要件定義書 6-16-20）。
+        // どの写真を大きく出し、どれを右下に重ねるかはここで決めて渡す（Blade に条件の組み立てを持たせない）。
+        //   トレーナー用 あり・会員写真 あり → トレーナー用を大きく、会員写真を重ねる
+        //   トレーナー用 あり・会員写真 なし → トレーナー用だけ
+        //   トレーナー用 なし・会員写真 あり → 会員写真を大きく（今までどおり）
+        //   どちらもなし                       → 「写真なし」（mainUrl が null）
+        // トレーナー用の写真の URL は、会員側と共用の weight_chart_data には入れず、トレーナー側だけのアクセサから取る
+        $trainerPhotoUrl = $trainee->trainer_photo_url;
+        $memberPhotoUrl = $weightChart['photoUrl'];
+        $photoFrame = [
+            'mainUrl' => $trainerPhotoUrl ?? $memberPhotoUrl,
+            'mainAlt' => $trainerPhotoUrl !== null
+                ? $trainee->display_name.'のトレーナー用の写真'
+                : $trainee->display_name.'の写真',
+            'overlayUrl' => $trainerPhotoUrl !== null ? $memberPhotoUrl : null,
+            'hasTrainerPhoto' => $trainerPhotoUrl !== null,
+        ];
+
+        // トレーナー用の写真の選択モーダル（S-0309-M02）の登録者の選択肢。メディア追加モーダル（S-0401-M02）と同じ
+        // （システム管理者を除く。表示順・名前順）
+        $trainers = Trainer::practitioners()
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         // 削除確認ダイアログの文言はコントローラ側で組み立てて Blade に渡す
         // （$deleteConfirmMessage）。Blade 内で @json() を使って onsubmit 属性に
         // 埋め込む形にすると、@json() が出力する "..." が onsubmit="..." の
@@ -129,7 +155,9 @@ class TraineeController extends Controller
             'trainee',
             'measurementCount',
             'deleteConfirmMessage',
-            'weightChart'
+            'weightChart',
+            'photoFrame',
+            'trainers'
         ));
     }
 
