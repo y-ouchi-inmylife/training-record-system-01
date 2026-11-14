@@ -98,9 +98,9 @@
                                          alt="{{ $photoFrame['mainAlt'] }}"
                                          style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
                                     @if($photoFrame['overlayUrl'])
-                                        {{-- 会員写真（右下に小さく重ねる。何の写真か分かるよう alt・title を「会員写真」にする） --}}
+                                        {{-- 会員写真（右下に小さく重ねる。読み上げ用に alt を「会員写真」にする。ツールチップ〔title〕は出さない。2026-11 変更：当初は title も付けていた） --}}
                                         <div class="trainee-show-photo-overlay">
-                                            <img src="{{ $photoFrame['overlayUrl'] }}" alt="会員写真" title="会員写真">
+                                            <img src="{{ $photoFrame['overlayUrl'] }}" alt="会員写真">
                                         </div>
                                     @endif
                                 @else

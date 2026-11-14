@@ -375,7 +375,10 @@ class TraineeTrainerPhotoTest extends TestCase
         $frame = $this->photoFrame($html);
         $this->assertStringContainsString('alt="モモのトレーナー用写真"', $frame);
         $this->assertStringContainsString('<div class="trainee-show-photo-overlay">', $frame);
-        $this->assertStringContainsString('alt="会員写真" title="会員写真"', $frame);
+        // 重ねた会員写真は読み上げ用の alt だけ。ツールチップ（title）は出さない（2026-11 変更）
+        $this->assertStringContainsString('<img src="https://', $frame);
+        $this->assertMatchesRegularExpression('/<div class="trainee-show-photo-overlay">\s*<img src="[^"]+" alt="会員写真">\s*<\/div>/u', $frame);
+        $this->assertStringNotContainsString('title=', $frame);
         $this->assertMatchesRegularExpression($actionButton, $frame);
         $footer = $this->modalFooter($html);
         $this->assertMatchesRegularExpression(
