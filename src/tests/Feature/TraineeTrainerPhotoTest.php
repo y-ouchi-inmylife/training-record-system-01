@@ -359,6 +359,8 @@ class TraineeTrainerPhotoTest extends TestCase
         $this->assertStringNotContainsString('trainee-show-photo-overlay"', $frame);
         $this->assertStringNotContainsString('>削除</button>', $html);
         $this->assertStringNotContainsString('trainerPhotoRemoveForm', $html);
+        // トレーナー用写真が未設定の警告マークは S-0305 だけ。S-0309 には出さない（2026-11 追加）
+        $this->assertStringNotContainsString('trainee-photo-warning', $html);
         // 枠の下のボタンの行はない
         $this->assertStringNotContainsString('>写真を選ぶ</button>', $html);
         $this->assertStringNotContainsString('>変更</button>', $html);

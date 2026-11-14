@@ -636,7 +636,7 @@ class ClientCountRenderingTest extends TestCase
 
         // 写真があるときは img の代替テキストで伝わるため、リンクに読み上げ用の名前は付けない
         $pattern = '/<a href="'.preg_quote(route('trainees.show', $id), '/').'" class="flex-shrink-0 text-decoration-none"\s*>\s*'
-            .'<div class="d-flex align-items-center justify-content-center"\s*'
+            .'<div class="d-flex align-items-center justify-content-center position-relative"\s*'
             .'style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba\(15, 26, 46, 0\.08\); border-radius: 0\.5rem; overflow: hidden;">\s*'
             .'<img src="https:\/\/media\.example\.test\/trainees\/202610\/abc\.jpg\?signed=1"\s*'
             .'alt="ポチの写真"\s*'
@@ -666,6 +666,62 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('alt="たまの写真"', $html);
     }
 
+    /** そのトレーニーの写真の枠のリンク（<a>〜</a>）の HTML */
+    private function photoLink(string $html, int $traineeId): string
+    {
+        $start = strpos($html, '<a href="'.route('trainees.show', $traineeId).'" class="flex-shrink-0 text-decoration-none"');
+        $this->assertNotFalse($start);
+
+        return substr($html, $start, strpos($html, '</a>', $start) + 4 - $start);
+    }
+
+    public function test_トレーナー用写真が未設定のトレーニーだけ写真の枠に警告マークを出す(): void
+    {
+        // 2026-11 追加（要件定義書 6-3-3、設計書 S-0305「写真」）：トレーナー用写真がないトレーニーに出す。会員写真の有無は関係ない
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $withTrainer = $this->trainee($client, 'ポチ', 'trainees/202610/member.jpg');
+        DB::table('trainees')->where('id', $withTrainer)->update(['trainer_photo_path' => 'trainee-trainer-photos/202611/t.jpg']);
+        $memberOnly = $this->trainee($client, 'たま', 'trainees/202610/member2.jpg');
+        $noPhoto = $this->trainee($client, 'ハル');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $mark = '<span class="trainee-photo-warning" title="トレーナー用写真が未設定です" aria-hidden="true"><i class="bi bi-exclamation-circle-fill"></i></span>';
+        $hidden = '<span class="visually-hidden">トレーナー用写真が未設定です</span>';
+
+        // トレーナー用写真あり：出さない
+        $link = $this->photoLink($html, $withTrainer);
+        $this->assertStringNotContainsString('trainee-photo-warning', $link);
+        $this->assertStringNotContainsString('トレーナー用写真が未設定です', $link);
+
+        // 会員写真だけ：会員写真の上に出す。読み上げは visually-hidden の文（リンクに aria-label は付けない）
+        $link = $this->photoLink($html, $memberOnly);
+        $this->assertStringContainsString('alt="たまの写真"', $link);
+        $this->assertStringContainsString($mark, $link);
+        $this->assertStringContainsString($hidden, $link);
+        $this->assertStringNotContainsString('aria-label=', $link);
+
+        // 写真なし：「写真なし」の枠に出す。読み上げは aria-label（同じ文を入れる）
+        $link = $this->photoLink($html, $noPhoto);
+        $this->assertStringContainsString('写真なし</span>', $link);
+        $this->assertStringContainsString($mark, $link);
+        $this->assertStringContainsString('aria-label="ハルの写真なし。トレーナー用写真が未設定です。トレーニー詳細へ"', $link);
+
+        // マークは枠（position-relative）の中に重ね、マーク専用のリンク・ボタンは持たない
+        $this->assertSame(2, substr_count($html, 'class="trainee-photo-warning"'));
+        $this->assertStringNotContainsString('<a class="trainee-photo-warning', $html);
+        $this->assertStringNotContainsString('<button class="trainee-photo-warning', $html);
+    }
+
+    public function test_警告マークの位置と色はappのscssにある(): void
+    {
+        $scss = file_get_contents(resource_path('sass/app.scss'));
+
+        $this->assertMatchesRegularExpression('/\.trainee-photo-warning \{\s*position: absolute;\s*top: 4px;\s*right: 4px;/u', $scss);
+        $this->assertMatchesRegularExpression('/\.trainee-photo-warning \{[^}]*color: \$warning;/u', $scss);
+    }
+
     public function test_写真がないトレーニーには同じ枠に写真なしを出しトレーニー詳細へのリンクにする(): void
     {
         $this->fakeMediaDisk();
@@ -676,10 +732,10 @@ class ClientCountRenderingTest extends TestCase
 
         // 写真があるときと同じ 96px の枠に、S-0309 と同じ見た目の「写真なし」。読み上げ用の名前を付ける
         $pattern = '/<a href="'.preg_quote(route('trainees.show', $id), '/').'" class="flex-shrink-0 text-decoration-none"\s*'
-            .'aria-label="たまの写真なし。トレーニー詳細へ"\s*>\s*'
-            .'<div class="d-flex align-items-center justify-content-center"\s*'
+            .'aria-label="たまの写真なし。トレーナー用写真が未設定です。トレーニー詳細へ"\s*>\s*'
+            .'<div class="d-flex align-items-center justify-content-center position-relative"\s*'
             .'style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba\(15, 26, 46, 0\.08\); border-radius: 0\.5rem; overflow: hidden;">\s*'
-            .'<span class="text-muted" style="font-size: 0\.875rem;">写真なし<\/span>\s*<\/div>\s*<\/a>/u';
+            .'<span class="text-muted" style="font-size: 0\.875rem;">写真なし<\/span>\s*<span class="trainee-photo-warning" title="トレーナー用写真が未設定です" aria-hidden="true"><i class="bi bi-exclamation-circle-fill"><\/i><\/span>\s*<span class="visually-hidden">トレーナー用写真が未設定です<\/span>\s*<\/div>\s*<\/a>/u';
         $this->assertMatchesRegularExpression($pattern, $html);
         // 写真の img は出さない
         $this->assertStringNotContainsString('alt="たまの写真"', $html);
@@ -734,7 +790,7 @@ class ClientCountRenderingTest extends TestCase
 
         // 写真がないまとまりも、左に「写真なし」の枠のリンク、右に名前・項目の列（位置がそろう）
         $this->assertMatchesRegularExpression(
-            '/<div class="d-flex align-items-start gap-3">\s*<a href="[^"]+" class="flex-shrink-0 text-decoration-none"\s*aria-label="たまの写真なし。トレーニー詳細へ"\s*>.*?写真なし<\/span>\s*<\/div>\s*<\/a>\s*'
+            '/<div class="d-flex align-items-start gap-3">\s*<a href="[^"]+" class="flex-shrink-0 text-decoration-none"\s*aria-label="たまの写真なし。トレーナー用写真が未設定です。トレーニー詳細へ"\s*>.*?写真なし<\/span>\s*<span class="trainee-photo-warning" title="トレーナー用写真が未設定です" aria-hidden="true"><i class="bi bi-exclamation-circle-fill"><\/i><\/span>\s*<span class="visually-hidden">トレーナー用写真が未設定です<\/span>\s*<\/div>\s*<\/a>\s*'
             .'<div class="flex-grow-1" style="min-width: 0;">\s*<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">\s*<h6 class="mb-0 text-break trainee-survey-line"><a href="[^"]+">たま<\/a><\/h6>/su',
             $html
         );
@@ -824,7 +880,7 @@ class ClientCountRenderingTest extends TestCase
 
         $url = preg_quote(route('trainees.show', $id), '/');
         $this->assertMatchesRegularExpression('/<h6 class="mb-0 text-break trainee-survey-line"><a href="'.$url.'" class="text-muted">名前未登録<\/a><\/h6>/u', $html);
-        $this->assertStringContainsString('aria-label="名前未登録の写真なし。トレーニー詳細へ"', $html);
+        $this->assertStringContainsString('aria-label="名前未登録の写真なし。トレーナー用写真が未設定です。トレーニー詳細へ"', $html);
         // リンクの文字が空にならない
         $this->assertDoesNotMatchRegularExpression('/<a href="'.$url.'"[^>]*><\/a>/u', $html);
     }

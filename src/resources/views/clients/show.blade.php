@@ -591,10 +591,15 @@
                                          大きさだけを 180px から 96px に変えている（角丸・白の余白・object-fit: contain で切り抜かない）。
                                          出す写真（2026-11 追加。要件定義書 6-16-20、設計書 S-0305「写真」）：トレーナー用写真があればそれ、
                                          なければ会員写真。重ねない（ワイプは S-0309 だけ）。Trainee::trainer_side_photo_url が選ぶ。
-                                         trainer_photo_path も trainees の列なので、追加のクエリは出ない（N+1 にならない）。 --}}
+                                         trainer_photo_path も trainees の列なので、追加のクエリは出ない（N+1 にならない）。
+                                         トレーナー用写真が未設定のトレーニー（会員写真の有無は関係ない）には、枠の右上に警告マーク（「！」）を重ねる
+                                         （2026-11 追加。設計書 S-0305「写真」。会員写真が出ているとトレーナー用写真を設定しないままになりやすいため）。
+                                         マークは飾り（aria-hidden）で、マウスを乗せると title の説明が出る。読み上げはリンクの中の visually-hidden の文で伝える。
+                                         写真がないとき（aria-label を付けるとき）は aria-label が読まれるので、aria-label にも同じ文を入れる。
+                                         見た目は app.scss の .trainee-photo-warning。マーク専用の動きはない（押すと写真の枠と同じく S-0309 へ） --}}
                                     <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0 text-decoration-none"
-                                       @if(! $trainee->photo_path && ! $trainee->trainer_photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーニー詳細へ" @endif>
-                                        <div class="d-flex align-items-center justify-content-center"
+                                       @if(! $trainee->photo_path && ! $trainee->trainer_photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーナー用写真が未設定です。トレーニー詳細へ" @endif>
+                                        <div class="d-flex align-items-center justify-content-center position-relative"
                                              style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
                                             @if($trainee->photo_path || $trainee->trainer_photo_path)
                                                 <img src="{{ $trainee->trainer_side_photo_url }}"
@@ -602,6 +607,10 @@
                                                      style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
                                             @else
                                                 <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
+                                            @endif
+                                            @if(! $trainee->hasTrainerPhoto())
+                                                <span class="trainee-photo-warning" title="トレーナー用写真が未設定です" aria-hidden="true"><i class="bi bi-exclamation-circle-fill"></i></span>
+                                                <span class="visually-hidden">トレーナー用写真が未設定です</span>
                                             @endif
                                         </div>
                                     </a>

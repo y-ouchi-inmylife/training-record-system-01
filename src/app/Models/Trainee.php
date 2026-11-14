@@ -585,6 +585,17 @@ class Trainee extends Model
     }
 
     /**
+     * トレーナー用写真を設定済みか（2026-11 追加）。
+     *
+     * 会員詳細（S-0305）のトレーニー欄で、未設定のトレーニーの写真の枠に警告マークを出すかどうかに使う
+     * （設計書 S-0305「写真」）。trainer_photo_path は $hidden だが、配列・JSON にしないときの属性の読み出しには影響しない。
+     */
+    public function hasTrainerPhoto(): bool
+    {
+        return is_string($this->trainer_photo_path) && $this->trainer_photo_path !== '';
+    }
+
+    /**
      * トレーナー側で写真を 1 枚だけ出すときの URL（2026-11 追加。会員詳細 S-0305 のトレーニー欄）。
      *
      * トレーナー用写真があればそれ、なければ会員写真、どちらもなければ null（重ねない）。

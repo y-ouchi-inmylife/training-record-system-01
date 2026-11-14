@@ -261,6 +261,34 @@ h2 {
     box-shadow: 0 1px 3px rgba(15, 26, 46, 0.2);
 }
 
+// 会員詳細（S-0305）のトレーニー欄の写真の枠（96px）に重ねる、トレーナー用写真が未設定の警告マーク（「！」。2026-11 追加。
+// 設計書 S-0305「写真」）。トレーナー用写真がないトレーニーに出す（会員写真の有無は関係ない）。
+// 色は §2-5 の「要対応・注意」と同じ warning の黄色。写真の上でも見えるよう、白い丸の背景と薄い影を付ける。
+// 位置は枠の内側へ上から 4px・右から 4px。大きさは 20px（白い丸は 22px）。
+// 枠の中央の「写真なし」の文字（縦 約 38〜58px）とは重ならない（マークは縦 4〜26px）。
+// 枠（96px）はインライン style だが、白い丸・影・アイコンの大きさなど指定が多く、S-0309 の写真まわり（.trainee-show-photo-*）と
+// 並べて置いたほうが探しやすいため、クラスにした。枠に position-relative を付けて使う
+.trainee-photo-warning {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 26, 46, 0.3);
+    color: $warning;
+    font-size: 20px;
+    line-height: 1;
+
+    .bi::before {
+        display: block;
+    }
+}
+
 // トレーニー詳細（S-0309）の計測値の一覧のスクロールの枠（2026-10 追加）。
 // - 縦に積むとき（xl 未満）：最大の高さ（約 10 件分）を決め、超えたら中でスクロールする
 // - xl 以上（写真とグラフのカードの右に並べたとき）：カード（h-100。.card は flex の縦並び）の残りの高さを埋める。
