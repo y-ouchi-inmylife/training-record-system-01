@@ -592,13 +592,14 @@
                                          出す写真（2026-11 追加。要件定義書 6-16-20、設計書 S-0305「写真」）：トレーナー用写真があればそれ、
                                          なければ会員写真。重ねない（ワイプは S-0309 だけ）。Trainee::trainer_side_photo_url が選ぶ。
                                          trainer_photo_path も trainees の列なので、追加のクエリは出ない（N+1 にならない）。
-                                         トレーナー用写真が未設定のトレーニー（会員写真の有無は関係ない）には、枠の右上に警告マーク（「！」）を重ねる
+                                         トレーナー用写真がなく、会員写真が出ているトレーニーには、枠の右上に警告マーク（「！」）を重ねる
                                          （2026-11 追加。設計書 S-0305「写真」。会員写真が出ているとトレーナー用写真を設定しないままになりやすいため）。
-                                         マークは飾り（aria-hidden）で、マウスを乗せると title の説明が出る。読み上げはリンクの中の visually-hidden の文で伝える。
-                                         写真がないとき（aria-label を付けるとき）は aria-label が読まれるので、aria-label にも同じ文を入れる。
+                                         「写真なし」のときは出さない（2026-11 変更：最初は出していた。写真なしは見れば分かるため外した）。
+                                         マークは飾り（aria-hidden）で、マウスを乗せると title の説明が出る。読み上げはリンクの中の visually-hidden の文で伝える
+                                         （会員写真が出ているときはリンクに aria-label を付けないので、この文と写真の代替テキストが読まれる）。
                                          見た目は app.scss の .trainee-photo-warning。マーク専用の動きはない（押すと写真の枠と同じく S-0309 へ） --}}
                                     <a href="{{ route('trainees.show', $trainee) }}" class="flex-shrink-0 text-decoration-none"
-                                       @if(! $trainee->photo_path && ! $trainee->trainer_photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーナー用写真が未設定です。トレーニー詳細へ" @endif>
+                                       @if(! $trainee->photo_path && ! $trainee->trainer_photo_path) aria-label="{{ $trainee->display_name }}の写真なし。トレーニー詳細へ" @endif>
                                         <div class="d-flex align-items-center justify-content-center position-relative"
                                              style="width: 96px; height: 96px; background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
                                             @if($trainee->photo_path || $trainee->trainer_photo_path)
@@ -608,7 +609,7 @@
                                             @else
                                                 <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
                                             @endif
-                                            @if(! $trainee->hasTrainerPhoto())
+                                            @if(! $trainee->hasTrainerPhoto() && $trainee->photo_path)
                                                 <span class="trainee-photo-warning" title="トレーナー用写真が未設定です" aria-hidden="true"><i class="bi bi-exclamation-circle-fill"></i></span>
                                                 <span class="visually-hidden">トレーナー用写真が未設定です</span>
                                             @endif
