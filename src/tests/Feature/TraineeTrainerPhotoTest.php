@@ -368,13 +368,19 @@ class TraineeTrainerPhotoTest extends TestCase
         $this->assertStringNotContainsString('設定する', $html);
         $this->assertStringContainsString('<h5 class="modal-title" id="trainerPhotoModalLabel">トレーナー用写真を選ぶ</h5>', $html);
 
-        // 会員写真だけ：会員写真を大きく、重ねない。［外す］はまだ出さない
+        // 会員写真だけ：メインは「写真なし」のまま、会員写真を右下に重ねる（2026-11 変更：最初は会員写真を大きく出していた）。
+        // ［外す］はまだ出さない
         Storage::disk(Trainee::STORAGE_DISK)->put('trainees/202611/member.jpg', 'member');
         $this->trainee->forceFill(['photo_path' => 'trainees/202611/member.jpg'])->save();
         $html = $show();
         $frame = $this->photoFrame($html);
-        $this->assertStringContainsString('alt="モモの写真"', $frame);
-        $this->assertStringNotContainsString('trainee-show-photo-overlay"', $frame);
+        $this->assertMatchesRegularExpression(
+            '/<span class="text-muted" style="font-size: 0\.875rem;">写真なし<\/span>\s*<div class="trainee-show-photo-overlay">\s*<img src="[^"]+" alt="会員写真">\s*<\/div>/u',
+            $frame
+        );
+        $this->assertStringNotContainsString('alt="モモの写真"', $frame);
+        $this->assertStringNotContainsString('alt="モモのトレーナー用写真"', $frame);
+        $this->assertSame(1, substr_count($frame, '<img '));
         $this->assertMatchesRegularExpression($actionButton, $frame);
         $this->assertStringNotContainsString('>外す</button>', $html);
 

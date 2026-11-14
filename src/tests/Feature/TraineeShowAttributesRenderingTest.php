@@ -56,7 +56,7 @@ class TraineeShowAttributesRenderingTest extends TestCase
             'trainee' => $trainee,
             'weightChart' => ['id' => 1, 'callName' => $trainee->client_call_name, 'photoUrl' => null, 'datasets' => []],
             'deleteConfirmMessage' => 'このトレーニーを削除しますか？',
-            // 写真の枠（2026-11 追加。トレーナー用写真なし＝会員写真を大きく出す今までどおりの形）と、
+            // 写真の枠（2026-11 追加。mainUrl はトレーナー用写真の URL〔2026-11 変更：会員写真は大きく出さず overlayUrl だけ〕）と、
             // トレーナー用写真の選択モーダル（S-0309-M02）の登録者の選択肢
             'photoFrame' => ['mainUrl' => null, 'mainAlt' => 'ポチの写真', 'overlayUrl' => null, 'hasTrainerPhoto' => false],
             'trainers' => collect(),

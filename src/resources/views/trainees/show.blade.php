@@ -87,7 +87,8 @@
                         <div class="align-self-center align-self-sm-start" style="flex-shrink: 0;">
                             {{-- 写真の枠（2026-11 変更。設計書 S-0309「写真の枠の表示」）。どの写真を大きく出し、どれを右下に重ねるかは
                                  コントローラで決めた $photoFrame をそのまま出す（トレーナー用写真があればそれを大きく、
-                                 会員写真もあれば右下に小さく重ねる。トレーナー用写真がなければ今までどおり会員写真）。
+                                 会員写真があればいつも右下に小さく重ねる。トレーナー用写真がなければメインは「写真なし」のまま。
+                                 2026-11 変更：最初はトレーナー用写真がないとき会員写真を大きく出していた）。
                                  重ねる写真の大きさ・縁取りは app.scss の .trainee-show-photo-overlay。枠はクリックしても何も起きない --}}
                             <div class="trainee-show-photo position-relative d-flex align-items-center justify-content-center"
                                  style="background-color: #ffffff; border: 1px solid rgba(15, 26, 46, 0.08); border-radius: 0.5rem; overflow: hidden;">
@@ -97,16 +98,18 @@
                                     <img src="{{ $photoFrame['mainUrl'] }}"
                                          alt="{{ $photoFrame['mainAlt'] }}"
                                          style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;">
-                                    @if($photoFrame['overlayUrl'])
-                                        {{-- 会員写真（右下に小さく重ねる。読み上げ用に alt を「会員写真」にする。ツールチップ〔title〕は出さない。2026-11 変更：当初は title も付けていた） --}}
-                                        <div class="trainee-show-photo-overlay">
-                                            <img src="{{ $photoFrame['overlayUrl'] }}" alt="会員写真">
-                                        </div>
-                                    @endif
                                 @else
-                                    {{-- 写真なしのプレースホルダ。会員側は「写真を登録」（登録操作への案内）
-                                         だが、トレーナー側は会員写真の登録操作をしないため文言を「写真なし」に変える。 --}}
+                                    {{-- 写真なしのプレースホルダ（トレーナー用写真がないとき。会員写真があっても出す）。会員側は「写真を登録」
+                                         （登録操作への案内）だが、トレーナー側は会員写真の登録操作をしないため文言を「写真なし」に変える。
+                                         文言は枠の中央、会員写真は右下、［写真］のボタンは左下なので重ならない --}}
                                     <span class="text-muted" style="font-size: 0.875rem;">写真なし</span>
+                                @endif
+                                @if($photoFrame['overlayUrl'])
+                                    {{-- 会員写真（右下に小さく重ねる。トレーナー用写真の有無によらない〔2026-11 変更〕。読み上げ用に alt を「会員写真」にする。
+                                         ツールチップ〔title〕は出さない。2026-11 変更：当初は title も付けていた） --}}
+                                    <div class="trainee-show-photo-overlay">
+                                        <img src="{{ $photoFrame['overlayUrl'] }}" alt="会員写真">
+                                    </div>
                                 @endif
                                 {{-- トレーナー用写真の操作（2026-11 変更。設計書 S-0309「写真の枠の表示」）。枠の左下に小さなボタンを 1 つ重ねる
                                      （右下は会員写真を重ねる場所なので、反対側の左下。2026-11 変更：最初は右上）。未設定・設定済みに関係なく同じボタンで、押すと S-0309-M02 を開く。

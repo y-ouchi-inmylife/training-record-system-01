@@ -76,17 +76,17 @@ class TraineeController extends Controller
         // どの写真を大きく出し、どれを右下に重ねるかはここで決めて渡す（Blade に条件の組み立てを持たせない）。
         //   トレーナー用 あり・会員写真 あり → トレーナー用を大きく、会員写真を重ねる
         //   トレーナー用 あり・会員写真 なし → トレーナー用だけ
-        //   トレーナー用 なし・会員写真 あり → 会員写真を大きく（今までどおり）
+        //   トレーナー用 なし・会員写真 あり → メインは「写真なし」（mainUrl が null）、会員写真を重ねる
         //   どちらもなし                       → 「写真なし」（mainUrl が null）
+        // 2026-11 変更：最初は「なし・あり」のとき会員写真を大きく出していた。メインの場所はトレーナー用写真の場所とし、
+        // 会員写真は参考として重ねるだけにするため、会員写真はいつも重ねる側にした（大きく出さない）
         // トレーナー用写真の URL は、会員側と共用の weight_chart_data には入れず、トレーナー側だけのアクセサから取る
         $trainerPhotoUrl = $trainee->trainer_photo_url;
         $memberPhotoUrl = $weightChart['photoUrl'];
         $photoFrame = [
-            'mainUrl' => $trainerPhotoUrl ?? $memberPhotoUrl,
-            'mainAlt' => $trainerPhotoUrl !== null
-                ? $trainee->display_name.'のトレーナー用写真'
-                : $trainee->display_name.'の写真',
-            'overlayUrl' => $trainerPhotoUrl !== null ? $memberPhotoUrl : null,
+            'mainUrl' => $trainerPhotoUrl,
+            'mainAlt' => $trainee->display_name.'のトレーナー用写真',
+            'overlayUrl' => $memberPhotoUrl,
             'hasTrainerPhoto' => $trainerPhotoUrl !== null,
         ];
 
