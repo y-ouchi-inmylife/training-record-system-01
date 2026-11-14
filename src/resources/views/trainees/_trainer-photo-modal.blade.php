@@ -1,9 +1,9 @@
 {{-- トレーナー用写真の選択モーダル（S-0309-M02。2026-11 追加。要件定義書 6-16-20）。
      写真の枠の左下に重ねた［写真］のボタン（data-trainer-photo-open）で開く。メディア一覧（ライブラリ）から
      写真を 1 枚だけ選び、［更新］で POST /trainees/{trainee}/trainer-photo に送る（通常の form の送信）。
-     トレーナー用写真を設定済み（$hasTrainerPhoto）のときだけ、フッターの左に［外す］を出す（2026-11 変更：当初は
-     写真の枠の下に置いていた）。外すフォーム（DELETE）は選ぶフォーム（POST）と入れ子にできないため、モーダルの外に置き、
-     ［外す］のボタンを form 属性で結ぶ。
+     トレーナー用写真を設定済み（$hasTrainerPhoto）のときだけ、フッターの左に［削除］を出す（2026-11 変更：当初は
+     写真の枠の下に置いていた）。削除のフォーム（DELETE）は選ぶフォーム（POST）と入れ子にできないため、モーダルの外に置き、
+     ［削除］のボタンを form 属性で結ぶ。
 
      見た目はメディア追加モーダル（S-0401-M02 / S-0404-M01。training-records/_form.blade.php の #mediaAddModal）に
      そろえる。JS は記録のフォームと一体なので共通化せず、次を複製して 1 枚だけ選ぶ形に変えた：
@@ -62,9 +62,9 @@
             </div>
             <div class="modal-footer">
                 @if($hasTrainerPhoto ?? false)
-                    {{-- 設定済みのときだけ左に［外す］。モーダルの中の削除なので白抜きの赤（設計書 4-4）。
+                    {{-- 設定済みのときだけ左に［削除］（2026-11 変更：当初の名前は［外す］。システム全体の言い方にそろえた）。モーダルの中の削除なので白抜きの赤（設計書 4-4）。
                          このモーダルのフォーム（POST）ではなく、外のフォーム（DELETE）を送る --}}
-                    <button type="submit" form="trainerPhotoRemoveForm" class="btn btn-outline-danger me-auto" id="trainerPhotoRemoveBtn">外す</button>
+                    <button type="submit" form="trainerPhotoRemoveForm" class="btn btn-outline-danger me-auto" id="trainerPhotoRemoveBtn">削除</button>
                 @endif
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                 {{-- 保存の操作なので緑（設計書 4-4「データ保存」。ほかの画面の［更新］と同じ btn-success。2026-11 変更：当初の名前は［設定する］）。
@@ -75,10 +75,10 @@
     </div>
 </div>
 @if($hasTrainerPhoto ?? false)
-    {{-- トレーナー用写真を外すフォーム（DELETE）。選ぶフォームの外に置き、モーダルのフッターの［外す］（form="trainerPhotoRemoveForm"）で送る。
-         送る前に確認ダイアログを出す（設計書 S-0309-M02「外す」） --}}
+    {{-- トレーナー用写真を削除するフォーム（DELETE）。選ぶフォームの外に置き、モーダルのフッターの［削除］（form="trainerPhotoRemoveForm"）で送る。
+         送る前に確認ダイアログを出す（設計書 S-0309-M02「削除」） --}}
     <form method="POST" action="{{ route('trainee-trainer-photo.destroy', $trainee) }}" id="trainerPhotoRemoveForm" class="d-none"
-          onsubmit="return confirm('トレーナー用写真を外しますか？（会員写真と、選んだもとのメディアはそのまま残ります）');">
+          onsubmit="return confirm('トレーナー用写真を削除しますか？（会員写真と、選んだもとのメディアはそのまま残ります）');">
         @csrf
         @method('DELETE')
     </form>

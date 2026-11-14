@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * トレーナー用写真の設定・外す（S-0309 / S-0309-M02。要件定義書 6-16-20。2026-11 追加）。
+ * トレーナー用写真の設定・削除（S-0309 / S-0309-M02。要件定義書 6-16-20。2026-11 追加）。
  *
  * トレーナーがメディア一覧（ライブラリ）から写真を 1 枚選び、そのトレーニーの「トレーナー用写真」にする。
  * 選んだメディアの表示用の画像（display_path）から、会員写真と同じ形式の画像（長辺 400px の JPEG 1 枚）を作って
@@ -132,14 +132,14 @@ class TraineeTrainerPhotoController extends Controller
     }
 
     /**
-     * トレーナー用写真を外す。DELETE /trainees/{trainee}/trainer-photo
+     * トレーナー用写真を削除する。DELETE /trainees/{trainee}/trainer-photo
      *
      * 順番：DB を NULL に戻す（updated_by も）→ ファイルを消す（削除の失敗はログのみ）。
      * 会員写真と元のメディアには触らない。
      */
     public function destroy(Trainee $trainee): RedirectResponse
     {
-        // 外すものがないときは 404（設計書 api-design.md）
+        // 削除するものがないときは 404（設計書 api-design.md）
         $key = $trainee->trainer_photo_path;
         if ($key === null || $key === '') {
             abort(404);
@@ -154,7 +154,7 @@ class TraineeTrainerPhotoController extends Controller
 
         return redirect()
             ->route('trainees.show', $trainee)
-            ->with('success', 'トレーナー用写真を外しました。');
+            ->with('success', 'トレーナー用写真を削除しました。');
     }
 
     /**

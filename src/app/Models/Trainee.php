@@ -112,7 +112,7 @@ class Trainee extends Model
 
     // トレーナー用写真（trainer_photo_path）は fillable に入れない（2026-11 追加）。
     // 会員側のフォーム（愛犬の情報の変更・愛犬アンケート）から書き換えられないよう、
-    // 設定・外すはトレーナー側の TraineeTrainerPhotoController で forceFill して保存する。
+    // 設定・削除はトレーナー側の TraineeTrainerPhotoController で forceFill して保存する。
 
     /**
      * 配列・JSON にしたときに出さない列（2026-11 追加）。

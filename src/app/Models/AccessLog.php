@@ -44,7 +44,7 @@ class AccessLog extends Model
             'delete_trainee' => 'トレーニー削除',
             // トレーナー用写真（2026-11 追加。設計書 db-schema.md のアクション表）
             'create_trainee_trainer_photo' => 'トレーナー用写真の設定',
-            'delete_trainee_trainer_photo' => 'トレーナー用写真を外す',
+            'delete_trainee_trainer_photo' => 'トレーナー用写真の削除',
             'create_trainee_measurement' => '計測値登録',
             'edit_trainee_measurement' => '計測値編集',
             'delete_trainee_measurement' => '計測値削除',

@@ -26,7 +26,7 @@ class LogAccess
         'trainees.store' => 'create_trainee',
         'trainees.update' => 'edit_trainee',
         'trainees.destroy' => 'delete_trainee',
-        // トレーナー用写真の設定・外す（2026-11 追加。要件定義書 6-16-20。target_id はルートの {trainee}）
+        // トレーナー用写真の設定・削除（2026-11 追加。要件定義書 6-16-20。target_id はルートの {trainee}）
         'trainee-trainer-photo.store' => 'create_trainee_trainer_photo',
         'trainee-trainer-photo.destroy' => 'delete_trainee_trainer_photo',
         // トレーニー計測値（D-0800、段階②）。参照は view_client に含めるため view_trainee_measurement は作らない。
