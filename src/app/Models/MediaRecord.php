@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -218,6 +219,57 @@ class MediaRecord extends Model
         }
         return Storage::disk(self::STORAGE_DISK)
             ->temporaryUrl($this->thumbnail_path, $expiresAt);
+    }
+
+    // --- ひも付くトレーニー・会員の表示（2026-11 追加。設計書 screen-design.md S-1302 / S-1302-M01） ---
+    //
+    // メディアとトレーニーは直接ひも付けない（ライブラリ型）。ひも付くトレーニング記録 → 会員 → 会員のトレーニー
+    // とたどって表示する。N+1 を避けるため、呼び出し側で trainingRecords.client.trainees を eager load しておくこと
+    // （MediaRecordController::index()）。文字列の組み立ては Client::traineesWithNameLabel() に 1 か所でまとめる。
+
+    /**
+     * ひも付くトレーニング記録を、トレーニング日の新しい順（同じ日なら記録 ID の大きい順）に並べて返す。
+     * 会員が取れない記録（通常はない）は除く
+     */
+    public function linkedTrainingRecordsLatestFirst(): Collection
+    {
+        return $this->trainingRecords
+            ->filter(fn ($record) => $record->client !== null)
+            ->sort(function ($a, $b) {
+                return [$b->training_date?->format('Y-m-d'), $b->id] <=> [$a->training_date?->format('Y-m-d'), $a->id];
+            })
+            ->values();
+    }
+
+    /**
+     * 一覧のカード用：会員ごとに重複をまとめた「トレーニー（会員）」の文字列の一覧。
+     * 並び順は、その会員のひも付く記録のうちトレーニング日がいちばん新しいものの新しい順。
+     * 何行出すか（最大 3 行・「ほか N名」）は表示側で決める
+     *
+     * @return Collection<int, string>
+     */
+    public function linkedClientLabels(): Collection
+    {
+        return $this->linkedTrainingRecordsLatestFirst()
+            ->unique('client_id')
+            ->map(fn ($record) => $record->client->traineesWithNameLabel())
+            ->values();
+    }
+
+    /**
+     * 詳細モーダル用：ひも付く記録ごとの日付（Y/m/d）と「トレーニー（会員）」の文字列。
+     * 同じ会員の記録が複数あれば記録ごとに 1 件。並び順は linkedTrainingRecordsLatestFirst() のとおり
+     *
+     * @return array<int, array{date: string, label: string}>
+     */
+    public function linkedTrainingRecordLines(): array
+    {
+        return $this->linkedTrainingRecordsLatestFirst()
+            ->map(fn ($record) => [
+                'date' => $record->training_date?->format('Y/m/d') ?? '',
+                'label' => $record->client->traineesWithNameLabel(),
+            ])
+            ->all();
     }
 
     // --- アクセサ ---

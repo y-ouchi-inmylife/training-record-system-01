@@ -47,8 +47,16 @@ class MediaRecordController extends Controller
     {
         $user = Auth::user();
 
-        // 詳細モーダルで登録者名を表示するため、N+1回避の eager load を入れる
-        $query = MediaRecord::with(['trainer'])
+        // 詳細モーダルで登録者名を表示するため、N+1回避の eager load を入れる。
+        // ひも付くトレーニー・会員（カードの「トレーニー（会員）」と詳細の「トレーニング記録」。2026-11 追加）も
+        // 記録 → 会員 → 会員のトレーニーの順に eager load する（列は表示に要るものだけ）。
+        // JOIN ではないので、ページ送りはメディアの行で数えたまま
+        $query = MediaRecord::with([
+            'trainer',
+            'trainingRecords' => fn ($q) => $q->select('training_records.id', 'training_records.client_id', 'training_records.training_date'),
+            'trainingRecords.client' => fn ($q) => $q->select('id', 'last_name', 'first_name'),
+            'trainingRecords.client.trainees' => fn ($q) => $q->select('id', 'client_id', 'name'),
+        ])
             ->orderBy('created_at', 'desc');
 
         // 登録者フィルタ（既存の音声記録一覧と同型）
@@ -79,6 +87,7 @@ class MediaRecordController extends Controller
         $mediaModalData = $mediaRecords->getCollection()->mapWithKeys(function ($m) use ($thumbnailExpiresAt) {
             // サムネイル presigned URL は thumbnail_status=done のものだけ発行（24件分、SDK 内 HMAC のみで高速）
             $thumbnailUrl = $m->temporaryThumbnailUrl($thumbnailExpiresAt);
+            $trainingRecordLines = $m->linkedTrainingRecordLines();
 
             return [$m->id => [
                 'type' => $m->type,
@@ -94,6 +103,9 @@ class MediaRecordController extends Controller
                 'original_filename' => $m->original_filename,
                 'created_at' => $m->created_at->format('Y/m/d H:i'),
                 'trainer_name' => $m->trainer?->name,
+                // ひも付くトレーニング記録（日付と「トレーニー（会員）」の文字列）と件数。表示に要る値だけを渡す（2026-11 追加）
+                'training_records' => $trainingRecordLines,
+                'training_record_count' => count($trainingRecordLines),
             ]];
         });
 

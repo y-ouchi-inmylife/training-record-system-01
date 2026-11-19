@@ -69,6 +69,24 @@
                                 {{-- 時刻のみ（日付は上の日付見出しに集約） --}}
                                 <div class="text-muted">{{ $media->created_at->format('H:i') }}</div>
                                 <div class="text-truncate" title="{{ $media->display_title }}">@if(empty($media->title))({{ $media->display_title }})@else{{ $media->display_title }}@endif</div>
+                                {{-- ひも付くトレーニー（会員）（2026-11 追加。設計書 S-1302「トレーニー・会員」）。
+                                     会員ごとにまとめて 1 人 1 行・最大 3 行。4 人以上は 3 行目に「ほか N名」を付け、
+                                     名前の部分だけを省略する（「ほか N名」は flex-shrink-0 で必ず見せる。text-truncate を
+                                     flex の子で効かせるため min-width: 0 を付ける）。title は付けない・リンクにしない。
+                                     ひも付きがなければ空欄だが、1 行分の高さを &nbsp; で確保する（§2-4。読み上げは aria-hidden で外す）。
+                                     新しい @php は足さない（$loop->count で人数を見る） --}}
+                                <div class="media-card-trainees text-muted">
+                                    @forelse($media->linkedClientLabels() as $clientLabel)
+                                        @continue($loop->iteration > 3)
+                                        @if($loop->iteration === 3 && $loop->count > 3)
+                                            <div class="d-flex"><span class="text-truncate" style="min-width: 0;">{{ $clientLabel }}</span><span class="flex-shrink-0">ほか{{ $loop->count - 3 }}名</span></div>
+                                        @else
+                                            <div class="text-truncate">{{ $clientLabel }}</div>
+                                        @endif
+                                    @empty
+                                        <div aria-hidden="true">&nbsp;</div>
+                                    @endforelse
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -135,6 +153,11 @@
 
                             <dt class="col-sm-3">登録者</dt>
                             <dd class="col-sm-9" id="mediaMetaTrainer"></dd>
+
+                            {{-- ひも付くトレーニング記録（2026-11 追加。設計書 S-1302-M01「トレーニング記録」）。
+                                 「日付　トレーニー（会員）」を 1 件 1 行で JS が差し込む。ひも付きがなければ空欄（§2-4）。リンクにしない --}}
+                            <dt class="col-sm-3">トレーニング記録</dt>
+                            <dd class="col-sm-9" id="mediaMetaTrainingRecords"></dd>
                         </dl>
                     </div>
                 </div>
@@ -311,6 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const metaType = document.getElementById('mediaMetaType');
     const metaOriginalFilename = document.getElementById('mediaMetaOriginalFilename');
     const metaTrainer = document.getElementById('mediaMetaTrainer');
+    const metaTrainingRecords = document.getElementById('mediaMetaTrainingRecords');
     const editTitle = document.getElementById('mediaEditTitle');
     const updateBtn = document.getElementById('mediaUpdateBtn');
     const deleteBtn = document.getElementById('mediaDeleteBtn');
@@ -344,6 +368,14 @@ document.addEventListener('DOMContentLoaded', function() {
             metaType.textContent = meta.type === 'photo' ? '写真' : (meta.type === 'video' ? '動画' : meta.type);
             metaOriginalFilename.textContent = meta.original_filename || '';
             metaTrainer.textContent = meta.trainer_name || '（削除済み）';
+            // ひも付くトレーニング記録：「日付　トレーニー（会員）」を 1 件 1 行（日付の後ろは全角空白）。
+            // サーバーが並べた順（トレーニング日の新しい順）のまま出す。ひも付きがなければ空欄
+            metaTrainingRecords.innerHTML = '';
+            (meta.training_records || []).forEach(function(line) {
+                const div = document.createElement('div');
+                div.textContent = line.date + '　' + line.label;
+                metaTrainingRecords.appendChild(div);
+            });
 
             // 編集可能項目（input の値をセット）
             editTitle.value = meta.title_raw || '';
@@ -609,7 +641,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // 削除ボタン: 確認 → DELETE（成功時 reload）
     deleteBtn.addEventListener('click', async function() {
         if (!currentMediaId) return;
-        if (!confirm('このメディアを削除します。レコードとストレージ上のファイルがともに削除され、元に戻せません。よろしいですか?')) {
+        // ひも付くトレーニング記録があるときは、今の確認文の前に 1 文足す（2026-11 追加。設計書 S-1302-M01「削除」）
+        let confirmMessage = 'このメディアを削除します。レコードとストレージ上のファイルがともに削除され、元に戻せません。よろしいですか?';
+        const linkedCount = (mediaModalData[currentMediaId] || {}).training_record_count || 0;
+        if (linkedCount > 0) {
+            confirmMessage = 'このメディアは ' + linkedCount + ' 件のトレーニング記録で使われています。削除すると記録からも消えます。\n' + confirmMessage;
+        }
+        if (!confirm(confirmMessage)) {
             return;
         }
         // 新しい削除を始めるので、前のエラーの表示を消す
