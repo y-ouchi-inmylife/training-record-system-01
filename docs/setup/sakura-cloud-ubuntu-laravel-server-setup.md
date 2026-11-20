@@ -414,6 +414,7 @@ nginx / php8.4-fpm / mysql / supervisor が `running` であること。
 ## 第3段階：サーバーの定常保守
 
 - **OS 更新**：定期的に `sudo apt update && sudo apt upgrade -y`。`System restart required` が出たら、アクセスの少ない時間帯に再起動する。
+- **自動更新**：自動更新（unattended-upgrades）が既定で動いており、MySQL などが知らないうちに再起動することがある。キューのワーカーは、各アプリのアプリ構築手順書（training-record-system-01 は 10-3）で `FATAL` になっていないかを確かめる（**2026-11 追加**）。
 - **PHP-FPM のプール**：標準のプールを止めた後は、PHP の更新のあとに `ls /etc/php/8.4/fpm/pool.d/` で `www.conf` が復活していないことを確認する（通常、パッケージの更新で名前を変えた設定ファイルが戻されることはないが、念のため）。
 - **SSL 証明書**：`sudo certbot certificates` で有効期限を確認する（自動更新が効いていれば期限の 30 日前頃に更新される）。
 - **ディスク・メモリ**：`df -h`、`free -h` で余裕を確認する。

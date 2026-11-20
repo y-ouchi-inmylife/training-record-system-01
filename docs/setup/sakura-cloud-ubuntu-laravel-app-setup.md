@@ -566,6 +566,7 @@ user=trs01
 numprocs=1
 autostart=true
 autorestart=true
+startretries=20
 stopwaitsecs=610
 redirect_stderr=true
 stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker-audio.log
@@ -576,6 +577,7 @@ user=trs01
 numprocs=1
 autostart=true
 autorestart=true
+startretries=20
 stopwaitsecs=610
 redirect_stderr=true
 stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker-media.log
@@ -587,6 +589,7 @@ stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker-media.
 - `--tries=1`：ジョブの `$tries`（1）と同じ。失敗したジョブはくり返さない。
 - `--timeout=600`：ジョブの時間の上限。`retry_after`（660）より短くする（10-1）。
 - `--max-time=3600`：1 時間ごとにワーカーを立ち上げ直す（メモリの増え続けを防ぐ。supervisor が `autorestart` で立ち上げ直す）。
+- `startretries=20`：立ち上げに失敗したとき、あきらめるまでに試す回数（**2026-11 追加**）。既定の 3 回だと約 7 秒で使い切り、`FATAL` になって止まったままになる。2026-11-14 に、自動更新（unattended-upgrades）で MySQL が約 8 秒再起動した間に、ワーカーが DB につながらずに `FATAL` になり、6 日間止まった。supervisor は失敗のたびに待ち時間を 1 秒ずつ延ばすので、20 回でおよそ 3 分粘る。
 - `stopwaitsecs=610`：止めるとき、動いているジョブ（最大 600 秒）が終わるまで待つ。
 - ワーカーは PHP-FPM のプールを通らない（コマンドラインの PHP で動く）ため、第6段階の `open_basedir` などの制限はかからない。実行ユーザーは `trs01` にそろえる。
 - ジョブの時間の上限を効かせるには、PHP の `pcntl` が要る。`php -m | grep pcntl` で出ることを確かめる（Ubuntu の PHP の CLI には入っている）。
@@ -627,8 +630,20 @@ sudo supervisorctl stop training-record-system-01-worker-audio training-record-s
 
 ### 10-3. 監視と、失敗したジョブの扱い
 
-- **ワーカーが動いているか**：`sudo supervisorctl status`（`RUNNING` であること）。落ちても supervisor が立ち上げ直す（`autorestart`）。
+- **ワーカーが動いているか**：`sudo supervisorctl status`（`RUNNING` であること）。落ちても supervisor が立ち上げ直す（`autorestart`）。ただし `startretries` の回数を使い切ると `FATAL` で止まり、それ以上は立ち上げ直さない（下記「ワーカーが `FATAL` になったとき」）。
 - **たまっているジョブ**：`SELECT COUNT(*) FROM jobs;` が 0 に戻ること。増え続けていたら、ワーカーが止まっている。
+- **ワーカーが `FATAL` になったとき**：`sudo supervisorctl status` で `FATAL`（または `BACKOFF`）なら、supervisor はもう立ち上げ直さない。原因を確かめてから、手で立ち上げる（**2026-11 追加**）。
+
+```bash
+sudo supervisorctl status
+tail -n 50 /var/www/training-record-system-01/src/storage/logs/worker-media.log   # audio は worker-audio.log
+# 原因（DB につながらない、など）が解消していることを確かめてから
+sudo supervisorctl start training-record-system-01-worker-media
+sudo supervisorctl status
+```
+
+  - 2026-11-14 の例：ログに `SQLSTATE[HY000] [2002] Connection refused` が出ていた（MySQL の再起動中）。
+  - `queue:restart` や失敗したジョブの再実行は、原因を確かめるまで行わない。手で立ち上げると、たまっていたジョブが古い順に処理される（録音があれば文字起こし・要約も動き、AI の料金がかかる）。
 - **失敗したジョブ**：
 
 ```bash
