@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -226,6 +227,37 @@ class MediaRecord extends Model
     // メディアとトレーニーは直接ひも付けない（ライブラリ型）。ひも付くトレーニング記録 → 会員 → 会員のトレーニー
     // とたどって表示する。N+1 を避けるため、呼び出し側で trainingRecords.client.trainees を eager load しておくこと
     // （MediaRecordController::index()）。文字列の組み立ては Client::traineesWithNameLabel() に 1 か所でまとめる。
+
+    /**
+     * 表示に要るひも付き（記録 → 会員 → 会員のトレーニー）を、列を絞って eager load する。
+     * メディア一覧（MediaRecordController::index）と、メディアを選ぶモーダルの候補の API
+     * （TrainingRecordController::availableMedia）で同じ読み込み方にするため 1 か所にまとめる（2026-11）。
+     * JOIN ではないので、ページ送りはメディアの行で数えたまま
+     */
+    public function scopeWithLinkedClients(Builder $query): Builder
+    {
+        return $query->with([
+            'trainingRecords' => fn ($q) => $q->select('training_records.id', 'training_records.client_id', 'training_records.training_date'),
+            'trainingRecords.client' => fn ($q) => $q->select('id', 'last_name', 'first_name'),
+            'trainingRecords.client.trainees' => fn ($q) => $q->select('id', 'client_id', 'name'),
+        ]);
+    }
+
+    /**
+     * メディアを選ぶモーダルのカード用（2026-11 追加。設計書 api-design.md available-media の linked_labels）：
+     * linkedClientLabels() の先頭 $max 件と、それより後ろの人数。メディア一覧のカードと同じ文字列・同じ並び
+     *
+     * @return array{labels: array<int, string>, others_count: int}
+     */
+    public function linkedClientSummary(int $max = 3): array
+    {
+        $labels = $this->linkedClientLabels();
+
+        return [
+            'labels' => $labels->take($max)->values()->all(),
+            'others_count' => max(0, $labels->count() - $max),
+        ];
+    }
 
     /**
      * ひも付くトレーニング記録を、トレーニング日の新しい順（同じ日なら記録 ID の大きい順）に並べて返す。

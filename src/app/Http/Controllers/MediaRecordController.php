@@ -52,12 +52,9 @@ class MediaRecordController extends Controller
         // ひも付くトレーニー・会員（カードの「トレーニー名：会員名」と詳細の「トレーニング記録」。2026-11 追加）も
         // 記録 → 会員 → 会員のトレーニーの順に eager load する（列は表示に要るものだけ）。
         // JOIN ではないので、ページ送りはメディアの行で数えたまま
-        $query = MediaRecord::with([
-            'trainer',
-            'trainingRecords' => fn ($q) => $q->select('training_records.id', 'training_records.client_id', 'training_records.training_date'),
-            'trainingRecords.client' => fn ($q) => $q->select('id', 'last_name', 'first_name'),
-            'trainingRecords.client.trainees' => fn ($q) => $q->select('id', 'client_id', 'name'),
-        ])
+        // 読み込み方は MediaRecord::scopeWithLinkedClients にまとめた（メディアを選ぶモーダルの候補の API と同じ）
+        $query = MediaRecord::with(['trainer'])
+            ->withLinkedClients()
             ->orderBy('created_at', 'desc');
 
         // 登録者フィルタ（既存の音声記録一覧と同型）

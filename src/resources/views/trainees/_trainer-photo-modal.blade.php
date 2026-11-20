@@ -85,6 +85,8 @@
 @endif
 
 @push('scripts')
+{{-- カードの「トレーニー・会員」の行を作る JS と肉球の <template>（メディア追加モーダルと共通） --}}
+@include('media-records._linked-clients-js')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const defaultTrainerId = @json(auth()->id());
@@ -273,6 +275,11 @@ document.addEventListener('DOMContentLoaded', function () {
         titleDiv.title = m.display_title || '';
         titleDiv.textContent = m.display_title || '';
         body.appendChild(titleDiv);
+        // ひも付くトレーニー・会員（2026-11 追加。設計書 S-0309-M02「トレーニー・会員」）。
+        // 行を作る関数は media-records/_linked-clients-js（メディア追加モーダルと共通。複製はしない）
+        if (typeof window.buildMediaLinkedClients === 'function') {
+            body.appendChild(window.buildMediaLinkedClients(m));
+        }
         card.appendChild(body);
 
         col.appendChild(card);

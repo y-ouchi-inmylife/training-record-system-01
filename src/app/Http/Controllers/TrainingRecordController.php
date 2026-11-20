@@ -385,7 +385,9 @@ class TrainingRecordController extends Controller
             'type' => 'nullable|in:photo',
         ]);
 
+        // カードの「トレーニー・会員」（2026-11 追加）のため、メディア一覧と同じ読み込み方で記録・会員・トレーニーを読む
         $query = MediaRecord::with(['trainer'])
+            ->withLinkedClients()
             ->orderBy('created_at', 'desc');
 
         // type=photo のときは、トレーナー用写真に選べるものだけに絞る：写真で、表示用の画像があるもの
@@ -412,6 +414,10 @@ class TrainingRecordController extends Controller
         // 各要素のメタ情報（mediaModalData と同形・5c フロントが lookup 不要で直接使える形）
         $thumbnailExpiresAt = now()->addMinutes(MediaRecordController::PLAY_URL_EXPIRES_MINUTES);
         $items = $paginator->getCollection()->map(function ($m) use ($thumbnailExpiresAt) {
+            // カードの「トレーニー・会員」（2026-11 追加。設計書 api-design.md available-media）：表示に要る値だけを足す。
+            // 文字列はメディア一覧と同じメソッド（MediaRecord::linkedClientLabels → Client::traineesWithNameLabel）で作る
+            $linked = $m->linkedClientSummary(3);
+
             return [
                 'id' => $m->id,
                 'type' => $m->type,
@@ -423,6 +429,8 @@ class TrainingRecordController extends Controller
                 'original_filename' => $m->original_filename,
                 'created_at' => $m->created_at->format('Y/m/d H:i'),
                 'trainer_name' => $m->trainer?->name,
+                'linked_labels' => $linked['labels'],
+                'linked_others_count' => $linked['others_count'],
             ];
         })->values();
 

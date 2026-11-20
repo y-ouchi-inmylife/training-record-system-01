@@ -72,6 +72,15 @@ class TraineeTrainerPhotoTest extends TestCase
             $table->timestamps();
         });
 
+        // 候補の API（available-media）がカードの「トレーニー・会員」のためにひも付きを読む（2026-11 追加）
+        Schema::create('media_record_training_record', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('media_record_id');
+            $table->unsignedBigInteger('training_record_id');
+            $table->unsignedInteger('sort_order')->default(0);
+            $table->timestamps();
+        });
+
         // トレーニー詳細（S-0309）を開くテストのため、詳細で読む表も作る（TraineeShowIntakeSurveyTest と同じ）
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();

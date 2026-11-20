@@ -653,9 +653,10 @@ document.addEventListener('DOMContentLoaded', function () {
 {{-- メディア追加モーダル制御（S-0404-M01）。
      available-media（5b）を fetch して候補を表示、チェック選択して mediaSelection.add で
      編集画面グリッドへ反映する。 --}}
+{{-- カードの「トレーニー・会員」の行を作る JS と肉球の <template>（トレーナー用写真の選択モーダルと共通） --}}
+@include('media-records._linked-clients-js')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-
     const defaultTrainerId = @json(auth()->id());
     const addBtn = document.getElementById('mediaAddBtn');
     const modalEl = document.getElementById('mediaAddModal');
@@ -899,6 +900,11 @@ document.addEventListener('DOMContentLoaded', function () {
         titleDiv.title = m.display_title || '';
         titleDiv.textContent = m.display_title || '';
         body.appendChild(titleDiv);
+        // ひも付くトレーニー・会員（2026-11 追加。設計書 S-0401-M02「トレーニー・会員」）。
+        // 行を作る関数は media-records/_linked-clients-js（トレーナー用写真の選択モーダルと共通）
+        if (typeof window.buildMediaLinkedClients === 'function') {
+            body.appendChild(window.buildMediaLinkedClients(m));
+        }
         card.appendChild(body);
 
         col.appendChild(card);
