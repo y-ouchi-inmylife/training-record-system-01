@@ -8,8 +8,11 @@
 
     {{-- 登録者フィルタ＋会員フィルタ＋新規登録ボタン。
          会員フィルタ（2026-11 追加。設計書 S-1302「会員」）は登録者の右に置き、ラベルの書き方（「:」付き）を登録者に合わせる。
-         狭い画面では折り返す（flex-wrap）。ラベルと欄が離れないよう、ラベルと欄の組ごとに d-flex でまとめる --}}
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+         狭い画面では折り返す（flex-wrap）。ラベルと欄が離れないよう、ラベルと欄の組ごとに d-flex でまとめる。
+         まとまりの間は、まとまりの切れ目が分かるよう横だけ広く空ける（column-gap-4 = 1.5rem。2026-11 変更：
+         最初は gap-2 = 0.5rem で、ラベルと欄の間と同じだった）。折り返したときの縦の間隔（row-gap-2 = 0.5rem）と、
+         まとまりの内側（ラベルと欄の間 gap-2）は今のまま --}}
+    <div class="d-flex flex-wrap align-items-center row-gap-2 column-gap-4 mb-4">
         <div class="d-flex align-items-center gap-2">
             <label for="trainer-filter" class="form-label mb-0 text-nowrap">登録者:</label>
             <select id="trainer-filter" class="form-select" style="width: 200px;">
@@ -359,8 +362,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 url: @json(route('api.clients.search', [], false)),
                 dataType: 'json',
                 delay: 250,
+                // 候補は内部ID の大きい順（新しく登録した会員ほど上）。order を付けなければ API は今までの並び（音声系の画面）
                 data: function (params) {
-                    return { q: params.term || '' };
+                    return { q: params.term || '', order: 'desc' };
                 },
                 processResults: function (data) {
                     return { results: data.results };

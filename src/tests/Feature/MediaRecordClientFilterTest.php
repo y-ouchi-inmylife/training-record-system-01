@@ -242,8 +242,12 @@ class MediaRecordClientFilterTest extends TestCase
         // 選んだら・外したら、page を消して client_id を差し替える（外したら消す）
         $this->assertStringContainsString("url.searchParams.set('client_id', value);", $html);
         $this->assertStringContainsString("url.searchParams.delete('client_id');", $html);
-        // 狭い画面では折り返す
-        $this->assertStringContainsString('<div class="d-flex flex-wrap align-items-center gap-2 mb-4">', $html);
+        // 候補は内部ID の大きい順（API に order=desc を付ける）
+        $this->assertStringContainsString("return { q: params.term || '', order: 'desc' };", $html);
+        // 狭い画面では折り返す。まとまりの間は横だけ広く（column-gap-4）、縦の間隔は 0.5rem のまま（row-gap-2）
+        $this->assertStringContainsString('<div class="d-flex flex-wrap align-items-center row-gap-2 column-gap-4 mb-4">', $html);
+        // まとまりの内側（ラベルと欄の間）は gap-2 のまま
+        $this->assertSame(2, substr_count($html, '<div class="d-flex align-items-center gap-2">'));
     }
 
     // ===== ページ送り =====
