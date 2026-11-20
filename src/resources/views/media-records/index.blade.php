@@ -72,8 +72,12 @@
                                 {{-- ひも付くトレーニー・会員（2026-11 追加・変更。設計書 S-1302「トレーニー・会員」）。
                                      表示名と見分けるため、細い区切り線（border-top）の下に「トレーニー名：会員名」を 1 人 1 行・最大 3 行で並べ、
                                      各行の先頭に青い肉球のマーク（自前の SVG。<x-icon-paw />。飾りなので aria-hidden）を付ける。名前は本文色、マークは text-primary。
-                                     4 人以上は 3 行目に「ほか N名」を付ける。省略するのは名前の部分だけ（マークと「ほか N名」は
-                                     flex-shrink-0 で必ず見せる。text-truncate を flex の子で効かせるため min-width: 0 を付ける）。
+                                     省略するのは名前の部分だけ（マークは flex-shrink-0 で必ず見せる。text-truncate を flex の子で
+                                     効かせるため min-width: 0 を付ける）。
+                                     4 人以上は 3 行目までを同じ作りの行にし、改行して 4 行目に「ほか N名」を出す（2026-11 変更。
+                                     最初は 3 行目の後ろに付けていたが、名前が省略されると名前の続きに見えたため）。4 行目は肉球なし・
+                                     text-muted・省略しない。文字の先頭を上の行の名前にそろえるため、肉球の幅（1em）と隙間（gap-1 =
+                                     0.25rem）の分だけ字下げする（既存のクラスにない値のためインライン style。1em は行と同じ文字の大きさ）。
                                      title は付けない・リンクにしない（カード全体が詳細を開くボタン）。
                                      ひも付きがなければ空欄で、区切り線もマークも出さないが、同じ太さの透明な線と同じ余白で
                                      区切り線の分も含めて 1 行分の高さを確保する（§2-4。読み上げは aria-hidden で外す）。
@@ -82,7 +86,10 @@
                                     <div class="media-card-trainees mt-1 pt-1 border-top">
                                         @foreach($media->linkedClientLabels() as $clientLabel)
                                             @continue($loop->iteration > 3)
-                                            <div class="d-flex align-items-center gap-1"><x-icon-paw class="text-primary flex-shrink-0" /><span class="text-truncate" style="min-width: 0;">{{ $clientLabel }}</span>@if($loop->iteration === 3 && $loop->count > 3)<span class="flex-shrink-0">ほか{{ $loop->count - 3 }}名</span>@endif</div>
+                                            <div class="d-flex align-items-center gap-1"><x-icon-paw class="text-primary flex-shrink-0" /><span class="text-truncate" style="min-width: 0;">{{ $clientLabel }}</span></div>
+                                            @if($loop->iteration === 3 && $loop->count > 3)
+                                                <div class="media-card-others text-muted" style="padding-left: calc(1em + 0.25rem);">ほか{{ $loop->count - 3 }}名</div>
+                                            @endif
                                         @endforeach
                                     </div>
                                 @else

@@ -17,7 +17,7 @@ use Tests\TestCase;
  * メディア一覧（S-1302）・メディア詳細（S-1302-M01）に、ひも付くトレーニーと会員を出す（2026-11 追加）。
  *
  * - 「トレーニー名：会員名」の組み立て（Client::traineesWithNameLabel）：1 頭・複数頭・名前未登録・トレーニーなし
- * - 一覧のカード：会員ごとにまとめて 1 人 1 行・最大 3 行、新しい順、4 人以上は 3 行目に「ほか N名」、ひも付きなしは 1 行分の空欄
+ * - 一覧のカード：会員ごとにまとめて 1 人 1 行・最大 3 行、新しい順、4 人以上は 4 行目に「ほか N名」（肉球なし・字下げ）、ひも付きなしは 1 行分の空欄
  * - 詳細：記録ごとに 1 行（トレーニング日の新しい順、同じ日は記録 ID の大きい順）
  * - 削除の確認文：ひも付きの件数を渡し、1 件以上なら 1 文足す
  * - 一覧のクエリの数がメディアの件数で増えない
@@ -222,9 +222,11 @@ class MediaRecordLinkedTraineesTest extends TestCase
             'ハナ：佐藤 次郎',
         ], $this->cardLines($html));
         $this->assertStringNotContainsString('ほか', $html);
+        // 3 人以下は 4 行目を出さない
+        $this->assertStringNotContainsString('media-card-others', $html);
     }
 
-    public function test_会員4人なら3行目にほか1名を付け名前の部分だけを省略する(): void
+    public function test_会員4人なら3行目は普通の行で4行目に肉球なしのほか1名を出す(): void
     {
         $media = $this->makeMedia();
         $this->link($media, $this->makeClient('大内', '佳和', ['アイ']), '2026-11-04');
@@ -237,11 +239,13 @@ class MediaRecordLinkedTraineesTest extends TestCase
         $this->assertSame([
             'アイ：大内 佳和',
             'モモ：山田 花子',
-            'ハナ：佐藤 次郎ほか1名',
+            'ハナ：佐藤 次郎',
         ], $this->cardLines($html));
         $this->assertStringNotContainsString('ソラ', $html);
-        // マーク（肉球）と「ほか N名」は省略の外（flex-shrink-0）に置き、名前の部分だけを text-truncate にする
-        $this->assertMatchesRegularExpression('#\<svg xmlns\="http\://www\.w3\.org/2000/svg" width\="1em" height\="1em" viewBox\="0 0 16 16" fill\="currentColor" aria\-hidden\="true" focusable\="false" style\="vertical\-align\: \-0\.125em;" class\="icon\-paw text\-primary flex\-shrink\-0"\>\s*(<ellipse [^>]*/>\s*){5}</svg>\s*<span class="text-truncate" style="min-width: 0;">ハナ：佐藤 次郎</span><span class="flex-shrink-0">ほか1名</span></div>#u', $html);
+        $this->assertSame(1, substr_count($html, 'media-card-others'));
+        $this->assertStringNotContainsString('ほか1名</span>', $html);
+        // 3 行目は 1〜2 行目と同じ作り（肉球＋名前。名前だけを省略）。4 行目は肉球なし・text-muted・名前の先頭にそろえる字下げ
+        $this->assertMatchesRegularExpression('#\<svg xmlns\="http\://www\.w3\.org/2000/svg" width\="1em" height\="1em" viewBox\="0 0 16 16" fill\="currentColor" aria\-hidden\="true" focusable\="false" style\="vertical\-align\: \-0\.125em;" class\="icon\-paw text\-primary flex\-shrink\-0"\>\s*(<ellipse [^>]*/>\s*){5}</svg>\s*<span class="text-truncate" style="min-width: 0;">ハナ：佐藤 次郎</span></div>\s*<div class="media-card-others text-muted" style="padding-left: calc\(1em \+ 0\.25rem\);">ほか1名</div>#u', $html);
         $this->assertSame(3, substr_count($html, 'class="icon-paw text-primary flex-shrink-0"'));
         $this->assertStringNotContainsString('bi-person', $html);
     }
