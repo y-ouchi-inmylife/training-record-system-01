@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function () {
             this.items = Array.isArray(initial) ? initial.slice() : [];
             this.render();
         },
-        add(media) {                     // 5c-2 で呼ぶ
+        add(media) {                     // 5c-2 で呼ぶ。フォームにすでにある ID（保存済み・未保存とも）は追加しない（二重にしない）
             if (this.items.some(i => i.id === media.id)) return;
             this.items.push(media);
             window.unsavedChangesGuard?.markDirty();
@@ -655,8 +655,7 @@ document.addEventListener('DOMContentLoaded', function () {
      編集画面グリッドへ反映する。 --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // edit では作成済み記録の id、create では null（登録画面ではクエリに含めない）
-    const trainingRecordId = @json($record?->id);
+
     const defaultTrainerId = @json(auth()->id());
     const addBtn = document.getElementById('mediaAddBtn');
     const modalEl = document.getElementById('mediaAddModal');
@@ -754,10 +753,8 @@ document.addEventListener('DOMContentLoaded', function () {
             trainer_id: trainerFilter.value,
             page: String(page),
         });
-        // create では trainingRecordId が null。クエリに含めず候補全件取得（除外なし）
-        if (trainingRecordId !== null) {
-            params.set('training_record_id', String(trainingRecordId));
-        }
+        // 登録・編集とも、記録に紐づけ済みかどうかで候補を外さない（training_record_id は送らない。2026-11 変更）。
+        // フォームにすでに入っているメディアを選んで［追加］しても、mediaSelection.add が ID で重複を見て追加しない
         try {
             const res = await fetch(
                 '/api/training-records/available-media?' + params.toString(),

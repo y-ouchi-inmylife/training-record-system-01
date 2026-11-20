@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
         submitBtn.disabled = true;
     }
 
-    // training-records/_form.blade.php の loadPage の複製（type=photo を付け、training_record_id は付けない）
+    // training-records/_form.blade.php の loadPage の複製（type=photo を付ける）
     async function loadPage(page) {
         clearSelection();
 

@@ -369,19 +369,15 @@ class TrainingRecordController extends Controller
      * 紐づけ候補メディア一覧（GET /api/training-records/available-media）
      *
      * S-0404-M01（編集）および S-0401-M02（登録）メディア追加モーダルが、メディア候補を
-     * 取得するための内部API。training_record_id 指定時はその記録に「まだ紐づいていない」
-     * メディアのみを候補とし、未指定時（登録画面）は全件を候補とする。
+     * 取得するための内部API。記録に紐づけ済みかどうかで候補を外さず、登録者の絞り込みの範囲の
+     * すべてのメディアを候補とする（2026-11 変更：以前は training_record_id を受け取り、その記録に
+     * 紐づけ済みのメディアを外していた。未保存の追加分は外れず、保存済みのものをフォームから外したあとは
+     * 選び直せなかったため、やめた。二重の追加はフォームの mediaSelection.add が ID で防ぐ）。
      * 登録者フィルタと24件ページネーションは MediaRecordController::index() と同方針。
      */
     public function availableMedia(Request $request): JsonResponse
     {
         $user = Auth::user();
-
-        // 登録画面では training_record_id 未指定。指定時は実在チェック（無ければ 404）
-        $trainingRecordId = $request->query('training_record_id');
-        $trainingRecord = $trainingRecordId
-            ? TrainingRecord::findOrFail($trainingRecordId)
-            : null;
 
         // type=photo（2026-11 追加。トレーナー用写真の選択モーダル S-0309-M02 から使う）。
         // 指定しなければ今までどおり（メディア追加モーダル S-0401-M02 / S-0404-M01 の動きは変えない）
@@ -400,14 +396,6 @@ class TrainingRecordController extends Controller
                 ->whereIn('conversion_status', [MediaRecord::CONVERSION_NOT_REQUIRED, MediaRecord::CONVERSION_DONE]);
         }
 
-        // 紐づけ済み除外は trainingRecord 指定時のみ。未指定（登録画面）は全件が候補
-        if ($trainingRecord) {
-            $query->whereNotIn('id', function ($q) use ($trainingRecord) {
-                $q->select('media_record_id')
-                  ->from('media_record_training_record')
-                  ->where('training_record_id', $trainingRecord->id);
-            });
-        }
 
         // 登録者フィルタ（既存メディア一覧と同型: 'all'=全件、id指定、未指定=自分）
         $trainerId = $request->query('trainer_id');
