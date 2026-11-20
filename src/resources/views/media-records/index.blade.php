@@ -69,20 +69,20 @@
                                 {{-- 時刻のみ（日付は上の日付見出しに集約） --}}
                                 <div class="text-muted">{{ $media->created_at->format('H:i') }}</div>
                                 <div class="text-truncate" title="{{ $media->display_title }}">@if(empty($media->title))({{ $media->display_title }})@else{{ $media->display_title }}@endif</div>
-                                {{-- ひも付く会員・トレーニー（2026-11 追加・変更。設計書 S-1302「会員・トレーニー」）。
-                                     表示名と見分けるため、細い区切り線（border-top）の下に「会員名：トレーニー」を 1 人 1 行・最大 3 行で並べ、
-                                     各行の先頭に人のアイコン（飾りなので aria-hidden）を付ける。名前は本文色、アイコンは text-muted。
-                                     4 人以上は 3 行目に「ほか N名」を付ける。省略するのは名前の部分だけ（アイコンと「ほか N名」は
+                                {{-- ひも付くトレーニー・会員（2026-11 追加・変更。設計書 S-1302「トレーニー・会員」）。
+                                     表示名と見分けるため、細い区切り線（border-top）の下に「トレーニー名：会員名」を 1 人 1 行・最大 3 行で並べ、
+                                     各行の先頭に青い肉球のマーク（自前の SVG。<x-icon-paw />。飾りなので aria-hidden）を付ける。名前は本文色、マークは text-primary。
+                                     4 人以上は 3 行目に「ほか N名」を付ける。省略するのは名前の部分だけ（マークと「ほか N名」は
                                      flex-shrink-0 で必ず見せる。text-truncate を flex の子で効かせるため min-width: 0 を付ける）。
                                      title は付けない・リンクにしない（カード全体が詳細を開くボタン）。
-                                     ひも付きがなければ空欄で、区切り線もアイコンも出さないが、同じ太さの透明な線と同じ余白で
+                                     ひも付きがなければ空欄で、区切り線もマークも出さないが、同じ太さの透明な線と同じ余白で
                                      区切り線の分も含めて 1 行分の高さを確保する（§2-4。読み上げは aria-hidden で外す）。
                                      新しい @php は足さない（$loop->count で人数を見る） --}}
                                 @if($media->linkedClientLabels()->isNotEmpty())
                                     <div class="media-card-trainees mt-1 pt-1 border-top">
                                         @foreach($media->linkedClientLabels() as $clientLabel)
                                             @continue($loop->iteration > 3)
-                                            <div class="d-flex align-items-center gap-1"><i class="bi bi-person text-muted flex-shrink-0" aria-hidden="true"></i><span class="text-truncate" style="min-width: 0;">{{ $clientLabel }}</span>@if($loop->iteration === 3 && $loop->count > 3)<span class="flex-shrink-0">ほか{{ $loop->count - 3 }}名</span>@endif</div>
+                                            <div class="d-flex align-items-center gap-1"><x-icon-paw class="text-primary flex-shrink-0" /><span class="text-truncate" style="min-width: 0;">{{ $clientLabel }}</span>@if($loop->iteration === 3 && $loop->count > 3)<span class="flex-shrink-0">ほか{{ $loop->count - 3 }}名</span>@endif</div>
                                         @endforeach
                                     </div>
                                 @else
@@ -156,7 +156,7 @@
                             <dd class="col-sm-9" id="mediaMetaTrainer"></dd>
 
                             {{-- ひも付くトレーニング記録（2026-11 追加。設計書 S-1302-M01「トレーニング記録」）。
-                                 「日付　会員名：トレーニー」を 1 件 1 行で JS が差し込む。ひも付きがなければ空欄（§2-4）。リンクにしない --}}
+                                 「日付　トレーニー名：会員名」を 1 件 1 行で JS が差し込む。ひも付きがなければ空欄（§2-4）。リンクにしない --}}
                             <dt class="col-sm-3">トレーニング記録</dt>
                             <dd class="col-sm-9" id="mediaMetaTrainingRecords"></dd>
                         </dl>
@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
             metaType.textContent = meta.type === 'photo' ? '写真' : (meta.type === 'video' ? '動画' : meta.type);
             metaOriginalFilename.textContent = meta.original_filename || '';
             metaTrainer.textContent = meta.trainer_name || '（削除済み）';
-            // ひも付くトレーニング記録：「日付　会員名：トレーニー」を 1 件 1 行（日付の後ろは全角空白）。
+            // ひも付くトレーニング記録：「日付　トレーニー名：会員名」を 1 件 1 行（日付の後ろは全角空白）。
             // サーバーが並べた順（トレーニング日の新しい順）のまま出す。ひも付きがなければ空欄
             metaTrainingRecords.innerHTML = '';
             (meta.training_records || []).forEach(function(line) {

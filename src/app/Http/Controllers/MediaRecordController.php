@@ -48,7 +48,7 @@ class MediaRecordController extends Controller
         $user = Auth::user();
 
         // 詳細モーダルで登録者名を表示するため、N+1回避の eager load を入れる。
-        // ひも付く会員・トレーニー（カードの「会員名：トレーニー」と詳細の「トレーニング記録」。2026-11 追加）も
+        // ひも付くトレーニー・会員（カードの「トレーニー名：会員名」と詳細の「トレーニング記録」。2026-11 追加）も
         // 記録 → 会員 → 会員のトレーニーの順に eager load する（列は表示に要るものだけ）。
         // JOIN ではないので、ページ送りはメディアの行で数えたまま
         $query = MediaRecord::with([
@@ -103,7 +103,7 @@ class MediaRecordController extends Controller
                 'original_filename' => $m->original_filename,
                 'created_at' => $m->created_at->format('Y/m/d H:i'),
                 'trainer_name' => $m->trainer?->name,
-                // ひも付くトレーニング記録（日付と「会員名：トレーニー」の文字列）と件数。表示に要る値だけを渡す（2026-11 追加）
+                // ひも付くトレーニング記録（日付と「トレーニー名：会員名」の文字列）と件数。表示に要る値だけを渡す（2026-11 追加）
                 'training_records' => $trainingRecordLines,
                 'training_record_count' => count($trainingRecordLines),
             ]];
