@@ -370,22 +370,20 @@ class ClientController extends Controller
                 ->orWhere('first_name_kana', 'like', "%{$query}%");
         });
 
-        // 並び順（2026-11 追加。設計書 api-design.md GET /api/clients/search の order）。
-        // 指定なしは今までどおり internal_id の昇順（列は VARCHAR のため文字列の順。音声系の画面はこちらのまま）。
-        // order=desc（メディア一覧 S-1302 の会員の絞り込み）は、内部ID を数として大きい順にする：
-        //   1. 数字だけ（先頭ゼロなし）の形のもの（自動採番の形）を先に、数の大きい順
+        // 並び順（2026-11 追加・変更。設計書 api-design.md GET /api/clients/search の order）。
+        // 内部ID を数として並べる。向きは order=desc（メディア一覧 S-1302 の会員の絞り込み）のときだけ大きい順、
+        // 指定なし（と desc 以外の値。音声系の画面）は小さい順。並べ方の考え方は向きによらず同じ：
+        //   1. 数字だけ（先頭ゼロなし）の形のもの（自動採番の形）を先に、数の順
         //   2. それ以外の形（編集で手で入れた先頭ゼロ・小数・符号つきなど。編集の入力チェックは numeric のため入りうる）は
-        //      後ろに、文字列の大きい順
+        //      後ろに、文字列の順
         // 「数字だけの形か」は、数にしてから文字に戻して元の値と同じかで見る（MySQL と、テストの SQLite のどちらでも動く書き方。
-        // MySQL の CAST(… AS UNSIGNED) は負の数を大きな数にするため、形を見ずに数で並べると「-1」がいちばん上に来てしまう）
-        if ($request->input('order') === 'desc') {
-            $canonical = 'CAST(CAST(internal_id AS UNSIGNED) AS CHAR) = internal_id';
-            $clients->orderByRaw("CASE WHEN {$canonical} THEN 0 ELSE 1 END")
-                ->orderByRaw("CASE WHEN {$canonical} THEN CAST(internal_id AS UNSIGNED) ELSE 0 END DESC")
-                ->orderBy('internal_id', 'desc');
-        } else {
-            $clients->orderBy('internal_id');
-        }
+        // MySQL の CAST(… AS UNSIGNED) は負の数を大きな数にするため、形を見ずに数で並べると「-1」がいちばん上に来てしまう）。
+        // 2026-11 変更：以前は指定なしのとき orderBy('internal_id')（VARCHAR の文字列の順）で、10 が 9 より前に来ていた
+        $direction = $request->input('order') === 'desc' ? 'desc' : 'asc';
+        $canonical = 'CAST(CAST(internal_id AS UNSIGNED) AS CHAR) = internal_id';
+        $clients->orderByRaw("CASE WHEN {$canonical} THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN {$canonical} THEN CAST(internal_id AS UNSIGNED) ELSE 0 END {$direction}")
+            ->orderBy('internal_id', $direction);
 
         $clients = $clients->limit(20)->get();
 
