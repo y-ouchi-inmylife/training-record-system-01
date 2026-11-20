@@ -2829,6 +2829,14 @@ POST /training-records に以下を追加する。
 
 **レスポンス**（JSON）:
 - 成功：`{ "data": [ <メディア>, ... ], "meta": { <ページネーション情報> } }`
+- `<メディア>` の項目：`id`・`type`・`mime_type`・`conversion_status`・`thumbnail_status`・`thumbnail_url`・`display_title`・`original_filename`・`created_at`・`trainer_name`、それと次の 2 つ（**2026-11 追加**。カードの「トレーニー・会員」の表示に要る値だけ）：
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| linked_labels | string[] | ひも付くトレーニング記録の会員ごとの「トレーニー名：会員名」（メディア一覧 S-1302 のカードと同じ文字列・同じ並び）の、先頭の最大 3 件。ひも付きがなければ空の配列 |
+| linked_others_count | integer | 4 人目以降の会員の人数（カードの「ほか N名」）。3 人以下なら 0 |
+
+- 文字列はメディア一覧と同じメソッド（`MediaRecord::linkedClientLabels()` → `Client::traineesWithNameLabel()`）で作る。記録・会員・トレーニーは eager load する（メディア一覧の `index` と同じ読み込み方。N+1 にしない）。`type=photo` を付けたときも同じ項目を返す
 
 ---
 
