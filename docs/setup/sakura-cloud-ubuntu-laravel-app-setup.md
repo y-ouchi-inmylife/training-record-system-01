@@ -555,8 +555,10 @@ sudo -u trs01 php artisan config:clear
 
 3. supervisor のワーカーの設定を作る（音声用とメディア用の 2 つ。**2026-10 変更**。すでに 1 つの設定〔`training-record-system-01-worker`〕で動いている環境は、10-5 の手順で置き換える）。
 
+ワーカーごとに 1 つずつ、設定ファイルを作る（`training-record-system-01-worker-audio.conf`・`training-record-system-01-worker-media.conf`）。
+
 ```bash
-sudo nano /etc/supervisor/conf.d/training-record-system-01-worker.conf
+sudo nano /etc/supervisor/conf.d/training-record-system-01-worker-audio.conf
 ```
 
 ```ini
@@ -570,7 +572,13 @@ startretries=20
 stopwaitsecs=610
 redirect_stderr=true
 stdout_logfile=/var/www/training-record-system-01/src/storage/logs/worker-audio.log
+```
 
+```bash
+sudo nano /etc/supervisor/conf.d/training-record-system-01-worker-media.conf
+```
+
+```ini
 [program:training-record-system-01-worker-media]
 command=/usr/bin/php /var/www/training-record-system-01/src/artisan queue:work database --queue=media,default --sleep=3 --tries=1 --timeout=600 --max-time=3600
 user=trs01
@@ -695,7 +703,9 @@ sudo nano /etc/logrotate.d/training-record-system-01-worker
 
 ```bash
 sudo supervisorctl stop training-record-system-01-worker   # 動いているジョブが終わるまで待つ（stopwaitsecs=610）
-sudo nano /etc/supervisor/conf.d/training-record-system-01-worker.conf   # 中身を 10-2 の 3 の 2 つの設定に入れ替える
+sudo rm /etc/supervisor/conf.d/training-record-system-01-worker.conf   # 古い 1 つの設定ファイルを消す
+sudo nano /etc/supervisor/conf.d/training-record-system-01-worker-audio.conf   # 10-2 の 3 の音声用の設定
+sudo nano /etc/supervisor/conf.d/training-record-system-01-worker-media.conf   # 10-2 の 3 のメディア用の設定
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status
