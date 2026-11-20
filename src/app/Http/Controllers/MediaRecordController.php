@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ConvertMediaJob;
 use App\Jobs\GenerateThumbnailJob;
+use App\Models\Client;
 use App\Models\MediaRecord;
 use App\Models\Trainer;
 use Illuminate\Contracts\View\View;
@@ -70,6 +71,21 @@ class MediaRecordController extends Controller
             $query->where('trainer_id', $user->id);
         }
 
+        // 会員の絞り込み（2026-11 追加。設計書 S-1302「会員」・api-design.md GET /media-records）。
+        // その会員のトレーニング記録にひも付いているメディアだけを出す。EXISTS のサブクエリなので JOIN で行は増えず、
+        // ページ送りはメディアの行で数えたまま。登録者の条件とは AND（会員を選んでも登録者は変えない）。
+        // 数字でない・存在しない会員の ID は無視する（エラーにしない。欄も未選択にする）。
+        // 選んだ会員は、会員の欄に選んだ状態で出すため view に渡す（候補の API を呼び直さない）
+        $selectedClient = null;
+        $clientIdParam = $request->query('client_id');
+        if (is_string($clientIdParam) && ctype_digit($clientIdParam)) {
+            $selectedClient = Client::query()->find((int) $clientIdParam, ['id', 'internal_id', 'last_name', 'first_name']);
+        }
+        if ($selectedClient) {
+            $query->whereHas('trainingRecords', fn ($q) => $q->where('training_records.client_id', $selectedClient->id));
+        }
+
+        // ページ送りのリンクに trainer_id・client_id など今のクエリを引き継ぐ
         $mediaRecords = $query->paginate(self::INDEX_PER_PAGE)->appends($request->query());
 
         // 登録者プルダウン用トレーナー一覧（system_admin を除外）
@@ -109,7 +125,7 @@ class MediaRecordController extends Controller
             ]];
         });
 
-        return view('media-records.index', compact('mediaRecords', 'trainers', 'selectedTrainerId', 'mediaModalData'));
+        return view('media-records.index', compact('mediaRecords', 'trainers', 'selectedTrainerId', 'mediaModalData', 'selectedClient'));
     }
 
     /**

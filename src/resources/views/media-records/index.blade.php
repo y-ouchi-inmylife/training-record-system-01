@@ -6,17 +6,36 @@
 <div class="container">
     <h2 class="mb-3">メディア一覧</h2>
 
-    {{-- 登録者フィルタ＋新規登録ボタン --}}
-    <div class="d-flex align-items-center gap-2 mb-4">
-        <label for="trainer-filter" class="form-label mb-0 text-nowrap">登録者:</label>
-        <select id="trainer-filter" class="form-select" style="width: 200px;">
-            <option value="all" {{ $selectedTrainerId == 'all' ? 'selected' : '' }}>全員</option>
-            @foreach($trainers as $trainer)
-                <option value="{{ $trainer->id }}" {{ $selectedTrainerId == $trainer->id ? 'selected' : '' }}>
-                    {{ $trainer->name }}
-                </option>
-            @endforeach
-        </select>
+    {{-- 登録者フィルタ＋会員フィルタ＋新規登録ボタン。
+         会員フィルタ（2026-11 追加。設計書 S-1302「会員」）は登録者の右に置き、ラベルの書き方（「:」付き）を登録者に合わせる。
+         狭い画面では折り返す（flex-wrap）。ラベルと欄が離れないよう、ラベルと欄の組ごとに d-flex でまとめる --}}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <label for="trainer-filter" class="form-label mb-0 text-nowrap">登録者:</label>
+            <select id="trainer-filter" class="form-select" style="width: 200px;">
+                <option value="all" {{ $selectedTrainerId == 'all' ? 'selected' : '' }}>全員</option>
+                @foreach($trainers as $trainer)
+                    <option value="{{ $trainer->id }}" {{ $selectedTrainerId == $trainer->id ? 'selected' : '' }}>
+                        {{ $trainer->name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label for="client-filter" class="form-label mb-0 text-nowrap">会員:</label>
+            {{-- Select2 で候補から 1 人選ぶ（候補は GET /api/clients/search）。未選択の表示（placeholder）は「全員」。
+                 幅は「内部ID 姓 名」が収まるよう登録者より少し広い 240px（Select2 は width: '100%' でこの枠に合わせる）。
+                 先頭の空の option は placeholder と allowClear に要る。選んだ会員があるときは、
+                 コントローラで取った会員を selected の option で出しておく（読み込み直したあと API を呼び直さない） --}}
+            <div style="width: 240px;">
+                <select id="client-filter" class="form-select">
+                    <option value=""></option>
+                    @if($selectedClient)
+                        <option value="{{ $selectedClient->id }}" selected>{{ $selectedClient->internal_id }} {{ $selectedClient->display_name }}</option>
+                    @endif
+                </select>
+            </div>
+        </div>
         <button type="button" class="btn btn-primary ms-auto" id="mediaUploadOpenBtn">新規登録</button>
     </div>
 
@@ -304,7 +323,7 @@
 @endpush
 
 @push('scripts')
-{{-- jQuery・Select2・テーマは npm で入れた入口から読み込む（CSS もこの入口に含める）。 --}}
+{{-- jQuery・Select2・テーマは npm で入れた入口から読み込む（CSS もこの入口に含める）。会員フィルタで使う。 --}}
 @vite(['resources/js/select2.js'])
 {{-- 非同期の保存の入力エラー・入力エラー以外の失敗を欄の下・モーダルの先頭に出す共通 JS
      （設計書 §2-7「非同期の保存（fetch）」。window.FormErrors に関数が載る） --}}
@@ -319,6 +338,52 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = new URL(window.location.href);
             url.searchParams.delete('page');
             url.searchParams.set('trainer_id', value);
+            window.location.href = url.toString();
+        });
+    }
+
+    // 会員フィルタ（2026-11 追加。設計書 S-1302「会員」）：Select2 で候補から 1 人選ぶ。
+    // 候補は内部 API GET /api/clients/search（音声系の画面と同じ API を変えずに使う）。
+    // 選んだら・外したら、登録者と同じくその場で読み込み直す（page を消し、ほかのパラメータは残して client_id を差し替える。
+    // 外したら client_id を消す）。jQuery・Select2 は上の Vite の入口（select2.js。module で defer）が読み込むため、
+    // DOMContentLoaded の中で呼ぶ
+    const clientFilter = document.getElementById('client-filter');
+    if (clientFilter && window.jQuery) {
+        const $clientFilter = window.jQuery(clientFilter);
+        $clientFilter.select2({
+            theme: 'bootstrap-5',
+            placeholder: '全員',
+            allowClear: true,
+            width: '100%',
+            ajax: {
+                url: @json(route('api.clients.search', [], false)),
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return { q: params.term || '' };
+                },
+                processResults: function (data) {
+                    return { results: data.results };
+                },
+                cache: true,
+            },
+            // 開いただけで先頭の 20 件（内部ID の順）を出す。名前を覚えていなくても選べるように
+            minimumInputLength: 0,
+            language: {
+                noResults: function () { return '該当する会員が見つかりません'; },
+                searching: function () { return '検索中...'; },
+                errorLoading: function () { return '会員を読み込めませんでした'; },
+            },
+        });
+        $clientFilter.on('change', function () {
+            const value = $clientFilter.val();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('page');
+            if (value) {
+                url.searchParams.set('client_id', value);
+            } else {
+                url.searchParams.delete('client_id');
+            }
             window.location.href = url.toString();
         });
     }
