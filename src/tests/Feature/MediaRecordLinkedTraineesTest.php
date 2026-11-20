@@ -16,7 +16,7 @@ use Tests\TestCase;
 /**
  * メディア一覧（S-1302）・メディア詳細（S-1302-M01）に、ひも付くトレーニーと会員を出す（2026-11 追加）。
  *
- * - 「トレーニー（会員）」の組み立て（Client::traineesWithNameLabel）：1 頭・複数頭・名前未登録・トレーニーなし
+ * - 「会員名：トレーニー」の組み立て（Client::traineesWithNameLabel）：1 頭・複数頭・名前未登録・トレーニーなし
  * - 一覧のカード：会員ごとにまとめて 1 人 1 行・最大 3 行、新しい順、4 人以上は 3 行目に「ほか N名」、ひも付きなしは 1 行分の空欄
  * - 詳細：記録ごとに 1 行（トレーニング日の新しい順、同じ日は記録 ID の大きい順）
  * - 削除の確認文：ひも付きの件数を渡し、1 件以上なら 1 文足す
@@ -122,14 +122,14 @@ class MediaRecordLinkedTraineesTest extends TestCase
         return $recordId;
     }
 
-    /** 一覧を開き、そのメディアのカードの「トレーニー（会員）」の部分の HTML を返す */
+    /** 一覧を開き、そのメディアのカードの「会員名：トレーニー」の部分の HTML を返す */
     private function cardTraineesHtml(string $html, MediaRecord $media): string
     {
         $start = strpos($html, 'data-media-id="'.$media->id.'"');
         $this->assertNotFalse($start, 'カードが見つからない');
         $section = substr($html, $start);
-        $from = strpos($section, 'class="media-card-trainees text-muted"');
-        $this->assertNotFalse($from, '「トレーニー（会員）」の枠が見つからない');
+        $from = strpos($section, 'class="media-card-trainees');
+        $this->assertNotFalse($from, '「会員名：トレーニー」の枠が見つからない');
         $section = substr($section, $from);
         // 枠の終わり：次のカード（または一覧の終わり）の手前まで
         $next = strpos($section, 'data-media-id=');
@@ -138,10 +138,10 @@ class MediaRecordLinkedTraineesTest extends TestCase
         return substr($section, 0, $end);
     }
 
-    /** カードの「トレーニー（会員）」の行を、タグを外した文字列で返す */
+    /** カードの「会員名：トレーニー」の行を、タグを外した文字列で返す */
     private function cardLines(string $traineesHtml): array
     {
-        preg_match_all('#<div class="(?:text-truncate|d-flex)">(.*?)</div>#su', $traineesHtml, $m);
+        preg_match_all('#<div class="d-flex align-items-center gap-1">(.*?)</div>#su', $traineesHtml, $m);
 
         return array_map(fn ($line) => trim(strip_tags($line)), $m[1]);
     }
@@ -153,25 +153,25 @@ class MediaRecordLinkedTraineesTest extends TestCase
 
     // ===== 表示文字列 =====
 
-    public function test_トレーニーが1頭なら名前と会員名(): void
+    public function test_トレーニーが1頭なら会員名とコロンと名前(): void
     {
         $client = $this->makeClient('大内', '佳和', ['アイ']);
 
-        $this->assertSame('アイ（大内 佳和）', $client->traineesWithNameLabel());
+        $this->assertSame('大内 佳和：アイ', $client->traineesWithNameLabel());
     }
 
     public function test_トレーニーが複数頭なら登録順に読点で区切る(): void
     {
         $client = $this->makeClient('大内', '佳和', ['アイ', 'アムロ']);
 
-        $this->assertSame('アイ、アムロ（大内 佳和）', $client->traineesWithNameLabel());
+        $this->assertSame('大内 佳和：アイ、アムロ', $client->traineesWithNameLabel());
     }
 
     public function test_名前未登録のトレーニーは名前未登録と出す(): void
     {
         $client = $this->makeClient('大内', '佳和', [null]);
 
-        $this->assertSame('名前未登録（大内 佳和）', $client->traineesWithNameLabel());
+        $this->assertSame('大内 佳和：名前未登録', $client->traineesWithNameLabel());
     }
 
     public function test_トレーニーがいなければ会員名だけで名が空でも空白を残さない(): void
@@ -189,7 +189,12 @@ class MediaRecordLinkedTraineesTest extends TestCase
 
         $html = $this->cardTraineesHtml($this->openIndex()->getContent(), $media);
 
-        $this->assertSame(['アイ（大内 佳和）'], $this->cardLines($html));
+        $this->assertSame(['大内 佳和：アイ'], $this->cardLines($html));
+        // 表示名と分ける区切り線と、行の先頭の人のアイコン（飾りなので aria-hidden）
+        $this->assertStringContainsString('class="media-card-trainees mt-1 pt-1 border-top"', $html);
+        $this->assertStringContainsString('<div class="d-flex align-items-center gap-1"><i class="bi bi-person text-muted flex-shrink-0" aria-hidden="true"></i><span class="text-truncate" style="min-width: 0;">大内 佳和：アイ</span></div>', $html);
+        // 名前は本文色（時刻の text-muted を枠に付けない）
+        $this->assertStringNotContainsString('media-card-trainees text-muted', $html);
         // ツールチップ・リンクは付けない
         $this->assertStringNotContainsString('title=', $html);
         $this->assertStringNotContainsString('<a ', $html);
@@ -210,9 +215,9 @@ class MediaRecordLinkedTraineesTest extends TestCase
         $html = $this->cardTraineesHtml($this->openIndex()->getContent(), $media);
 
         $this->assertSame([
-            'モモ（山田 花子）',
-            'アイ、アムロ（大内 佳和）',
-            'ハナ（佐藤 次郎）',
+            '山田 花子：モモ',
+            '大内 佳和：アイ、アムロ',
+            '佐藤 次郎：ハナ',
         ], $this->cardLines($html));
         $this->assertStringNotContainsString('ほか', $html);
     }
@@ -228,23 +233,27 @@ class MediaRecordLinkedTraineesTest extends TestCase
         $html = $this->cardTraineesHtml($this->openIndex()->getContent(), $media);
 
         $this->assertSame([
-            'アイ（大内 佳和）',
-            'モモ（山田 花子）',
-            'ハナ（佐藤 次郎）ほか1名',
+            '大内 佳和：アイ',
+            '山田 花子：モモ',
+            '佐藤 次郎：ハナほか1名',
         ], $this->cardLines($html));
         $this->assertStringNotContainsString('ソラ', $html);
-        // 「ほか N名」は省略の外（flex-shrink-0）に置き、名前の部分だけを text-truncate にする
-        $this->assertStringContainsString('<span class="text-truncate" style="min-width: 0;">ハナ（佐藤 次郎）</span><span class="flex-shrink-0">ほか1名</span>', $html);
+        // アイコンと「ほか N名」は省略の外（flex-shrink-0）に置き、名前の部分だけを text-truncate にする
+        $this->assertStringContainsString('<i class="bi bi-person text-muted flex-shrink-0" aria-hidden="true"></i><span class="text-truncate" style="min-width: 0;">佐藤 次郎：ハナ</span><span class="flex-shrink-0">ほか1名</span></div>', $html);
+        $this->assertSame(3, substr_count($html, 'bi-person'));
     }
 
-    public function test_ひも付きがなければ空欄で1行分の高さを取る(): void
+    public function test_ひも付きがなければ区切り線とアイコンを出さず区切り線の分も含めて1行分の高さを取る(): void
     {
         $media = $this->makeMedia();
 
         $html = $this->cardTraineesHtml($this->openIndex()->getContent(), $media);
 
         $this->assertSame([], $this->cardLines($html));
-        $this->assertMatchesRegularExpression('#<div aria-hidden="true">&nbsp;</div>#', $html);
+        $this->assertStringNotContainsString('border-top"', $html);
+        $this->assertStringNotContainsString('bi-person', $html);
+        // 同じ余白と同じ太さの透明な線で、ひも付きが 1 人のカードと高さをそろえる
+        $this->assertStringContainsString('class="media-card-trainees mt-1 pt-1" style="border-top: var(--bs-border-width) solid transparent;" aria-hidden="true">&nbsp;</div>', $html);
     }
 
     // ===== 詳細（S-1302-M01） =====
@@ -263,10 +272,10 @@ class MediaRecordLinkedTraineesTest extends TestCase
         $data = $response->viewData('mediaModalData')[$media->id];
 
         $this->assertSame([
-            ['date' => '2026/11/01', 'label' => 'アイ（大内 佳和）'],
-            ['date' => '2026/11/01', 'label' => 'モモ（山田 花子）'],
-            ['date' => '2026/10/04', 'label' => 'アイ（大内 佳和）'],
-            ['date' => '2026/09/30', 'label' => 'アイ（大内 佳和）'],
+            ['date' => '2026/11/01', 'label' => '大内 佳和：アイ'],
+            ['date' => '2026/11/01', 'label' => '山田 花子：モモ'],
+            ['date' => '2026/10/04', 'label' => '大内 佳和：アイ'],
+            ['date' => '2026/09/30', 'label' => '大内 佳和：アイ'],
         ], $data['training_records']);
         $this->assertSame(4, $data['training_record_count']);
 

@@ -191,17 +191,19 @@ class Client extends Authenticatable
     }
 
     /**
-     * 「トレーニー（会員）」の表示文字列（2026-11 追加。メディア一覧 S-1302 のカードとメディア詳細 S-1302-M01）。
+     * 「会員名：トレーニー」の表示文字列（2026-11 追加。メディア一覧 S-1302 のカードとメディア詳細 S-1302-M01）。
      *
-     * - 1 頭：「アイ（大内 佳和）」
-     * - 複数頭：「アイ、アムロ（大内 佳和）」（登録順。trainees リレーションの並び）
-     * - 名前未登録の頭は「名前未登録」（Trainee::display_name。§2-4）
+     * - 1 頭：「大内 佳和：アイ」
+     * - 複数頭：「大内 佳和：アイ、アムロ」（登録順。trainees リレーションの並び）
+     * - 名前未登録の頭は「名前未登録」（Trainee::display_name。§2-4）：「大内 佳和：名前未登録」
      * - トレーニーなし：「大内 佳和」（会員名だけ）
      *
+     * 区切りは全角のコロン「：」で、前後に空白は入れない。2026-11 変更：最初は「アイ（大内 佳和）」の形だったが、
+     * メディア一覧のカードで表示名の「(元ファイル名)」の続きに見えたため、括弧をやめてこの形にした。
      * 会員名は display_name を trim する（名が空のとき末尾に空白を残さない）。敬称は付けない。
      * N+1 を避けるため、呼び出し側で trainees を eager load しておくこと
      * （MediaRecordController::index() の trainingRecords.client.trainees）。
-     * 組み立ては設計書 screen-design.md S-1302「トレーニー（会員）の表示の組み立て」
+     * 組み立ては設計書 screen-design.md S-1302「会員・トレーニーの表示の組み立て」
      */
     public function traineesWithNameLabel(): string
     {
@@ -210,8 +212,7 @@ class Client extends Authenticatable
             return $clientName;
         }
 
-        return $this->trainees->map(fn ($trainee) => $trainee->display_name)->implode('、')
-            .'（'.$clientName.'）';
+        return $clientName.'：'.$this->trainees->map(fn ($trainee) => $trainee->display_name)->implode('、');
     }
 
     /**

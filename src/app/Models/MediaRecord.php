@@ -221,7 +221,7 @@ class MediaRecord extends Model
             ->temporaryUrl($this->thumbnail_path, $expiresAt);
     }
 
-    // --- ひも付くトレーニー・会員の表示（2026-11 追加。設計書 screen-design.md S-1302 / S-1302-M01） ---
+    // --- ひも付く会員・トレーニーの表示（2026-11 追加。設計書 screen-design.md S-1302 / S-1302-M01） ---
     //
     // メディアとトレーニーは直接ひも付けない（ライブラリ型）。ひも付くトレーニング記録 → 会員 → 会員のトレーニー
     // とたどって表示する。N+1 を避けるため、呼び出し側で trainingRecords.client.trainees を eager load しておくこと
@@ -242,7 +242,7 @@ class MediaRecord extends Model
     }
 
     /**
-     * 一覧のカード用：会員ごとに重複をまとめた「トレーニー（会員）」の文字列の一覧。
+     * 一覧のカード用：会員ごとに重複をまとめた「会員名：トレーニー」の文字列の一覧。
      * 並び順は、その会員のひも付く記録のうちトレーニング日がいちばん新しいものの新しい順。
      * 何行出すか（最大 3 行・「ほか N名」）は表示側で決める
      *
@@ -257,7 +257,7 @@ class MediaRecord extends Model
     }
 
     /**
-     * 詳細モーダル用：ひも付く記録ごとの日付（Y/m/d）と「トレーニー（会員）」の文字列。
+     * 詳細モーダル用：ひも付く記録ごとの日付（Y/m/d）と「会員名：トレーニー」の文字列。
      * 同じ会員の記録が複数あれば記録ごとに 1 件。並び順は linkedTrainingRecordsLatestFirst() のとおり
      *
      * @return array<int, array{date: string, label: string}>
