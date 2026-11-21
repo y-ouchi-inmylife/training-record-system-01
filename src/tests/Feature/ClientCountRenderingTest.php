@@ -337,12 +337,13 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('>使い切り</span>', $html);
 
         // 利用の行（2026-11 変更：その前はマス）：利用 1 件に 1 行。残りは見出しの「あと n回」だけで、
-        // 「未利用 n回」の行は出さない（2026-11 変更）。メモのある利用には印が付く
+        // 「未利用 n回」の行は出さない（2026-11 変更）。メモのある利用はメモを文字で出す（2026-11 変更：その前は印）
         $this->assertSame(4, substr_count($html, 'class="list-group-item list-group-item-action usage-row'));
         $this->assertStringNotContainsString('>未利用', $html);
         $this->assertStringNotContainsString('data-usage-unused', $html);
         $this->assertStringContainsString('data-used-on="2026-09-04"', $html);
-        $this->assertSame(1, substr_count($html, 'bi-chat-left-text'));
+        $this->assertSame(1, substr_count($html, '<span class="usage-row-note text-body-secondary text-truncate">メモあり利用</span>'));
+        $this->assertStringNotContainsString('bi-chat-left-text', $html);
 
         // 見出し・利用の行は編集モーダルを開く button
         $this->assertStringContainsString('data-id="'.$new->id.'"', $html);
@@ -528,8 +529,8 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(
             '<button>2026/11/02 契約（9回）</button>'
             .'<span class="flex-shrink-0">あと 5回</span>'
-            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span>'
-            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>4回コース</span></div>',
+            .'<span class="small flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span>'
+            .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>4回コース</span></div>',
             $this->contractHeading($html, $contract)
         );
     }
@@ -548,15 +549,15 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(
             '<button>2026/10/01 契約（1回）</button>'
             .'<span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>'
-            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 2026/10/31</span>'
-            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>初回</span></div>',
+            .'<span class="small flex-shrink-0" data-contract-expires-on>有効期限 2026/10/31</span>'
+            .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>初回</span></div>',
             $this->contractHeading($html, $done)
         );
         // メモがない契約ではメモを出さない。予定を含んで使い切った契約は「すべてご予約済み」（今のまま）
         $this->assertSame(
             '<button>2026/11/01 契約（1回）</button>'
             .'<span class="badge bg-secondary flex-shrink-0">すべてご予約済み</span>'
-            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span></div>',
+            .'<span class="small flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span></div>',
             $this->contractHeading($html, $reserved)
         );
     }
@@ -572,7 +573,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(
             '<button>2026/11/02 契約（3回）</button>'
             .'<span class="flex-shrink-0">あと 3回</span>'
-            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>メモだけ</span></div>',
+            .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>メモだけ</span></div>',
             $heading
         );
         $this->assertStringNotContainsString('有効期限', $heading);
@@ -589,8 +590,8 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(
             '<button>2026/10/01 契約（4回）</button>'
             .'<span class="flex-shrink-0">あと 4回</span>'
-            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 <span class="text-danger">2026/10/31</span></span>'
-            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>メモ</span></div>',
+            .'<span class="small flex-shrink-0" data-contract-expires-on>有効期限 <span class="text-danger">2026/10/31</span></span>'
+            .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>メモ</span></div>',
             $this->contractHeading($html, $contract)
         );
         // 見出しのボタンを押すと、その契約の編集モーダルを開く（今のまま。メモ・有効期限は data-* で渡す）
@@ -721,7 +722,7 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    public function test_利用の行は_ラベル_日付と曜日_時刻_トレーニー_メモの印の順(): void
+    public function test_利用の行は_ラベル_日付と曜日_時刻_トレーニー_メモの順(): void
     {
         $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
         $this->fakeMediaDisk();
@@ -737,7 +738,7 @@ class ClientCountRenderingTest extends TestCase
             .'<span class="usage-row-date">2026/11/21(土)</span>'
             .'<span class="usage-row-time">8:00〜19:00</span>'
             .'<span class="usage-row-trainee text-truncate">アムロ</span>'
-            .'<i class="bi bi-chat-left-text" aria-hidden="true"></i><span class="visually-hidden">（メモあり）</span>',
+            .'<span class="usage-row-note text-body-secondary text-truncate">体調よし</span>',
             $this->rowCells($html, $today)
         );
         // 編集モーダルに渡す値（時刻は HH:MM）。押すと編集モーダルを開く
@@ -747,6 +748,31 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('data-end-time="19:00"', $row);
         $this->assertStringContainsString('data-client-contract-id="'.$contract->id.'"', $row);
         $this->assertStringContainsString('onclick="window.usageModal.openForEdit(this.dataset)"', $row);
+    }
+
+    public function test_利用の行のメモはメモがない行では出さず_トレーニーなしの行でも出す(): void
+    {
+        // 利用のメモは文字で出す（2026-11 変更：その前はメモの印〔bi-chat-left-text〕だけ）。設計書 S-0305 セクション5「利用の行」
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+        $noNote = $this->usageWith($client, '2026-11-20', $ai);
+        $noTrainee = $this->usageWith($client, '2026-11-19', null, note: '初回カウンセリング後に様子を見る');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // メモがない行はメモを出さない（空けたまま）
+        $this->assertStringEndsWith('<span class="usage-row-trainee text-truncate">アイ</span>', $this->rowCells($html, $noNote));
+        // トレーニーなしの行も、トレーニーの列（空）のあとにメモを出す（メモの列の位置はそろう）
+        $this->assertStringEndsWith(
+            '<span class="usage-row-trainee text-truncate"></span><span class="usage-row-note text-body-secondary text-truncate">初回カウンセリング後に様子を見る</span>',
+            $this->rowCells($html, $noTrainee)
+        );
+        $this->assertStringNotContainsString('bi-chat-left-text', $html);
+        // 列の幅：トレーニーは固定幅、メモは残りの幅
+        $this->assertMatchesRegularExpression('/\.usage-row-trainee\s*\{\s*width:\s*6em;\s*flex-shrink:\s*0;/u', $html);
+        $this->assertMatchesRegularExpression('/\.usage-row-note\s*\{\s*flex:\s*1 1 8em;/u', $html);
     }
 
     public function test_利用の行は実施済みはラベルなし_今日と予定はラベルと見た目を変える(): void

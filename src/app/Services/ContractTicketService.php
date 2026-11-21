@@ -88,6 +88,10 @@ class ContractTicketService
      *     int => string,
      *     ...
      *   ],
+     *   'usageNotes'        => [      // 利用の id ごとの、利用の行に文字で出すメモ。メモが空なら null（会員詳細だけ。2026-11 追加。
+     *     int => ?string,             // 会員側 S-1412 には渡さない：利用のメモは会員には一切出さない）
+     *     ...
+     *   ],
      * ]
      *
      * @param  Collection<int, ClientContract>  $contracts
@@ -133,9 +137,11 @@ class ContractTicketService
         $today = today()->format('Y-m-d');
         $usageStates = [];
         $usageDates = [];
+        $usageNotes = [];
         foreach ($sortedUsages as $usage) {
             $usageStates[$usage->id] = self::usageState($usage, $today);
             $usageDates[$usage->id] = self::dateWithWeekday($usage);
+            $usageNotes[$usage->id] = blank($usage->note) ? null : $usage->note;
         }
 
         $contractRows = [];
@@ -204,6 +210,7 @@ class ContractTicketService
             'defaultContractId' => $defaultContractId,
             'usageStates' => $usageStates,
             'usageDates' => $usageDates,
+            'usageNotes' => $usageNotes,
         ];
     }
 

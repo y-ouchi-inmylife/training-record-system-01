@@ -154,8 +154,16 @@
 .usage-row-time {
     width: 7em;
 }
+/* トレーニーは固定幅（入らない名前は .text-truncate で「…」。2026-11 変更：その前は残りの幅）。
+   トレーニーなしの行も同じ幅を取るので、メモの列の位置がそろう */
 .usage-row-trainee {
-    flex: 1 1 4em;
+    width: 6em;
+    flex-shrink: 0;
+}
+/* 利用のメモ（文字。2026-11 変更：その前はメモの印）。残りの幅に 1 行で出し、入らなければ「…」。
+   残りの幅が狭すぎるときは次の行に折り返す（flex-basis 8em・最小 4em） */
+.usage-row-note {
+    flex: 1 1 8em;
     min-width: 4em;
 }
 /* 今日の行は左端に太い線（list-group-flush の左右の枠を使わず、内側の影で引く。太さは 4px） */
@@ -512,7 +520,7 @@
                                 </div>
                                 <div class="list-group list-group-flush usage-rows">
                                     @foreach($ticket['unassigned']['usages'] as $usage)
-                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id]])
+                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id], 'note' => $ticket['usageNotes'][$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
@@ -547,17 +555,18 @@
                                     @endif
                                     {{-- 有効期限（ないときは「有効期限」の語も出さない）。有効期限を過ぎていて残りがある契約（$row['expired']。
                                          判定は ContractTicketService）は、日付の部分だけを赤字にする（期限切れの印はこの赤字だけ） --}}
+                                    {{-- 有効期限とメモは少し小さい文字（small。2026-11 変更）。契約日・回数と状態の大きさは変えない --}}
                                     @if($row['expiresOn'])
-                                        <span class="flex-shrink-0" data-contract-expires-on>有効期限 @if($row['expired'])<span class="text-danger">{{ $row['expiresOn'] }}</span>@else{{ $row['expiresOn'] }}@endif</span>
+                                        <span class="small flex-shrink-0" data-contract-expires-on>有効期限 @if($row['expired'])<span class="text-danger">{{ $row['expiresOn'] }}</span>@else{{ $row['expiresOn'] }}@endif</span>
                                     @endif
                                     {{-- メモ（あるときだけ）。本文より少し薄い色で、長いときは 1 行に収めて「…」で省く（全文は契約の編集モーダルで見る） --}}
                                     @if($row['note'])
-                                        <span class="text-body-secondary text-truncate mw-100" data-contract-note>{{ $row['note'] }}</span>
+                                        <span class="small text-body-secondary text-truncate mw-100" data-contract-note>{{ $row['note'] }}</span>
                                     @endif
                                 </div>
                                 <div class="list-group list-group-flush usage-rows">
                                     @foreach($row['usages'] as $usage)
-                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id]])
+                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id], 'note' => $ticket['usageNotes'][$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
