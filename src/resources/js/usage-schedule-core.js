@@ -164,7 +164,7 @@ export function capacityState(count, capacity) {
  * カレンダーのマス（ボタン）・日付の数字・「n/上限」の文字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
  *
  * - 空きあり・満・超過（capacityState）は「n/上限」の文字の色だけで示し、マスの背景の色は変えない
- *   （満＝緑 usage-schedule-count-full、超過＝赤の太字 usage-schedule-count-over。色は app.scss で Bootstrap の $green-700・$red-600。
+ *   （満＝緑 usage-schedule-count-full、超過＝赤の太字 usage-schedule-count-over。色は app.scss で Bootstrap の $green-600・$red-600。
  *   小さな文字でも背景の上で読め〔コントラスト比 4.5:1 以上〕、緑・赤と見分けられる中間の濃さ。
  *   2026-11 変更：その前は満・超過のマスの背景も緑・赤〔bg-success-subtle・bg-danger-subtle〕にしていた）
  * - 今日はマスの背景を薄い青（bg-primary-subtle）。日付の数字は通常のまま
