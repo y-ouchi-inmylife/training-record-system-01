@@ -26,7 +26,8 @@
 
      ## 項目の並び（設計書 S-0305-M05。2026-11 変更）
 
-     利用日 → 開始時刻・終了時刻（横並び） → トレーニー → 契約 → メモ。
+     契約 → 利用日 → 開始時刻・終了時刻（横並び） → トレーニー → メモ（登録・編集とも。2026-11 変更：契約を一番上にした。
+     その前は 利用日 → 開始時刻・終了時刻 → トレーニー → 契約 → メモ）。
      開始時刻・終了時刻は input type="time"（計測値の計測時刻と同じ。Flatpickr は使わない）。範囲のエラーは各欄の下ではなく、
      まとまりの下に出す（§2-7 の但し書き）。
 
@@ -69,6 +70,25 @@
 
                 <div class="modal-body">
                     <div class="row g-3">
+                        {{-- 契約（一番上の項目。任意。2026-11 変更：その前はトレーニーの次〔トレーニーの欄がないときは開始時刻・終了時刻の次〕）。エラーで開き直したときは選んでいた値を選び直す。
+                             disabled（使い切り）の付け外しはモードに合わせて JS の applyDisabled() で行う。 --}}
+                        <div class="col-12">
+                            <label for="client_contract_id" class="form-label">契約</label>
+                            <select class="form-select @if($openModal === 'usage') @error('client_contract_id') is-invalid @enderror @endif"
+                                    id="client_contract_id" name="client_contract_id">
+                                @foreach($contractOptions as $option)
+                                    <option value="{{ $option['id'] }}"
+                                            data-used-up="{{ $option['usedUp'] ? '1' : '0' }}"
+                                            @disabled($option['usedUp'])
+                                            @selected($openModal === 'usage' && (string) old('client_contract_id') === (string) $option['id'])>{{ $option['label'] }}</option>
+                                @endforeach
+                                <option value="" data-used-up="0"
+                                        @selected($openModal === 'usage' && old('client_contract_id') === null)>契約なし</option>
+                            </select>
+                            @if($openModal === 'usage')
+                                <x-form-error field="client_contract_id" />
+                            @endif
+                        </div>
                         <div class="col-md-6">
                             <label for="used_on" class="form-label">利用日 <span class="text-danger">*</span></label>
                             {{-- 入力部品は計測値モーダルの計測日と同じ（Flatpickr の .datepicker） --}}
@@ -124,25 +144,6 @@
                                 @endif
                             </div>
                         @endif
-                        {{-- 契約（トレーニーの次の項目。トレーニーの欄がないときは開始時刻・終了時刻の次。任意）。エラーで開き直したときは選んでいた値を選び直す。
-                             disabled（使い切り）の付け外しはモードに合わせて JS の applyDisabled() で行う。 --}}
-                        <div class="col-12">
-                            <label for="client_contract_id" class="form-label">契約</label>
-                            <select class="form-select @if($openModal === 'usage') @error('client_contract_id') is-invalid @enderror @endif"
-                                    id="client_contract_id" name="client_contract_id">
-                                @foreach($contractOptions as $option)
-                                    <option value="{{ $option['id'] }}"
-                                            data-used-up="{{ $option['usedUp'] ? '1' : '0' }}"
-                                            @disabled($option['usedUp'])
-                                            @selected($openModal === 'usage' && (string) old('client_contract_id') === (string) $option['id'])>{{ $option['label'] }}</option>
-                                @endforeach
-                                <option value="" data-used-up="0"
-                                        @selected($openModal === 'usage' && old('client_contract_id') === null)>契約なし</option>
-                            </select>
-                            @if($openModal === 'usage')
-                                <x-form-error field="client_contract_id" />
-                            @endif
-                        </div>
                         <div class="col-12">
                             <label for="usage_note" class="form-label">メモ</label>
                             <input type="text" maxlength="255"

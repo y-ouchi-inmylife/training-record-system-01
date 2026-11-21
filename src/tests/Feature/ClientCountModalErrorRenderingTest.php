@@ -259,12 +259,13 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $this->assertStringContainsString('name="count"', $this->contractPart($html));
     }
 
-    public function test_利用モーダルの項目は利用日_開始時刻_終了時刻_トレーニー_契約_メモの順(): void
+    public function test_利用モーダルの項目は契約_利用日_開始時刻_終了時刻_トレーニー_メモの順(): void
     {
-        // 2026-11 変更：時刻とトレーニーを足した（設計書 S-0305-M05「利用日 → 開始時刻・終了時刻（横並び） → トレーニー → 契約 → メモ」）
+        // 2026-11 変更：契約を一番上にした（設計書 S-0305-M05「契約 → 利用日 → 開始時刻・終了時刻（横並び） → トレーニー → メモ」）。
+        // その前に、時刻とトレーニーを足した
         $usage = $this->usagePart($this->renderModals(null, []));
 
-        $positions = array_map(fn ($name) => strpos($usage, 'name="'.$name.'"'), ['used_on', 'start_time', 'end_time', 'trainee_id', 'client_contract_id', 'note']);
+        $positions = array_map(fn ($name) => strpos($usage, 'name="'.$name.'"'), ['client_contract_id', 'used_on', 'start_time', 'end_time', 'trainee_id', 'note']);
         foreach ($positions as $position) {
             $this->assertNotFalse($position);
         }
