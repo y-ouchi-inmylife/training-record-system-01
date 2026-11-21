@@ -104,8 +104,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
-| 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/usages` | 利用を登録する（ルート名 `client-usages.store`）。会員の残り回数がマイナスになる登録も受け付けるが、残りのない契約（`client_contract_id`）への割り当ては入力エラー（S-0305 に戻り、モーダルを開き直す）。トレーニー（`trainee_id`）・開始時刻（`start_time`）・終了時刻（`end_time`）も受け取る（**2026-11 追加**。下の 4-1-3「POST /clients/{client}/usages」） | auth | 管理者、一般 |
-| 回数管理 | S-0305 会員詳細画面 | PUT | `/client-usages/{usage}` | 利用を更新する（ルート名 `client-usages.update`）。会員の残り回数がマイナスになる更新も受け付けるが、残りのない契約への割り当て（その利用自身は除いて数える）は入力エラー。パラメータは登録と同じ（**2026-11 追加**：トレーニー・開始時刻・終了時刻） | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/usages` | 利用を登録する（ルート名 `client-usages.store`）。会員の残り回数がマイナスになる登録も受け付けるが、残りのない契約（`client_contract_id`）への割り当ては入力エラー（S-0305 に戻り、モーダルを開き直す）。トレーニー（`trainee_id`）・開始時刻（`start_time`）・終了時刻（`end_time`）も受け取る（**2026-11 追加**。下の 4-1-3「POST /clients/{client}/usages」）。利用日が今日以降で同時に預かれる頭数を超えるときは、確認済みの印（`_capacity_confirmed`）がなければ保存せずに確認で戻る（**2026-11 追加**） | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | PUT | `/client-usages/{usage}` | 利用を更新する（ルート名 `client-usages.update`）。会員の残り回数がマイナスになる更新も受け付けるが、残りのない契約への割り当て（その利用自身は除いて数える）は入力エラー。パラメータは登録と同じ（**2026-11 追加**：トレーニー・開始時刻・終了時刻。**2026-11 追加**：確認済みの印と、上限の確認で戻る動きも登録と同じ） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-usages/{usage}` | 利用を削除する（物理削除。ルート名 `client-usages.destroy`） | auth | 管理者、一般 |
 | トレーニング記録管理 | S-0401 トレーニング記録登録画面 | GET | `/training-records/create` | トレーニング記録登録画面を表示する | auth | 管理者、一般 |
 | トレーニング記録管理 | S-0401 トレーニング記録登録画面 | POST | `/training-records` | トレーニング記録を新規登録する | auth | 管理者、一般 |
@@ -133,7 +133,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 愛犬性格診断 | S-0602 愛犬性格診断のプロンプト画面 | GET | `/settings/evaluation-prompts` | 愛犬性格診断のプロンプト画面を表示する（**2026-10-19 追加**。同じ日に名前を「愛犬性格診断のアドバイスのプロンプト」から変えた） | auth | 管理者 |
 | 愛犬性格診断 | S-0602 愛犬性格診断のプロンプト画面 | PUT | `/settings/evaluation-prompts` | 愛犬性格診断のプロンプトを更新する（**2026-10-19 追加**） | auth | 管理者 |
 | 予定 | S-1601 事業所情報の設定画面 | GET | `/settings/schedule` | 事業所情報の設定画面を表示する（ルート名 `settings.schedule.edit`。**2026-11 追加**） | auth | 管理者 |
-| 予定 | S-1601 事業所情報の設定画面 | PUT | `/settings/schedule` | 営業開始時刻・営業終了時刻を更新する（ルート名 `settings.schedule.update`。**2026-11 追加**） | auth | 管理者 |
+| 予定 | S-1601 事業所情報の設定画面 | PUT | `/settings/schedule` | 営業開始時刻・営業終了時刻・同時に預かれる頭数を更新する（ルート名 `settings.schedule.update`。**2026-11 追加**。頭数は **2026-11 追加**） | auth | 管理者 |
 | 音声ファイル容量管理 | S-0701 音声ファイル一覧画面 | GET | `/usage-stats` | 音声ファイル一覧画面を表示する（サーバー容量管理用） | auth | システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | GET | `/trainers/create` | トレーナー登録画面を表示する | auth | 管理者、システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | POST | `/trainers` | トレーナーを登録する | auth | 管理者、システム管理者 |
@@ -205,6 +205,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 内部API | - | GET | `/api/audio-records/{id}/summary` | 音声記録の要約テキストを取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/audio-records/summaries` | 要約取り込み候補の音声記録一覧を取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/trainers` | 担当トレーナーの選択候補を取得する | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/usage-schedule/month` | 利用の予約状況：月の日ごとの頭数と上限を返す（S-0305-M05。**2026-11 追加**。4-2-6） | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/usage-schedule/day` | 利用の予約状況：その日の頭数・上限・予約の一覧を返す（S-0305-M05。**2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records/upload-url` | アップロード用の署名付きURLを発行する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records` | アップロード完了後、メディアレコードを作成する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/media-records/{id}/play` | メディアを表示・再生する（ストリーミング） | auth | 管理者、一般 |
@@ -664,24 +666,28 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 | end_time | string | ● | required, date_format:H:i, start_time より後（同じ時刻は不可） | 終了時刻（**2026-11 追加**）。日付をまたぐ利用は扱わない |
 | client_contract_id | integer | | nullable, integer。この会員の契約であること・選んだ契約に残りがあること | 割り当てる契約。空は「契約なし」 |
 | note | string | | nullable, string, max:255 | メモ |
+| _capacity_confirmed | string | | —（ルールに持たず、保存する値に入らない） | 確認済みの印（**2026-11 追加**）。`1` のとき、同時に預かれる頭数を超えていても保存する。上限の確認で戻ったときに、モーダルが hidden で入れる |
 
 **処理**:
 - 同じトレーニーの利用が同じ日に 2 件以上あってもエラーにしない
 - 会員の残り回数がマイナスになる登録も受け付ける（今までどおり）
+- **保存時の上限の確認**（**2026-11 追加**。requirements.md 6-17-11）：入力の検証のあとで、利用日が今日以降なら、その利用を入れたときの時間帯の頭数（`UsageCapacityService`）を同時に預かれる頭数（`system_settings` の `schedule_capacity`）と比べる。超えていて `_capacity_confirmed` が `1` でなければ、保存しないで確認で戻る（下）。入力エラーがあるときは確かめない（検証が先に断る）。今日より前の利用は確かめない
 
 **レスポンス**:
 - 成功：`redirect()->route('clients.show', $client)` ＋「利用を登録しました。」
 - バリデーションエラー：S-0305 に戻り、利用のモーダルを開き直す（「契約・利用エンドポイントのリダイレクト先」）
+- 上限の確認で戻る（**2026-11 追加**）：`redirect()->route('clients.show', $client)->withInput()` ＋ フラッシュ `usage_capacity_warning` に注意の文（screen-design.md S-0305-M05「保存時の上限の確認」）。S-0305 は利用のモーダルを開き直し、上部に注意を出し、`_capacity_confirmed` に `1` を入れる。アクセスログには記録しない
 
 ###### PUT /client-usages/{usage}
 
 **概要**: 利用を更新する（S-0305-M05 の編集モード）。日程の変更もこの更新で行う（requirements.md 6-17-9）。**2026-11 追加**：この節を足した。
 
-**リクエスト**: `POST /clients/{client}/usages` と同じ（会員は `$usage->client_id`）。契約の残りは、その利用自身を除いて数える
+**リクエスト**: `POST /clients/{client}/usages` と同じ（会員は `$usage->client_id`）。契約の残りは、その利用自身を除いて数える。保存時の上限の確認も登録と同じで、**その利用自身は数えない**（**2026-11 追加**）
 
 **レスポンス**:
 - 成功：`redirect()->route('clients.show', $usage->client_id)` ＋「利用を更新しました。」
 - バリデーションエラー：登録と同じ
+- 上限の確認で戻る：登録と同じ（戻り先は `clients.show` の `$usage->client_id`。注意の文の最後は「このまま更新する場合は、もう一度［更新］を押してください。」）
 
 
 ---
@@ -2787,19 +2793,20 @@ POST /training-records に以下を追加する。
 
 **概要**: 事業所情報の設定画面を表示する。管理者のみ（`admin-only`。S-0601・S-0602 と同じ）。
 
-**レスポンス**: view（`system_settings` の `schedule_open_time`・`schedule_close_time`。行がなければコード側の初期値 08:00・19:00）
+**レスポンス**: view（`system_settings` の `schedule_open_time`・`schedule_close_time`・`schedule_capacity`。行がなければコード側の初期値 08:00・19:00・3）
 
 ###### PUT /settings/schedule
 
-**概要**: 営業開始時刻・営業終了時刻を更新する。管理者のみ。
+**概要**: 営業開始時刻・営業終了時刻・同時に預かれる頭数を更新する。管理者のみ。
 
 **リクエスト**:
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | schedule_open_time | string | ● | required, date_format:H:i | 営業開始時刻 |
 | schedule_close_time | string | ● | required, date_format:H:i, schedule_open_time より後（同じ時刻は不可） | 営業終了時刻 |
+| schedule_capacity | integer | ● | required, integer, between:1,99 | 同時に預かれる頭数（**2026-11 追加**） |
 
-**処理**: `system_settings` の `schedule_open_time`・`schedule_close_time` を作る・更新する（値は `HH:MM` の文字列）。登録済みの利用の時刻は変えない。アクセスログは記録しない（S-0601・S-0602 の更新と同じ）
+**処理**: `system_settings` の `schedule_open_time`・`schedule_close_time`・`schedule_capacity` を作る・更新する（時刻は `HH:MM` の文字列、頭数は数字の文字列）。登録済みの利用の時刻は変えない。アクセスログは記録しない（S-0601・S-0602 の更新と同じ）
 
 **レスポンス**: `redirect('/settings/schedule')`。フラッシュ `success` に「事業所情報の設定を更新しました。」
 
@@ -3196,3 +3203,62 @@ POST /training-records に以下を追加する。
 | display_title | string | 表示名（title が空なら元ファイル名） |
 | is_processing | boolean | 変換かサムネイルのどちらかが処理中（processing）か |
 | has_error | boolean | 変換かサムネイルのどちらかがエラー（error）か |
+
+#### 4-2-6. 利用の予約状況
+
+（**2026-11 追加**。requirements.md 6-17-11、screen-design.md S-0305-M05「予約状況」）
+
+利用のモーダルの予約状況（カレンダーとその日の予約）が読み込む。頭数は**事業所全体**（すべての会員の利用）で、数え方は requirements.md 6-17-11（利用 1 件＝1 頭、時間帯は終わりを含まない、最も多く重なる瞬間の頭数）。計算は `App\Services\UsageCapacityService`（保存時の上限の確認と同じ）。上限は `system_settings` の `schedule_capacity`（行がなければ 3）。
+
+- 権限：利用の登録・編集と同じ（`auth` ＋ `practitioners`。トレーナー用ドメイン。システム管理者は 403）
+- 参照なので、アクセスログには記録しない（`LogAccess` の `ACTION_MAP` に足さない）
+- コントローラ：`UsageScheduleController`（`month` / `day`）
+- クエリパラメータが正しくないときは、Laravel 標準の 422（`{message, errors}`）
+
+##### GET /api/usage-schedule/month
+
+**概要**: 月の日ごとの頭数と上限を返す（ルート名 `api.usage-schedule.month`）。
+
+**リクエスト**（クエリパラメータ）:
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| month | string | ● | required, date_format:Y-m | 表示する月（例 `2026-11`） |
+| exclude_usage_id | integer | | nullable, integer | 数えない利用の id（編集中の利用自身） |
+
+**レスポンス**（200）:
+```json
+{
+  "month": "2026-11",
+  "today": "2026-11-21",
+  "capacity": 3,
+  "days": { "2026-11-24": 1, "2026-11-26": 2, "2026-11-27": 3 }
+}
+```
+- `days`：その日の頭数（その日の中で最も多く重なる瞬間の頭数）。**頭数が 1 以上の日だけ**を入れる
+- `today`：アプリのタイムゾーンでの今日（カレンダーの「今日」の印に使う）
+
+##### GET /api/usage-schedule/day
+
+**概要**: その日の頭数・上限・予約の一覧を返す（ルート名 `api.usage-schedule.day`）。
+
+**リクエスト**（クエリパラメータ）:
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| date | string | ● | required, date_format:Y-m-d | 日付 |
+| exclude_usage_id | integer | | nullable, integer | 数えない・出さない利用の id（編集中の利用自身） |
+
+**レスポンス**（200）:
+```json
+{
+  "date": "2026-11-26",
+  "date_label": "11/26(木)",
+  "capacity": 3,
+  "count": 2,
+  "usages": [
+    { "time_range": "8:00〜19:00", "label": "アムロ（佐藤 一郎）" },
+    { "time_range": "13:00〜19:00", "label": "検証Dog（大内 太郎）" }
+  ]
+}
+```
+- `count`：その日の頭数（月の `days` と同じ数え方）
+- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「（会員名）」）。利用の id・会員の id は返さない（画面で使わないため）
