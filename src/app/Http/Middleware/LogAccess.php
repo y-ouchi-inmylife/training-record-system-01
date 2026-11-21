@@ -66,15 +66,49 @@ class LogAccess
         'client-usages.destroy' => 'delete_client_usage',
     ];
 
+    /**
+     * この要求の中で新しくセッションに載せられていたら、送信が戻された（保存していない）とみなすキー（2026-11 追加。
+     * 要件定義書 6-8-9「記録しない送信」）。
+     *
+     * - errors：入力エラー。FormRequest・$request->validate()・ValidationException・withErrors() は、
+     *   どれもエラーの一覧をこのキーでセッションに載せて前の画面に戻す（Laravel 標準）
+     */
+    private const RETURNED_FLASH_KEYS = [
+        'errors',
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
 
-        if (auth()->check() && $request->route()) {
+        if (auth()->check() && $request->route() && ! $this->wasReturned($request, $response)) {
             $this->logAccess($request);
         }
 
         return $response;
+    }
+
+    /**
+     * 入力エラーなどで戻された送信か（2026-11 追加。要件定義書 6-8-9）。戻された送信は記録しない。
+     *
+     * その前は、レスポンスを見ずに記録していたため、入力エラーで戻った送信も「登録」「編集」などとして記録されていた。
+     * 判定は、この要求の中で新しくセッションに載せられたキー（`_flash.new`。次の要求で読むために、この要求で flash したもの）に
+     * RETURNED_FLASH_KEYS があるかで見る。前の要求から引き継いだもの（`_flash.old`）は見ない。
+     * JSON の要求の入力エラー（HTTP 422。セッションには載せない）も戻された送信とみなす
+     */
+    private function wasReturned(Request $request, Response $response): bool
+    {
+        if ($response->getStatusCode() === 422) {
+            return true;
+        }
+
+        if (! $request->hasSession()) {
+            return false;
+        }
+
+        $flashed = (array) $request->session()->get('_flash.new', []);
+
+        return array_intersect(self::RETURNED_FLASH_KEYS, $flashed) !== [];
     }
 
     private function logAccess(Request $request): void
