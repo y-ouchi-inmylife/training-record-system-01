@@ -773,6 +773,8 @@ class ClientCountRenderingTest extends TestCase
         // 列の幅：トレーニーは固定幅、メモは残りの幅
         $this->assertMatchesRegularExpression('/\.usage-row-trainee\s*\{\s*width:\s*6em;\s*flex-shrink:\s*0;/u', $html);
         $this->assertMatchesRegularExpression('/\.usage-row-note\s*\{\s*flex:\s*1 1 8em;/u', $html);
+        // md 以上では、メモを次の行に回さない（flex-basis と最小の幅を 0 にして、トレーニーの右の残りの幅に入れる。2026-11 修正）
+        $this->assertMatchesRegularExpression('/@media \(min-width: 768px\) \{\s*\.usage-row-note\s*\{\s*flex-basis:\s*0;\s*min-width:\s*0;\s*\}\s*\}/u', $html);
     }
 
     public function test_利用の行は実施済みはラベルなし_今日と予定はラベルと見た目を変える(): void

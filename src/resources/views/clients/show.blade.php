@@ -166,6 +166,16 @@
     flex: 1 1 8em;
     min-width: 4em;
 }
+/* md 以上（ノートPC 以上）では、メモを次の行に回さない（2026-11 修正）。
+   行は flex-wrap のため、上の flex-basis 8em（行の文字 14px で 112px）がトレーニーの右の残り（会員詳細の右カラム〔col-lg-5〕では
+   70px 前後）より大きいと、メモだけが次の行に回っていた。md 以上では flex-basis と最小の幅を 0 にして、トレーニーの右の
+   残りの幅にそのまま入れ、入らない分は .text-truncate で「…」にする（md 未満は上の指定のまま、狭ければ折り返す） */
+@media (min-width: 768px) {
+    .usage-row-note {
+        flex-basis: 0;
+        min-width: 0;
+    }
+}
 /* 今日の行は左端に太い線（list-group-flush の左右の枠を使わず、内側の影で引く。太さは 4px） */
 .usage-row-today {
     box-shadow: inset 4px 0 0 var(--bs-dark);
