@@ -561,7 +561,9 @@
                                     @if($row['usedUp'])
                                         <span class="badge bg-secondary flex-shrink-0">{{ $row['reserved'] ? 'すべてご予約済み' : 'すべてご利用済み' }}</span>
                                     @else
-                                        <span class="flex-shrink-0">あと {{ $row['remaining'] }}回</span>
+                                        {{-- 残りがある契約は「あと n回」を緑のバッジ（§2-5 の bg-success「正常」。2026-11 変更：その前は文字）。
+                                             大きさ・形は使い切った契約のバッジと同じ（どちらも標準バッジ） --}}
+                                        <span class="badge bg-success flex-shrink-0">あと {{ $row['remaining'] }}回</span>
                                     @endif
                                     {{-- 有効期限（ないときは「有効期限」の語も出さない）。有効期限を過ぎていて残りがある契約（$row['expired']。
                                          判定は ContractTicketService）は、日付の部分だけを赤字にする（期限切れの印はこの赤字だけ） --}}

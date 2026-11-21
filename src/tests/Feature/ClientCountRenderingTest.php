@@ -331,7 +331,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertLessThan($oldPos, $newPos, '契約は新しいものが上');
 
         // 状態：新しい契約は「あと 2回」、古い契約は「すべてご利用済み」（bg-secondary）
-        $this->assertStringContainsString('<span class="flex-shrink-0">あと 2回</span>', $html);
+        $this->assertStringContainsString('<span class="badge bg-success flex-shrink-0">あと 2回</span>', $html);
         $this->assertStringContainsString('<span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>', $html);
         $this->assertStringNotContainsString('残り 2</span>', $html);
         $this->assertStringNotContainsString('>使い切り</span>', $html);
@@ -495,7 +495,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         // 見出しのボタン（「{契約日} 契約（N回）」だけ）の直後に状態が続く＝ボタンの外で、契約日・回数のすぐ後ろ（2026-11 変更：メモはボタンの外の最後）
-        $this->assertMatchesRegularExpression('/2026\/10\/12 契約（4回）<\/button>\s*<span class="flex-shrink-0">あと 4回<\/span>/u', $html);
+        $this->assertMatchesRegularExpression('/2026\/10\/12 契約（4回）<\/button>\s*<span class="badge bg-success flex-shrink-0">あと 4回<\/span>/u', $html);
         $this->assertMatchesRegularExpression('/2026\/09\/03 契約（1回）<\/button>\s*<span class="badge bg-secondary flex-shrink-0">すべてご利用済み<\/span>/u', $html);
         // 「未割り当て n」も「（契約なし）」のすぐ後ろ
         $this->assertMatchesRegularExpression('/<span>（契約なし）<\/span>\s*<span class="badge bg-warning text-dark">未割り当て 1<\/span>/u', $html);
@@ -528,11 +528,33 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertSame(
             '<button>2026/11/02 契約（9回）</button>'
-            .'<span class="flex-shrink-0">あと 5回</span>'
+            .'<span class="badge bg-success flex-shrink-0">あと 5回</span>'
             .'<span class="small flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span>'
             .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>4回コース</span></div>',
             $this->contractHeading($html, $contract)
         );
+    }
+
+    public function test_契約の状態は残りがあれば緑のバッジ_使い切りは今のバッジ(): void
+    {
+        // 2026-11 変更：「あと n回」を緑（§2-5 の bg-success）のバッジにした（その前は文字）。使い切った契約のバッジは今のまま
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $client = $this->makeClient('0001', '山田');
+        $open = $this->contract($client, '2026-11-02', 9);
+        $done = $this->contract($client, '2026-10-20', 1);
+        $reserved = $this->contract($client, '2026-10-01', 1);
+        $this->usage($client, '2026-11-02', 4, null, $open);
+        $this->usage($client, '2026-10-22', 1, null, $done);
+        $this->usage($client, '2026-11-25', 1, null, $reserved);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<button>2026/11/02 契約（9回）</button><span class="badge bg-success flex-shrink-0">あと 5回</span>', $this->contractHeading($html, $open));
+        $this->assertStringContainsString('<span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>', $this->contractHeading($html, $done));
+        $this->assertStringContainsString('<span class="badge bg-secondary flex-shrink-0">すべてご予約済み</span>', $this->contractHeading($html, $reserved));
+        // 文字だけの「あと n回」は契約の見出しに出さない。カードの見出しの「ご利用回数 あと n回」（大きい数字）は今のまま
+        $this->assertStringNotContainsString('<span class="flex-shrink-0">あと', $html);
+        $this->assertSame('<h6 class="mb-0">ご利用回数<span class="ms-2"><span>あと <span class="fs-5">5</span>回</span></span></h6>', $this->countHeading($html));
     }
 
     public function test_使い切った契約の見出しはバッジのあとに有効期限とメモ(): void
@@ -572,7 +594,7 @@ class ClientCountRenderingTest extends TestCase
         $heading = $this->contractHeading($html, $contract);
         $this->assertSame(
             '<button>2026/11/02 契約（3回）</button>'
-            .'<span class="flex-shrink-0">あと 3回</span>'
+            .'<span class="badge bg-success flex-shrink-0">あと 3回</span>'
             .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>メモだけ</span></div>',
             $heading
         );
@@ -589,7 +611,7 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertSame(
             '<button>2026/10/01 契約（4回）</button>'
-            .'<span class="flex-shrink-0">あと 4回</span>'
+            .'<span class="badge bg-success flex-shrink-0">あと 4回</span>'
             .'<span class="small flex-shrink-0" data-contract-expires-on>有効期限 <span class="text-danger">2026/10/31</span></span>'
             .'<span class="small text-body-secondary text-truncate mw-100" data-contract-note>メモ</span></div>',
             $this->contractHeading($html, $contract)
@@ -610,7 +632,7 @@ class ClientCountRenderingTest extends TestCase
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
         // 残りは見出しの「あと 2回」だけ
-        $this->assertStringContainsString('<span class="flex-shrink-0">あと 2回</span>', $html);
+        $this->assertStringContainsString('<span class="badge bg-success flex-shrink-0">あと 2回</span>', $html);
         $this->assertStringNotContainsString('>未利用', $html);
         $this->assertStringNotContainsString('data-usage-unused', $html);
         $this->assertStringNotContainsString('bi-plus-lg', $html);
