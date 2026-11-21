@@ -7,6 +7,9 @@ use App\Models\Client;
 use App\Models\ClientContract;
 use App\Models\ClientUsage;
 use App\Models\Trainer;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
@@ -14,6 +17,7 @@ use Tests\TestCase;
  * 入力エラーで戻った送信をアクセスログに記録しない（2026-11 追加。要件定義書 6-8-9「記録しない送信」、db-schema.md DS-0500 注記）。
  *
  * - 入力エラーで戻った送信（Laravel 標準のエラーの一覧 `errors` をセッションに載せて戻すもの）は記録しない
+ * - 断られた送信（フラッシュの `error` を載せて戻すもの。例：記録などがある会員の削除）も記录しない（2026-11 追加）
  * - 成功した送信は今までどおり記録する
  * - LogAccess の ACTION_MAP のすべての操作が対象。ここでは利用（登録・編集）と、ほかの操作として契約（登録・編集）で確かめる
  *
@@ -139,5 +143,75 @@ class AccessLogReturnedSubmissionTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame(['create_client_usage'], AccessLog::query()->pluck('action')->all());
+    }
+
+    // ---- 断られた操作（2026-11 追加。error のフラッシュ） ----
+
+    /** 会員削除の判定に使う表を作り、管理者でログインする */
+    private function prepareClientDelete(): void
+    {
+        Schema::create('training_records', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('client_id');
+        });
+        Schema::create('audio_records', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('client_id');
+        });
+        $admin = new Trainer(['name' => '管理者太郎', 'role' => 'admin']);
+        $admin->id = 100;
+        $admin->exists = true;
+        $this->actingAs($admin, 'web');
+    }
+
+    public function test_断られた会員削除は記録しない(): void
+    {
+        $this->prepareClientDelete();
+        DB::table('training_records')->insert(['client_id' => $this->client->id]);
+
+        $this->delete(route('clients.destroy', $this->client))
+            ->assertRedirect(route('clients.show', $this->client))
+            ->assertSessionHas('error', 'この会員にはトレーニング記録が登録されているため削除できません。');
+
+        $this->assertTrue(Client::query()->whereKey($this->client->id)->exists());
+        $this->assertSame(0, AccessLog::query()->count());
+    }
+
+    public function test_トレーニー契約利用で断られた会員削除も記録しない(): void
+    {
+        $this->prepareClientDelete();
+        ClientContract::query()->create(['client_id' => $this->client->id, 'contracted_on' => '2026-10-12', 'count' => 4]);
+
+        $this->delete(route('clients.destroy', $this->client))
+            ->assertSessionHas('error', 'この会員には契約が登録されているため削除できません。');
+
+        $this->assertSame(0, AccessLog::query()->count());
+    }
+
+    public function test_削除できた会員削除は記録する(): void
+    {
+        $this->prepareClientDelete();
+
+        $this->delete(route('clients.destroy', $this->client))
+            ->assertRedirect(route('clients.index'))
+            ->assertSessionHas('success', '会員を削除しました。');
+
+        $this->assertFalse(Client::query()->whereKey($this->client->id)->exists());
+        $log = AccessLog::query()->sole();
+        $this->assertSame('delete_client', $log->action);
+        $this->assertSame($this->client->id, (int) $log->target_id);
+    }
+
+    public function test_断られたすぐあとの削除できた会員削除は記録する(): void
+    {
+        // 前の要求で載せた error（次の要求では _flash.old）は見ない
+        $this->prepareClientDelete();
+        DB::table('audio_records')->insert(['client_id' => $this->client->id]);
+        $this->delete(route('clients.destroy', $this->client))->assertSessionHas('error');
+
+        DB::table('audio_records')->delete();
+        $this->delete(route('clients.destroy', $this->client))->assertSessionHas('success');
+
+        $this->assertSame(['delete_client'], AccessLog::query()->pluck('action')->all());
     }
 }

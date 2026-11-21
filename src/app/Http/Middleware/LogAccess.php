@@ -74,10 +74,15 @@ class LogAccess
      * - errors：入力エラー。FormRequest・$request->validate()・ValidationException・withErrors() は、
      *   どれもエラーの一覧をこのキーでセッションに載せて前の画面に戻す（Laravel 標準）
      * - 利用の保存時の上限の確認で戻ったときの注意（ClientUsageController::CAPACITY_WARNING_SESSION_KEY。requirements.md 6-17-11）
+     * - error：断られた・失敗した送信（2026-11 追加）。ACTION_MAP の操作は、業務上の制約で断ったとき（記録などがある会員の削除、
+     *   案内中の案内があるトレーニーへの案内の発行）と、保存に失敗したとき（トレーニング記録の登録・更新の例外、会員削除の外部キー違反）に
+     *   だけ error を載せて戻り、成功したときには載せない。そのため error があれば「行わなかった送信」とみなせる。
+     *   成功の処理で error を載せる操作を足すときは、この判定に当たらないようにすること
      */
     private const RETURNED_FLASH_KEYS = [
         'errors',
         ClientUsageController::CAPACITY_WARNING_SESSION_KEY,
+        'error',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -92,7 +97,7 @@ class LogAccess
     }
 
     /**
-     * 入力エラーなどで戻された送信か（2026-11 追加。要件定義書 6-8-9）。戻された送信は記録しない。
+     * 入力エラー・確認・断り・失敗で戻された送信か（2026-11 追加。要件定義書 6-8-9）。戻された送信は記録しない（実際に行った操作だけを記録する）。
      *
      * その前は、レスポンスを見ずに記録していたため、入力エラーで戻った送信も「登録」「編集」などとして記録されていた。
      * 判定は、この要求の中で新しくセッションに載せられたキー（`_flash.new`。次の要求で読むために、この要求で flash したもの）に
