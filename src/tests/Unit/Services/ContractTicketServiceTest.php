@@ -78,8 +78,10 @@ class ContractTicketServiceTest extends TestCase
         $ticket = (new ContractTicketService)->build($contracts, $usages);
 
         $this->assertSame([2 => '2026/11/22(日)', 1 => '2026/11/23(月)'], $ticket['usageDates']);
-        // usages は割り当てた利用だけ（未利用の null を含まない）。slots は今までどおり未利用の null を含む（会員側 S-1412 が使う）
-        $this->assertSame([2, 1], array_map(fn ($usage) => $usage->id, $ticket['contracts'][0]['usages']));
+        // usages は割り当てた利用だけ（未利用の null を含まない）で、新しい順（2026-11 変更）。
+        // slots は今までどおり昇順で、未利用の null を含む（会員側 S-1412 が使う）
+        $this->assertSame([1, 2], array_map(fn ($usage) => $usage->id, $ticket['contracts'][0]['usages']));
+        $this->assertSame(2, $ticket['contracts'][0]['slots'][0]->id);
         $this->assertCount(3, $ticket['contracts'][0]['slots']);
         $this->assertNull($ticket['contracts'][0]['slots'][2]);
     }
@@ -134,6 +136,29 @@ class ContractTicketServiceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_会員詳細の利用の行は新しい順_slotsは昇順のまま(): void
+    {
+        // 2026-11 変更：会員詳細（S-0305）の usages は「利用日の新しい順 → 開始時刻の遅い順 → id の大きい順」。
+        // 会員側（S-1412）の slots は「利用日 → 開始時刻 → id」の昇順のまま
+        $contracts = collect([$this->contract(1, '2026-10-01', 5)]);
+        $usages = collect([
+            $this->usage(1, 1, '2026-10-05', '09:00:00'),
+            $this->usage(2, 1, '2026-10-05', '15:00:00'),
+            $this->usage(3, 1, '2026-10-04', '18:00:00'),
+            $this->usage(4, 1, '2026-10-05', '09:00:00'),
+            $this->usage(5, null, '2026-10-01'),
+            $this->usage(6, null, '2026-10-03'),
+        ]);
+
+        $ticket = (new ContractTicketService)->build($contracts, $usages);
+        $ids = fn (array $list) => array_map(fn ($usage) => $usage?->id, $list);
+
+        $this->assertSame([2, 4, 1, 3], $ids($ticket['contracts'][0]['usages']));
+        $this->assertSame([3, 1, 4, 2, null], $ids($ticket['contracts'][0]['slots']));
+        $this->assertSame([6, 5], $ids($ticket['unassigned']['usages']));
+        $this->assertSame([5, 6], $ids($ticket['unassigned']['slots']));
+    }
+
     public function test_同じ日の利用は開始時刻の順に並び_同じ時刻ならidの順(): void
     {
         // 利用日 → 開始時刻 → id の順（2026-11 変更。設計書 requirements.md 6-17-9）。id の小さい利用ほど開始時刻が遅い
@@ -171,7 +196,7 @@ class ContractTicketServiceTest extends TestCase
         $this->assertSame(4, $row['remaining']);
         $this->assertFalse($row['usedUp']);
         $this->assertSame(0, $row['usageCount']);
-        $this->assertSame(['slots' => [], 'count' => 0], $result['unassigned']);
+        $this->assertSame(['slots' => [], 'usages' => [], 'count' => 0], $result['unassigned']);
         $this->assertSame(4, $result['remaining']);
         $this->assertFalse($result['isEmpty']);
     }

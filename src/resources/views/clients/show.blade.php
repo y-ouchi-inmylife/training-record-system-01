@@ -511,14 +511,15 @@
                                     <span class="badge bg-warning text-dark">未割り当て {{ $ticket['unassigned']['count'] }}</span>
                                 </div>
                                 <div class="list-group list-group-flush usage-rows">
-                                    @foreach($ticket['unassigned']['slots'] as $usage)
+                                    @foreach($ticket['unassigned']['usages'] as $usage)
                                         @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
                         @endif
-                        {{-- 契約ごとのまとまり（契約日の新しいものが上。その契約に割り当てた利用を 1 行に 1 件ずつ、古い利用が上。
-                             その下に残りを「未利用 n回」の 1 行で出す。2026-11 変更：その前はマス）。
+                        {{-- 契約ごとのまとまり（契約日の新しいものが上。その契約に割り当てた利用を 1 行に 1 件ずつ、新しい利用が上。
+                             2026-11 変更：その前はマス。続けて 2026-11 変更：古い利用が上だったのを新しい利用が上にし、
+                             利用の行の下の「未利用 n回」の行と［＋］をなくした。残りは見出しの「あと n回」で示す）。
                              data-usage-count は割り当てた利用の件数（削除の確認ダイアログの文言に使う。回数ではない） --}}
                         @foreach($ticket['contracts'] as $row)
                             <div @class(['mb-3' => ! $loop->last])>
@@ -553,17 +554,6 @@
                                     @foreach($row['usages'] as $usage)
                                         @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id]])
                                     @endforeach
-                                    {{-- 未利用の行（2026-11 変更：その前は未利用のマスを残りの数だけ並べていた）。残りが 0 の契約では出さない。
-                                         ［＋］を押すと、この契約を選んだ状態で利用の登録モーダル（S-0305-M05）を開く --}}
-                                    @if($row['remaining'] > 0)
-                                        <div class="list-group-item d-flex align-items-center column-gap-2 py-1 px-2 small" data-usage-unused>
-                                            <span class="text-muted">未利用 {{ $row['remaining'] }}回</span>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-auto"
-                                                    data-client-contract-id="{{ $row['contract']->id }}"
-                                                    aria-label="{{ $row['contract']->contracted_on->format('Y/m/d') }} の契約で利用を追加"
-                                                    onclick="window.usageModal.openForCreate(this.dataset.clientContractId)"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
-                                        </div>
-                                    @endif
                                 </div>
                             </div>
                         @endforeach

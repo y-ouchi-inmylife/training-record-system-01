@@ -54,8 +54,9 @@ class ContractTicketService
      *   'remaining'  => ?int,  // 会員の残り回数（契約回数の合計 − 利用の件数。未割り当ても数える）。契約も利用も 0 件なら null
      *   'isEmpty'    => bool,  // 契約も利用も 1 件もないか（カード本文の空の状態の判定用）
      *   'unassigned' => [      // 「（契約なし）」の行
-     *     'slots' => ClientUsage[],  // 1 要素 = 1 マス。利用日 → 開始時刻 → id の昇順
-     *     'count' => int,            // 未割り当ての利用の件数（＝マスの数。バッジ「未割り当て n」の n）
+     *     'slots'  => ClientUsage[],  // 1 要素 = 1 マス。利用日 → 開始時刻 → id の昇順（会員側 S-1412 の回数券型のマス）
+     *     'usages' => ClientUsage[],  // 同じ利用を新しい順（slots の逆順）に並べたもの（会員詳細 S-0305 の利用の行。2026-11 追加）
+     *     'count'  => int,            // 未割り当ての利用の件数（＝マスの数。バッジ「未割り当て n」の n）
      *   ],
      *   'contracts'  => [      // 表示順（契約日の新しいものが先頭）
      *     [
@@ -66,8 +67,9 @@ class ContractTicketService
      *       'usageCount' => int,                   // 割り当てた利用の件数（削除の確認ダイアログ用。＝使ったマスの数）
      *       'expired'    => bool,                  // 有効期限を過ぎていて残りがあるか（有効期限の日付を赤字にする）
      *       'reserved'   => bool,                  // 使い切っていて、今日より後の利用（予定）を 1 件でも含むか（「すべてご予約済み」。2026-11 追加）
-     *       'usages'     => ClientUsage[],         // 割り当てた利用だけ（未利用の null を含まない）。利用日 → 開始時刻 → id の昇順。
-     *                                              // 会員詳細（S-0305）の 1 行に 1 利用の表示に使う（2026-11 追加）
+     *       'usages'     => ClientUsage[],         // 割り当てた利用だけ（未利用の null を含まない）。**新しい順**（利用日の新しい順 →
+     *                                              // 開始時刻の遅い順 → id の大きい順。slots の昇順のすべてを逆にしたもの）。
+     *                                              // 会員詳細（S-0305）の 1 行に 1 利用の表示に使う（2026-11 追加。2026-11 変更：その前は昇順）
      *     ],
      *     ...
      *   ],
@@ -163,7 +165,9 @@ class ContractTicketService
                 'reserved' => $usedUp && collect($assigned)->contains(
                     fn (ClientUsage $usage) => $usageStates[$usage->id] === self::STATE_UPCOMING
                 ),
-                'usages' => $assigned,
+                // 会員詳細（S-0305）の利用の行は新しい順（2026-11 変更）。$assigned は利用日 → 開始時刻 → id の昇順なので、
+                // 逆にすれば「利用日の新しい順 → 開始時刻の遅い順 → id の大きい順」になる。slots（会員側 S-1412 のマス）は昇順のまま
+                'usages' => array_reverse($assigned),
             ];
 
             $contractOptions[] = [
@@ -184,6 +188,8 @@ class ContractTicketService
             'isEmpty' => $sortedContracts->isEmpty() && $sortedUsages->isEmpty(),
             'unassigned' => [
                 'slots' => $unassignedSlots,
+                // 会員詳細（S-0305）の「（契約なし）」のまとまりの利用の行は、契約の下と同じく新しい順（2026-11 変更）
+                'usages' => array_reverse($unassignedSlots),
                 'count' => count($unassignedSlots),
             ],
             // 表示用：契約日の新しいものが上

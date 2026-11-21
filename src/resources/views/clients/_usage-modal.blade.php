@@ -7,8 +7,7 @@
                 'traineeOptions' => $usageForm['traineeOptions'], 'defaultTraineeId' => $usageForm['defaultTraineeId'],
                 'defaultStartTime' => $usageForm['defaultStartTime'], 'defaultEndTime' => $usageForm['defaultEndTime']])
        // ボタン側:
-       //   新規登録: onclick="window.usageModal.openForCreate()"
-       //            （「未利用」の行の［＋］からは openForCreate(this.dataset.clientContractId) で、その契約を選んで開く）
+       //   新規登録: onclick="window.usageModal.openForCreate()"（2026-11 変更：契約を指定して開く入口〔「未利用」の行の［＋］〕はなくした）
        //   編集   : onclick="window.usageModal.openForEdit(this.dataset)"
        //            （data-id / data-client-contract-id / data-trainee-id / data-used-on / data-start-time / data-end-time / data-note。
        //              clients/_usage-row.blade.php。時刻は HH:MM）
@@ -291,19 +290,14 @@
         deleteForm.action = DESTROY_URL_TEMPLATE.replace('__ID__', encodeURIComponent(id));
     }
 
-    // contractId を渡すと、その契約を選んだ状態で開く（「未利用」の行の［＋］から）。
-    // 渡さないとき（「利用を追加」ボタン）は、登録時の初期値（残りがある一番古い契約）を選ぶ。
-    // どちらも登録モードなので、使い切りの契約は無効のまま（「未利用」の行は残りがある契約にしかない）。
-    function openForCreate(contractId) {
+    // 登録モードで開く（「利用を追加」ボタン）。契約は登録時の初期値（残りがある一番古い契約）を選ぶ。
+    // 使い切りの契約は無効のまま。2026-11 変更：契約を指定して開く入口（「未利用」の行の［＋］）をなくしたため、引数をなくした
+    function openForCreate() {
         initRefs();
         if (!modal) return;
         setCreateMode();
         applyDisabled(null);
-        if (contractId !== undefined && contractId !== null && contractId !== '') {
-            contractSelect.value = String(contractId);
-        } else {
-            contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
-        }
+        contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
         usedOnInput.value = todayString();
         startTimeInput.value = DEFAULT_START_TIME;
         endTimeInput.value = DEFAULT_END_TIME;
