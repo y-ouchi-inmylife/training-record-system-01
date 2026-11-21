@@ -141,6 +141,11 @@
 .ticket-slot {
     min-width: 6.5rem;
 }
+/* マスの 2 行目のトレーニーの表示名（2026-11 追加）。長いときは「…」で省く（.text-truncate）。
+   時刻（8:00〜19:00）と並べてもマスが横に広がりすぎないよう、名前の幅だけを抑える */
+.ticket-slot-trainee {
+    max-width: 5em;
+}
 .ticket-slot-empty {
     /* 未利用のマス（btn btn-sm）。点線の枠で、実線の枠の利用済みのマスと見分ける。
        普段は文字と枠を薄くし（文字は本文の色 --bs-body-color の 50%。白の上で #909294 相当、
@@ -507,7 +512,7 @@
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">
                                     @foreach($ticket['unassigned']['slots'] as $usage)
-                                        @include('clients._usage-slot', ['usage' => $usage])
+                                        @include('clients._usage-slot', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
@@ -535,8 +540,10 @@
                                     {{-- 契約の状態（あと n回／すべてご利用済み。会員側 S-1412 と同じ言葉）。見出しのボタンの外に、見出しのすぐ後ろに置く
                                          （見出しとの間は column-gap-2）。有効期限が過ぎていても、この表示は変えない
                                          （期限切れは見出しの有効期限の日付の赤字で示す） --}}
+                                    {{-- 使い切った契約のうち、予定（今日より後の利用）を含む契約は「すべてご予約済み」（2026-11 追加。
+                                         判定は ContractTicketService の reserved）。バッジはどちらも bg-secondary --}}
                                     @if($row['usedUp'])
-                                        <span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>
+                                        <span class="badge bg-secondary flex-shrink-0">{{ $row['reserved'] ? 'すべてご予約済み' : 'すべてご利用済み' }}</span>
                                     @else
                                         <span class="flex-shrink-0">あと {{ $row['remaining'] }}回</span>
                                     @endif
@@ -544,7 +551,7 @@
                                 <div class="d-flex flex-wrap gap-1">
                                     @foreach($row['slots'] as $usage)
                                         @if($usage)
-                                            @include('clients._usage-slot', ['usage' => $usage])
+                                            @include('clients._usage-slot', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id]])
                                         @else
                                             {{-- 未利用のマス。押すと、この契約を選んだ状態で利用の登録モーダル（S-0305-M05）を開く
                                                  （何番目のマスかは関係しない）。使い切りの契約には未利用のマスがない --}}

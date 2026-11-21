@@ -25,10 +25,24 @@ use Illuminate\Support\Collection;
  * 通常はマスからあふれない。万一データ上あふれていても画面が壊れないよう、
  * あふれた分も契約の行のマスとして末尾に並べ（隠さない）、契約の状態は使い切り（画面では「すべてご利用済み」）として扱う。
  *
+ * 利用は予定としても使う（2026-11 追加。設計書 requirements.md 6-17-9）。利用日が今日より前の利用を「実施済み」、
+ * 今日の利用を「今日」、今日より後の利用を「予定」として、マスの見た目を変えるための状態（usageStates）を返す。
+ * 「今日」はアプリのタイムゾーンでの today()（時刻は使わない）。使い切った契約のうち、予定を 1 件でも含む契約は
+ * 「すべてご予約済み」にする（reserved）。残り回数の計算は変えない（予定の利用も使った回数に数える）。
+ *
  * ロジックを Blade に書かないため、ビューにそのまま渡せる配列で返す。
  */
 class ContractTicketService
 {
+    /** 利用の状態：利用日が今日より前（実施済み） */
+    public const STATE_PAST = 'past';
+
+    /** 利用の状態：利用日が今日 */
+    public const STATE_TODAY = 'today';
+
+    /** 利用の状態：利用日が今日より後（予定） */
+    public const STATE_UPCOMING = 'upcoming';
+
     /**
      * 回数券型の表示データと、利用モーダルの選択肢を組み立てる。
      *
@@ -48,6 +62,7 @@ class ContractTicketService
      *       'usedUp'     => bool,                  // 残りが 0 か
      *       'usageCount' => int,                   // 割り当てた利用の件数（削除の確認ダイアログ用。＝使ったマスの数）
      *       'expired'    => bool,                  // 有効期限を過ぎていて残りがあるか（有効期限の日付を赤字にする）
+     *       'reserved'   => bool,                  // 使い切っていて、今日より後の利用（予定）を 1 件でも含むか（「すべてご予約済み」。2026-11 追加）
      *     ],
      *     ...
      *   ],
@@ -56,6 +71,10 @@ class ContractTicketService
      *     ...
      *   ],
      *   'defaultContractId' => ?int,  // 登録時の初期値（残りがある契約のうち一番古いもの。なければ null＝「契約なし」）
+     *   'usageStates'       => [      // 利用の id ごとの状態（STATE_PAST / STATE_TODAY / STATE_UPCOMING。2026-11 追加）
+     *     int => string,
+     *     ...
+     *   ],
      * ]
      *
      * @param  Collection<int, ClientContract>  $contracts
@@ -96,9 +115,13 @@ class ContractTicketService
             }
         }
 
-        // 有効期限の判定に使う「今日」。アプリのタイムゾーン（config('app.timezone')）での日付。
-        // today() は Carbon::setTestNow() で固定できる。
+        // 有効期限の判定と、利用の実施済み・今日・予定の判定に使う「今日」。アプリのタイムゾーン（config('app.timezone')）での日付。
+        // today() は Carbon::setTestNow() で固定できる。日付どうしを Y-m-d の文字列で比べる（時刻は使わない）
         $today = today()->format('Y-m-d');
+        $usageStates = [];
+        foreach ($sortedUsages as $usage) {
+            $usageStates[$usage->id] = self::usageState($usage, $today);
+        }
 
         $contractRows = [];
         $contractOptions = [];
@@ -125,6 +148,10 @@ class ContractTicketService
                 'usedUp' => $usedUp,
                 'usageCount' => count($assigned),
                 'expired' => $contract->isExpiredWithRemaining($usedUp, $today),
+                // 「すべてご予約済み」：使い切っていて、割り当てた利用に予定（今日より後）が 1 件でもある
+                'reserved' => $usedUp && collect($assigned)->contains(
+                    fn (ClientUsage $usage) => $usageStates[$usage->id] === self::STATE_UPCOMING
+                ),
             ];
 
             $contractOptions[] = [
@@ -151,7 +178,22 @@ class ContractTicketService
             'contracts' => array_reverse($contractRows),
             'contractOptions' => $contractOptions,
             'defaultContractId' => $defaultContractId,
+            'usageStates' => $usageStates,
         ];
+    }
+
+    /**
+     * 利用の状態（実施済み・今日・予定）。利用日を今日（Y-m-d）と比べる
+     */
+    private static function usageState(ClientUsage $usage, string $today): string
+    {
+        $usedOn = $usage->used_on->format('Y-m-d');
+
+        return match (true) {
+            $usedOn < $today => self::STATE_PAST,
+            $usedOn === $today => self::STATE_TODAY,
+            default => self::STATE_UPCOMING,
+        };
     }
 
     /**

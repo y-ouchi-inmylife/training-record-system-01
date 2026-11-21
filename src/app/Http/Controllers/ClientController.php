@@ -206,7 +206,7 @@ class ClientController extends Controller
                 ->orderBy('training_time', 'desc');
         }, 'trainees.measurements', 'trainees.latestIntakeSurveyResponse', 'trainees.activeIntakeSurveyToken', 'trainees.activePersonalityDiagnosisToken', 'trainees.latestPersonalityDiagnosisResult', 'trainees.latestIntakeSurveyToken', 'trainees.latestPersonalityDiagnosisToken', 'audioRecords' => function ($query) {
             $query->select(['id', 'client_id']);
-        }, 'contracts', 'usages']);
+        }, 'contracts', 'usages.trainee']);
 
         // 回数券型の表示データと残り回数（どちらもセクション5「回数」。残り回数はカードの見出しに出す）。
         // マスの並べ方（利用に持たせた割り当てのとおり）・契約ごとの残り・利用モーダルの「契約」の

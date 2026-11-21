@@ -66,6 +66,56 @@ class ContractTicketServiceTest extends TestCase
         $this->fail("contract {$contractId} not found");
     }
 
+    public function test_利用の状態は今日より前が実施済み_今日が今日_今日より後が予定(): void
+    {
+        // 「今日」はアプリのタイムゾーンでの日付。時刻は使わない（2026-11 追加。requirements.md 6-17-9）
+        Carbon::setTestNow(Carbon::parse('2026-11-21 23:30:00', 'Asia/Tokyo'));
+        $usages = collect([
+            $this->usage(1, null, '2026-11-20'),
+            $this->usage(2, null, '2026-11-21'),
+            $this->usage(3, null, '2026-11-22'),
+        ]);
+
+        $ticket = (new ContractTicketService)->build(collect(), $usages);
+
+        $this->assertSame([
+            1 => ContractTicketService::STATE_PAST,
+            2 => ContractTicketService::STATE_TODAY,
+            3 => ContractTicketService::STATE_UPCOMING,
+        ], $ticket['usageStates']);
+        Carbon::setTestNow();
+    }
+
+    public function test_使い切った契約は予定を含めばすべてご予約済み_今日以前だけならすべてご利用済み(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-21 10:00:00', 'Asia/Tokyo'));
+        $contracts = collect([
+            $this->contract(1, '2026-10-01', 2), // 今日と過去で使い切り
+            $this->contract(2, '2026-10-02', 2), // 予定を含んで使い切り
+            $this->contract(3, '2026-10-03', 3), // 予定はあるが使い切っていない
+        ]);
+        $usages = collect([
+            $this->usage(1, 1, '2026-11-01'),
+            $this->usage(2, 1, '2026-11-21'),
+            $this->usage(3, 2, '2026-11-01'),
+            $this->usage(4, 2, '2026-11-22'),
+            $this->usage(5, 3, '2026-11-25'),
+        ]);
+
+        $ticket = (new ContractTicketService)->build($contracts, $usages);
+        $rows = collect($ticket['contracts'])->keyBy(fn ($row) => $row['contract']->id);
+
+        $this->assertTrue($rows[1]['usedUp']);
+        $this->assertFalse($rows[1]['reserved']);
+        $this->assertTrue($rows[2]['usedUp']);
+        $this->assertTrue($rows[2]['reserved']);
+        $this->assertFalse($rows[3]['usedUp']);
+        $this->assertFalse($rows[3]['reserved']);
+        // 残り回数の計算は変えない（予定の利用も使った回数に数える）
+        $this->assertSame(2, $ticket['remaining']);
+        Carbon::setTestNow();
+    }
+
     public function test_同じ日の利用は開始時刻の順に並び_同じ時刻ならidの順(): void
     {
         // 利用日 → 開始時刻 → id の順（2026-11 変更。設計書 requirements.md 6-17-9）。id の小さい利用ほど開始時刻が遅い

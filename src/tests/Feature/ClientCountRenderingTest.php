@@ -558,6 +558,97 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
+    // ---- マスの 2 行の表示と、実施済み・今日・予定の見分け（2026-11 追加。設計書 S-0305 セクション5「マス（利用済み）」） ----
+
+    /** その利用のマス（button）の HTML */
+    private function slotHtml(string $html, ClientUsage $usage): string
+    {
+        $this->assertSame(1, preg_match('/<button type="button" class="[^"]*ticket-slot[^"]*"\s+data-id="'.$usage->id.'".*?<\/button>/su', $html, $m), 'slot '.$usage->id);
+
+        return $m[0];
+    }
+
+    private function usageWith(Client $client, string $usedOn, ?int $traineeId, string $start = '08:00:00', string $end = '19:00:00', ?ClientContract $contract = null): ClientUsage
+    {
+        return ClientUsage::query()->create([
+            'client_id' => $client->id, 'client_contract_id' => $contract?->id, 'trainee_id' => $traineeId,
+            'used_on' => $usedOn, 'start_time' => $start, 'end_time' => $end,
+        ]);
+    }
+
+    public function test_マスは実施済み_今日_予定で見た目とラベルを変える(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+        $contract = $this->contract($client, '2026-11-01', 4);
+        $past = $this->usageWith($client, '2026-11-20', $ai, contract: $contract);
+        $today = $this->usageWith($client, '2026-11-21', $ai, contract: $contract);
+        $upcoming = $this->usageWith($client, '2026-11-25', $ai, contract: $contract);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $pastSlot = $this->slotHtml($html, $past);
+        $this->assertStringContainsString('class="btn btn-sm btn-outline-secondary ticket-slot"', $pastSlot);
+        $this->assertStringNotContainsString('今日', $pastSlot);
+        $this->assertStringNotContainsString('予定', $pastSlot);
+
+        $todaySlot = $this->slotHtml($html, $today);
+        $this->assertStringContainsString('class="btn btn-sm btn-outline-secondary ticket-slot border-2"', $todaySlot);
+        $this->assertStringContainsString('<span class="d-block">2026/11/21<span class="badge text-bg-dark ms-1">今日</span>', $todaySlot);
+
+        $upcomingSlot = $this->slotHtml($html, $upcoming);
+        $this->assertStringContainsString('class="btn btn-sm btn-outline-secondary ticket-slot bg-info-subtle"', $upcomingSlot);
+        $this->assertStringContainsString('<span class="d-block">2026/11/25<span class="badge text-bg-info ms-1">予定</span>', $upcomingSlot);
+    }
+
+    public function test_マスの2行目にトレーニーの表示名と時刻を出し_時の先頭の0は付けない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+        $blank = $this->trainee($client, null);
+        $named = $this->usageWith($client, '2026-11-20', $ai, '08:05:00', '19:00:00');
+        $unnamed = $this->usageWith($client, '2026-11-20', $blank, '13:00:00', '14:30:00');
+        $noTrainee = $this->usageWith($client, '2026-11-20', null, '09:00:00', '10:00:00');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<span class="d-flex justify-content-center gap-1 small"><span class="text-truncate ticket-slot-trainee">アイ</span><span class="text-nowrap">8:05〜19:00</span></span>', $this->slotHtml($html, $named));
+        // 名前が未登録のトレーニーはトレーナー側の表示名「名前未登録」
+        $this->assertStringContainsString('<span class="text-truncate ticket-slot-trainee">名前未登録</span><span class="text-nowrap">13:00〜14:30</span>', $this->slotHtml($html, $unnamed));
+        // トレーニーなしは時刻だけ
+        $this->assertStringContainsString('<span class="d-flex justify-content-center gap-1 small"><span class="text-nowrap">9:00〜10:00</span></span>', $this->slotHtml($html, $noTrainee));
+        // 編集モーダルに渡す値（時刻は HH:MM）
+        $this->assertStringContainsString('data-trainee-id="'.$ai.'"', $this->slotHtml($html, $named));
+        $this->assertStringContainsString('data-start-time="08:05"', $this->slotHtml($html, $named));
+        $this->assertStringContainsString('data-end-time="19:00"', $this->slotHtml($html, $named));
+        $this->assertStringContainsString('data-trainee-id=""', $this->slotHtml($html, $noTrainee));
+        // 同じ日のマスは開始時刻の順
+        $this->assertLessThan(strpos($html, 'data-id="'.$noTrainee->id.'"'), strpos($html, 'data-id="'.$named->id.'"'));
+        $this->assertLessThan(strpos($html, 'data-id="'.$unnamed->id.'"'), strpos($html, 'data-id="'.$noTrainee->id.'"'));
+    }
+
+    public function test_使い切った契約は予定を含めばすべてご予約済み_含まなければすべてご利用済み(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $done = $this->contract($client, '2026-10-01', 1);
+        $reserved = $this->contract($client, '2026-11-01', 1);
+        $this->usageWith($client, '2026-11-21', null, contract: $done);       // 今日だけ → すべてご利用済み
+        $this->usageWith($client, '2026-11-22', null, contract: $reserved);   // 予定 → すべてご予約済み
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary flex-shrink-0">すべてご予約済み</span>'));
+        $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>'));
+        // 新しい契約（予約済み）が上
+        $this->assertLessThan(strpos($html, 'すべてご利用済み</span>'), strpos($html, 'すべてご予約済み</span>'));
+    }
+
     // ---- 利用のモーダルのトレーニーの選択肢・初期値と時刻の初期値（2026-11 追加。設計書 S-0305-M05） ----
 
     /** 会員詳細の、利用のモーダルの JS の定数（例：DEFAULT_TRAINEE_ID）の値（JSON のまま） */
