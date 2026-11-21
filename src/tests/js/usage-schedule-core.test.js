@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+    CAPACITY_AVAILABLE,
+    CAPACITY_FULL,
+    CAPACITY_OVER,
     applyInput,
+    capacityState,
     countText,
     dayHeading,
     dayLabel,
     initialState,
-    isFull,
     monthHeading,
     monthWeeks,
     moveMonth,
@@ -73,23 +76,37 @@ describe('monthWeeks', () => {
     });
 });
 
-describe('頭数の表示', () => {
-    it('頭数が 1 以上なら「n/上限」、0 なら空', () => {
+describe('預かる数の表示', () => {
+    it('預かる数が 1 以上なら「n/上限」、0 なら空', () => {
         expect(countText(2, 3)).toBe('2/3');
         expect(countText(0, 3)).toBe('');
     });
 
-    it('上限以上の日だけ赤（0 頭の日は赤にしない）', () => {
-        expect(isFull(3, 3)).toBe(true);
-        expect(isFull(4, 3)).toBe(true);
-        expect(isFull(2, 3)).toBe(false);
-        expect(isFull(0, 0)).toBe(false);
+    // 2026-11 変更：満（上限ちょうど）は緑、超過（上限を超える）は赤に分けた。その前は上限以上をひとまとめに赤にしていた
+    it.each([
+        [0, 3, CAPACITY_AVAILABLE],
+        [1, 3, CAPACITY_AVAILABLE],
+        [2, 3, CAPACITY_AVAILABLE],
+        [3, 3, CAPACITY_FULL],
+        [4, 3, CAPACITY_OVER],
+        [10, 3, CAPACITY_OVER],
+        [1, 1, CAPACITY_FULL],
+        [2, 1, CAPACITY_OVER],
+        [0, 1, CAPACITY_AVAILABLE],
+    ])('預かる数 %i・上限 %i は %s', (count, capacity, expected) => {
+        expect(capacityState(count, capacity)).toBe(expected);
+    });
+
+    it('状態の値は空きあり・満・超過の 3 つ', () => {
+        expect([CAPACITY_AVAILABLE, CAPACITY_FULL, CAPACITY_OVER]).toEqual(['available', 'full', 'over']);
     });
 
     it('その日の予約の見出しと 1 行の文', () => {
         expect(dayLabel('2026-11-26')).toBe('11/26(木)');
         expect(dayLabel('2026-11-01')).toBe('11/1(日)');
-        expect(dayHeading('2026-11-26', 2, 3)).toBe('11/26(木) の予約　2/3頭');
+        expect(dayHeading('2026-11-26', 2, 3)).toBe('11/26(木) の予約　2/3');
+        expect(dayHeading('2026-11-26', 4, 3)).toBe('11/26(木) の予約　4/3');
+        expect(dayHeading('2026-11-26', 4, 3)).not.toContain('頭');
         expect(usageLine({ time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）' })).toBe('8:00〜19:00　アムロ（佐藤 一郎）');
     });
 });

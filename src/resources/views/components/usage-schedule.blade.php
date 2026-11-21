@@ -1,7 +1,7 @@
 {{-- 利用の予約状況の部品（カレンダーとその日の予約。2026-11 追加。設計書 screen-design.md S-0305-M05「予約状況」）。
 
      利用モーダル（clients/_usage-modal.blade.php）から切り離した部品。後でカレンダー画面（S-1602。まだ作らない）でも使い回す。
-     中身（月のマス・頭数・その日の予約）は JS（resources/js/usage-schedule.js の UsageSchedule）が組み立て、
+     中身（月のマス・預かる数・その日の予約）は JS（resources/js/usage-schedule.js の UsageSchedule）が組み立て、
      サーバーの JSON（api-design.md 4-2-6。data-month-url・data-day-url）から読む。ここは入れ物だけを置く。
 
      使い方：<x-usage-schedule id="usageSchedule" />
@@ -35,7 +35,7 @@
     {{-- 読み込み中・失敗の知らせ（失敗しても、使う側の入力と保存は止めない） --}}
     <div class="small text-body-secondary mb-2 d-none" data-usage-schedule-status role="status"></div>
 
-    {{-- その日の予約（見出し「M/D(曜) の予約　n/上限頭」と、開始時刻の順の一覧） --}}
+    {{-- その日の予約（見出し「M/D(曜) の予約　n/上限」と、開始時刻の順の一覧） --}}
     <div class="card">
         <div class="card-header small fw-bold py-1" data-usage-schedule-day-heading></div>
         <ul class="list-group list-group-flush" data-usage-schedule-day-list></ul>

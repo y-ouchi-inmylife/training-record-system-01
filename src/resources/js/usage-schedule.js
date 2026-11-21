@@ -10,18 +10,20 @@
  *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
- * 頭数・予約はサーバーから JSON で読む（rootEl の data-month-url・data-day-url。権限は利用の登録・編集と同じ）。
+ * 預かる数・予約はサーバーから JSON で読む（rootEl の data-month-url・data-day-url。権限は利用の登録・編集と同じ）。
  * 読み込み中は「読み込み中…」、失敗したら「予約状況を読み込めませんでした。」を出す。失敗しても使う側の入力・保存は止めない。
  * 月を移したとき・選んだ日を変えたときに読み直す。古い要求の答えが後から届いても、新しい表示を上書きしない（連番で見分ける）。
  * 計算（月のマス・状態の移り方）は usage-schedule-core.js。
  */
 import {
+    CAPACITY_FULL,
+    CAPACITY_OVER,
     WEEKDAYS,
     applyInput,
+    capacityState,
     countText,
     dayHeading,
     initialState,
-    isFull,
     monthHeading,
     monthWeeks,
     moveMonth,
@@ -41,8 +43,8 @@ class UsageSchedule {
         this.state = null;
         this.excludeUsageId = null;
         this.today = null;          // サーバーの今日（月の JSON の today）
-        this.capacity = null;       // 同時に預かれる頭数（JSON の capacity）
-        this.counts = {};           // 出している月の日ごとの頭数
+        this.capacity = null;       // 同時に預かれる数（JSON の capacity）
+        this.counts = {};           // 出している月の日ごとの預かる数
         this.monthSeq = 0;
         this.daySeq = 0;
 
@@ -182,16 +184,22 @@ class UsageSchedule {
 
     dayButton(ymd) {
         const count = this.counts[ymd] || 0;
-        const full = this.capacity !== null && isFull(count, this.capacity);
+        // 空きあり・満・超過（判定は usage-schedule-core.js）。上限をまだ読んでいない間は色を付けない
+        const state = this.capacity === null ? null : capacityState(count, this.capacity);
         const selected = ymd === this.state.selected;
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.date = ymd;
         const classes = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
         if (selected) {
+            // 選んでいる日は、満・超過でも選んでいる日の見た目を優先する
             classes.push('btn-primary');
-        } else if (full) {
+        } else if (state === CAPACITY_OVER) {
+            // 超過：赤（§2-5 の bg-danger〔異常〕の系統）
             classes.push('bg-danger-subtle', 'text-danger', 'border-danger-subtle');
+        } else if (state === CAPACITY_FULL) {
+            // 満（上限ちょうど）：緑（§2-5 の bg-success〔正常・完了〕の系統。2026-11 追加）
+            classes.push('bg-success-subtle', 'text-success-emphasis', 'border-success-subtle');
         } else {
             classes.push('btn-light');
         }
@@ -208,14 +216,14 @@ class UsageSchedule {
 
         const countEl = document.createElement('span');
         countEl.className = 'd-block small usage-schedule-count';
-        // 頭数がない日も高さをそろえるため、ノーブレークスペースを入れる
+        // 預かる数がない日も高さをそろえるため、ノーブレークスペースを入れる
         const text = this.capacity === null ? '' : countText(count, this.capacity);
         countEl.textContent = text === '' ? '\u00a0' : text;
         button.appendChild(countEl);
 
         const weekday = WEEKDAYS[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
         const label = [`${parseInt(ymd.slice(5, 7), 10)}月${parseInt(ymd.slice(8), 10)}日(${weekday})`];
-        if (count > 0 && this.capacity !== null) label.push(`${count}/${this.capacity}頭`);
+        if (count > 0 && this.capacity !== null) label.push(`${count}/${this.capacity}`);
         if (ymd === this.today) label.push('今日');
         button.setAttribute('aria-label', label.join(' '));
 

@@ -28,7 +28,7 @@ class SystemSettingSeeder extends Seeder
             // 行がなくても ScheduleSetting の初期値で動く（本番はシーダーを流さないため）。値は ScheduleSetting の初期値とそろえる
             ['key' => ScheduleSetting::OPEN_TIME_KEY, 'value' => ScheduleSetting::DEFAULT_OPEN_TIME],
             ['key' => ScheduleSetting::CLOSE_TIME_KEY, 'value' => ScheduleSetting::DEFAULT_CLOSE_TIME],
-            // 同時に預かれる頭数（2026-11 追加。requirements.md 6-17-11）
+            // 同時に預かれる数（2026-11 追加。requirements.md 6-17-11）
             ['key' => ScheduleSetting::CAPACITY_KEY, 'value' => (string) ScheduleSetting::DEFAULT_CAPACITY],
         ];
 

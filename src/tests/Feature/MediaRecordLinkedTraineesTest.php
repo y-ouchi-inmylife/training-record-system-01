@@ -16,7 +16,7 @@ use Tests\TestCase;
 /**
  * メディア一覧（S-1302）・メディア詳細（S-1302-M01）に、ひも付くトレーニーと会員を出す（2026-11 追加）。
  *
- * - 「トレーニー名：会員名」の組み立て（Client::traineesWithNameLabel）：1 頭・複数頭・名前未登録・トレーニーなし
+ * - 「トレーニー名：会員名」の組み立て（Client::traineesWithNameLabel）：1 つ・複数・名前未登録・トレーニーなし
  * - 一覧のカード：会員ごとにまとめて 1 人 1 行・最大 3 行、新しい順、4 人以上は 4 行目に「ほか N名」（肉球なし・字下げ）、ひも付きなしは 1 行分の空欄
  * - 詳細：記録ごとに 1 行（トレーニング日の新しい順、同じ日は記録 ID の大きい順）
  * - 削除の確認文：ひも付きの件数を渡し、1 件以上なら 1 文足す
@@ -153,14 +153,14 @@ class MediaRecordLinkedTraineesTest extends TestCase
 
     // ===== 表示文字列 =====
 
-    public function test_トレーニーが1頭ならトレーニー名とコロンと会員名(): void
+    public function test_トレーニーが1つならトレーニー名とコロンと会員名(): void
     {
         $client = $this->makeClient('大内', '佳和', ['アイ']);
 
         $this->assertSame('アイ：大内 佳和', $client->traineesWithNameLabel());
     }
 
-    public function test_トレーニーが複数頭なら登録順に読点で区切る(): void
+    public function test_トレーニーが複数なら登録順に読点で区切る(): void
     {
         $client = $this->makeClient('大内', '佳和', ['アイ', 'アムロ']);
 

@@ -941,7 +941,7 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 保存時の上限の確認で開き直したモーダル（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」） ----
 
-    private const CAPACITY_WARNING = '11/26(木) 15:00〜17:00 は 3頭になります（上限 2頭）。このまま登録する場合は、もう一度［登録］を押してください。';
+    private const CAPACITY_WARNING = '11/26(木) 15:00〜17:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。';
 
     public function test_上限の確認で戻ると利用のモーダルを開き直し_上部に注意を出して印を入れる(): void
     {
@@ -965,6 +965,25 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/id="usage_note" name="note"\s+value="メモ"/u', $html);
         $this->assertStringContainsString('const oldUsageId = null;', $html);
         $this->assertStringContainsString("if (confirmedInput.value === '1') {", $html);
+    }
+
+    public function test_利用のモーダルに頭の字が出ない_注意が出ているときも(): void
+    {
+        // 2026-11 変更：犬を「頭」で数える表現は使わない（予約の一覧の見出し・注意の文・項目名）
+        $client = $this->makeClient('0001', '山田');
+
+        foreach ([
+            [],
+            ['_old_input' => ['_form_type' => 'usage', 'used_on' => '2026-11-26', 'start_time' => '14:00', 'end_time' => '18:00'],
+                'usage_capacity_warning' => self::CAPACITY_WARNING],
+        ] as $session) {
+            $html = $this->withSession($session)->get(route('clients.show', $client))->assertOk()->getContent();
+            $start = strpos($html, 'id="usageModal"');
+            $modal = substr($html, $start, strpos($html, 'id="usageDeleteForm"', $start) - $start);
+            $this->assertStringNotContainsString('頭', strip_tags($modal));
+        }
+        // 注意の文は新しい形
+        $this->assertStringContainsString('は、同時に預かる数が 3 になり、上限（2）を超えます。', $html);
     }
 
     public function test_注意がなければ印は空で_注意も出さない(): void
@@ -1016,7 +1035,7 @@ class ClientCountRenderingTest extends TestCase
         return $m[1];
     }
 
-    public function test_トレーニーの初期値は空でないトレーニーが1頭ならその1頭(): void
+    public function test_トレーニーの初期値は空でないトレーニーが1つだけならそのトレーニー(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1026,7 +1045,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame((string) $ai, $this->usageModalConst($client, 'DEFAULT_TRAINEE_ID'));
     }
 
-    public function test_トレーニーの初期値は空でないトレーニーが0頭で全体で1頭ならその1頭(): void
+    public function test_トレーニーの初期値は空でないトレーニーがなく全体で1つだけならそのトレーニー(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1038,12 +1057,12 @@ class ClientCountRenderingTest extends TestCase
     public function test_トレーニーの初期値はそれ以外なら選ばない(): void
     {
         $this->fakeMediaDisk();
-        // 空でないトレーニーが 2 頭
+        // 空でないトレーニーが 2 つ
         $two = $this->makeClient('0001', '山田');
         $this->trainee($two, 'アイ');
         $this->trainee($two, 'モモ');
         $this->assertSame('null', $this->usageModalConst($two, 'DEFAULT_TRAINEE_ID'));
-        // 空のトレーニーだけが 2 頭
+        // 空のトレーニーだけが 2 つ
         $blanks = $this->makeClient('0002', '佐藤');
         $this->trainee($blanks, null);
         $this->trainee($blanks, null);
@@ -1498,7 +1517,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(1, substr_count($html, '>取消</button>'));
     }
 
-    public function test_取消モーダルはトレーニーが何頭いても1つで送信先のひな形を持つ(): void
+    public function test_取消モーダルはトレーニーがいくつあっても1つで送信先のひな形を持つ(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1827,7 +1846,7 @@ class ClientCountRenderingTest extends TestCase
         // 2026-10-17 変更：発行のあとは案内の画面を開かず、会員詳細（ページの上）に戻る。
         // マイページ登録案内の発行のリダイレクトと完了メッセージは ClientEmailRegistrationTokenStoreTest で確かめる
         // （このテストの表はトークンの列を持たないため）。出し方はトレーニーの案内と同じ session('success')
-        // 1 頭に出しておける案内は 1 つまで（2026-10-19 変更）なので、組み合わせは別のトレーニーで確かめる
+        // トレーニーごとに出しておける案内は 1 つまで（2026-10-19 変更）なので、組み合わせは別のトレーニーで確かめる
         // （2026-10-19 変更：単独の愛犬性格診断は新しく発行しないので、2 つ目は組み合わせにした）
         $other = $this->trainee($client, 'たま');
         $cases = [
@@ -1991,7 +2010,7 @@ class ClientCountRenderingTest extends TestCase
         DB::table('trainee_personality_diagnosis_results')->insert($row);
     }
 
-    /** トレーニー 1 頭分の「性格診断」の行（行の始まりから、日付〔または「診断なし」〕の span の終わりまで）の HTML */
+    /** トレーニー 1 つ分の「性格診断」の行（行の始まりから、日付〔または「診断なし」〕の span の終わりまで）の HTML */
     private function personalityLatest(string $html, int $traineeId): string
     {
         // 2026-10-19 変更：診断なしのときはラベルがリンクでないので、トレーニーの名前のリンクのあとの性格診断の行から取る
@@ -2111,7 +2130,7 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みのアドバイス（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない。
+        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みのアドバイス（1 本。2026-10-18 追加）。トレーニーがいくつあっても増えない。
         // 2026-11 変更：利用のモーダルのトレーニーの初期値を決める、空でないトレーニーの判定（Client::defaultUsageTraineeId）の 1 本が増えて 3 本
         $this->assertSame(3, $count($one));
         $this->assertSame(3, $count($three));
@@ -2299,7 +2318,7 @@ class ClientCountRenderingTest extends TestCase
         return '<div class="d-flex flex-column align-items-end gap-1 ms-auto small">\s*<div class="d-flex flex-wrap align-items-center justify-content-end gap-2">\s*';
     }
 
-    /** トレーニー 1 頭分の「案内中」の表示（名前の行の右のまとまり）の HTML（なければ null） */
+    /** トレーニー 1 つ分の「案内中」の表示（名前の行の右のまとまり）の HTML（なければ null） */
     private function inProgressRow(string $html, string $name): ?string
     {
         // まとまりの中の最後の段の［取消］とボタンのまとまりの閉じから、段・まとまり・右の入れ物・名前の行の閉じまで
@@ -2531,7 +2550,7 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 「期限切れ」の行と上下のそろえ（2026-10-19 追加。設計書 S-0305 セクション3「案内の操作」） ----
 
-    /** トレーニー 1 頭分の「期限切れ」の表示（名前の行の右）の HTML（なければ null） */
+    /** トレーニー 1 つ分の「期限切れ」の表示（名前の行の右）の HTML（なければ null） */
     private function expiredRow(string $html, string $name): ?string
     {
         // ラベル「期限切れ」から、値（種類の名前）の span とまとまりの閉じまで（［案内を発行］はまとまりの外）
@@ -2674,7 +2693,7 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 案内中・期限切れの表示を名前の行の右に（2026-10-19 変更。設計書 S-0305 セクション3「案内の操作」） ----
 
-    /** トレーニー 1 頭分の、名前の h6 から属性の並び（犬種の dl）の手前までの HTML */
+    /** トレーニー 1 つ分の、名前の h6 から属性の並び（犬種の dl）の手前までの HTML */
     private function nameRowToBreed(string $html, string $name): string
     {
         $start = strpos($html, '>'.$name.'</a></h6>');
@@ -3188,7 +3207,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<h6 class="mb-0" data-client-records-heading>これまでの記録（0件）</h6>', $html);
     }
 
-    public function test_トレーニーの見出しは件数を出さない0頭1頭複数とも(): void
+    public function test_トレーニーの見出しは件数を出さないいない1つ複数とも(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -3199,8 +3218,8 @@ class ClientCountRenderingTest extends TestCase
 
             $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-            $this->assertSame(1, substr_count($html, '<h6 class="mb-0">トレーニー</h6>'), $count.'頭');
-            $this->assertDoesNotMatchRegularExpression('/トレーニー（\d+件）/u', $html, $count.'頭');
+            $this->assertSame(1, substr_count($html, '<h6 class="mb-0">トレーニー</h6>'), 'トレーニー '.$count);
+            $this->assertDoesNotMatchRegularExpression('/トレーニー（\d+件）/u', $html, 'トレーニー '.$count);
         }
     }
 }

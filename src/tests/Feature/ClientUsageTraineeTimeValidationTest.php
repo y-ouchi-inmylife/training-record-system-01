@@ -14,7 +14,7 @@ use Tests\TestCase;
  * 利用の登録・編集のトレーニー・開始時刻・終了時刻の検証（2026-11 追加。設計書 S-0305-M05・requirements.md 6-17-4・
  * api-design.md「POST /clients/{client}/usages」）。
  *
- * - トレーニーは、その会員にトレーニーが 1 頭以上いるときは必須（空のトレーニーも数える）。この会員のトレーニーに限る
+ * - トレーニーは、その会員にトレーニーがいるときは必須（空のトレーニーも数える）。この会員のトレーニーに限る
  * - トレーニーがいない会員は、トレーニーなし（NULL）で登録できる
  * - 開始時刻・終了時刻は必須・H:i。終了時刻は開始時刻より後（同じ時刻は不可）
  * - 同じトレーニーの利用が同じ日に 2 件以上あってもよい
@@ -35,7 +35,7 @@ class ClientUsageTraineeTimeValidationTest extends TestCase
         $this->createTraineesTableForUsage();
         $this->createClientCountTables();
         $this->createAccessLogsTable();
-        // 今日以降の利用の保存で、同時に預かれる頭数（2026-11 追加）を読む
+        // 今日以降の利用の保存で、同時に預かれる数（2026-11 追加）を読む
         $this->createSystemSettingsTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);

@@ -15,8 +15,8 @@ use Tests\TestCase;
 /**
  * 利用の予約状況の内部 API（2026-11 追加。api-design.md 4-2-6、screen-design.md S-0305-M05「予約状況」）。
  *
- * - GET /api/usage-schedule/month：月の日ごとの頭数（1 以上の日だけ）・上限・今日
- * - GET /api/usage-schedule/day：その日の頭数・上限・予約の一覧（開始時刻の順。「トレーニー（会員名）」）
+ * - GET /api/usage-schedule/month：月の日ごとの預かる数（1 以上の日だけ）・上限・今日
+ * - GET /api/usage-schedule/day：その日の預かる数・上限・予約の一覧（開始時刻の順。「トレーニー（会員名）」）
  * - どちらも除く利用（編集中の利用自身）を受け取る
  * - 権限は利用の登録・編集と同じ（practitioners。システム管理者は 403）。参照なのでアクセスログに記録しない
  *
@@ -71,7 +71,7 @@ class UsageScheduleApiTest extends TestCase
 
     // ---- 月 ----
 
-    public function test_月の日ごとの頭数と上限と今日を返す(): void
+    public function test_月の日ごとの預かる数と上限と今日を返す(): void
     {
         $this->usage($this->sato, '2026-11-26', '08:00', '19:00');
         $this->usage($this->ouchi, '2026-11-26', '13:00', '19:00');
@@ -147,7 +147,7 @@ class UsageScheduleApiTest extends TestCase
             ]);
     }
 
-    public function test_予約がない日は空の一覧で頭数0(): void
+    public function test_予約がない日は空の一覧で預かる数0(): void
     {
         $this->getJson(route('api.usage-schedule.day', ['date' => '2026-11-26']))
             ->assertOk()
@@ -155,7 +155,7 @@ class UsageScheduleApiTest extends TestCase
             ->assertJsonPath('usages', []);
     }
 
-    public function test_その日は除く利用を一覧にも頭数にも入れない(): void
+    public function test_その日は除く利用を一覧にも預かる数にも入れない(): void
     {
         $this->usage($this->sato, '2026-11-26', '08:00', '19:00');
         $self = $this->usage($this->ouchi, '2026-11-26', '10:00', '12:00');

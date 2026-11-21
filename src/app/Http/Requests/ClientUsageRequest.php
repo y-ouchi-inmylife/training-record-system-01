@@ -25,8 +25,8 @@ use Illuminate\Validation\Validator;
  * 契約日と利用日の前後・有効期限はチェックに使わない。
  *
  * トレーニー（trainee_id。2026-11 追加。requirements.md 6-17-4）：
- *   - その会員にトレーニーが 1 頭以上いるときは必須（空のトレーニーも数える）
- *   - この会員のトレーニーであること。その会員にトレーニーが 1 頭もいないときは指定できない（どの値もこの会員のトレーニーではない）
+ *   - その会員にトレーニーがいるときは必須（空のトレーニーも数える）
+ *   - この会員のトレーニーであること。その会員にトレーニーがいないときは指定できない（どの値もこの会員のトレーニーではない）
  *   - 同じトレーニーの利用が同じ日に 2 件以上あってもエラーにしない（1 日で 2 回分使うことがあるため）
  * 開始時刻・終了時刻（start_time・end_time。2026-11 追加）：必須・H:i。終了時刻は開始時刻より後（同じ時刻は不可。日付をまたぐ利用は扱わない）。
  *   前後は 2 つの欄の形式が正しいときだけ確かめる（形式の誤りに重ねて前後の文言を出さないため）。
@@ -88,7 +88,7 @@ class ClientUsageRequest extends FormRequest
         $traineeId = $this->input('trainee_id');
 
         if ($traineeId === null || $traineeId === '') {
-            // その会員にトレーニーが 1 頭以上いれば必須（空のトレーニーも数える）
+            // その会員にトレーニーがいれば必須（空のトレーニーも数える）
             if (Trainee::query()->where('client_id', $clientId)->exists()) {
                 $validator->errors()->add('trainee_id', __('validation.custom.trainee_id.required'));
             }

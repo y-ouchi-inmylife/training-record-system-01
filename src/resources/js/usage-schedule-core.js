@@ -103,14 +103,34 @@ export function dayLabel(ymd) {
     return `${d.month}/${d.day}(${WEEKDAYS[weekday]})`;
 }
 
-/** カレンダーのマスに出す頭数（「2/3」）。頭数が 0 なら空 */
+/** カレンダーのマスに出す預かる数（「2/3」）。預かる数が 0 なら空 */
 export function countText(count, capacity) {
     return count > 0 ? `${count}/${capacity}` : '';
 }
 
-/** その日の頭数が上限以上か（赤で示す日）。頭数が 0 の日は赤にしない */
-export function isFull(count, capacity) {
-    return count > 0 && count >= capacity;
+/** 預かる数の状態：空きあり（上限未満。0 も含む）・満（上限ちょうど）・超過（上限を超える）。2026-11 追加 */
+export const CAPACITY_AVAILABLE = 'available';
+export const CAPACITY_FULL = 'full';
+export const CAPACITY_OVER = 'over';
+
+/**
+ * その日の預かる数と上限から、空きあり・満・超過を決める（2026-11 変更：その前は上限以上をひとまとめに「赤」としていた）。
+ * 画面の部品はこの結果でマスの色を決める（空きあり＝色なし、満＝緑、超過＝赤。設計書 S-0305-M05「予約状況」）。
+ * 預かる数が 0 の日は空きあり
+ *
+ * @param {number} count その日の預かる数
+ * @param {number} capacity 同時に預かれる数（上限）
+ * @returns {'available'|'full'|'over'}
+ */
+export function capacityState(count, capacity) {
+    if (count > capacity) {
+        return CAPACITY_OVER;
+    }
+    if (count > 0 && count === capacity) {
+        return CAPACITY_FULL;
+    }
+
+    return CAPACITY_AVAILABLE;
 }
 
 /**
@@ -153,7 +173,7 @@ export function usageLine(usage) {
     return `${usage.time_range}　${usage.label}`;
 }
 
-/** その日の予約の見出し（「11/26(木) の予約　2/3頭」） */
+/** その日の予約の見出し（「11/26(木) の予約　2/3」。2026-11 変更：単位を付けない） */
 export function dayHeading(ymd, count, capacity) {
-    return `${dayLabel(ymd)} の予約　${count}/${capacity}頭`;
+    return `${dayLabel(ymd)} の予約　${count}/${capacity}`;
 }

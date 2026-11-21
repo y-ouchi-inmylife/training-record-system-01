@@ -4,7 +4,7 @@
      （キャンセルの見た目も M06 と同じ白抜き。4-4 の塗りにそろえるときは M02・M03・M06 と一緒に直す）。
 
      開き方：「性格診断」の行の「取消」ボタンに data-bs-toggle="modal" data-bs-target="#personalityDiagnosisCancelModal"
-     と data-personality-diagnosis-trainee-id="{トレーニーの id}" を付ける。トレーニーが何頭いてもモーダルは
+     と data-personality-diagnosis-trainee-id="{トレーニーの id}" を付ける。トレーニーがいくつあってもモーダルは
      1 つにし、開いたボタンのトレーニーの id を、送信先の URL のひな形に入れる（契約モーダル
      S-0305-M04 の「URL のひな形を JS で置き換える」方式と同じ）。 --}}
 <div class="modal fade" id="personalityDiagnosisCancelModal" tabindex="-1"

@@ -186,7 +186,7 @@ class Trainee extends Model
     }
 
     /**
-     * 愛犬アンケートの回答（D-1100。1 頭に複数件持てる）
+     * 愛犬アンケートの回答（D-1100。トレーニーごとに複数件持てる）
      */
     public function intakeSurveyResponses(): HasMany
     {
@@ -240,7 +240,7 @@ class Trainee extends Model
     }
 
     /**
-     * 性格診断の結果（D-1200。1 頭に何件でも持てる）。新しい順（回答日時の降順。同じ日時なら後に作ったものが先）。
+     * 性格診断の結果（D-1200。トレーニーごとに何件でも持てる）。新しい順（回答日時の降順。同じ日時なら後に作ったものが先）。
      * トレーニー詳細（S-0309）の性格診断の欄はこの並び順のまま出し、「前回」は 1 つ後ろの要素
      */
     public function personalityDiagnosisResults(): HasMany
@@ -292,7 +292,7 @@ class Trainee extends Model
      * 「空のトレーニー」＝ CONTENT_COLUMNS がどれも空（NULL か空文字）で、CONTENT_RELATIONS のどの表にも行がないトレーニー。
      * 利用の登録のトレーニーの初期値（Client::defaultUsageTraineeId）で使う。
      * 2026-11 変更：その前は会員の削除の判定（空のトレーニーだけなら会員と一緒に消す）にも使っていたが、
-     * 会員の削除はトレーニーが 1 頭でもいれば断るようにしたため、会員の削除では使わない
+     * 会員の削除はトレーニーがいれば断るようにしたため、会員の削除では使わない
      */
     public function scopeNotBlank(Builder $query): Builder
     {
@@ -663,7 +663,7 @@ class Trainee extends Model
     }
 
     /**
-     * 体重推移グラフ 1 頭分のデータを組み立てる。
+     * 体重推移グラフのトレーニー 1 つ分のデータを組み立てる。
      *
      * 会員ダッシュボード（S-1402）とトレーナー側トレーニー詳細（S-0309）の両方で
      * 共用する。呼び出し側は本アクセサの返り値をトレーニーごとに集めるだけで足り、
@@ -695,8 +695,8 @@ class Trainee extends Model
      *
      * ## 前提：`measurements` は eager load しておくこと
      *
-     * 一覧で多頭を回すケース（S-1402 で $client->trainees()->with('measurements')）
-     * にも、単頭ケース（S-0309 で $trainee->load('measurements')）にも同じ形で
+     * 一覧で複数のトレーニーを回すケース（S-1402 で $client->trainees()->with('measurements')）
+     * にも、トレーニー 1 つのケース（S-0309 で $trainee->load('measurements')）にも同じ形で
      * 使えるが、いずれも呼び出し側で `measurements` を eager load しておくこと
      * （load せずに呼ぶと本アクセサ内の `$this->measurements` で追加クエリが発生する）。
      *

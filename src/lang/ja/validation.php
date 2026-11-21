@@ -422,7 +422,7 @@ return [
         // 事業所情報の設定（S-1601。2026-11 追加）
         'schedule_open_time' => '営業開始時刻',
         'schedule_close_time' => '営業終了時刻',
-        'schedule_capacity' => '同時に預かれる頭数',
+        'schedule_capacity' => '同時に預かれる数',
     ],
 
 ];

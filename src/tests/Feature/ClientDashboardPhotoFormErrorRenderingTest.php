@@ -136,7 +136,7 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         $view->assertDontSee('invalid-feedback', false);
     }
 
-    public function test_2頭並ぶとき片方のphotoエラーはもう片方のカードに出ない(): void
+    public function test_2つ並ぶとき片方のphotoエラーはもう片方のカードに出ない(): void
     {
         // トレーニー 1 でエラーが起きた想定
         $view = $this->renderDashboard(
@@ -154,7 +154,7 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
         $this->assertSame(1, substr_count($view->__toString(), 'ERR_photo_for_trainee_1'));
     }
 
-    public function test_formキーで2頭並ぶとき該当トレーニーのカードだけに出る(): void
+    public function test_formキーで2つ並ぶとき該当トレーニーのカードだけに出る(): void
     {
         $view = $this->renderDashboard(
             errors: ['form' => 'ERR_form_message'],

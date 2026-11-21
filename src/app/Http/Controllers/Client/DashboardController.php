@@ -95,26 +95,26 @@ class DashboardController extends Controller
     /**
      * 体重推移グラフ用のデータをトレーニーごとに組み立てる。
      *
-     * 1 頭分の組み立てロジックは `Trainee::getWeightChartDataAttribute()` に集約
+     * トレーニー 1 つ分の組み立てロジックは `Trainee::getWeightChartDataAttribute()` に集約
      * （**2026-09 変更**、トレーナー側 S-0309 と共用するため）。本メソッドは
      * トレーニーを回してアクセサを呼ぶだけの薄い形。返り値の形（トレーニー配列で
      * 各要素は `id / name / photoUrl / datasets`）は変更なし — Blade
      * （client/dashboard.blade.php）は無変更で動く。詳細な設計方針・データ形式・
      * タイムゾーン扱いは `Trainee::getWeightChartDataAttribute()` の docblock を参照。
      *
-     * トレーニー 0 頭の会員では空配列を返し、Blade で `@if(!empty($weightCharts))` により
+     * トレーニーのいない会員では空配列を返し、Blade で `@if(!empty($weightCharts))` により
      * ブロックごと非表示になる（挙動変更なし）。
      */
     private function buildWeightCharts($client): array
     {
         // トレーニーは Trainee::trainees() で `id` 昇順（登録順）が既定。
         // アクセサ内で $this->measurements を触るため、ここで eager load しておく
-        // （load しないと 1+N のクエリになる。単頭ケースは S-0309 側で別途
+        // （load しないと 1+N のクエリになる。トレーニー 1 つのケースは S-0309 側で別途
         // $trainee->load('measurements') 済み）。
         // personalityDiagnosisResults は性格診断（タイプ・レーダーチャート）に使う（2026-10 追加。要件定義書 6-15-19）。
-        // トレーニーが何頭いてもクエリは 1 本。自分のトレーニーの結果だけ（$client->trainees() の絞り込みのまま）
+        // トレーニーがいくつあってもクエリは 1 本。自分のトレーニーの結果だけ（$client->trainees() の絞り込みのまま）
         // latestIntakeSurveyResponse・activeIntakeSurveyToken・activePersonalityDiagnosisToken は、回答待ちの案内の
-        // お知らせ（2026-10 追加。要件定義書 6-15-3）に使う。どれもトレーニーが何頭いてもクエリは 1 本
+        // お知らせ（2026-10 追加。要件定義書 6-15-3）に使う。どれもトレーニーがいくつあってもクエリは 1 本
         $trainees = $client->trainees()->with([
             'measurements', 'personalityDiagnosisResults',
             'latestIntakeSurveyResponse', 'activeIntakeSurveyToken', 'activePersonalityDiagnosisToken',

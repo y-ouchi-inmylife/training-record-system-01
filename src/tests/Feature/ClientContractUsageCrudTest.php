@@ -199,7 +199,7 @@ class ClientContractUsageCrudTest extends TestCase
             'used_on' => '2026-10-12',
             'start_time' => '08:00',
             'end_time' => '19:00',
-            'note' => 'トレーニー2頭のうち1頭',
+            'note' => 'トレーニー2つのうち1つ',
         ]);
 
         $response->assertRedirect(route('clients.show', $this->client));
@@ -208,7 +208,7 @@ class ClientContractUsageCrudTest extends TestCase
         $usage = ClientUsage::query()->sole();
         $this->assertSame($this->client->id, $usage->client_id);
         $this->assertSame('2026-10-12', $usage->used_on->format('Y-m-d'));
-        $this->assertSame('トレーニー2頭のうち1頭', $usage->note);
+        $this->assertSame('トレーニー2つのうち1つ', $usage->note);
         // 利用 1 件は 1 回分。回数のカラムは持たない
         $this->assertArrayNotHasKey('count', $usage->getAttributes());
         $this->assertSame(200, (int) $usage->updated_by);

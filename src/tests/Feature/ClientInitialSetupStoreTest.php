@@ -185,7 +185,7 @@ class ClientInitialSetupStoreTest extends TestCase
         });
     }
 
-    public function test_トレーニーが1頭いる会員_送信の前後でトレーニーの値が変わらない(): void
+    public function test_トレーニーが1つある会員_送信の前後でトレーニーの値が変わらない(): void
     {
         $traineeId = DB::table('trainees')->insertGetId([
             'client_id' => $this->client->id,
@@ -209,7 +209,7 @@ class ClientInitialSetupStoreTest extends TestCase
         $this->assertSame(1, DB::table('trainees')->count());
     }
 
-    public function test_トレーニーが0頭の会員_送信後もトレーニーは0頭のまま(): void
+    public function test_トレーニーがいない会員_送信後もトレーニーはいないまま(): void
     {
         $this->postSetup($this->validInput())->assertRedirect(route('client-portal.dashboard'));
 
@@ -250,7 +250,7 @@ class ClientInitialSetupStoreTest extends TestCase
         $this->assertSame(1, DB::table('trainees')->count());
     }
 
-    public function test_古いtrainee項目が送られてもトレーニーが0頭の会員には作られない(): void
+    public function test_古いtrainee項目が送られてもトレーニーがいない会員には作られない(): void
     {
         $this->postSetup($this->validInput([
             'trainee_name' => 'モモ',

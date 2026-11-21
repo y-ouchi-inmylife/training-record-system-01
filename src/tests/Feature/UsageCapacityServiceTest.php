@@ -10,11 +10,11 @@ use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
 
 /**
- * 同時に預かれる頭数の数え方（2026-11 追加。requirements.md 6-17-11）。
+ * 同時に預かれる数の数え方（2026-11 追加。requirements.md 6-17-11）。
  *
- * - 利用 1 件＝1 頭（トレーニーがない利用も 1 頭）・事業所全体（すべての会員の利用）で数える
+ * - 利用 1 件を 1 と数える（トレーニーがない利用も 1 と数える）・事業所全体（すべての会員の利用）で数える
  * - 同じ日の中で時間帯が重なる利用を数える。時間帯は終わりを含まない
- * - 「ある時間帯の頭数」「ある日の頭数」は、最も多く重なる瞬間の頭数
+ * - 「ある時間帯の預かる数」「ある日の預かる数」は、最も多く重なる瞬間の預かる数
  * - 編集中の利用自身は数えない（除く利用）
  */
 class UsageCapacityServiceTest extends TestCase
@@ -54,7 +54,7 @@ class UsageCapacityServiceTest extends TestCase
         ]);
     }
 
-    // ---- ある日の頭数 ----
+    // ---- ある日の預かる数 ----
 
     public function test_重なる利用を数える(): void
     {
@@ -62,7 +62,7 @@ class UsageCapacityServiceTest extends TestCase
         $this->usage('2026-11-26', '13:00', '19:00');
         $this->usage('2026-11-26', '10:00', '12:00');
 
-        // 10:00〜12:00 は 8:00〜19:00 と重なり 2 頭、13:00〜19:00 も 2 頭。3 つが同時に重なる瞬間はない
+        // 10:00〜12:00 は 8:00〜19:00 と重なり 2、13:00〜19:00 も 2。3 つが同時に重なる瞬間はない
         $this->assertSame(2, $this->service->dayCount('2026-11-26'));
     }
 
@@ -82,7 +82,7 @@ class UsageCapacityServiceTest extends TestCase
         $this->assertSame(2, $this->service->dayCount('2026-11-26'));
     }
 
-    public function test_トレーニーなしの利用も1頭(): void
+    public function test_トレーニーなしの利用も1と数える(): void
     {
         DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->client->id, 'name' => 'ポチ']);
         $this->usage('2026-11-26', '08:00', '19:00', traineeId: 10);
@@ -117,13 +117,13 @@ class UsageCapacityServiceTest extends TestCase
         $this->assertSame(1, $this->service->dayCount('2026-11-26', $self->id));
     }
 
-    // ---- 月の日ごとの頭数 ----
+    // ---- 月の日ごとの預かる数 ----
 
-    public function test_月の日ごとの頭数は1以上の日だけを日付の順に返す(): void
+    public function test_月の日ごとの預かる数は1以上の日だけを日付の順に返す(): void
     {
         $this->usage('2026-11-30', '08:00', '19:00');
         $this->usage('2026-11-01', '08:00', '12:00');
-        $this->usage('2026-11-01', '12:00', '19:00'); // 終わりを含まないので 1 頭のまま
+        $this->usage('2026-11-01', '12:00', '19:00'); // 終わりを含まないので 1のまま
         $a = $this->usage('2026-11-26', '08:00', '19:00');
         $this->usage('2026-11-26', '13:00', '19:00', $this->makeClient('0002', '佐藤'));
         // 前後の月は入れない
@@ -135,19 +135,19 @@ class UsageCapacityServiceTest extends TestCase
         $this->assertSame(['2026-11-01' => 1, '2026-11-26' => 1, '2026-11-30' => 1], $this->service->monthCounts('2026-11', $a->id));
     }
 
-    // ---- その時間帯に 1 件入れたときの頭数 ----
+    // ---- その時間帯に 1 件入れたときの預かる数 ----
 
-    public function test_入れる利用も1頭として数え_頭数が最も多くなる時間帯を返す(): void
+    public function test_入れる利用も1と数え_預かる数が最も多くなる時間帯を返す(): void
     {
         $this->usage('2026-11-26', '08:00', '19:00');
         $this->usage('2026-11-26', '13:00', '19:00');
         $this->usage('2026-11-26', '15:00', '17:00');
 
-        // 14:00〜18:00 に入れると、15:00〜17:00 が 4 頭（8:00〜19:00・13:00〜19:00・15:00〜17:00・入れる利用）
+        // 14:00〜18:00 に入れると、15:00〜17:00 が 4（8:00〜19:00・13:00〜19:00・15:00〜17:00・入れる利用）
         $this->assertSame(['count' => 4, 'start' => '15:00', 'end' => '17:00'], $this->service->peakWith('2026-11-26', '14:00', '18:00'));
     }
 
-    public function test_重なる利用がなければ1頭で_時間帯はその利用の時間帯(): void
+    public function test_重なる利用がなければ1で_時間帯はその利用の時間帯(): void
     {
         $this->usage('2026-11-26', '08:00', '12:00');
 
@@ -162,9 +162,9 @@ class UsageCapacityServiceTest extends TestCase
         $this->assertSame(['count' => 2, 'start' => '10:00', 'end' => '11:00'], $this->service->peakWith('2026-11-26', '10:00', '11:00'));
     }
 
-    public function test_同じ頭数が続く時間帯はつなげて返す(): void
+    public function test_同じ預かる数が続く時間帯はつなげて返す(): void
     {
-        // 9:00〜12:00 と 12:00〜15:00（つながっている）に重なる → 8:00〜16:00 に入れると 9:00〜15:00 がずっと 2 頭
+        // 9:00〜12:00 と 12:00〜15:00（つながっている）に重なる → 8:00〜16:00 に入れると 9:00〜15:00 がずっと 2
         $this->usage('2026-11-26', '09:00', '12:00');
         $this->usage('2026-11-26', '12:00', '15:00');
 
@@ -181,7 +181,7 @@ class UsageCapacityServiceTest extends TestCase
 
     public function test_入れる利用の時間帯の外の重なりは数えない(): void
     {
-        // 8:00〜10:00 に 3 頭重なっていても、10:00〜12:00 に入れる利用の頭数には入れない
+        // 8:00〜10:00 に 3重なっていても、10:00〜12:00 に入れる利用の預かる数には入れない
         $this->usage('2026-11-26', '08:00', '10:00');
         $this->usage('2026-11-26', '08:00', '10:00');
         $this->usage('2026-11-26', '08:00', '11:00');

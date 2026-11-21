@@ -12,13 +12,13 @@ use Illuminate\Http\Request;
  * 利用の予約状況の内部 API（2026-11 追加。api-design.md 4-2-6、screen-design.md S-0305-M05「予約状況」）。
  *
  * 利用モーダルの予約状況（カレンダーとその日の予約。<x-usage-schedule>・resources/js/usage-schedule.js）が読む。
- * 頭数は事業所全体で数える（UsageCapacityService。保存時の上限の確認と同じ計算）。上限は ScheduleSetting::capacity()。
+ * 預かる数は事業所全体で数える（UsageCapacityService。保存時の上限の確認と同じ計算）。上限は ScheduleSetting::capacity()。
  * 権限は利用の登録・編集と同じ（routes/api.php の auth・practitioners）。参照なので、アクセスログには記録しない。
  */
 class UsageScheduleController extends Controller
 {
     /**
-     * 月の日ごとの頭数と上限（GET /api/usage-schedule/month）
+     * 月の日ごとの預かる数と上限（GET /api/usage-schedule/month）
      */
     public function month(Request $request, UsageCapacityService $service): JsonResponse
     {
@@ -32,13 +32,13 @@ class UsageScheduleController extends Controller
             'month' => $validated['month'],
             'today' => today()->toDateString(),
             'capacity' => ScheduleSetting::capacity(),
-            // 頭数が 1 以上の日だけ。日がなくても JSON のオブジェクト（{}）にする
+            // 預かる数が 1 以上の日だけ。日がなくても JSON のオブジェクト（{}）にする
             'days' => (object) $service->monthCounts($validated['month'], $exclude),
         ]);
     }
 
     /**
-     * その日の頭数・上限・予約の一覧（GET /api/usage-schedule/day）
+     * その日の預かる数・上限・予約の一覧（GET /api/usage-schedule/day）
      */
     public function day(Request $request, UsageCapacityService $service): JsonResponse
     {

@@ -23,7 +23,7 @@ use Tests\TestCase;
  * - 「空のトレーニー」＝トレーニーの項目（名前・犬種・性別・誕生日・去勢避妊・写真）がどれも空で、結び付く 5 つの表
  *   （計測値・愛犬アンケートの案内と回答・愛犬性格診断の案内と結果）のどれにも行がない（Trainee::scopeNotBlank）
  * 空のトレーニーの判定は、利用の登録のトレーニーの初期値（Client::defaultUsageTraineeId）で使う。
- * 会員の削除（2026-11 変更：空のトレーニーも含め、トレーニーが 1 頭でもいれば断る）は ClientDeleteConstraintTest で確かめる。
+ * 会員の削除（2026-11 変更：空のトレーニーも含め、トレーニーがいれば断る）は ClientDeleteConstraintTest で確かめる。
  */
 class ClientRegistrationTraineeTest extends TestCase
 {

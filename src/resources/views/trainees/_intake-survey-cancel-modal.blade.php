@@ -5,7 +5,7 @@
      （client / trainee）で渡していた。2026-10 に操作を会員詳細に寄せたため、S-0309 では使わない
 
      開き方：会員詳細のトレーニーカードの「取消」ボタンに data-bs-toggle="modal" data-bs-target="#intakeSurveyCancelModal"
-     と data-intake-survey-trainee-id="{トレーニーの id}" を付ける。トレーニーが何頭いてもモーダルは
+     と data-intake-survey-trainee-id="{トレーニーの id}" を付ける。トレーニーがいくつあってもモーダルは
      1 つにし、開いたボタンのトレーニーの id を、送信先の URL のひな形に入れる（契約モーダル
      S-0305-M04 の「URL のひな形を JS で置き換える」方式と同じ）。 --}}
 <div class="modal fade" id="intakeSurveyCancelModal" tabindex="-1"

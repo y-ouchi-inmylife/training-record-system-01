@@ -7,16 +7,16 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * 同時に預かれる頭数の数え方（2026-11 追加。requirements.md 6-17-11、用語集 No.43）。
+ * 同時に預かれる数の数え方（2026-11 追加。requirements.md 6-17-11、用語集 No.43）。
  *
- * - 利用 1 件＝1 頭（トレーニーがない利用も 1 頭）
+ * - 利用 1 件を 1 と数える（トレーニーがない利用も 1 と数える）
  * - 事業所全体（すべての会員の利用）で数える
  * - 同じ日の中で、時間帯が重なる利用を数える。時間帯は終わりを含まない（「12:00 まで」と「12:00 から」は重ならない）
- * - 「ある時間帯の頭数」は、その時間帯の中で最も多く重なる瞬間の頭数。「ある日の頭数」は、その日の中で最も多く重なる瞬間の頭数
+ * - 「ある時間帯の預かる数」は、その時間帯の中で最も多く重なる瞬間の預かる数。「ある日の預かる数」は、その日の中で最も多く重なる瞬間の預かる数
  * - 編集のときは、編集中の利用自身を数えない（$excludeUsageId）
  *
  * 予約状況の表示（UsageScheduleController）と、利用の保存時の上限の確認（ClientUsageController）で、この計算を使う。
- * 上限（同時に預かれる頭数）は App\Support\ScheduleSetting::capacity()。
+ * 上限（同時に預かれる数）は App\Support\ScheduleSetting::capacity()。
  *
  * 時刻は「HH:MM」にそろえて比べる（DB の TIME は「HH:MM:SS」、画面の入力は「HH:MM」のため。分より細かい時刻は扱わない）。
  */
@@ -39,7 +39,7 @@ class UsageCapacityService
     }
 
     /**
-     * その日の頭数（その日の中で最も多く重なる瞬間の頭数）
+     * その日の預かる数（その日の中で最も多く重なる瞬間の預かる数）
      */
     public function dayCount(string $date, ?int $excludeUsageId = null): int
     {
@@ -47,7 +47,7 @@ class UsageCapacityService
     }
 
     /**
-     * 月の日ごとの頭数。頭数が 1 以上の日だけを、日付（Y-m-d）の昇順で返す
+     * 月の日ごとの預かる数。預かる数が 1 以上の日だけを、日付（Y-m-d）の昇順で返す
      *
      * @param  string  $month  「Y-m」
      * @return array<string, int>
@@ -75,8 +75,8 @@ class UsageCapacityService
     }
 
     /**
-     * その日のその時間帯に利用を 1 件入れたときの、その時間帯の頭数（入れる利用も 1 頭として数える）と、
-     * 頭数が最も多くなる時間帯（保存時の上限の確認の注意に出す）。
+     * その日のその時間帯に利用を 1 件入れたときの、その時間帯の預かる数（入れる利用も 1 と数える）と、
+     * 預かる数が最も多くなる時間帯（保存時の上限の確認の注意に出す）。
      * 最も多くなる時間帯が離れて 2 つ以上あるときは、早いほうを返す。
      *
      * @return array{count: int, start: string, end: string} start・end は「HH:MM」
@@ -94,7 +94,7 @@ class UsageCapacityService
             }
         }
 
-        // 境目で区切った小さな時間帯ごとに頭数を数え、いちばん多い頭数が続く最初のひとまとまりを取る
+        // 境目で区切った小さな時間帯ごとに預かる数を数え、いちばん多い預かる数が続く最初のひとまとまりを取る
         $points = [];
         foreach ($intervals as [$s, $e]) {
             $points[$s] = true;
@@ -104,7 +104,7 @@ class UsageCapacityService
         sort($points, SORT_STRING);
 
         $best = ['count' => 0, 'start' => $start, 'end' => $end];
-        $running = null; // 今数えているひとまとまり（いちばん多い頭数が続いている間）
+        $running = null; // 今数えているひとまとまり（いちばん多い預かる数が続いている間）
         for ($i = 0; $i < count($points) - 1; $i++) {
             [$from, $to] = [$points[$i], $points[$i + 1]];
             $count = 0;
@@ -118,7 +118,7 @@ class UsageCapacityService
                 $best = ['count' => $count, 'start' => $from, 'end' => $to];
                 $running = true;
             } elseif ($count === $best['count'] && $running && $best['end'] === $from) {
-                $best['end'] = $to; // 同じ頭数が続く間は、ひとまとまりとしてつなげる
+                $best['end'] = $to; // 同じ預かる数が続く間は、ひとまとまりとしてつなげる
             } else {
                 $running = false;
             }

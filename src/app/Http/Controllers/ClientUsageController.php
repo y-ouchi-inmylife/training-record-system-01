@@ -24,8 +24,8 @@ use Illuminate\Support\Carbon;
  * 登録・編集は止めない（警告も出さない。設計書 6-17-4）。
  *
  * 保存時の上限の確認（2026-11 追加。requirements.md 6-17-11、screen-design.md S-0305-M05「保存時の上限の確認」）：
- * 入力の検証のあと、利用日が今日以降で、その利用を入れたときの時間帯の頭数（UsageCapacityService）が
- * 同時に預かれる頭数（ScheduleSetting::capacity()）を超え、確認済みの印（CONFIRMED_INPUT）がなければ、
+ * 入力の検証のあと、利用日が今日以降で、その利用を入れたときの時間帯の預かる数（UsageCapacityService）が
+ * 同時に預かれる数（ScheduleSetting::capacity()）を超え、確認済みの印（CONFIRMED_INPUT）がなければ、
  * 保存しないで会員詳細に戻り、利用のモーダルを開き直して注意を出す（入力エラーで開き直す仕組みに乗せる。withInput）。
  * 注意の文はセッションの CAPACITY_WARNING_SESSION_KEY に載せる。この送信はアクセスログに記録しない（LogAccess）。
  */
@@ -85,7 +85,7 @@ class ClientUsageController extends Controller
      *
      * - 確認済みの印があれば確かめない
      * - 利用日が今日（アプリのタイムゾーン）より前なら確かめない
-     * - その利用を入れたときの時間帯の頭数が上限を超えるときだけ確認する（上限と同じ頭数なら確認しない）
+     * - その利用を入れたときの時間帯の預かる数が上限を超えるときだけ確認する（上限と同じ預かる数なら確認しない）
      *
      * @param  array<string, mixed>  $validated
      * @param  string  $button  最後の文のボタンの名前（「登録」「更新」）
@@ -114,7 +114,7 @@ class ClientUsageController extends Controller
 
         return ClientUsage::toShortDateLabel($date).' '
             .ClientUsage::toDisplayTime($peak['start']).'〜'.ClientUsage::toDisplayTime($peak['end'])
-            .' は '.$peak['count'].'頭になります（上限 '.$capacity.'頭）。'
+            .' は、同時に預かる数が '.$peak['count'].' になり、上限（'.$capacity.'）を超えます。'
             .'このまま'.$button.'する場合は、もう一度［'.$button.'］を押してください。';
     }
 

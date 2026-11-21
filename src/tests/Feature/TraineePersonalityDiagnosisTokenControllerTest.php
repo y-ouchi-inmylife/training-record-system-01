@@ -54,7 +54,7 @@ class TraineePersonalityDiagnosisTokenControllerTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineePersonalityDiagnosisTokensTable();
-        // 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬アンケートの案内も確かめる（2026-10-19 追加）
+        // トレーニーごとに出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬アンケートの案内も確かめる（2026-10-19 追加）
         $this->createTraineeIntakeSurveyTokensTable();
         $this->createTraineePersonalityDiagnosisResultsTable();
 

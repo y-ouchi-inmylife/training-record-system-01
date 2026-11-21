@@ -5,7 +5,7 @@
 {{-- 事業所情報の設定画面（S-1601。2026-11 追加。設計書 screen-design.md 3-16。2026-11 変更：画面の名前を改めた。
      URL・ルート名・設定のキー・クラス名などの内部の名前は schedule のまま）。
      営業開始時刻・営業終了時刻は、利用を登録するときの開始時刻・終了時刻の初期値になる。
-     同時に預かれる頭数（2026-11 追加）は、利用の予約状況と保存時の上限の確認に使う。
+     同時に預かれる数（2026-11 追加）は、利用の予約状況と保存時の上限の確認に使う。
      - 小さなフォームなので、上部の案内（x-form-error-summary）は置かない（§2-7 の例外）
      - 2 つの時刻は横に並べ、範囲のエラーは各欄の下ではなく、まとまりの下に出す（§2-7 の但し書き。エラーの欄は赤枠だけ）
      - 説明文は置かない（2026-11 変更：その前は時刻のまとまりの下に出していたが、分かりにくいため消した）
@@ -48,19 +48,18 @@
                 <x-form-error field="schedule_open_time" block />
                 <x-form-error field="schedule_close_time" block />
 
-                {{-- 同時に預かれる頭数（2026-11 追加。設計書 S-1601・requirements.md 6-17-11）。営業開始時刻・営業終了時刻の下。
-                     欄の右に「頭」（input-group）。エラーは input-group の下に block で出す --}}
-                <div class="mt-3">
-                    <label for="schedule_capacity" class="form-label">同時に預かれる頭数 <span class="text-danger">*</span></label>
-                    <div class="input-group" style="max-width: 10rem;" data-schedule-capacity>
-                        <input type="number" class="form-control @error('schedule_capacity') is-invalid @enderror"
-                               id="schedule_capacity" name="schedule_capacity"
-                               value="{{ old('schedule_capacity', $capacity) }}"
-                               min="1" max="99" step="1" inputmode="numeric"
-                               required autocomplete="off">
-                        <span class="input-group-text">頭</span>
-                    </div>
-                    <x-form-error field="schedule_capacity" block />
+                {{-- 同時に預かれる数（2026-11 追加。設計書 S-1601・requirements.md 6-17-11）。営業開始時刻・営業終了時刻の下。
+                     数字の欄だけで単位は付けない（2026-11 変更：その前は欄の右に単位を出していた。ペットは家族として扱うため、
+                     犬を数える単位は使わない）。エラーは欄の下に出す --}}
+                <div class="mt-3" data-schedule-capacity>
+                    <label for="schedule_capacity" class="form-label">同時に預かれる数 <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control @error('schedule_capacity') is-invalid @enderror"
+                           style="max-width: 10rem;"
+                           id="schedule_capacity" name="schedule_capacity"
+                           value="{{ old('schedule_capacity', $capacity) }}"
+                           min="1" max="99" step="1" inputmode="numeric"
+                           required autocomplete="off">
+                    <x-form-error field="schedule_capacity" />
                 </div>
 
             </form>

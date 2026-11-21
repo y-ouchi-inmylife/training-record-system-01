@@ -27,7 +27,7 @@ class ScheduleSettingRequest extends FormRequest
         return [
             'schedule_open_time' => 'required|date_format:H:i',
             'schedule_close_time' => 'required|date_format:H:i',
-            // 同時に預かれる頭数（2026-11 追加。1〜99 の整数）
+            // 同時に預かれる数（2026-11 追加。1〜99 の整数）
             'schedule_capacity' => 'required|integer|between:'.ScheduleSetting::MIN_CAPACITY.','.ScheduleSetting::MAX_CAPACITY,
         ];
     }

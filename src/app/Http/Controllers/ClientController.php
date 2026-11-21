@@ -186,12 +186,12 @@ class ClientController extends Controller
         // 各 trainee の measurements を eager load することで、
         // トレーニーカードの「最終計測」表示で N+1 を起こさない。
         // trainees.latestIntakeSurveyResponse と trainees.activeIntakeSurveyToken は愛犬アンケートの行の
-        // 状態（Trainee::intake_survey_status）に使う。トレーニーが何頭いてもクエリはそれぞれ 1 本で済む
+        // 状態（Trainee::intake_survey_status）に使う。トレーニーがいくつあってもクエリはそれぞれ 1 本で済む
         // （2026-10 追加）。
         // trainees.activePersonalityDiagnosisToken は性格診断の行のボタン（案内を発行／案内を表示・取消）に使う
-        // （2026-10 追加。トレーニーが何頭いてもクエリは 1 本）。
+        // （2026-10 追加。トレーニーがいくつあってもクエリは 1 本）。
         // trainees.latestPersonalityDiagnosisResult は性格診断の行の最新の診断の日付に使う
-        // （2026-10 追加。トレーニー詳細のグラフの「今回」と同じ回。トレーニーが何頭いてもクエリは 1 本）。
+        // （2026-10 追加。トレーニー詳細のグラフの「今回」と同じ回。トレーニーがいくつあってもクエリは 1 本）。
         // measurements は Trainee::measurements() で計測日時降順に並ぶため、
         // Trainee::latest_measurement アクセサが `first()` で最新 1 件を取り出せる
         // （設計書 S-0305 セクション3「最終計測」参照）。

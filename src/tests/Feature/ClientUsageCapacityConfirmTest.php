@@ -15,10 +15,10 @@ use Tests\TestCase;
  * 利用の保存時の上限の確認（2026-11 追加。requirements.md 6-17-11、screen-design.md S-0305-M05「保存時の上限の確認」、
  * api-design.md POST /clients/{client}/usages・PUT /client-usages/{usage}）。
  *
- * - 利用日が今日以降で、その利用を入れたときの時間帯の頭数が上限を超え、確認済みの印がなければ、保存せずに確認で戻る
+ * - 利用日が今日以降で、その利用を入れたときの時間帯の預かる数が上限を超え、確認済みの印がなければ、保存せずに確認で戻る
  *   （会員詳細へ・入力した値を戻す・注意の文をセッションに載せる）
  * - 確認済みの印（_capacity_confirmed = 1）があれば保存する
- * - 今日より前の利用は確かめない。上限と同じ頭数は確かめない（超えるときだけ）
+ * - 今日より前の利用は確かめない。上限と同じ預かる数は確かめない（超えるときだけ）
  * - 入力エラーがあるときは、入力エラーを先に出す
  * - 編集のときは、編集中の利用自身を数えない
  * - 確認で戻った送信はアクセスログに記録しない
@@ -43,7 +43,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->createClientCountTables();
         $this->createAccessLogsTable();
         $this->createSystemSettingsTable();
-        // 上限は 2 頭
+        // 上限は 2
         SystemSetting::query()->create(['key' => 'schedule_capacity', 'value' => '2']);
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
@@ -81,7 +81,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         ], $overrides);
     }
 
-    /** 11/26 に、ほかの会員の利用で 2 頭（上限）が埋まっている時間帯を作る（15:00〜17:00 が 2 頭） */
+    /** 11/26 に、ほかの会員の利用で 2（上限）が埋まっている時間帯を作る（15:00〜17:00 が 2） */
     private function fillTwo(): void
     {
         $this->usage($this->other, '2026-11-26', '08:00', '19:00');
@@ -99,7 +99,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionHasNoErrors();
         $response->assertSessionHas('usage_capacity_warning',
-            '11/26(木) 15:00〜17:00 は 3頭になります（上限 2頭）。このまま登録する場合は、もう一度［登録］を押してください。');
+            '11/26(木) 15:00〜17:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。');
         $response->assertSessionHasInput('used_on', '2026-11-26');
         $response->assertSessionHasInput('note', 'メモ');
         $response->assertSessionHasInput('_form_type', 'usage');
@@ -127,9 +127,9 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->assertSame(0, ClientUsage::query()->where('client_id', $this->client->id)->count());
     }
 
-    public function test_上限と同じ頭数なら確認しない(): void
+    public function test_上限と同じ預かる数なら確認しない(): void
     {
-        $this->usage($this->other, '2026-11-26', '08:00', '19:00'); // 1 頭 ＋ 入れる利用で 2 頭（上限と同じ）
+        $this->usage($this->other, '2026-11-26', '08:00', '19:00'); // 1 ＋ 入れる利用で 2（上限と同じ）
 
         $this->post(route('client-usages.store', $this->client), $this->input())
             ->assertSessionHas('success', '利用を登録しました。')
@@ -155,7 +155,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
 
         $this->post(route('client-usages.store', $this->client), $this->input(['used_on' => '2026-11-21']))
             ->assertSessionHas('usage_capacity_warning',
-                '11/21(土) 14:00〜18:00 は 3頭になります（上限 2頭）。このまま登録する場合は、もう一度［登録］を押してください。');
+                '11/21(土) 14:00〜18:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。');
 
         $this->post(route('client-usages.store', $this->client), $this->input(['used_on' => '2026-11-20']))
             ->assertSessionHas('success', '利用を登録しました。');
@@ -177,9 +177,9 @@ class ClientUsageCapacityConfirmTest extends TestCase
     public function test_編集のときは自身を数えない(): void
     {
         $this->usage($this->other, '2026-11-26', '08:00', '19:00');
-        $self = $this->usage($this->client, '2026-11-26', '14:00', '18:00'); // 今 2 頭（上限）
+        $self = $this->usage($this->client, '2026-11-26', '14:00', '18:00'); // 今 2（上限）
 
-        // メモだけ変える：自身を数えなければ 2 頭のままなので確認しない
+        // メモだけ変える：自身を数えなければ 2のままなので確認しない
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id, 'note' => '直した']))
             ->assertSessionHas('success', '利用を更新しました。')
             ->assertSessionMissing('usage_capacity_warning');
@@ -194,7 +194,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id]))
             ->assertRedirect(route('clients.show', $this->client))
             ->assertSessionHas('usage_capacity_warning',
-                '11/26(木) 15:00〜17:00 は 3頭になります（上限 2頭）。このまま更新する場合は、もう一度［更新］を押してください。')
+                '11/26(木) 15:00〜17:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま更新する場合は、もう一度［更新］を押してください。')
             ->assertSessionHasInput('_usage_id', (string) $self->id);
         $this->assertSame('2026-11-27', $self->fresh()->used_on->toDateString(), '保存していない');
 

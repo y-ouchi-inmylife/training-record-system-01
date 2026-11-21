@@ -50,7 +50,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineeIntakeSurveyTokensTable();
-        // 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬性格診断の案内も確かめる（2026-10-19 追加）
+        // トレーニーごとに出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬性格診断の案内も確かめる（2026-10-19 追加）
         $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
 
@@ -369,7 +369,7 @@ class TraineeIntakeSurveyTokenControllerTest extends TestCase
         $this->assertSame(0, DB::table('trainee_intake_survey_tokens')->count());
     }
 
-    // ---- 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまで（2026-10-19 変更） ----
+    // ---- トレーニーごとに出しておける案内は 2 つの種類を合わせて 1 つまで（2026-10-19 変更） ----
 
     public function test_愛犬性格診断が回答待ちなら発行せず会員詳細に戻ってエラーの知らせを出す(): void
     {

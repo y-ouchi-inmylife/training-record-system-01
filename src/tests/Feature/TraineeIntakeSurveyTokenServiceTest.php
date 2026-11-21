@@ -39,7 +39,7 @@ class TraineeIntakeSurveyTokenServiceTest extends TestCase
             $table->unsignedBigInteger('updated_by')->nullable();
         });
         $this->createTraineeIntakeSurveyTokensTable();
-        // 1 頭に出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬性格診断の案内も確かめる（2026-10-19 追加）
+        // トレーニーごとに出しておける案内は 2 つの種類を合わせて 1 つまでなので、発行では愛犬性格診断の案内も確かめる（2026-10-19 追加）
         $this->createTraineePersonalityDiagnosisTokensTable();
         $this->createTraineeIntakeSurveyResponsesTable();
 

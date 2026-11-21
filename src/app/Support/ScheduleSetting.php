@@ -8,7 +8,7 @@ use App\Models\SystemSetting;
  * 予定の設定（S-1601。2026-11 追加。設計書 requirements.md 6-17-10・db-schema.md DS-0100）の値を読む。
  *
  * 営業開始時刻・営業終了時刻は、利用を登録するときの開始時刻・終了時刻の初期値になる（用語集 No.42）。
- * 同時に預かれる頭数（用語集 No.43。requirements.md 6-17-11。2026-11 追加）は、利用の予約状況の「n/上限」と、
+ * 同時に預かれる数（用語集 No.43。requirements.md 6-17-11。2026-11 追加）は、利用の予約状況の「n/上限」と、
  * 利用の保存時の上限の確認に使う（数え方は App\Services\UsageCapacityService）。
  * 値は system_settings の schedule_open_time・schedule_close_time（「HH:MM」の文字列）・schedule_capacity（数字の文字列）。
  * **行がないときは、ここに持つ初期値（08:00・19:00・3）で動く**（本番ではシーダーを流さず、migrate だけで反映するため）。
@@ -26,13 +26,13 @@ class ScheduleSetting
     /** 営業終了時刻の初期値（行がないとき・シーダー） */
     public const DEFAULT_CLOSE_TIME = '19:00';
 
-    /** 同時に預かれる頭数のキー（2026-11 追加） */
+    /** 同時に預かれる数のキー（2026-11 追加） */
     public const CAPACITY_KEY = 'schedule_capacity';
 
-    /** 同時に預かれる頭数の初期値（行がないとき・シーダー。2026-11 追加） */
+    /** 同時に預かれる数の初期値（行がないとき・シーダー。2026-11 追加） */
     public const DEFAULT_CAPACITY = 3;
 
-    /** 同時に預かれる頭数の範囲（画面の検証。2026-11 追加） */
+    /** 同時に預かれる数の範囲（画面の検証。2026-11 追加） */
     public const MIN_CAPACITY = 1;
 
     public const MAX_CAPACITY = 99;
@@ -54,7 +54,7 @@ class ScheduleSetting
     }
 
     /**
-     * 同時に預かれる頭数（2026-11 追加）。行がない・空・整数として読めない・1 未満のときは初期値
+     * 同時に預かれる数（2026-11 追加）。行がない・空・整数として読めない・1 未満のときは初期値
      */
     public static function capacity(): int
     {
@@ -65,7 +65,7 @@ class ScheduleSetting
     }
 
     /**
-     * 営業開始時刻・営業終了時刻・同時に預かれる頭数を保存する（行がなければ作り、あれば更新する。頭数は 2026-11 追加）
+     * 営業開始時刻・営業終了時刻・同時に預かれる数を保存する（行がなければ作り、あれば更新する。預かる数は 2026-11 追加）
      */
     public static function save(string $openTime, string $closeTime, int $capacity): void
     {

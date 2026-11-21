@@ -121,7 +121,7 @@ class ClientDashboardSurveyNoticeTest extends TestCase
             ->get(route('client-portal.dashboard'))->assertOk()->getContent();
     }
 
-    /** 愛犬 1 頭分のカード（カード〔article〕の始まりから終わりまで。お知らせは名前の見出しより前にあるため） */
+    /** 愛犬 1 つ分のカード（カード〔article〕の始まりから終わりまで。お知らせは名前の見出しより前にあるため） */
     private function card(string $html, string $callName): string
     {
         $heading = strpos($html, '>'.$callName.'</h2>');
