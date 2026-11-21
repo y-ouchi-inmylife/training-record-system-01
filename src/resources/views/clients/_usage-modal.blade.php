@@ -21,8 +21,8 @@
        - $traineeOptions    : 「トレーニー」の選択肢（その会員のトレーニー全部。空のトレーニーも含む。id 順。[id, label]。
                               label はトレーナー側の表示名〔名前未登録なら「名前未登録」〕）。空の配列ならこの欄を出さない（2026-11 追加）
        - $defaultTraineeId  : ?int 登録時の「トレーニー」の初期値（Client::defaultUsageTraineeId()。null は初期選択なし。2026-11 追加）
-       - $defaultStartTime  : string 登録時の開始時刻の初期値（予定の設定の営業開始時刻。HH:MM。2026-11 追加）
-       - $defaultEndTime    : string 登録時の終了時刻の初期値（予定の設定の営業終了時刻。HH:MM。2026-11 追加）
+       - $defaultStartTime  : string 登録時の開始時刻の初期値（事業所情報の設定の営業開始時刻。HH:MM。2026-11 追加）
+       - $defaultEndTime    : string 登録時の終了時刻の初期値（事業所情報の設定の営業終了時刻。HH:MM。2026-11 追加）
 
      ## 項目の並び（設計書 S-0305-M05。2026-11 変更）
 
@@ -183,7 +183,7 @@
     const DESTROY_URL_TEMPLATE = @json(route('client-usages.destroy', ['usage' => '__ID__']));
     // 登録時の「契約」の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
     const DEFAULT_CONTRACT_ID = @json($defaultContractId);
-    // 登録時の「トレーニー」の初期値（null は初期選択なし）と、開始時刻・終了時刻の初期値（予定の設定。HH:MM）。2026-11 追加
+    // 登録時の「トレーニー」の初期値（null は初期選択なし）と、開始時刻・終了時刻の初期値（事業所情報の設定。HH:MM）。2026-11 追加
     const DEFAULT_TRAINEE_ID = @json($defaultTraineeId);
     const DEFAULT_START_TIME = @json($defaultStartTime);
     const DEFAULT_END_TIME = @json($defaultEndTime);

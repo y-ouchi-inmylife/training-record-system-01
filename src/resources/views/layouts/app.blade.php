@@ -111,8 +111,8 @@
                                          同じ日に、名前も変えた（その前は「…のアドバイスのプロンプト」） --}}
                                     <li><a class="dropdown-item" href="{{ route('settings.evaluation-prompts.edit') }}">{{ __('messages.personality_diagnosis_name') }}のプロンプト</a></li>
                                     <li><a class="dropdown-item" href="{{ route('settings.summary-prompts.edit') }}">要約プロンプト</a></li>
-                                    {{-- 予定の設定（S-1601。2026-11 追加）。プロンプトの設定の項目の後（設計書 §2-1-1 8-5） --}}
-                                    <li><a class="dropdown-item" href="{{ route('settings.schedule.edit') }}">予定の設定</a></li>
+                                    {{-- 事業所情報の設定（S-1601。2026-11 追加。2026-11 変更：名前を改めた）。プロンプトの設定の項目の後（設計書 §2-1-1 8-5） --}}
+                                    <li><a class="dropdown-item" href="{{ route('settings.schedule.edit') }}">事業所情報の設定</a></li>
                                 @endif
                             </ul>
                         </li>

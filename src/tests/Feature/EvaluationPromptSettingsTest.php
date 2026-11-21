@@ -80,8 +80,8 @@ class EvaluationPromptSettingsTest extends TestCase
             '/<li><a class="dropdown-item" href="'.preg_quote(route('access-logs.index'), '/').'">トレーナー操作履歴<\\/a><\\/li>\\s*<li><hr class="dropdown-divider"><\\/li>\\s*'
             .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.evaluation-prompts.edit'), '/').'">愛犬性格診断のプロンプト<\\/a><\\/li>\\s*'
             .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.summary-prompts.edit'), '/').'">要約プロンプト<\\/a><\\/li>\\s*'
-            // 要約プロンプトの後に予定の設定（S-1601。2026-11 追加。設計書 §2-1-1 8-5）
-            .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.schedule.edit'), '/').'">予定の設定<\\/a><\\/li>\\s*<\\/ul>/u',
+            // 要約プロンプトの後に事業所情報の設定（S-1601。2026-11 追加。設計書 §2-1-1 8-5）
+            .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.schedule.edit'), '/').'">事業所情報の設定<\\/a><\\/li>\\s*<\\/ul>/u',
             $html
         );
         $this->assertLessThan(strpos($html, '>要約プロンプト</a></li>'), strpos($html, '>愛犬性格診断のプロンプト</a></li>'));

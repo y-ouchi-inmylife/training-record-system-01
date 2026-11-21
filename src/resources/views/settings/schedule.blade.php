@@ -1,12 +1,13 @@
 @extends('layouts.app')
 
-@section('title', '予定の設定')
+@section('title', '事業所情報の設定')
 
-{{-- 予定の設定画面（S-1601。2026-11 追加。設計書 screen-design.md 3-16）。
+{{-- 事業所情報の設定画面（S-1601。2026-11 追加。設計書 screen-design.md 3-16。2026-11 変更：画面の名前を改めた。
+     URL・ルート名・設定のキー・クラス名などの内部の名前は schedule のまま）。
      営業開始時刻・営業終了時刻は、利用を登録するときの開始時刻・終了時刻の初期値になる。
      - 小さなフォームなので、上部の案内（x-form-error-summary）は置かない（§2-7 の例外）
      - 2 つの時刻は横に並べ、範囲のエラーは各欄の下ではなく、まとまりの下に出す（§2-7 の但し書き。エラーの欄は赤枠だけ）
-     - 説明文はまとまりの下
+     - 説明文は置かない（2026-11 変更：その前は時刻のまとまりの下に出していたが、分かりにくいため消した）
      - 保存していない変更があるときの離脱の確認は、要約プロンプト（S-0601）と同じ UnsavedChangesGuard --}}
 
 @section('content')
@@ -14,7 +15,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-4" style="max-width: 700px;">
-                <h2 class="mb-0">予定の設定</h2>
+                <h2 class="mb-0">事業所情報の設定</h2>
                 <div class="d-flex gap-2">
                     <button type="submit" form="scheduleSettingForm" class="btn btn-success text-nowrap">更新</button>
                 </div>
@@ -46,7 +47,6 @@
                 <x-form-error field="schedule_open_time" block />
                 <x-form-error field="schedule_close_time" block />
 
-                <p class="text-muted mt-3 mb-0" data-schedule-setting-description>利用を登録するときの開始時刻・終了時刻の初期値になります。登録済みの利用は変わりません。</p>
             </form>
         </div>
     </div>

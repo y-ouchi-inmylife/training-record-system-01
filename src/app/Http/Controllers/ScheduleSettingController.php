@@ -8,7 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 /**
- * 予定の設定画面（S-1601。2026-11 追加。設計書 screen-design.md 3-16・requirements.md 6-17-10）。
+ * 事業所情報の設定画面（S-1601。2026-11 追加。設計書 screen-design.md 3-16・requirements.md 6-17-10）。
  *
  * 利用を登録するときの開始時刻・終了時刻の初期値（営業開始時刻・営業終了時刻）を、管理者が変える。
  * 変えても登録済みの利用の時刻は変わらない。
@@ -36,6 +36,6 @@ class ScheduleSettingController extends Controller
         ScheduleSetting::save($validated['schedule_open_time'], $validated['schedule_close_time']);
 
         return redirect()->route('settings.schedule.edit')
-            ->with('success', '予定の設定を更新しました。');
+            ->with('success', '事業所情報の設定を更新しました。');
     }
 }

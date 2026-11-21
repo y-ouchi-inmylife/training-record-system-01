@@ -76,23 +76,26 @@ class ScheduleSettingTest extends TestCase
         $this->assertMatchesRegularExpression('/name="schedule_close_time"\s+value="18:00"/', $html);
     }
 
-    public function test_画面の見出しと説明文と更新ボタンが出て上部の案内は置かない(): void
+    public function test_画面の名前は事業所情報の設定で_更新ボタンが出て説明文と上部の案内は置かない(): void
     {
+        // 2026-11 変更：画面の名前を「事業所情報の設定」に改め、説明文を消した（設計書 S-1601）
         $this->actingAsRole('admin');
 
         $html = $this->get(route('settings.schedule.edit'))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<title>予定の設定', $html);
-        $this->assertStringContainsString('<h2 class="mb-0">予定の設定</h2>', $html);
+        $this->assertStringContainsString('<title>事業所情報の設定', $html);
+        $this->assertStringContainsString('<h2 class="mb-0">事業所情報の設定</h2>', $html);
+        $this->assertStringNotContainsString('予定の設定', $html);
         $this->assertStringContainsString('<button type="submit" form="scheduleSettingForm" class="btn btn-success text-nowrap">更新</button>', $html);
-        $this->assertStringContainsString('<p class="text-muted mt-3 mb-0" data-schedule-setting-description>利用を登録するときの開始時刻・終了時刻の初期値になります。登録済みの利用は変わりません。</p>', $html);
-        // 説明文は時刻のまとまりの下
-        $this->assertGreaterThan(strpos($html, 'data-schedule-time-range'), strpos($html, 'data-schedule-setting-description'));
+        // 説明文は出さない
+        $this->assertStringNotContainsString('data-schedule-setting-description', $html);
+        $this->assertStringNotContainsString('初期値になります', $html);
+        $this->assertStringNotContainsString('登録済みの利用は変わりません', $html);
         // 離脱前の確認（S-0601 と同じ）
         $this->assertStringContainsString("formSelector: '#scheduleSettingForm'", $html);
     }
 
-    public function test_管理者メニューのプロンプトの設定の後に予定の設定がある(): void
+    public function test_管理者メニューのプロンプトの設定の後に事業所情報の設定がある(): void
     {
         $this->actingAsRole('admin');
 
@@ -100,7 +103,7 @@ class ScheduleSettingTest extends TestCase
 
         $this->assertMatchesRegularExpression(
             '/<li><a class="dropdown-item" href="'.preg_quote(route('settings.summary-prompts.edit'), '/').'">要約プロンプト<\/a><\/li>\s*'
-            .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.schedule.edit'), '/').'">予定の設定<\/a><\/li>/s',
+            .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.schedule.edit'), '/').'">事業所情報の設定<\/a><\/li>/s',
             $html
         );
         // 開いているときは【管理者】を強調する
@@ -124,7 +127,7 @@ class ScheduleSettingTest extends TestCase
 
         $this->update(['schedule_open_time' => '09:00', 'schedule_close_time' => '18:30'])
             ->assertRedirect(route('settings.schedule.edit'))
-            ->assertSessionHas('success', '予定の設定を更新しました。');
+            ->assertSessionHas('success', '事業所情報の設定を更新しました。');
         $this->assertSame('09:00', ScheduleSetting::openTime());
         $this->assertSame('18:30', ScheduleSetting::closeTime());
 
