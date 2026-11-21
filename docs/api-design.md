@@ -104,7 +104,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/contracts` | 契約を登録する（ルート名 `client-contracts.store`）。処理後は S-0305 に戻る（下の注記参照） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-contracts/{contract}` | 契約を更新する（ルート名 `client-contracts.update`）。回数を、その契約に割り当て済みの利用の件数より少なくする更新は入力エラー | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-contracts/{contract}` | 契約を削除する（物理削除。ルート名 `client-contracts.destroy`）。割り当てられていた利用は「契約なし」になる（DB の ON DELETE SET NULL。利用そのものは消えない） | auth | 管理者、一般 |
-| 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/usages` | 利用を登録する（ルート名 `client-usages.store`）。会員の残り回数がマイナスになる登録も受け付けるが、残りのない契約（`client_contract_id`）への割り当ては入力エラー（S-0305 に戻り、モーダルを開き直す）。トレーニー（`trainee_id`）・開始時刻（`start_time`）・終了時刻（`end_time`）も受け取る（**2026-11 追加**。下の 4-1-3「POST /clients/{client}/usages」）。利用日が今日以降で同時に預かれる数を超えるときは、確認済みの印（`_capacity_confirmed`）がなければ保存せずに確認で戻る（**2026-11 追加**） | auth | 管理者、一般 |
+| 回数管理 | S-0305 会員詳細画面 | POST | `/clients/{client}/usages` | 利用を登録する（ルート名 `client-usages.store`）。会員の残り回数がマイナスになる登録も受け付けるが、残りのない契約（`client_contract_id`）への割り当ては入力エラー（S-0305 に戻り、モーダルを開き直す）。トレーニー（`trainee_id`）・開始時刻（`start_time`）・終了時刻（`end_time`）も受け取る（**2026-11 追加**。下の 4-1-3「POST /clients/{client}/usages」）。利用日が今日以降で同時に預かれる数を超えるときは、確認済みの印（`_capacity_confirmed`）がなければ保存せずに確認で戻る（**2026-11 追加**。ふだんは画面が保存の前に `GET /api/usage-schedule/check` で問い合わせて確認ダイアログを出し、［OK］で印を付けて送るので、ここで戻るのは安全網） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | PUT | `/client-usages/{usage}` | 利用を更新する（ルート名 `client-usages.update`）。会員の残り回数がマイナスになる更新も受け付けるが、残りのない契約への割り当て（その利用自身は除いて数える）は入力エラー。パラメータは登録と同じ（**2026-11 追加**：トレーニー・開始時刻・終了時刻。**2026-11 追加**：確認済みの印と、上限の確認で戻る動きも登録と同じ） | auth | 管理者、一般 |
 | 回数管理 | S-0305 会員詳細画面 | DELETE | `/client-usages/{usage}` | 利用を削除する（物理削除。ルート名 `client-usages.destroy`） | auth | 管理者、一般 |
 | トレーニング記録管理 | S-0401 トレーニング記録登録画面 | GET | `/training-records/create` | トレーニング記録登録画面を表示する | auth | 管理者、一般 |
@@ -207,6 +207,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 内部API | - | GET | `/api/trainers` | 担当トレーナーの選択候補を取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/usage-schedule/month` | 利用の予約状況：月の日ごとの預かる数と上限を返す（S-0305-M05。**2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/usage-schedule/day` | 利用の予約状況：その日の預かる数・上限・予約の一覧を返す（S-0305-M05。**2026-11 追加**。4-2-6） | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/usage-schedule/check` | 利用の保存の前の確認：この利用を入れたときの預かる数と、確認が要るかを返す（S-0305-M05。**2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records/upload-url` | アップロード用の署名付きURLを発行する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records` | アップロード完了後、メディアレコードを作成する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/media-records/{id}/play` | メディアを表示・再生する（ストリーミング） | auth | 管理者、一般 |
@@ -666,17 +667,17 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 | end_time | string | ● | required, date_format:H:i, start_time より後（同じ時刻は不可） | 終了時刻（**2026-11 追加**）。日付をまたぐ利用は扱わない |
 | client_contract_id | integer | | nullable, integer。この会員の契約であること・選んだ契約に残りがあること | 割り当てる契約。空は「契約なし」 |
 | note | string | | nullable, string, max:255 | メモ |
-| _capacity_confirmed | string | | —（ルールに持たず、保存する値に入らない） | 確認済みの印（**2026-11 追加**）。`1` のとき、同時に預かれる数を超えていても保存する。上限の確認で戻ったときに、モーダルが hidden で入れる |
+| _capacity_confirmed | string | | —（ルールに持たず、保存する値に入らない） | 確認済みの印（**2026-11 追加**）。`1` のとき、同時に預かれる数を超えていても保存する。保存の前の確認ダイアログで［OK］を押したとき、または上限の確認で戻ったときに、モーダルが hidden で入れる |
 
 **処理**:
 - 同じトレーニーの利用が同じ日に 2 件以上あってもエラーにしない
 - 会員の残り回数がマイナスになる登録も受け付ける（今までどおり）
-- **保存時の上限の確認**（**2026-11 追加**。requirements.md 6-17-11）：入力の検証のあとで、利用日が今日以降なら、その利用を入れたときの時間帯の預かる数（`UsageCapacityService`）を同時に預かれる数（`system_settings` の `schedule_capacity`）と比べる。超えていて `_capacity_confirmed` が `1` でなければ、保存しないで確認で戻る（下）。入力エラーがあるときは確かめない（検証が先に断る）。今日より前の利用は確かめない
+- **保存時の上限の確認**（**2026-11 追加**。requirements.md 6-17-11）：画面は保存の前に `GET /api/usage-schedule/check`（4-2-6）で問い合わせ、上限を超えるときは確認ダイアログを出して、［OK］なら `_capacity_confirmed=1` を付けて送る（**2026-11 変更**）。ここでの確認は安全網（問い合わせに失敗したとき・確認している間にほかの人が予約を入れたとき）。入力の検証のあとで、利用日が今日以降なら、その利用を入れたときの時間帯の預かる数（`UsageCapacityService`）を同時に預かれる数（`system_settings` の `schedule_capacity`）と比べる。超えていて `_capacity_confirmed` が `1` でなければ、保存しないで確認で戻る（下）。入力エラーがあるときは確かめない（検証が先に断る）。今日より前の利用は確かめない
 
 **レスポンス**:
 - 成功：`redirect()->route('clients.show', $client)` ＋「利用を登録しました。」
 - バリデーションエラー：S-0305 に戻り、利用のモーダルを開き直す（「契約・利用エンドポイントのリダイレクト先」）
-- 上限の確認で戻る（**2026-11 追加**）：`redirect()->route('clients.show', $client)->withInput()` ＋ フラッシュ `usage_capacity_warning` に注意の文（screen-design.md S-0305-M05「保存時の上限の確認」）。S-0305 は利用のモーダルを開き直し、上部に注意を出し、`_capacity_confirmed` に `1` を入れる。アクセスログには記録しない
+- 上限の確認で戻る（**2026-11 追加**）：`redirect()->route('clients.show', $client)->withInput()` ＋ フラッシュ `usage_capacity_warning` に注意の文（「この利用を入れると、{M/D(曜)} {開始}〜{終了} に同時に預かる数が {n} になり、上限（{上限}）を超えます。このまま登録する場合は、もう一度［登録］を押してください。」。screen-design.md S-0305-M05「保存時の上限の確認」の 2）。S-0305 は利用のモーダルを開き直し、上部に注意を出し、`_capacity_confirmed` に `1` を入れる。アクセスログには記録しない
 
 ###### PUT /client-usages/{usage}
 
@@ -3212,7 +3213,7 @@ POST /training-records に以下を追加する。
 
 - 権限：利用の登録・編集と同じ（`auth` ＋ `practitioners`。トレーナー用ドメイン。システム管理者は 403）
 - 参照なので、アクセスログには記録しない（`LogAccess` の `ACTION_MAP` に足さない）
-- コントローラ：`UsageScheduleController`（`month` / `day`）
+- コントローラ：`UsageScheduleController`（`month` / `day` / `check`。`check` は保存の前の確認。**2026-11 追加**）
 - クエリパラメータが正しくないときは、Laravel 標準の 422（`{message, errors}`）
 
 ##### GET /api/usage-schedule/month
@@ -3262,3 +3263,36 @@ POST /training-records に以下を追加する。
 ```
 - `count`：その日の預かる数（月の `days` と同じ数え方）
 - `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「（会員名）」）。利用の id・会員の id は返さない（画面で使わないため）
+
+##### GET /api/usage-schedule/check
+
+**概要**: 利用の保存の前の確認（S-0305-M05「保存時の上限の確認」の 1）で、この利用を入れたときの預かる数と、確認ダイアログが要るかを返す（ルート名 `api.usage-schedule.check`。**2026-11 追加**）。
+
+**リクエスト**（クエリパラメータ）:
+| パラメータ | 型 | 必須 | バリデーション | 説明 |
+|-----------|-----|------|---------------|------|
+| used_on | string | ● | required, date_format:Y-m-d | 利用日 |
+| start_time | string | ● | required, date_format:H:i | 開始時刻 |
+| end_time | string | ● | required, date_format:H:i, start_time より後 | 終了時刻 |
+| exclude_usage_id | integer | | nullable, integer | 数えない利用の id（編集中の利用自身） |
+
+**処理**:
+- 判定は、利用の保存時の確認（`POST /clients/{client}/usages`・`PUT /client-usages/{usage}`）と**同じもの**を使う（`UsageCapacityService` の確認の判定。利用日が今日以降で、その利用を入れたときの時間帯の預かる数〔`peakWith`〕が上限を超えるときだけ確認が要る）
+- 何も変えない。参照なので、アクセスログには記録しない
+
+**レスポンス**（200）:
+```json
+{
+  "needs_confirmation": true,
+  "count": 4,
+  "capacity": 3,
+  "peak_start": "15:00",
+  "peak_end": "17:00",
+  "date_label": "11/26(木)"
+}
+```
+- `needs_confirmation`：確認ダイアログが要るか（利用日が今日より前・上限以下なら `false`）
+- `count`：この利用を入れたときの、その時間帯の預かる数（最も多く重なる瞬間の数）
+- `peak_start`・`peak_end`：預かる数が最も多くなる時間帯（「8:00」の形。離れて 2 つ以上あるときは早いほう）
+- `date_label`：ダイアログに出す日付の表記（「M/D(曜)」）
+- 入力が正しくないときは、Laravel 標準の 422（画面は確認せずにそのまま送信し、保存時の検証に任せる）
