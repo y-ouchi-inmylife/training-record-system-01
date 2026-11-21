@@ -523,14 +523,12 @@
                              data-usage-count は割り当てた利用の件数（削除の確認ダイアログの文言に使う。回数ではない） --}}
                         @foreach($ticket['contracts'] as $row)
                             <div @class(['mb-3' => ! $loop->last])>
-                                {{-- 見出しと状態を左から並べる（状態は見出しのすぐ後ろ。右端には寄せない）。
-                                     狭い幅で見出しが長いときは、状態が次の行に折り返す（flex-wrap） --}}
+                                {{-- 契約の見出し（2026-11 変更。設計書 S-0305 セクション5「契約の見出し」）：
+                                     「{契約日} 契約（N回）」→ 状態 → 「有効期限 {日付}」→ メモ の順に左から並べる（右端には寄せない）。
+                                     狭い幅では折り返す（flex-wrap。順は崩さない）。その前は「契約日 契約（N回） メモ 有効期限」のあとに状態だった --}}
                                 <div class="d-flex flex-wrap align-items-center column-gap-2 mb-1">
-                                    {{-- 契約の見出し。押すとその契約の編集モーダル（S-0305-M04）を開く。
-                                         メモ・有効期限がない契約は、その部分（「有効期限」の語も）を出さない。
-                                         「有効期限」の語は契約のモーダル（S-0305-M04）の項目名とそろえる。
-                                         有効期限を過ぎていて残りがある契約（$row['expired']。判定は ContractTicketService）は、
-                                         有効期限の日付の部分だけを赤字にする（「有効期限」の文字は赤字にしない）。 --}}
+                                    {{-- 「{契約日} 契約（N回）」だけがボタン。押すとその契約の編集モーダル（S-0305-M04）を開く。
+                                         状態・有効期限・メモはボタンの外（状態をボタンの外に置く決まりのまま、表記の順を変えたため） --}}
                                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                                             data-id="{{ $row['contract']->id }}"
                                             data-contracted-on="{{ $row['contract']->contracted_on->format('Y-m-d') }}"
@@ -538,16 +536,23 @@
                                             data-expires-on="{{ $row['contract']->expires_on?->format('Y-m-d') }}"
                                             data-note="{{ $row['contract']->note }}"
                                             data-usage-count="{{ $row['usageCount'] }}"
-                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）@if($row['contract']->note) {{ $row['contract']->note }}@endif @if($row['contract']->expires_on) 有効期限 @if($row['expired'])<span class="text-danger">{{ $row['contract']->expires_on->format('Y/m/d') }}</span>@else{{ $row['contract']->expires_on->format('Y/m/d') }}@endif @endif</button>
-                                    {{-- 契約の状態（あと n回／すべてご利用済み。会員側 S-1412 と同じ言葉）。見出しのボタンの外に、見出しのすぐ後ろに置く
-                                         （見出しとの間は column-gap-2）。有効期限が過ぎていても、この表示は変えない
-                                         （期限切れは見出しの有効期限の日付の赤字で示す） --}}
-                                    {{-- 使い切った契約のうち、予定（今日より後の利用）を含む契約は「すべてご予約済み」（2026-11 追加。
-                                         判定は ContractTicketService の reserved）。バッジはどちらも bg-secondary --}}
+                                            onclick="window.contractModal.openForEdit(this.dataset)">{{ $row['contract']->contracted_on->format('Y/m/d') }} 契約（{{ $row['contract']->count }}回）</button>
+                                    {{-- 契約の状態（あと n回／すべてご利用済み／すべてご予約済み。会員側 S-1412 と同じ言葉）。
+                                         使い切った契約のうち、予定（今日より後の利用）を含む契約は「すべてご予約済み」（判定は ContractTicketService の reserved）。
+                                         バッジはどちらも bg-secondary。有効期限が過ぎていても、この表示は変えない --}}
                                     @if($row['usedUp'])
                                         <span class="badge bg-secondary flex-shrink-0">{{ $row['reserved'] ? 'すべてご予約済み' : 'すべてご利用済み' }}</span>
                                     @else
                                         <span class="flex-shrink-0">あと {{ $row['remaining'] }}回</span>
+                                    @endif
+                                    {{-- 有効期限（ないときは「有効期限」の語も出さない）。有効期限を過ぎていて残りがある契約（$row['expired']。
+                                         判定は ContractTicketService）は、日付の部分だけを赤字にする（期限切れの印はこの赤字だけ） --}}
+                                    @if($row['expiresOn'])
+                                        <span class="flex-shrink-0" data-contract-expires-on>有効期限 @if($row['expired'])<span class="text-danger">{{ $row['expiresOn'] }}</span>@else{{ $row['expiresOn'] }}@endif</span>
+                                    @endif
+                                    {{-- メモ（あるときだけ）。本文より少し薄い色で、長いときは 1 行に収めて「…」で省く（全文は契約の編集モーダルで見る） --}}
+                                    @if($row['note'])
+                                        <span class="text-body-secondary text-truncate mw-100" data-contract-note>{{ $row['note'] }}</span>
                                     @endif
                                 </div>
                                 <div class="list-group list-group-flush usage-rows">

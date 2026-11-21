@@ -70,6 +70,8 @@ class ContractTicketService
      *       'usages'     => ClientUsage[],         // 割り当てた利用だけ（未利用の null を含まない）。**新しい順**（利用日の新しい順 →
      *                                              // 開始時刻の遅い順 → id の大きい順。slots の昇順のすべてを逆にしたもの）。
      *                                              // 会員詳細（S-0305）の 1 行に 1 利用の表示に使う（2026-11 追加。2026-11 変更：その前は昇順）
+     *       'expiresOn'  => ?string,               // 契約の見出しに出す有効期限（Y/m/d）。有効期限がなければ null（「有効期限」の語も出さない。2026-11 追加）
+     *       'note'       => ?string,               // 契約の見出しに出すメモ。メモが空なら null（2026-11 追加）
      *     ],
      *     ...
      *   ],
@@ -168,6 +170,10 @@ class ContractTicketService
                 // 会員詳細（S-0305）の利用の行は新しい順（2026-11 変更）。$assigned は利用日 → 開始時刻 → id の昇順なので、
                 // 逆にすれば「利用日の新しい順 → 開始時刻の遅い順 → id の大きい順」になる。slots（会員側 S-1412 のマス）は昇順のまま
                 'usages' => array_reverse($assigned),
+                // 会員詳細（S-0305）の契約の見出し（2026-11 変更：契約日・回数 → 状態 → 有効期限 → メモの順）に出す値。
+                // 出すかどうかは null かどうかで決める（Blade で判定を組み立てない）
+                'expiresOn' => $contract->expires_on?->format('Y/m/d'),
+                'note' => blank($contract->note) ? null : $contract->note,
             ];
 
             $contractOptions[] = [

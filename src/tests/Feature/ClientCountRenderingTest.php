@@ -323,9 +323,9 @@ class ClientCountRenderingTest extends TestCase
         $this->assertNoOldHeading($html);
         $this->assertHeaderHasNoRemaining($html);
 
-        // 契約の見出し（メモ・有効期限は、あるときだけ出す）。新しい契約が上
-        $newPos = strpos($html, '2026/10/12 契約（4回） 4回コース');
-        $oldPos = strpos($html, '2026/09/03 契約（2回）  有効期限 2026/12/03');
+        // 契約の見出し（有効期限・メモは、あるときだけ出す）。新しい契約が上
+        $newPos = strpos($html, '2026/10/12 契約（4回）</button>');
+        $oldPos = strpos($html, '2026/09/03 契約（2回）</button>');
         $this->assertNotFalse($newPos);
         $this->assertNotFalse($oldPos);
         $this->assertLessThan($oldPos, $newPos, '契約は新しいものが上');
@@ -493,9 +493,9 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 見出しのボタン（</button>）の直後に状態が続く＝ボタンの外で、見出しのすぐ後ろ
-        $this->assertMatchesRegularExpression('/2026\/10\/12 契約（4回） 4回コース\s*<\/button>\s*<span class="flex-shrink-0">あと 4回<\/span>/u', $html);
-        $this->assertMatchesRegularExpression('/2026\/09\/03 契約（1回）\s*<\/button>\s*<span class="badge bg-secondary flex-shrink-0">すべてご利用済み<\/span>/u', $html);
+        // 見出しのボタン（「{契約日} 契約（N回）」だけ）の直後に状態が続く＝ボタンの外で、契約日・回数のすぐ後ろ（2026-11 変更：メモはボタンの外の最後）
+        $this->assertMatchesRegularExpression('/2026\/10\/12 契約（4回）<\/button>\s*<span class="flex-shrink-0">あと 4回<\/span>/u', $html);
+        $this->assertMatchesRegularExpression('/2026\/09\/03 契約（1回）<\/button>\s*<span class="badge bg-secondary flex-shrink-0">すべてご利用済み<\/span>/u', $html);
         // 「未割り当て n」も「（契約なし）」のすぐ後ろ
         $this->assertMatchesRegularExpression('/<span>（契約なし）<\/span>\s*<span class="badge bg-warning text-dark">未割り当て 1<\/span>/u', $html);
 
@@ -503,6 +503,98 @@ class ClientCountRenderingTest extends TestCase
         $card = substr($html, strpos($html, 'contract-ticket-scroll">'), 4000);
         $this->assertStringNotContainsString('justify-content-between', $card);
         $this->assertStringContainsString('d-flex flex-wrap align-items-center column-gap-2 mb-1', $card);
+    }
+
+    // ---- 契約の見出しの表記順（2026-11 変更。設計書 S-0305 セクション5「契約の見出し」）：
+    //      「{契約日} 契約（N回）」→ 状態 → 「有効期限 {日付}」→ メモ ----
+
+    /** その契約の見出しの行（ボタンの開始から、利用の行の一覧の手前まで）を、空白をつめて返す */
+    private function contractHeading(string $html, ClientContract $contract): string
+    {
+        $this->assertSame(1, preg_match('/<button type="button" class="btn btn-link p-0 text-start text-decoration-none"\s+data-id="'.$contract->id.'".*?(?=<div class="list-group list-group-flush usage-rows">)/su', $html, $m), 'heading '.$contract->id);
+
+        return trim(preg_replace('/>\s+</u', '><', preg_replace('/<button[^>]*>/u', '<button>', $m[0])));
+    }
+
+    public function test_契約の見出しは契約日と回数_状態_有効期限_メモの順(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $client = $this->makeClient('0001', '山田');
+        $contract = $this->contract($client, '2026-11-02', 9, '4回コース', '2026-11-30');
+        $this->usage($client, '2026-11-02', 4, null, $contract);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(
+            '<button>2026/11/02 契約（9回）</button>'
+            .'<span class="flex-shrink-0">あと 5回</span>'
+            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span>'
+            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>4回コース</span></div>',
+            $this->contractHeading($html, $contract)
+        );
+    }
+
+    public function test_使い切った契約の見出しはバッジのあとに有効期限とメモ(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $client = $this->makeClient('0001', '山田');
+        $done = $this->contract($client, '2026-10-01', 1, '初回', '2026-10-31');
+        $reserved = $this->contract($client, '2026-11-01', 1, null, '2026-11-30');
+        $this->usage($client, '2026-10-02', 1, null, $done);
+        $this->usage($client, '2026-11-25', 1, null, $reserved); // 予定
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(
+            '<button>2026/10/01 契約（1回）</button>'
+            .'<span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>'
+            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 2026/10/31</span>'
+            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>初回</span></div>',
+            $this->contractHeading($html, $done)
+        );
+        // メモがない契約ではメモを出さない。予定を含んで使い切った契約は「すべてご予約済み」（今のまま）
+        $this->assertSame(
+            '<button>2026/11/01 契約（1回）</button>'
+            .'<span class="badge bg-secondary flex-shrink-0">すべてご予約済み</span>'
+            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 2026/11/30</span></div>',
+            $this->contractHeading($html, $reserved)
+        );
+    }
+
+    public function test_有効期限が空の契約では有効期限の語を出さない(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+        $contract = $this->contract($client, '2026-11-02', 3, 'メモだけ');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $heading = $this->contractHeading($html, $contract);
+        $this->assertSame(
+            '<button>2026/11/02 契約（3回）</button>'
+            .'<span class="flex-shrink-0">あと 3回</span>'
+            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>メモだけ</span></div>',
+            $heading
+        );
+        $this->assertStringNotContainsString('有効期限', $heading);
+    }
+
+    public function test_期限切れで残りがある契約は状態のあとの有効期限の日付だけ赤字(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $client = $this->makeClient('0001', '山田');
+        $contract = $this->contract($client, '2026-10-01', 4, 'メモ', '2026-10-31');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(
+            '<button>2026/10/01 契約（4回）</button>'
+            .'<span class="flex-shrink-0">あと 4回</span>'
+            .'<span class="flex-shrink-0" data-contract-expires-on>有効期限 <span class="text-danger">2026/10/31</span></span>'
+            .'<span class="text-body-secondary text-truncate mw-100" data-contract-note>メモ</span></div>',
+            $this->contractHeading($html, $contract)
+        );
+        // 見出しのボタンを押すと、その契約の編集モーダルを開く（今のまま。メモ・有効期限は data-* で渡す）
+        $this->assertMatchesRegularExpression('/data-id="'.$contract->id.'"[^>]*data-expires-on="2026-10-31"[^>]*data-note="メモ"[^>]*onclick="window\.contractModal\.openForEdit\(this\.dataset\)">2026\/10\/01 契約（4回）<\/button>/u', $html);
     }
 
     public function test_未利用の行と［＋］は出さず_利用の追加は利用を追加ボタンだけ(): void
