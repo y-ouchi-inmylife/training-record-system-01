@@ -881,6 +881,64 @@ class ClientCountRenderingTest extends TestCase
         $this->assertLessThan(strpos($html, 'すべてご利用済み</span>'), strpos($html, 'すべてご予約済み</span>'));
     }
 
+    // ---- 利用のモーダルの配置と予約状況（2026-11 追加。設計書 S-0305-M05「予約状況」） ----
+
+    public function test_利用のモーダルはmodal_xlで_左に入力欄_右に予約状況の部品(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $start = strpos($html, 'id="usageModal"');
+        $this->assertNotFalse($start);
+        $modal = substr($html, $start, strpos($html, 'id="usageDeleteForm"', $start) - $start);
+
+        $this->assertStringContainsString('<div class="modal-dialog modal-xl">', $modal);
+        // 左（col-lg-6）に入力欄、右（col-lg-6）に予約状況。lg 未満では予約状況が入力欄の下に回る（並びの順のまま）
+        $this->assertMatchesRegularExpression('/<div class="row g-4">\s*<div class="col-lg-6" data-usage-inputs>/u', $modal);
+        $inputs = strpos($modal, 'data-usage-inputs');
+        $schedule = strpos($modal, 'id="usageSchedule"');
+        $this->assertNotFalse($schedule);
+        $this->assertLessThan($schedule, strpos($modal, 'id="usage_note"'), 'メモ（入力欄の最後）は予約状況より前');
+        $this->assertLessThan($schedule, $inputs);
+        $this->assertMatchesRegularExpression('/<div class="col-lg-6">\s*<div id="usageSchedule" class="usage-schedule"/u', $modal);
+
+        // 部品：JSON の URL・月の見出しと前後の月・曜日（日〜土）・その日の予約・読み込みの知らせ
+        $this->assertStringContainsString('data-month-url="'.route('api.usage-schedule.month').'"', $modal);
+        $this->assertStringContainsString('data-day-url="'.route('api.usage-schedule.day').'"', $modal);
+        foreach (['data-usage-schedule-prev', 'data-usage-schedule-heading', 'data-usage-schedule-next', 'data-usage-schedule-days',
+            'data-usage-schedule-status', 'data-usage-schedule-day-heading', 'data-usage-schedule-day-list'] as $attribute) {
+            $this->assertStringContainsString($attribute, $modal, $attribute);
+        }
+        preg_match_all('/<th scope="col" class="fw-normal p-1">(.)<\/th>/u', $modal, $m);
+        $this->assertSame(['日', '月', '火', '水', '木', '金', '土'], $m[1]);
+        // 部品の JS（Vite の入口）を読み込み、利用のモーダルの JS がつなぐ
+        $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
+        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('usageSchedule')", $html);
+    }
+
+    public function test_利用日の欄にflatpickrのクラスが付かず_直接入力できる(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('/<input type="text" class="([^"]*)"\s+id="used_on" name="used_on"[^>]*>/u', $html, $m));
+        $this->assertStringNotContainsString('datepicker', $m[1]);
+        $this->assertStringContainsString('placeholder="例: 2026-09-15"', $m[0]);
+        // ほかのモーダルの日付（契約日）は今までどおり flatpickr
+        $this->assertMatchesRegularExpression('/class="form-control datepicker[^"]*"\s+id="contracted_on"/u', $html);
+    }
+
+    public function test_編集で開くときは編集中の利用を予約状況から除く(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('schedule.open(usedOnInput.value, { excludeUsageId: data.id, fallbackDate: todayString() });', $html);
+        $this->assertStringContainsString('schedule.open(usedOnInput.value, { excludeUsageId: null, fallbackDate: todayString() });', $html);
+    }
+
     // ---- 利用のモーダルのトレーニーの選択肢・初期値と時刻の初期値（2026-11 追加。設計書 S-0305-M05） ----
 
     /** 会員詳細の、利用のモーダルの JS の定数（例：DEFAULT_TRAINEE_ID）の値（JSON のまま） */

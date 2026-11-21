@@ -90,6 +90,19 @@ class ClientUsage extends Model
         return self::toDisplayTime($this->start_time).'〜'.self::toDisplayTime($this->end_time);
     }
 
+    /** 曜日（日曜始まり） */
+    private const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+    /**
+     * 日付の短い見出し「n/j(曜)」（例「11/26(木)」。2026-11 追加。予約状況のその日の予約の見出しと、保存時の上限の確認の注意に使う）
+     */
+    public static function toShortDateLabel(\DateTimeInterface|string $date): string
+    {
+        $date = \Illuminate\Support\Carbon::parse($date);
+
+        return $date->format('n/j').'('.self::WEEKDAYS[$date->dayOfWeek].')';
+    }
+
     /**
      * 「HH:MM:SS」または「HH:MM」を「HH:MM」に直す。空なら空文字
      */

@@ -47,13 +47,22 @@
        （ClientUsageRequest。使い切りの契約は画面でも選べない）。会員の残り回数が
        マイナスになる登録・編集は止めない（「契約なし」は残りに関係なく登録できる）
 
+     ## 配置と予約状況（設計書 S-0305-M05「予約状況」。2026-11 追加）
+
+     モーダルは modal-xl。左（col-lg-6）に入力欄、右（col-lg-6）に予約状況（<x-usage-schedule>。カレンダーとその日の予約）。
+     lg 未満では予約状況を入力欄の下に回す。利用日の欄には flatpickr を付けない（右のカレンダーと役割が重なるため。直接入力はできる）。
+     カレンダーの日付を押すと利用日の欄に入れ、利用日の欄に正しい日付を入れるとカレンダーが動く。
+     開いたときの月：登録は今日、編集はその利用の利用日、エラーで開き直したときは入力していた利用日（正しくなければ今日）。
+     編集のときは、編集中の利用自身を予約状況に入れない（除く利用の id を渡す）。
+
      エラーのあとの開き直しは契約モーダルと同じ（hidden `_form_type` = 'usage'、
      編集で失敗したときは old('_usage_id') で編集モードに戻す）。選んでいた契約は
      old('client_contract_id') で選び直す（「契約なし」を選んでいた場合は null で戻るので「契約なし」を選ぶ）。
 --}}
 
 <div class="modal fade" id="usageModal" tabindex="-1" aria-labelledby="usageModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    {{-- modal-xl：右に予約状況を置くため広げる（2026-11 変更） --}}
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             {{-- novalidate：ブラウザの吹き出しを止め、検証はサーバーに一本化する（設計書 §2-7）。 --}}
             <form id="usageForm" method="POST" action="{{ route('client-usages.store', $client) }}" novalidate>
@@ -69,6 +78,9 @@
                 </div>
 
                 <div class="modal-body">
+                    <div class="row g-4">
+                    {{-- 左：入力欄（並びは今のまま） --}}
+                    <div class="col-lg-6" data-usage-inputs>
                     <div class="row g-3">
                         {{-- 契約（一番上の項目。任意。2026-11 変更：その前はトレーニーの次〔トレーニーの欄がないときは開始時刻・終了時刻の次〕）。エラーで開き直したときは選んでいた値を選び直す。
                              disabled（使い切り）の付け外しはモードに合わせて JS の applyDisabled() で行う。 --}}
@@ -91,8 +103,9 @@
                         </div>
                         <div class="col-md-6">
                             <label for="used_on" class="form-label">利用日 <span class="text-danger">*</span></label>
-                            {{-- 入力部品は計測値モーダルの計測日と同じ（Flatpickr の .datepicker） --}}
-                            <input type="text" class="form-control datepicker @if($openModal === 'usage') @error('used_on') is-invalid @enderror @endif"
+                            {{-- テキストの欄（YYYY-MM-DD を直接入力できる）。flatpickr（.datepicker）は付けない
+                                 （2026-11 変更：右の予約状況のカレンダーと役割が重なるため。その前は計測値モーダルの計測日と同じ .datepicker） --}}
+                            <input type="text" class="form-control @if($openModal === 'usage') @error('used_on') is-invalid @enderror @endif"
                                    id="used_on" name="used_on"
                                    value="{{ $openModal === 'usage' ? old('used_on') : '' }}"
                                    placeholder="例: 2026-09-15" pattern="\d{4}-\d{2}-\d{2}" maxlength="10"
@@ -157,6 +170,12 @@
                             @endif
                         </div>
                     </div>
+                    </div>
+                    {{-- 右：予約状況（カレンダーとその日の予約。lg 未満では入力欄の下。2026-11 追加） --}}
+                    <div class="col-lg-6">
+                        <x-usage-schedule id="usageSchedule" />
+                    </div>
+                    </div>
                 </div>
 
                 <div class="modal-footer">
@@ -210,6 +229,7 @@
     let traineeSelect = null;   // その会員にトレーニーがいなければ null（欄を出さない）
     let startTimeInput = null;
     let endTimeInput = null;
+    let schedule = null;        // 予約状況（window.UsageSchedule。2026-11 追加）
 
     // 使い切った契約を選べなくする。currentContractId（編集中の利用が今割り当てられている契約）
     // だけは使い切りでも選べるようにする。登録モードでは null を渡す。
@@ -265,6 +285,17 @@
             traineeSelect.addEventListener('change', applyTraineeBlank);
         }
 
+        // 予約状況（2026-11 追加）。カレンダーの日付を押したら利用日の欄に入れ、
+        // 利用日の欄に正しい日付を入れたらカレンダーをその月・日に動かす
+        schedule = new window.UsageSchedule(document.getElementById('usageSchedule'), {
+            onSelect: function (ymd) {
+                usedOnInput.value = ymd;
+                usedOnInput.dispatchEvent(new Event('input', { bubbles: true }));
+            },
+        });
+        usedOnInput.addEventListener('input', function () { schedule.setDate(usedOnInput.value); });
+        usedOnInput.addEventListener('change', function () { schedule.setDate(usedOnInput.value); });
+
         deleteBtn.addEventListener('click', function () {
             if (confirm('この利用を削除しますか？')) {
                 deleteForm.submit();
@@ -304,6 +335,7 @@
         endTimeInput.value = DEFAULT_END_TIME;
         setTrainee(DEFAULT_TRAINEE_ID);
         noteInput.value = '';
+        schedule.open(usedOnInput.value, { excludeUsageId: null, fallbackDate: todayString() });
         modal.show();
     }
 
@@ -321,6 +353,8 @@
         // 「トレーニーなし」（data-trainee-id が空）の利用は、未選択の状態で開く
         setTrainee(data.traineeId || null);
         noteInput.value = data.note || '';
+        // 編集中の利用自身は、予約状況の頭数にも一覧にも入れない
+        schedule.open(usedOnInput.value, { excludeUsageId: data.id, fallbackDate: todayString() });
         modal.show();
     }
 
@@ -342,6 +376,8 @@
             }
             // トレーニー・時刻は Blade の old() で戻し済み。未選択の選択肢の表示だけを合わせる
             applyTraineeBlank();
+            // 予約状況は入力していた利用日の月で開く（正しくない日付なら今日）
+            schedule.open(usedOnInput.value, { excludeUsageId: oldUsageId || null, fallbackDate: todayString() });
             modal.show();
         @endif
     });

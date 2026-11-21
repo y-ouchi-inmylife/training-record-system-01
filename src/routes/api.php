@@ -5,6 +5,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\MediaRecordController;
 use App\Http\Controllers\TrainingRecordController;
 use App\Http\Controllers\TrainerController;
+use App\Http\Controllers\UsageScheduleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,6 +27,10 @@ Route::domain(config('subdomain.trainer_host'))
     // 録音実行の「作成する」：文字起こし → 要約 → トレーニング記録の作成をひとつながりで始める（2026-10）
     Route::post('/audio-records/{audioRecord}/auto-create-training-record', [AudioRecordController::class, 'startAutoCreate'])->name('api.audio-records.auto-create-training-record');
     Route::get('/trainers', [TrainerController::class, 'apiList'])->name('api.trainers.list');
+    // 利用の予約状況（利用モーダル S-0305-M05 の予約状況が読む。2026-11 追加。api-design.md 4-2-6）。
+    // 権限は利用の登録・編集と同じ（practitioners）。参照なのでアクセスログには記録しない（LogAccess の ACTION_MAP に足さない）
+    Route::get('/usage-schedule/month', [UsageScheduleController::class, 'month'])->name('api.usage-schedule.month');
+    Route::get('/usage-schedule/day', [UsageScheduleController::class, 'day'])->name('api.usage-schedule.day');
     Route::post('/training-records/auto-create', [TrainingRecordController::class, 'autoCreate'])->name('api.training-records.auto-create');
     Route::get('/training-records/available-media', [TrainingRecordController::class, 'availableMedia'])->name('api.training-records.available-media');
     Route::post('/media-records/upload-url', [MediaRecordController::class, 'uploadUrl'])->name('api.media-records.upload-url');

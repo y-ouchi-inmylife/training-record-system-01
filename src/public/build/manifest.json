@@ -115,6 +115,12 @@
     "src": "resources/js/trainee-birthday-input.js",
     "isEntry": true
   },
+  "resources/js/usage-schedule.js": {
+    "file": "assets/usage-schedule-CzBZGlIV.js",
+    "name": "usage-schedule",
+    "src": "resources/js/usage-schedule.js",
+    "isEntry": true
+  },
   "resources/sass/app.scss": {
     "file": "assets/app-CtXUzdgL.css",
     "src": "resources/sass/app.scss",
