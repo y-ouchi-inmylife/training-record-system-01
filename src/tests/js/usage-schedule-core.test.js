@@ -7,7 +7,7 @@ import {
     capacityCheckQuery,
     capacityConfirmMessage,
     capacityState,
-    countColorClasses,
+    countBadgeClasses,
     cellCountText,
     countText,
     dayCellClasses,
@@ -161,19 +161,22 @@ describe('dayCellClasses', () => {
     const cell = (state, selected, today) => dayCellClasses({ state, selected, today });
     const BG_COLORS = ['bg-success-subtle', 'bg-danger-subtle', 'border-success-subtle', 'border-danger-subtle'];
 
+    // 2026-11 変更：満・超過は「n/上限」を小さなバッジにした（その前は文字の色）
     it.each([
-        [CAPACITY_FULL, 'usage-schedule-count-full'],
-        [CAPACITY_OVER, 'usage-schedule-count-over'],
-    ])('%s のマスに背景の色のクラスは付かず、「n/上限」に文字の色のクラスが付く', (state, textColor) => {
-        const { button, day, count } = cell(state, false, false);
+        [CAPACITY_FULL, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        [CAPACITY_OVER, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+    ])('%s のマスに背景の色のクラスは付かず、「n/上限」がバッジになる', (state, badge) => {
+        const { button, day, count, countBadge } = cell(state, false, false);
         BG_COLORS.forEach((c) => expect(button).not.toContain(c));
         expect(button).toContain('btn-light');
-        expect(count).toEqual(['d-block', 'small', 'usage-schedule-count', textColor]);
+        expect(count).toEqual(['d-block', 'small', 'usage-schedule-count']);
+        expect(countBadge).toEqual(badge);
         expect(day).toEqual(['d-block']);
     });
 
-    it('空きありの「n/上限」は通常の文字の色', () => {
+    it('空きありの「n/上限」は通常の色の太字で、バッジにしない', () => {
         expect(cell(CAPACITY_AVAILABLE, false, false).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
+        expect(cell(CAPACITY_AVAILABLE, false, false).countBadge).toEqual([]);
     });
 
     it('今日のマスは薄い青の背景で、日付の数字に青の太字は付かない', () => {
@@ -187,12 +190,12 @@ describe('dayCellClasses', () => {
     });
 
     it.each([
-        [CAPACITY_FULL, 'usage-schedule-count-full'],
-        [CAPACITY_OVER, 'usage-schedule-count-over'],
-    ])('今日が %s のとき、薄い青の背景と緑・赤の文字が両方付く', (state, textColor) => {
-        const { button, count } = cell(state, false, true);
+        [CAPACITY_FULL, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        [CAPACITY_OVER, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+    ])('今日が %s のとき、薄い青の背景と緑・赤のバッジが両方付く', (state, badge) => {
+        const { button, countBadge } = cell(state, false, true);
         expect(button).toContain('bg-primary-subtle');
-        expect(count).toContain(textColor);
+        expect(countBadge).toEqual(badge);
         BG_COLORS.forEach((c) => expect(button).not.toContain(c));
     });
 
@@ -203,10 +206,10 @@ describe('dayCellClasses', () => {
     });
 
     it('選んでいる日は枠だけ（背景はその日のまま。塗りつぶしにならない）', () => {
-        const { button, count } = cell(CAPACITY_FULL, true, false);
+        const { button, countBadge } = cell(CAPACITY_FULL, true, false);
         expect(button).toEqual(expect.arrayContaining(['btn-light', 'usage-schedule-selected']));
         expect(button).not.toContain('btn-primary');
-        expect(count).toContain('usage-schedule-count-full');
+        expect(countBadge).toEqual(['badge', 'bg-success', 'usage-schedule-count-badge']);
     });
 
     it('上限をまだ読んでいない間は、空きありと同じ', () => {
@@ -214,6 +217,7 @@ describe('dayCellClasses', () => {
             button: ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day', 'btn-light'],
             day: ['d-block'],
             count: ['d-block', 'small', 'usage-schedule-count'],
+            countBadge: [],
         });
     });
 });
@@ -263,19 +267,19 @@ describe('「n/上限」の太字と色', () => {
         },
     );
 
-    it('色のクラスは満・超過だけ（カレンダーと見出しで同じ判定）', () => {
-        expect(countColorClasses(CAPACITY_FULL)).toEqual(['usage-schedule-count-full']);
-        expect(countColorClasses(CAPACITY_OVER)).toEqual(['usage-schedule-count-over']);
-        expect(countColorClasses(CAPACITY_AVAILABLE)).toEqual([]);
-        expect(countColorClasses(null)).toEqual([]);
+    it('バッジのクラスは満（badge bg-success）・超過（badge bg-danger）だけ（カレンダーと見出しで同じ判定）', () => {
+        expect(countBadgeClasses(CAPACITY_FULL)).toEqual(['badge', 'bg-success', 'usage-schedule-count-badge']);
+        expect(countBadgeClasses(CAPACITY_OVER)).toEqual(['badge', 'bg-danger', 'usage-schedule-count-badge']);
+        expect(countBadgeClasses(CAPACITY_AVAILABLE)).toEqual([]);
+        expect(countBadgeClasses(null)).toEqual([]);
     });
 
     it.each([
-        [3, 3, ['usage-schedule-count-full']],
-        [4, 3, ['usage-schedule-count-over']],
+        [3, 3, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        [4, 3, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
         [1, 3, []],
         [0, 3, []],
-    ])('見出し：預かる数 %i・上限 %i の「n/上限」の色のクラスは %j', (count, capacity, classes) => {
+    ])('見出し：預かる数 %i・上限 %i の「n/上限」のバッジのクラスは %j', (count, capacity, classes) => {
         const parts = dayHeadingParts('2026-11-20', count, capacity);
         expect(parts.label).toBe('11/20(金) の予約　');
         expect(parts.count).toBe(`${count}/${capacity}`);
@@ -284,11 +288,11 @@ describe('「n/上限」の太字と色', () => {
         expect(dayHeading('2026-11-20', count, capacity)).toBe(`11/20(金) の予約　${count}/${capacity}`);
     });
 
-    it('見出しの色のクラスは、カレンダーの同じ日の「n/上限」の色のクラスと同じ', () => {
-        for (const [count, capacity] of [[1, 3], [3, 3], [4, 3]]) {
+    it('見出しのバッジのクラスは、カレンダーの同じ日の「n/上限」のバッジのクラスと同じ', () => {
+        for (const [count, capacity] of [[0, 3], [1, 3], [3, 3], [4, 3]]) {
             const cell = dayCellClasses({ state: capacityState(count, capacity), selected: false, today: false });
             const heading = dayHeadingParts('2026-11-20', count, capacity);
-            expect(cell.count.filter((c) => c.startsWith('usage-schedule-count-'))).toEqual(heading.countClasses);
+            expect(cell.countBadge).toEqual(heading.countClasses);
         }
     });
 });
@@ -322,12 +326,13 @@ describe('過去の日と「0/上限」', () => {
     });
 
     it.each([
-        [CAPACITY_FULL, 'usage-schedule-count-full'],
-        [CAPACITY_OVER, 'usage-schedule-count-over'],
-    ])('過去の日が %s のとき、灰色の背景と色の文字が両方付く（太字も）', (state, colorClass) => {
-        const { button, count } = cell({ state, past: true });
+        [CAPACITY_FULL, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        [CAPACITY_OVER, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+    ])('過去の日が %s のとき、灰色の背景とバッジが両方付く（太字も）', (state, badge) => {
+        const { button, count, countBadge } = cell({ state, past: true });
         expect(button).toContain('bg-secondary-subtle');
-        expect(count).toEqual(['d-block', 'small', 'usage-schedule-count', colorClass]);
+        expect(count).toEqual(['d-block', 'small', 'usage-schedule-count']);
+        expect(countBadge).toEqual(badge);
     });
 
     it('過去の日を選んでいるとき、灰色の背景と枠が両方付く', () => {

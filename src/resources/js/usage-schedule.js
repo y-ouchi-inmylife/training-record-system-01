@@ -161,7 +161,7 @@ class UsageSchedule {
             const data = await this.fetchJson(`${this.dayUrl}?${this.params({ date })}`);
             if (seq !== this.daySeq) return;
             this.capacity = data.capacity;
-            // 「n/上限」の部分だけを別の要素にし、カレンダーと同じ色のクラスを付ける（2026-11 変更）
+            // 「n/上限」の部分だけを別の要素にし、満・超過はカレンダーと同じバッジにする（2026-11 変更）
             const heading = dayHeadingParts(date, data.count, data.capacity);
             const countEl = document.createElement('span');
             countEl.className = heading.countClasses.join(' ');
@@ -218,7 +218,15 @@ class UsageSchedule {
         countEl.className = classes.count.join(' ');
         // 読み込む前は「n/上限」を出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
         const text = cellCountText({ count, capacity: this.capacity, loaded: this.countsLoaded });
-        countEl.textContent = text === '' ? '\u00a0' : text;
+        if (text !== '' && classes.countBadge.length > 0) {
+            // 満・超過は「n/上限」を小さなバッジにする（2026-11 変更）
+            const badge = document.createElement('span');
+            badge.className = classes.countBadge.join(' ');
+            badge.textContent = text;
+            countEl.appendChild(badge);
+        } else {
+            countEl.textContent = text === '' ? '\u00a0' : text;
+        }
         button.appendChild(countEl);
 
         const weekday = WEEKDAYS[new Date(`${ymd}T00:00:00Z`).getUTCDay()];

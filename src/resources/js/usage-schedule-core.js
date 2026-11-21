@@ -163,19 +163,19 @@ export function capacityState(count, capacity) {
 /**
  * カレンダーのマス（ボタン）・日付の数字・「n/上限」の文字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
  *
- * - 空きあり・満・超過（capacityState）は「n/上限」の文字の色だけで示し、マスの背景の色は変えない
- *   （満＝緑 usage-schedule-count-full、超過＝赤の太字 usage-schedule-count-over。色は app.scss で Bootstrap の $green-600・$red-600。
- *   小さな文字でも背景の上で読め〔コントラスト比 4.5:1 以上〕、緑・赤と見分けられる中間の濃さ。
- *   2026-11 変更：その前は満・超過のマスの背景も緑・赤〔bg-success-subtle・bg-danger-subtle〕にしていた）
+ * - 空きあり・満・超過（capacityState）は「n/上限」の見た目だけで示し、マスの背景の色は変えない。
+ *   満・超過は「n/上限」を小さなバッジ（countBadge。countBadgeClasses）にし、空きありは通常の色の太字のまま
+ *   （2026-11 変更：その前は満・超過を文字の色〔$green-600・$red-600〕だけで示していた。さらにその前はマスの背景を緑・赤にしていた）
  * - 今日はマスの背景を薄い青（bg-primary-subtle）。日付の数字は通常のまま
  *   （2026-11 変更：その前は日付の数字を青の太字〔text-primary・fw-bold〕にしていた）
  * - 選んでいる日（＝利用日）は太い青の枠（usage-schedule-selected。app.scss で内側に描くので、マスの大きさは変わらない）
  * - 今日を選んでいるときは、薄い青の背景と枠の両方。上限をまだ読んでいない間（state が null）は空きありと同じ
  * - 今日より前の日（past。isPastDay）は、マスの背景を灰色（bg-secondary-subtle）、日付の数字を少し薄い色（text-body-secondary）。
- *   「n/上限」の色と太字は変えない。過去の日を選んでいるときは、灰色の背景と枠の両方（2026-11 追加）
+ *   「n/上限」の見た目（バッジ・太字）は変えない。過去の日を選んでいるときは、灰色の背景と枠の両方（2026-11 追加）
  *
  * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean, past?: boolean}} cell
- * @returns {{button: string[], day: string[], count: string[]}}
+ * @returns {{button: string[], day: string[], count: string[], countBadge: string[]}}
+ *   count は「n/上限」の入れ物、countBadge はその中のバッジ（空きありは空。バッジを作らない）
  */
 export function dayCellClasses({ state, selected, today, past = false }) {
     const button = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
@@ -192,26 +192,28 @@ export function dayCellClasses({ state, selected, today, past = false }) {
         button.push('usage-schedule-selected');
     }
 
-    // 「n/上限」はどれも太字（usage-schedule-count。app.scss）。色は満・超過だけ（countColorClasses）
-    const count = ['d-block', 'small', 'usage-schedule-count', ...countColorClasses(state)];
+    // 「n/上限」はどれも太字（usage-schedule-count。app.scss）。満・超過は中をバッジにする（countBadgeClasses）
+    const count = ['d-block', 'small', 'usage-schedule-count'];
 
-    return { button, day, count };
+    return { button, day, count, countBadge: countBadgeClasses(state) };
 }
 
 /**
- * 「n/上限」の色のクラス（2026-11 追加。カレンダーのマスと、その日の予約の見出しで同じものを使う。設計書 S-0305-M05「予約状況」）。
- * 満＝usage-schedule-count-full（緑）、超過＝usage-schedule-count-over（赤）、空きあり・上限をまだ読んでいない間（null）＝なし。
- * 色は app.scss に 1 か所だけ書く
+ * 「n/上限」のバッジのクラス（2026-11 変更。カレンダーのマスと、その日の予約の見出しで同じものを使う。設計書 S-0305-M05「予約状況」）。
+ * 満＝緑のバッジ（badge bg-success）、超過＝赤のバッジ（badge bg-danger）。どちらも白い文字（§2-5 のバッジの配色）。
+ * 空きあり・上限をまだ読んでいない間（null）＝なし（バッジにしない）。
+ * usage-schedule-count-badge は、マスの大きさが変わらないようにバッジの文字の大きさと余白を合わせるクラス（app.scss）。
+ * 2026-11 変更：その前は文字の色のクラス（usage-schedule-count-full・usage-schedule-count-over）を返していた
  *
  * @param {('available'|'full'|'over'|null)} state
  * @returns {string[]}
  */
-export function countColorClasses(state) {
+export function countBadgeClasses(state) {
     if (state === CAPACITY_OVER) {
-        return ['usage-schedule-count-over'];
+        return ['badge', 'bg-danger', 'usage-schedule-count-badge'];
     }
     if (state === CAPACITY_FULL) {
-        return ['usage-schedule-count-full'];
+        return ['badge', 'bg-success', 'usage-schedule-count-badge'];
     }
 
     return [];
@@ -266,7 +268,7 @@ export function dayHeading(ymd, count, capacity) {
 
 /**
  * その日の予約の見出しを、「M/D(曜) の予約　」と「n/上限」に分けたもの（2026-11 追加）。
- * 「n/上限」の部分だけに、カレンダーと同じ色のクラス（countColorClasses。判定は capacityState）を付ける。見出しはもともと太字
+ * 「n/上限」の部分だけに、カレンダーと同じバッジのクラス（countBadgeClasses。判定は capacityState）を付ける。見出しはもともと太字
  *
  * @returns {{label: string, count: string, countClasses: string[]}}
  */
@@ -274,7 +276,7 @@ export function dayHeadingParts(ymd, count, capacity) {
     return {
         label: `${dayLabel(ymd)} の予約　`,
         count: `${count}/${capacity}`,
-        countClasses: countColorClasses(capacityState(count, capacity)),
+        countClasses: countBadgeClasses(capacityState(count, capacity)),
     };
 }
 

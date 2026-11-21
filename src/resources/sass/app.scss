@@ -364,16 +364,15 @@ h2 {
     font-weight: $font-weight-bold;
 }
 
-// 色は満＝緑・超過＝赤。カレンダーのマスと、その日の予約の見出しの「n/上限」の両方で、このクラスを使う（色を 2 か所に書かない）。
-// 満・超過とも Bootstrap の色の段階の 600（$green-600・$red-600。2026-11 変更：満は 700 だと黒に近く見分けにくかったため、超過とそろえて 600 にした）。
-// 小さな文字でも、通常のマス（btn-light）・今日のマス（bg-primary-subtle）・過去の日のマス（bg-secondary-subtle）の上で
-// コントラスト比 4.5:1 以上で読め（$green-600〔#146c43〕：6.12・4.90・5.03、$red-600〔#b02a37〕：6.16・4.94・5.07）、緑・赤と見分けられる濃さ。
-// text-success・text-danger は 4.5:1 に届かず、text-*-emphasis は黒とほとんど見分けられないため、中間の濃さにした
-.usage-schedule-count-full {
-    color: $green-600;
-}
-
-.usage-schedule-count-over {
-    color: $red-600;
+// 満・超過の「n/上限」は小さなバッジ（badge bg-success・badge bg-danger。白い文字。2026-11 変更。設計書 S-0305-M05「予約状況」）。
+// カレンダーのマスと、その日の予約の見出しの「n/上限」の両方で使う。白い文字とバッジの地のコントラスト比は 4.53（bg-success）・4.53（bg-danger）。
+// マスの大きさ（67×43 px）が変わらないよう、文字の大きさは「n/上限」と同じ（1em）にし、上下の余白をなくし、行の高さは周りに合わせ、左右の余白を小さくする。
+// 2026-11 変更：その前は文字の色（.usage-schedule-count-full：$green-600、.usage-schedule-count-over：$red-600）で示していたが、
+// 満の緑が暗く見分けにくく、明るい緑の文字では白に近い背景の上で 4.5:1 に届かないため、バッジにした（文字の色のクラスは消した）
+.usage-schedule-count-badge {
+    --bs-badge-font-size: 1em;
+    --bs-badge-padding-y: 0;
+    --bs-badge-padding-x: .35em;
+    line-height: inherit;
 }
 
