@@ -189,7 +189,7 @@ class UsageSchedule {
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.date = ymd;
-        // 色（空きあり・満・超過）・選んでいる日の枠・今日の数字の色は usage-schedule-core.js の dayCellClasses で決める
+        // 「n/上限」の文字の色（空きあり・満・超過）・今日の背景・選んでいる日の枠は usage-schedule-core.js の dayCellClasses で決める
         const classes = dayCellClasses({ state, selected, today: ymd === this.today });
         button.className = classes.button.join(' ');
         if (selected) button.setAttribute('aria-pressed', 'true');
@@ -200,7 +200,7 @@ class UsageSchedule {
         button.appendChild(day);
 
         const countEl = document.createElement('span');
-        countEl.className = 'd-block small usage-schedule-count';
+        countEl.className = classes.count.join(' ');
         // 預かる数がない日も高さをそろえるため、ノーブレークスペースを入れる
         const text = this.capacity === null ? '' : countText(count, this.capacity);
         countEl.textContent = text === '' ? '\u00a0' : text;

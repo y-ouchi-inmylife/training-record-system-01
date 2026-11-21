@@ -149,54 +149,64 @@ describe('状態の移り方', () => {
     });
 });
 
-// 選んでいる日は太い青の枠、今日は日付の数字を青の太字（2026-11 変更。設計書 S-0305-M05「予約状況」）
+// 満・超過は「n/上限」の文字の色だけ、今日は薄い青の背景、選んでいる日は太い青の枠（2026-11 変更。設計書 S-0305-M05「予約状況」）
 describe('dayCellClasses', () => {
     const cell = (state, selected, today) => dayCellClasses({ state, selected, today });
+    const BG_COLORS = ['bg-success-subtle', 'bg-danger-subtle', 'border-success-subtle', 'border-danger-subtle'];
 
-    it('選んでいる日は塗りつぶし（btn-primary）にならず、枠のクラスが付く', () => {
-        const { button, day } = cell(CAPACITY_AVAILABLE, true, false);
-        expect(button).toContain('usage-schedule-selected');
+    it.each([
+        [CAPACITY_FULL, 'usage-schedule-count-full'],
+        [CAPACITY_OVER, 'usage-schedule-count-over'],
+    ])('%s のマスに背景の色のクラスは付かず、「n/上限」に文字の色のクラスが付く', (state, textColor) => {
+        const { button, day, count } = cell(state, false, false);
+        BG_COLORS.forEach((c) => expect(button).not.toContain(c));
         expect(button).toContain('btn-light');
-        expect(button).not.toContain('btn-primary');
-        expect(button).not.toContain('bg-primary');
+        expect(count).toEqual(['d-block', 'small', 'usage-schedule-count', textColor]);
         expect(day).toEqual(['d-block']);
     });
 
-    it.each([
-        [CAPACITY_FULL, ['bg-success-subtle', 'text-success-emphasis', 'border-success-subtle']],
-        [CAPACITY_OVER, ['bg-danger-subtle', 'text-danger', 'border-danger-subtle']],
-    ])('選んでいる日が %s でも、その背景と文字の色が残る', (state, colors) => {
-        const { button } = cell(state, true, false);
-        expect(button).toEqual(expect.arrayContaining([...colors, 'usage-schedule-selected']));
+    it('空きありの「n/上限」は通常の文字の色', () => {
+        expect(cell(CAPACITY_AVAILABLE, false, false).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
+    });
+
+    it('今日のマスは薄い青の背景で、日付の数字に青の太字は付かない', () => {
+        const { button, day } = cell(CAPACITY_AVAILABLE, false, true);
+        expect(button).toEqual(expect.arrayContaining(['usage-schedule-today', 'bg-primary-subtle']));
         expect(button).not.toContain('btn-light');
+        expect(button).not.toContain('usage-schedule-selected');
+        expect(day).toEqual(['d-block']);
+        expect(day).not.toContain('text-primary');
+        expect(day).not.toContain('fw-bold');
+    });
+
+    it.each([
+        [CAPACITY_FULL, 'usage-schedule-count-full'],
+        [CAPACITY_OVER, 'usage-schedule-count-over'],
+    ])('今日が %s のとき、薄い青の背景と緑・赤の文字が両方付く', (state, textColor) => {
+        const { button, count } = cell(state, false, true);
+        expect(button).toContain('bg-primary-subtle');
+        expect(count).toContain(textColor);
+        BG_COLORS.forEach((c) => expect(button).not.toContain(c));
+    });
+
+    it('今日を選んでいるとき、薄い青の背景と枠が両方付く', () => {
+        const { button } = cell(CAPACITY_OVER, true, true);
+        expect(button).toEqual(expect.arrayContaining(['bg-primary-subtle', 'usage-schedule-selected']));
         expect(button).not.toContain('btn-primary');
     });
 
-    it('今日は数字が青の太字で、枠は付かない', () => {
-        const { button, day } = cell(CAPACITY_AVAILABLE, false, true);
-        expect(day).toEqual(['d-block', 'text-primary', 'fw-bold']);
-        expect(button).not.toContain('usage-schedule-selected');
-        expect(button.join(' ')).not.toMatch(/\bborder(-2|-primary)?\b/);
+    it('選んでいる日は枠だけ（背景はその日のまま。塗りつぶしにならない）', () => {
+        const { button, count } = cell(CAPACITY_FULL, true, false);
+        expect(button).toEqual(expect.arrayContaining(['btn-light', 'usage-schedule-selected']));
+        expect(button).not.toContain('btn-primary');
+        expect(count).toContain('usage-schedule-count-full');
     });
 
-    it('今日を選んでいるときは、枠と青の太字の両方が付く', () => {
-        const { button, day } = cell(CAPACITY_AVAILABLE, true, true);
-        expect(button).toContain('usage-schedule-selected');
-        expect(day).toEqual(['d-block', 'text-primary', 'fw-bold']);
-    });
-
-    it('今日が満・超過の日でも、数字は青の太字で、マスは満・超過の色のまま', () => {
-        expect(cell(CAPACITY_FULL, false, true).button).toContain('bg-success-subtle');
-        expect(cell(CAPACITY_OVER, true, true).button).toEqual(expect.arrayContaining(['bg-danger-subtle', 'text-danger', 'usage-schedule-selected']));
-        expect(cell(CAPACITY_OVER, true, true).day).toEqual(['d-block', 'text-primary', 'fw-bold']);
-    });
-
-    it('選んでいない・今日でない日は、色だけ（上限をまだ読んでいない間は空きありと同じ）', () => {
+    it('上限をまだ読んでいない間は、空きありと同じ', () => {
         expect(cell(null, false, false)).toEqual({
             button: ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day', 'btn-light'],
             day: ['d-block'],
+            count: ['d-block', 'small', 'usage-schedule-count'],
         });
-        expect(cell(CAPACITY_FULL, false, false).button).not.toContain('usage-schedule-selected');
     });
 });
-

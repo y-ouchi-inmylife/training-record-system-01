@@ -134,26 +134,24 @@ export function capacityState(count, capacity) {
 }
 
 /**
- * カレンダーのマス（ボタン）と、その中の日付の数字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
+ * カレンダーのマス（ボタン）・日付の数字・「n/上限」の文字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
  *
- * - 背景と文字の色は、空きあり・満・超過の 3 段階（capacityState）。選んでいる日・今日でも変えない
- *   （空きあり＝btn-light、満＝緑、超過＝赤。上限をまだ読んでいない間〔state が null〕は空きありと同じ）
- * - 選んでいる日（＝利用日）は太い青の枠（usage-schedule-selected。app.scss で内側に描くので、マスの大きさは変わらない）。
- *   2026-11 変更：その前は青の塗りつぶし（btn-primary）で、満・超過の色より優先していた
- * - 今日は日付の数字を青の太字（text-primary・fw-bold）。枠は付けない。2026-11 変更：その前は青の枠（border-primary）
- * - 今日を選んでいるときは、枠と青の太字の両方
+ * - 空きあり・満・超過（capacityState）は「n/上限」の文字の色だけで示し、マスの背景の色は変えない
+ *   （満＝緑 usage-schedule-count-full、超過＝赤の太字 usage-schedule-count-over。色は app.scss で Bootstrap の $green-700・$red-600。
+ *   小さな文字でも背景の上で読め〔コントラスト比 4.5:1 以上〕、緑・赤と見分けられる中間の濃さ。
+ *   2026-11 変更：その前は満・超過のマスの背景も緑・赤〔bg-success-subtle・bg-danger-subtle〕にしていた）
+ * - 今日はマスの背景を薄い青（bg-primary-subtle）。日付の数字は通常のまま
+ *   （2026-11 変更：その前は日付の数字を青の太字〔text-primary・fw-bold〕にしていた）
+ * - 選んでいる日（＝利用日）は太い青の枠（usage-schedule-selected。app.scss で内側に描くので、マスの大きさは変わらない）
+ * - 今日を選んでいるときは、薄い青の背景と枠の両方。上限をまだ読んでいない間（state が null）は空きありと同じ
  *
  * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean}} cell
- * @returns {{button: string[], day: string[]}}
+ * @returns {{button: string[], day: string[], count: string[]}}
  */
 export function dayCellClasses({ state, selected, today }) {
     const button = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
-    if (state === CAPACITY_OVER) {
-        // 超過：赤（§2-5 の bg-danger〔異常〕の系統）
-        button.push('bg-danger-subtle', 'text-danger', 'border-danger-subtle');
-    } else if (state === CAPACITY_FULL) {
-        // 満（上限ちょうど）：緑（§2-5 の bg-success〔正常・完了〕の系統）
-        button.push('bg-success-subtle', 'text-success-emphasis', 'border-success-subtle');
+    if (today) {
+        button.push('usage-schedule-today', 'bg-primary-subtle');
     } else {
         button.push('btn-light');
     }
@@ -161,13 +159,14 @@ export function dayCellClasses({ state, selected, today }) {
         button.push('usage-schedule-selected');
     }
 
-    const day = ['d-block'];
-    if (today) {
-        button.push('usage-schedule-today');
-        day.push('text-primary', 'fw-bold');
+    const count = ['d-block', 'small', 'usage-schedule-count'];
+    if (state === CAPACITY_OVER) {
+        count.push('usage-schedule-count-over');
+    } else if (state === CAPACITY_FULL) {
+        count.push('usage-schedule-count-full');
     }
 
-    return { button, day };
+    return { button, day: ['d-block'], count };
 }
 
 /**
