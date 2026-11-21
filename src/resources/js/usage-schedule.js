@@ -23,7 +23,7 @@ import {
     capacityState,
     countText,
     dayCellClasses,
-    dayHeading,
+    dayHeadingParts,
     initialState,
     monthHeading,
     monthWeeks,
@@ -156,7 +156,13 @@ class UsageSchedule {
             const data = await this.fetchJson(`${this.dayUrl}?${this.params({ date })}`);
             if (seq !== this.daySeq) return;
             this.capacity = data.capacity;
-            this.dayHeadingEl.textContent = dayHeading(date, data.count, data.capacity);
+            // 「n/上限」の部分だけを別の要素にし、カレンダーと同じ色のクラスを付ける（2026-11 変更）
+            const heading = dayHeadingParts(date, data.count, data.capacity);
+            const countEl = document.createElement('span');
+            countEl.className = heading.countClasses.join(' ');
+            countEl.dataset.usageScheduleDayCount = '';
+            countEl.textContent = heading.count;
+            this.dayHeadingEl.replaceChildren(document.createTextNode(heading.label), countEl);
             this.renderDayList(data.usages || []);
         } catch (error) {
             if (seq !== this.daySeq) return;

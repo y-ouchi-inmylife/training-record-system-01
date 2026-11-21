@@ -7,9 +7,11 @@ import {
     capacityCheckQuery,
     capacityConfirmMessage,
     capacityState,
+    countColorClasses,
     countText,
     dayCellClasses,
     dayHeading,
+    dayHeadingParts,
     dayLabel,
     initialState,
     monthHeading,
@@ -243,6 +245,48 @@ describe('保存の前の確認', () => {
             .not.toContain('exclude_usage_id');
         expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: 12 }))
             .toBe('used_on=2026-11-26&start_time=14%3A00&end_time=18%3A00&exclude_usage_id=12');
+    });
+});
+
+// 「n/上限」はすべて太字、見出しの「n/上限」にもカレンダーと同じ色（2026-11 変更。設計書 S-0305-M05「予約状況」）
+describe('「n/上限」の太字と色', () => {
+    it.each([CAPACITY_AVAILABLE, CAPACITY_FULL, CAPACITY_OVER, null])(
+        'カレンダーの「n/上限」は %s でも太字のクラス（usage-schedule-count）が付く',
+        (state) => {
+            const { count, day } = dayCellClasses({ state, selected: false, today: false });
+            expect(count).toContain('usage-schedule-count');
+            // 日付の数字は太字にしない
+            expect(day).toEqual(['d-block']);
+        },
+    );
+
+    it('色のクラスは満・超過だけ（カレンダーと見出しで同じ判定）', () => {
+        expect(countColorClasses(CAPACITY_FULL)).toEqual(['usage-schedule-count-full']);
+        expect(countColorClasses(CAPACITY_OVER)).toEqual(['usage-schedule-count-over']);
+        expect(countColorClasses(CAPACITY_AVAILABLE)).toEqual([]);
+        expect(countColorClasses(null)).toEqual([]);
+    });
+
+    it.each([
+        [3, 3, ['usage-schedule-count-full']],
+        [4, 3, ['usage-schedule-count-over']],
+        [1, 3, []],
+        [0, 3, []],
+    ])('見出し：預かる数 %i・上限 %i の「n/上限」の色のクラスは %j', (count, capacity, classes) => {
+        const parts = dayHeadingParts('2026-11-20', count, capacity);
+        expect(parts.label).toBe('11/20(金) の予約　');
+        expect(parts.count).toBe(`${count}/${capacity}`);
+        expect(parts.countClasses).toEqual(classes);
+        // 見出し全体の文はそのまま
+        expect(dayHeading('2026-11-20', count, capacity)).toBe(`11/20(金) の予約　${count}/${capacity}`);
+    });
+
+    it('見出しの色のクラスは、カレンダーの同じ日の「n/上限」の色のクラスと同じ', () => {
+        for (const [count, capacity] of [[1, 3], [3, 3], [4, 3]]) {
+            const cell = dayCellClasses({ state: capacityState(count, capacity), selected: false, today: false });
+            const heading = dayHeadingParts('2026-11-20', count, capacity);
+            expect(cell.count.filter((c) => c.startsWith('usage-schedule-count-'))).toEqual(heading.countClasses);
+        }
     });
 });
 

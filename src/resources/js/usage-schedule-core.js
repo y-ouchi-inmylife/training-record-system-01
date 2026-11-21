@@ -159,14 +159,29 @@ export function dayCellClasses({ state, selected, today }) {
         button.push('usage-schedule-selected');
     }
 
-    const count = ['d-block', 'small', 'usage-schedule-count'];
-    if (state === CAPACITY_OVER) {
-        count.push('usage-schedule-count-over');
-    } else if (state === CAPACITY_FULL) {
-        count.push('usage-schedule-count-full');
-    }
+    // 「n/上限」はどれも太字（usage-schedule-count。app.scss）。色は満・超過だけ（countColorClasses）
+    const count = ['d-block', 'small', 'usage-schedule-count', ...countColorClasses(state)];
 
     return { button, day: ['d-block'], count };
+}
+
+/**
+ * 「n/上限」の色のクラス（2026-11 追加。カレンダーのマスと、その日の予約の見出しで同じものを使う。設計書 S-0305-M05「予約状況」）。
+ * 満＝usage-schedule-count-full（緑）、超過＝usage-schedule-count-over（赤）、空きあり・上限をまだ読んでいない間（null）＝なし。
+ * 色は app.scss に 1 か所だけ書く
+ *
+ * @param {('available'|'full'|'over'|null)} state
+ * @returns {string[]}
+ */
+export function countColorClasses(state) {
+    if (state === CAPACITY_OVER) {
+        return ['usage-schedule-count-over'];
+    }
+    if (state === CAPACITY_FULL) {
+        return ['usage-schedule-count-full'];
+    }
+
+    return [];
 }
 
 /**
@@ -211,7 +226,23 @@ export function usageLine(usage) {
 
 /** その日の予約の見出し（「11/26(木) の予約　2/3」。2026-11 変更：単位を付けない） */
 export function dayHeading(ymd, count, capacity) {
-    return `${dayLabel(ymd)} の予約　${count}/${capacity}`;
+    const parts = dayHeadingParts(ymd, count, capacity);
+
+    return parts.label + parts.count;
+}
+
+/**
+ * その日の予約の見出しを、「M/D(曜) の予約　」と「n/上限」に分けたもの（2026-11 追加）。
+ * 「n/上限」の部分だけに、カレンダーと同じ色のクラス（countColorClasses。判定は capacityState）を付ける。見出しはもともと太字
+ *
+ * @returns {{label: string, count: string, countClasses: string[]}}
+ */
+export function dayHeadingParts(ymd, count, capacity) {
+    return {
+        label: `${dayLabel(ymd)} の予約　`,
+        count: `${count}/${capacity}`,
+        countClasses: countColorClasses(capacityState(count, capacity)),
+    };
 }
 
 /**
