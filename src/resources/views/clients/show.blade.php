@@ -247,17 +247,15 @@
                     @if($client->trainingRecords->count() > 0)
                         alert('この会員にはトレーニング記録が登録されているため削除できません。');
                         return false;
-                    @elseif($client->hasNonBlankTrainees())
-                        {{-- 空でないトレーニーがいれば止める（2026-10-18 変更：空のトレーニーだけなら一緒に削除できる。
-                             判定は ClientController::destroy と同じ Client::hasNonBlankTrainees） --}}
-                        alert('この会員にはトレーニーが登録されているため削除できません。');
+                    @elseif($traineeContractUsageDeletionBlockedMessage !== null)
+                        {{-- トレーニー（空のトレーニーも含む）・契約・利用のどれかがあれば止める。文言には、あるものを挙げる
+                             （2026-11 変更。判定と文言は ClientController::destroy と同じ Client::traineeContractUsageDeletionBlockedMessage） --}}
+                        alert('{{ $traineeContractUsageDeletionBlockedMessage }}');
                         return false;
                     @elseif($client->audioRecords->count() > 0)
                         alert('この会員には音声記録が登録されているため削除できません。');
                         return false;
                     @else
-                        {{-- 空のトレーニーだけがいるとき（会員の登録で自動で作ったものなど。一緒に消える）も同じ文（2026-10-18 変更：
-                             ユーザーレビューで不要となり、一度添えていた「登録内容のないトレーニーも一緒に削除します。」を外した） --}}
                         return confirm('この会員を削除しますか？');
                     @endif
                 }

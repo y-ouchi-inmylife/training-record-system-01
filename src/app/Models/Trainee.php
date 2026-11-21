@@ -290,8 +290,9 @@ class Trainee extends Model
      * 空でないトレーニーに絞る（2026-10-18 追加。要件定義書 6-3-5）。
      *
      * 「空のトレーニー」＝ CONTENT_COLUMNS がどれも空（NULL か空文字）で、CONTENT_RELATIONS のどの表にも行がないトレーニー。
-     * 会員の登録で自動で作ったトレーニー（中身は空）だけの会員は、トレーニーごと削除できる（Client::hasNonBlankTrainees）。
-     * 判定はこの 1 か所にまとめ、会員詳細（S-0305）の削除の確認と ClientController::destroy の両方で使う
+     * 利用の登録のトレーニーの初期値（Client::defaultUsageTraineeId）で使う。
+     * 2026-11 変更：その前は会員の削除の判定（空のトレーニーだけなら会員と一緒に消す）にも使っていたが、
+     * 会員の削除はトレーニーが 1 頭でもいれば断るようにしたため、会員の削除では使わない
      */
     public function scopeNotBlank(Builder $query): Builder
     {

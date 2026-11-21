@@ -18,15 +18,15 @@ use Tests\TestCase;
  * 本番で音声記録のある会員の削除が外部キーに断られて 500 になった事例の再発防止）。
  *
  * 要件定義書 6-3-5・画面設計書 S-0305・API 設計書 DELETE /clients/{id} が
- * 定める「削除できない条件（トレーニング記録・トレーニー・音声記録）」と、
+ * 定める「削除できない条件（トレーニング記録・トレーニー・契約・利用・音声記録）」と、
  * 画面の確かめをすり抜けて DB の外部キーに断られた場合の最後の守りを確かめる。
  *
  * テスト用 SQLite ではマイグレーション（MySQL 専用の CHECK 制約）が通らないため、
  * 既存の CreatesRecordingTables と同じく検証に必要な列だけでテーブルを作る。
  *
- * 2026-10-18 変更：空のトレーニー（登録内容がなく、結び付く表の行もない。会員の登録で自動で作ったものなど）だけなら、
- * 会員を削除でき、トレーニーも一緒に消える。空でないトレーニーが 1 頭でもいれば今までどおり止める（Trainee::scopeNotBlank）。
- * 「空」の判定と会員の登録で作るトレーニーは ClientRegistrationTraineeTest で確かめる。
+ * 2026-11 変更：トレーニー（空のトレーニーも含む）・契約・利用が 1 件でもあれば止め、文言にはあるものを挙げる。
+ * 会員の削除で、ほかのものを一緒に消すことはない。その前（2026-10-18〜）は、空のトレーニーだけなら会員と一緒に消し、
+ * 契約・利用は外部キーの CASCADE で一緒に消えていた。
  */
 class ClientDeleteConstraintTest extends TestCase
 {
@@ -58,6 +58,8 @@ class ClientDeleteConstraintTest extends TestCase
         });
         // トレーニーと、トレーニーに結び付く表（空のトレーニーかの判定に使う。2026-10-18 追加）
         $this->createTraineesWithRelatedTables();
+        // 契約・利用（2026-11 追加。会員の削除を断る条件に入れたため）
+        $this->createClientCountTables();
         Schema::create('audio_records', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('client_id');
@@ -78,6 +80,28 @@ class ClientDeleteConstraintTest extends TestCase
             'first_name' => '太郎',
         ]);
         return $client->fresh();
+    }
+
+    /** 契約を 1 件入れて id を返す */
+    private function insertContract(Client $client): int
+    {
+        return DB::table('client_contracts')->insertGetId([
+            'client_id' => $client->id,
+            'contracted_on' => '2026-11-01',
+            'count' => 4,
+        ]);
+    }
+
+    /** 利用を 1 件入れる（契約は省略で「契約なし」） */
+    private function insertUsage(Client $client, ?int $contractId = null): void
+    {
+        DB::table('client_usages')->insert([
+            'client_id' => $client->id,
+            'client_contract_id' => $contractId,
+            'used_on' => '2026-11-10',
+            'start_time' => '08:00:00',
+            'end_time' => '19:00:00',
+        ]);
     }
 
     // ---- 削除拒否 ----
@@ -101,7 +125,6 @@ class ClientDeleteConstraintTest extends TestCase
     public function test_空でないトレーニーがある会員は削除できず_トレーニーのメッセージが出る(): void
     {
         $client = $this->makeClient();
-        DB::table('trainees')->insert(['client_id' => $client->id]);
         DB::table('trainees')->insert(['client_id' => $client->id, 'name' => 'ポチ']);
 
         $response = app(ClientController::class)->destroy($client);
@@ -129,8 +152,9 @@ class ClientDeleteConstraintTest extends TestCase
         $this->assertTrue(Client::where('id', $client->id)->exists());
     }
 
-    public function test_空のトレーニーだけの会員は削除できてトレーニーも消える(): void
+    public function test_空のトレーニーだけの会員は削除できず_トレーニーは消えない(): void
     {
+        // 2026-11 変更：その前は、空のトレーニーだけなら会員を削除でき、トレーニーも一緒に消えた
         $client = $this->makeClient();
         // 会員の登録で自動で作ったトレーニー（中身は空）と、空文字だけのトレーニー
         DB::table('trainees')->insert(['client_id' => $client->id]);
@@ -138,34 +162,114 @@ class ClientDeleteConstraintTest extends TestCase
 
         $response = app(ClientController::class)->destroy($client);
 
-        $this->assertSame(route('clients.index'), $response->getTargetUrl());
-        $this->assertSame('会員を削除しました。', $response->getSession()->get('success'));
-        $this->assertFalse(Client::where('id', $client->id)->exists());
-        $this->assertSame(0, DB::table('trainees')->where('client_id', $client->id)->count());
+        $this->assertSame(route('clients.show', $client), $response->getTargetUrl());
+        $this->assertSame(
+            'この会員にはトレーニーが登録されているため削除できません。',
+            $response->getSession()->get('error')
+        );
+        $this->assertTrue(Client::where('id', $client->id)->exists(), '会員は消えていない');
+        $this->assertSame(2, DB::table('trainees')->where('client_id', $client->id)->count(), 'トレーニーは消えていない');
     }
 
-    public function test_ほかの会員のトレーニーは消さない(): void
+    public function test_契約だけある会員は削除できず_契約のメッセージが出る(): void
+    {
+        $client = $this->makeClient();
+        $this->insertContract($client);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame(route('clients.show', $client), $response->getTargetUrl());
+        $this->assertSame(
+            'この会員には契約が登録されているため削除できません。',
+            $response->getSession()->get('error')
+        );
+        $this->assertTrue(Client::where('id', $client->id)->exists());
+        $this->assertSame(1, DB::table('client_contracts')->where('client_id', $client->id)->count(), '契約は消えていない');
+    }
+
+    public function test_利用だけある会員は削除できず_利用のメッセージが出る(): void
+    {
+        // 契約なし（未割り当て）・トレーニーなしの利用
+        $client = $this->makeClient();
+        $this->insertUsage($client);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame(route('clients.show', $client), $response->getTargetUrl());
+        $this->assertSame(
+            'この会員には利用が登録されているため削除できません。',
+            $response->getSession()->get('error')
+        );
+        $this->assertTrue(Client::where('id', $client->id)->exists());
+        $this->assertSame(1, DB::table('client_usages')->where('client_id', $client->id)->count(), '利用は消えていない');
+    }
+
+    public function test_トレーニー契約利用が全部あれば3つをこの順に挙げる(): void
+    {
+        $client = $this->makeClient();
+        $this->insertUsage($client, $this->insertContract($client));
+        DB::table('trainees')->insert(['client_id' => $client->id]);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame(
+            'この会員にはトレーニー・契約・利用が登録されているため削除できません。',
+            $response->getSession()->get('error')
+        );
+    }
+
+    public function test_あるものだけを挙げる_トレーニーと利用(): void
+    {
+        $client = $this->makeClient();
+        DB::table('trainees')->insert(['client_id' => $client->id]);
+        $this->insertUsage($client);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame(
+            'この会員にはトレーニー・利用が登録されているため削除できません。',
+            $response->getSession()->get('error')
+        );
+    }
+
+    public function test_ほかの会員のトレーニー契約利用は判定に入れない(): void
     {
         $client = $this->makeClient();
         $other = Client::query()->create(['internal_id' => '0002', 'last_name' => '佐藤']);
-        DB::table('trainees')->insert(['client_id' => $client->id]);
         DB::table('trainees')->insert(['client_id' => $other->id]);
+        $this->insertUsage($other, $this->insertContract($other));
 
-        app(ClientController::class)->destroy($client);
+        $response = app(ClientController::class)->destroy($client);
 
+        $this->assertSame(route('clients.index'), $response->getTargetUrl());
+        $this->assertFalse(Client::where('id', $client->id)->exists());
         $this->assertSame(1, DB::table('trainees')->where('client_id', $other->id)->count());
+        $this->assertSame(1, DB::table('client_contracts')->where('client_id', $other->id)->count());
+        $this->assertSame(1, DB::table('client_usages')->where('client_id', $other->id)->count());
     }
 
-    public function test_空のトレーニーがいてもトレーニング記録があれば今までどおり止める(): void
+    public function test_トレーニング記録があればトレーニング記録の文言が先(): void
     {
         $client = $this->makeClient();
         DB::table('trainees')->insert(['client_id' => $client->id]);
+        $this->insertContract($client);
         DB::table('training_records')->insert(['client_id' => $client->id]);
 
         $response = app(ClientController::class)->destroy($client);
 
         $this->assertSame('この会員にはトレーニング記録が登録されているため削除できません。', $response->getSession()->get('error'));
         $this->assertSame(1, DB::table('trainees')->where('client_id', $client->id)->count());
+    }
+
+    public function test_トレーニー契約利用があれば音声記録より先に挙げる(): void
+    {
+        $client = $this->makeClient();
+        $this->insertContract($client);
+        DB::table('audio_records')->insert(['client_id' => $client->id]);
+
+        $response = app(ClientController::class)->destroy($client);
+
+        $this->assertSame('この会員には契約が登録されているため削除できません。', $response->getSession()->get('error'));
     }
 
     public function test_どれも登録されていない会員は削除できて会員一覧に戻る(): void
@@ -242,9 +346,10 @@ class ClientDeleteConstraintTest extends TestCase
             '音声記録が登録されているため削除できません',
             $blade
         );
-        // 既存の条件もそのまま残っていること（トレーニーは、空でないトレーニーがいるときだけ止める。2026-10-18 変更）
+        // 既存の条件もそのまま残っていること（トレーニー・契約・利用は、サーバーと同じメソッドの文言で止める。2026-11 変更）
         $this->assertStringContainsString('trainingRecords->count() > 0', $blade);
-        $this->assertStringContainsString('$client->hasNonBlankTrainees()', $blade);
+        $this->assertStringContainsString('$traineeContractUsageDeletionBlockedMessage !== null', $blade);
+        $this->assertStringNotContainsString('hasNonBlankTrainees', $blade);
     }
 }
 
@@ -281,6 +386,14 @@ class ClientDeleteConstraintTest_FaultyClient extends Client
     public function audioRecords(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(\App\Models\AudioRecord::class, 'client_id');
+    }
+    public function contracts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ClientContract::class, 'client_id');
+    }
+    public function usages(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ClientUsage::class, 'client_id');
     }
 
     public function delete(): bool

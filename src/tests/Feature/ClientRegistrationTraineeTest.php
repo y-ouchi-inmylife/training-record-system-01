@@ -22,7 +22,8 @@ use Tests\TestCase;
  * - 入力エラーのときは会員もトレーニーもできない
  * - 「空のトレーニー」＝トレーニーの項目（名前・犬種・性別・誕生日・去勢避妊・写真）がどれも空で、結び付く 5 つの表
  *   （計測値・愛犬アンケートの案内と回答・愛犬性格診断の案内と結果）のどれにも行がない（Trainee::scopeNotBlank）
- * 会員の削除（空のトレーニーだけなら一緒に削除）は ClientDeleteConstraintTest で確かめる。
+ * 空のトレーニーの判定は、利用の登録のトレーニーの初期値（Client::defaultUsageTraineeId）で使う。
+ * 会員の削除（2026-11 変更：空のトレーニーも含め、トレーニーが 1 頭でもいれば断る）は ClientDeleteConstraintTest で確かめる。
  */
 class ClientRegistrationTraineeTest extends TestCase
 {
@@ -79,7 +80,7 @@ class ClientRegistrationTraineeTest extends TestCase
         }
         $this->assertSame(100, (int) $trainee->updated_by);
         $this->assertTrue($trainee->isBlank());
-        $this->assertFalse($client->hasNonBlankTrainees());
+        $this->assertFalse($client->trainees()->notBlank()->exists());
     }
 
     public function test_登録のあとは会員詳細へ移り完了メッセージは今のまま(): void
@@ -160,7 +161,7 @@ class ClientRegistrationTraineeTest extends TestCase
         $trainee->update(['name' => '', 'breed' => '']);
 
         $this->assertTrue($trainee->isBlank());
-        $this->assertFalse($trainee->client->hasNonBlankTrainees());
+        $this->assertFalse($trainee->client->trainees()->notBlank()->exists());
     }
 
     public static function contentColumns(): array
@@ -184,7 +185,7 @@ class ClientRegistrationTraineeTest extends TestCase
         DB::table('trainees')->where('id', $trainee->id)->update([$column => $value]);
 
         $this->assertFalse($trainee->isBlank());
-        $this->assertTrue($trainee->client->hasNonBlankTrainees());
+        $this->assertTrue($trainee->client->trainees()->notBlank()->exists());
     }
 
     public static function contentTables(): array
@@ -207,7 +208,7 @@ class ClientRegistrationTraineeTest extends TestCase
         DB::table($table)->insert(['trainee_id' => $trainee->id] + $row);
 
         $this->assertFalse($trainee->isBlank());
-        $this->assertTrue($trainee->client->hasNonBlankTrainees());
+        $this->assertTrue($trainee->client->trainees()->notBlank()->exists());
     }
 
     public function test_アドバイスだけの結果も空でない(): void
@@ -252,7 +253,7 @@ class ClientRegistrationTraineeTest extends TestCase
         ]);
 
         $this->assertFalse($trainee->isBlank());
-        $this->assertTrue($trainee->client->hasNonBlankTrainees());
+        $this->assertTrue($trainee->client->trainees()->notBlank()->exists());
         $this->assertSame([$trainee->id], Trainee::query()->notBlank()->pluck('id')->all());
     }
 }

@@ -244,12 +244,27 @@ class Client extends Authenticatable
     }
 
     /**
-     * 空でないトレーニーが 1 頭でもいるか（2026-10-18 追加。要件定義書 6-3-5）。いれば会員を削除できない。
-     * 空のトレーニー（会員の登録で自動で作ったものなど。Trainee::scopeNotBlank）だけなら、会員の削除で一緒に消す
+     * 会員の削除を断る「トレーニー・契約・利用」の文言（2026-11 追加。要件定義書 6-3-5）。
+     *
+     * トレーニー（空のトレーニーも含む）・契約・利用のうち、1 件でも登録されているものを「・」でつないで
+     * 「この会員には○○が登録されているため削除できません。」を返す。どれもなければ null。
+     * 判定はこの 1 か所にまとめ、ClientController::destroy と会員詳細（S-0305）の削除の確かめの両方で使う。
+     * 2026-11 変更：その前は空でないトレーニーだけを見て（hasNonBlankTrainees）、空のトレーニーは会員と一緒に消し、
+     * 契約・利用は外部キーの CASCADE で一緒に消えていた
      */
-    public function hasNonBlankTrainees(): bool
+    public function traineeContractUsageDeletionBlockedMessage(): ?string
     {
-        return $this->trainees()->notBlank()->exists();
+        $labels = array_keys(array_filter([
+            'トレーニー' => $this->trainees()->exists(),
+            '契約' => $this->contracts()->exists(),
+            '利用' => $this->usages()->exists(),
+        ]));
+
+        if ($labels === []) {
+            return null;
+        }
+
+        return 'この会員には'.implode('・', $labels).'が登録されているため削除できません。';
     }
 
     /**

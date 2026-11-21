@@ -964,7 +964,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame('"17:00"', $this->usageModalConst($client, 'DEFAULT_END_TIME'));
     }
 
-    // ---- 会員の削除の確認（2026-10-18 変更：空のトレーニーだけなら一緒に削除できる） ----
+    // ---- 会員の削除の確認（2026-11 変更：トレーニー〔空のトレーニーも含む〕・契約・利用が 1 件でもあれば止める） ----
 
     /** 管理者で会員詳細を開き、削除の確認の JS（confirmDelete）を返す */
     private function confirmDeleteScript(Client $client): string
@@ -979,21 +979,36 @@ class ClientCountRenderingTest extends TestCase
         return preg_replace('/\s+/u', ' ', substr($html, $start, strpos($html, '</script>', $start) - $start));
     }
 
-    public function test_削除の確認_空のトレーニーだけならトレーニーがいないときと同じ文(): void
+    public function test_削除の確認_空のトレーニーだけでも止める(): void
     {
+        // 2026-11 変更：その前は、空のトレーニーだけならトレーニーがいないときと同じ確認の文を出していた
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $this->trainee($client, null);
 
         $script = $this->confirmDeleteScript($client);
 
-        // 2026-10-18 変更：ユーザーレビューで、一度添えていた「登録内容のないトレーニーも一緒に削除します。」を外した
-        $this->assertStringContainsString("return confirm('この会員を削除しますか？');", $script);
-        $this->assertStringNotContainsString('登録内容のないトレーニー', $script);
-        $this->assertStringNotContainsString('トレーニーが登録されているため削除できません', $script);
+        $this->assertStringContainsString("alert('この会員にはトレーニーが登録されているため削除できません。'); return false;", $script);
+        $this->assertStringNotContainsString('confirm(', $script);
     }
 
-    public function test_削除の確認_空でないトレーニーがいれば今までどおり止める(): void
+    public function test_削除の確認_契約と利用があれば挙げて止める(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $contractId = DB::table('client_contracts')->insertGetId(['client_id' => $client->id, 'contracted_on' => '2026-11-01', 'count' => 4]);
+        DB::table('client_usages')->insert([
+            'client_id' => $client->id, 'client_contract_id' => $contractId,
+            'used_on' => '2026-11-10', 'start_time' => '08:00:00', 'end_time' => '19:00:00',
+        ]);
+
+        $script = $this->confirmDeleteScript($client);
+
+        $this->assertStringContainsString("alert('この会員には契約・利用が登録されているため削除できません。'); return false;", $script);
+        $this->assertStringNotContainsString('confirm(', $script);
+    }
+
+    public function test_削除の確認_空でないトレーニーがいれば止める(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');

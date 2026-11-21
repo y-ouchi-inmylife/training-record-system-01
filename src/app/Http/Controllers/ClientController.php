@@ -255,7 +255,13 @@ class ClientController extends Controller
             'defaultEndTime' => ScheduleSetting::closeTime(),
         ];
 
-        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline', 'contractDefaultExpiresOn', 'usageForm'));
+        // 会員の削除を断る「トレーニー・契約・利用」の文言（2026-11 追加。設計書 S-0305［削除］）。
+        // 削除ボタンは管理者だけに出すので、管理者のときだけ求める。判定は destroy と同じメソッド
+        $traineeContractUsageDeletionBlockedMessage = auth()->user()->isAdmin()
+            ? $client->traineeContractUsageDeletionBlockedMessage()
+            : null;
+
+        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline', 'contractDefaultExpiresOn', 'usageForm', 'traineeContractUsageDeletionBlockedMessage'));
     }
 
     /**
@@ -306,13 +312,14 @@ class ClientController extends Controller
                 ->with('error', 'この会員にはトレーニング記録が登録されているため削除できません。');
         }
 
-        // 空でないトレーニーが登録されている場合も削除不可（設計書 6-3-5、段階① で追加）。
-        // 2026-10-18 変更：空のトレーニー（会員の登録で自動で作ったものなど。Trainee::scopeNotBlank）だけなら削除でき、
-        // 一緒に消す（下）。その前はトレーニーが 1 頭でもいれば削除不可
-        if ($client->hasNonBlankTrainees()) {
+        // トレーニー（空のトレーニーも含む）・契約・利用のどれかが登録されている場合も削除不可（設計書 6-3-5）。
+        // 文言には、登録されているものを挙げる（Client::traineeContractUsageDeletionBlockedMessage）。
+        // 2026-11 変更：その前は空でないトレーニーだけを見て、空のトレーニーは一緒に消し、契約・利用は CASCADE で一緒に消えていた
+        $blockedMessage = $client->traineeContractUsageDeletionBlockedMessage();
+        if ($blockedMessage !== null) {
             return redirect()
                 ->route('clients.show', $client)
-                ->with('error', 'この会員にはトレーニーが登録されているため削除できません。');
+                ->with('error', $blockedMessage);
         }
 
         // 音声記録が登録されている場合も削除不可（2026-10 追加。
@@ -325,13 +332,9 @@ class ClientController extends Controller
         }
 
         try {
-            // 空のトレーニーを明示して消してから会員を消す（2026-10-18 追加）。trainees.client_id の外部キーは CASCADE だが、
-            // 消すものを読み手に分かるようにするため明示する。空のトレーニーには結び付く表の行がないので、ほかに消えるものはない。
-            // 操作の記録は会員の削除（delete_client）だけ（契約・利用を一緒に消すときと同じく、一緒に消したものの分は残さない）
-            DB::transaction(function () use ($client) {
-                $client->trainees()->delete();
-                $client->delete();
-            });
+            // ここに来る会員には、トレーニー・契約・利用はない（上で断る）ので、会員だけを消す。
+            // 2026-11 変更：その前は空のトレーニーを明示して消してから会員を消していた
+            $client->delete();
         } catch (QueryException $e) {
             // 最後の守り。画面の確かめをすり抜けて DB の外部キー（RESTRICT）に断られたとき、
             // サーバーエラー（500）にせず会員詳細に戻す（2026-10 追加。本番で音声記録のある
