@@ -304,7 +304,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertHeaderHasNoRemaining($html);
     }
 
-    public function test_回数カードに契約の見出し_マス_すべてご利用済み_あとn回が出る(): void
+    public function test_回数カードに契約の見出し_利用の行_すべてご利用済み_あとn回が出る(): void
     {
         $client = $this->makeClient('0001', '山田');
         $old = $this->contract($client, '2026-09-03', 2, null, '2026-12-03');
@@ -336,16 +336,19 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringNotContainsString('残り 2</span>', $html);
         $this->assertStringNotContainsString('>使い切り</span>', $html);
 
-        // マス：未利用が 2 つ、利用済みは利用日。メモのある利用には印が付く
-        $this->assertSame(2, substr_count($html, '>未利用</button>'));
+        // 利用の行（2026-11 変更：その前はマス）：利用 1 件に 1 行。残りは「未利用 n回」の 1 行（使い切った契約には出ない）。
+        // メモのある利用には印が付く
+        $this->assertSame(4, substr_count($html, 'class="list-group-item list-group-item-action usage-row'));
+        $this->assertSame(1, substr_count($html, '>未利用 2回</span>'));
+        $this->assertSame(1, substr_count($html, 'data-usage-unused'));
         $this->assertStringContainsString('data-used-on="2026-09-04"', $html);
         $this->assertSame(1, substr_count($html, 'bi-chat-left-text'));
 
-        // 見出し・マスは編集モーダルを開く button
+        // 見出し・利用の行は編集モーダルを開く button
         $this->assertStringContainsString('data-id="'.$new->id.'"', $html);
         // 契約の見出しに、割り当てた利用の件数（削除の確認ダイアログ用）
         $this->assertMatchesRegularExpression('/data-id="'.$new->id.'"[^>]*data-usage-count="2"/u', $html);
-        // 利用のマスに、今割り当てられている契約の id（編集モーダルの初期値用）
+        // 利用の行に、今割り当てられている契約の id（編集モーダルの初期値用）
         $this->assertStringContainsString('data-client-contract-id="'.$old->id.'"', $html);
         $this->assertStringContainsString('onclick="window.contractModal.openForEdit(this.dataset)"', $html);
         $this->assertStringContainsString('onclick="window.usageModal.openForEdit(this.dataset)"', $html);
@@ -502,8 +505,9 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('d-flex flex-wrap align-items-center column-gap-2 mb-1', $card);
     }
 
-    public function test_未利用のマスはその契約を選んで利用の登録を開くボタン(): void
+    public function test_未利用の行は残りの回数と_その契約で利用の登録を開く［＋］を出す(): void
     {
+        // 2026-11 変更：その前は「未利用」のマスを残りの数だけ並べていた（設計書 S-0305 セクション5「未利用の行」）
         $client = $this->makeClient('0001', '山田');
         $open = $this->contract($client, '2026-10-12', 3);
         $full = $this->contract($client, '2026-09-03', 1);
@@ -512,16 +516,21 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 未利用のマスは button。契約の id の data-* と、読み上げ用の名前を持つ。押すとその契約で登録モーダルを開く
-        $pattern = '/<button type="button" class="btn btn-sm ticket-slot ticket-slot-empty"\s+'
+        // 「未利用 n回」（n はその契約の残り）と、行の右の［＋］。［＋］は button で、契約の id の data-* と読み上げ用の名前を持つ
+        $pattern = '/<div class="list-group-item d-flex align-items-center column-gap-2 py-1 px-2 small" data-usage-unused>\s*'
+            .'<span class="text-muted">未利用 2回<\/span>\s*'
+            .'<button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-auto"\s+'
             .'data-client-contract-id="'.$open->id.'"\s+'
-            .'aria-label="未利用。2026\/10\/12 の契約で利用を追加"\s+'
-            .'onclick="window\.usageModal\.openForCreate\(this\.dataset\.clientContractId\)">未利用<\/button>/u';
-        $this->assertSame(2, preg_match_all($pattern, $html), 'あと 2回 の契約に未利用のマスが 2 つ');
+            .'aria-label="2026\/10\/12 の契約で利用を追加"\s+'
+            .'onclick="window\.usageModal\.openForCreate\(this\.dataset\.clientContractId\)"><i class="bi bi-plus-lg" aria-hidden="true"><\/i><\/button>/u';
+        $this->assertSame(1, preg_match_all($pattern, $html));
 
-        // 使い切りの契約には未利用のマスが出ない
-        $this->assertDoesNotMatchRegularExpression('/ticket-slot-empty"\s+data-client-contract-id="'.$full->id.'"/u', $html);
-        $this->assertSame(2, substr_count($html, '>未利用</button>'));
+        // 使い切りの契約（残り 0）には未利用の行が出ない
+        $this->assertSame(1, substr_count($html, 'data-usage-unused'));
+        $this->assertDoesNotMatchRegularExpression('/data-client-contract-id="'.$full->id.'"\s+aria-label=/u', $html);
+        // マスの部品はもう出さない
+        $this->assertStringNotContainsString('ticket-slot', $html);
+        $this->assertStringNotContainsString('>未利用</button>', $html);
 
         // 「利用を追加」ボタンからの開き方は今のまま（契約の指定なし）
         $this->assertStringContainsString('onclick="window.usageModal.openForCreate()">利用を追加</button>', $html);
@@ -529,15 +538,8 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('function openForCreate(contractId) {', $html);
         $this->assertStringContainsString('contractSelect.value = String(contractId);', $html);
         $this->assertStringContainsString("contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);", $html);
-
-        // 押せる見た目：.btn の上で、点線の枠とマウスを乗せたときの色の変化を指定している
-        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-hover-bg:[^}]*border-style:\s*dashed;/su', $html);
-        // 普段は文字と枠を薄く（文字は本文の色の 50%）、マウスを乗せたとき・押したときは文字を本文の色に戻す
-        // （フォーカスしたときは Bootstrap の .btn:focus-visible が hover の変数を使う）
-        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-color:\s*rgba\(var\(--bs-body-color-rgb\),\s*0\.5\);/su', $html);
-        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-border-color:\s*rgba\(var\(--bs-body-color-rgb\),\s*0\.12\);/su', $html);
-        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-hover-color:\s*var\(--bs-body-color\);/su', $html);
-        $this->assertMatchesRegularExpression('/\.ticket-slot-empty\s*\{[^}]*--bs-btn-active-color:\s*var\(--bs-body-color\);/su', $html);
+        // エラーで編集モードに開き直したときに今の契約を読む先も、利用の行
+        $this->assertStringContainsString("document.querySelector('button.usage-row[data-id=\"'", $html);
     }
 
     // ---- トレーニーカードの写真（S-0305 セクション3「写真」） ----
@@ -558,25 +560,62 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    // ---- マスの 2 行の表示と、実施済み・今日・予定の見分け（2026-11 追加。設計書 S-0305 セクション5「マス（利用済み）」） ----
+    // ---- 利用の行（1 行に 1 利用）と、実施済み・今日・予定の見分け（2026-11 追加。2026-11 変更：その前は 2 行のマス。
+    //      設計書 S-0305 セクション5「利用の行」） ----
 
-    /** その利用のマス（button）の HTML */
-    private function slotHtml(string $html, ClientUsage $usage): string
+    /** その利用の行（button）の HTML */
+    private function rowHtml(string $html, ClientUsage $usage): string
     {
-        $this->assertSame(1, preg_match('/<button type="button" class="[^"]*ticket-slot[^"]*"\s+data-id="'.$usage->id.'".*?<\/button>/su', $html, $m), 'slot '.$usage->id);
+        $this->assertSame(1, preg_match('/<button type="button" class="list-group-item list-group-item-action usage-row[^"]*"\s+data-id="'.$usage->id.'".*?<\/button>/su', $html, $m), 'row '.$usage->id);
 
         return $m[0];
     }
 
-    private function usageWith(Client $client, string $usedOn, ?int $traineeId, string $start = '08:00:00', string $end = '19:00:00', ?ClientContract $contract = null): ClientUsage
+    /** 利用の行の中身（data-* と onclick を除いた、ラベルからメモの印まで） */
+    private function rowCells(string $html, ClientUsage $usage): string
+    {
+        $row = $this->rowHtml($html, $usage);
+
+        return substr($row, strpos($row, '>', strpos($row, 'onclick=')) + 1, -strlen('</button>'));
+    }
+
+    private function usageWith(Client $client, string $usedOn, ?int $traineeId, string $start = '08:00:00', string $end = '19:00:00', ?ClientContract $contract = null, ?string $note = null): ClientUsage
     {
         return ClientUsage::query()->create([
             'client_id' => $client->id, 'client_contract_id' => $contract?->id, 'trainee_id' => $traineeId,
-            'used_on' => $usedOn, 'start_time' => $start, 'end_time' => $end,
+            'used_on' => $usedOn, 'start_time' => $start, 'end_time' => $end, 'note' => $note,
         ]);
     }
 
-    public function test_マスは実施済み_今日_予定で見た目とラベルを変える(): void
+    public function test_利用の行は_ラベル_日付と曜日_時刻_トレーニー_メモの印の順(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $amuro = $this->trainee($client, 'アムロ');
+        $contract = $this->contract($client, '2026-11-01', 4);
+        $today = $this->usageWith($client, '2026-11-21', $amuro, contract: $contract, note: '体調よし');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(
+            '<span class="usage-row-label"><span class="badge text-bg-dark">今日</span></span>'
+            .'<span class="usage-row-date">2026/11/21(土)</span>'
+            .'<span class="usage-row-time">8:00〜19:00</span>'
+            .'<span class="usage-row-trainee text-truncate">アムロ</span>'
+            .'<i class="bi bi-chat-left-text" aria-hidden="true"></i><span class="visually-hidden">（メモあり）</span>',
+            $this->rowCells($html, $today)
+        );
+        // 編集モーダルに渡す値（時刻は HH:MM）。押すと編集モーダルを開く
+        $row = $this->rowHtml($html, $today);
+        $this->assertStringContainsString('data-trainee-id="'.$amuro.'"', $row);
+        $this->assertStringContainsString('data-start-time="08:00"', $row);
+        $this->assertStringContainsString('data-end-time="19:00"', $row);
+        $this->assertStringContainsString('data-client-contract-id="'.$contract->id.'"', $row);
+        $this->assertStringContainsString('onclick="window.usageModal.openForEdit(this.dataset)"', $row);
+    }
+
+    public function test_利用の行は実施済みはラベルなし_今日と予定はラベルと見た目を変える(): void
     {
         $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
         $this->fakeMediaDisk();
@@ -585,50 +624,60 @@ class ClientCountRenderingTest extends TestCase
         $contract = $this->contract($client, '2026-11-01', 4);
         $past = $this->usageWith($client, '2026-11-20', $ai, contract: $contract);
         $today = $this->usageWith($client, '2026-11-21', $ai, contract: $contract);
-        $upcoming = $this->usageWith($client, '2026-11-25', $ai, contract: $contract);
+        $upcoming = $this->usageWith($client, '2026-11-26', $ai, '13:00:00', contract: $contract);
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $pastSlot = $this->slotHtml($html, $past);
-        $this->assertStringContainsString('class="btn btn-sm btn-outline-secondary ticket-slot"', $pastSlot);
-        $this->assertStringNotContainsString('今日', $pastSlot);
-        $this->assertStringNotContainsString('予定', $pastSlot);
-
-        $todaySlot = $this->slotHtml($html, $today);
-        $this->assertStringContainsString('class="btn btn-sm btn-outline-secondary ticket-slot border-2"', $todaySlot);
-        $this->assertStringContainsString('<span class="d-block">2026/11/21<span class="badge text-bg-dark ms-1">今日</span>', $todaySlot);
-
-        $upcomingSlot = $this->slotHtml($html, $upcoming);
-        $this->assertStringContainsString('class="btn btn-sm btn-outline-secondary ticket-slot bg-info-subtle"', $upcomingSlot);
-        $this->assertStringContainsString('<span class="d-block">2026/11/25<span class="badge text-bg-info ms-1">予定</span>', $upcomingSlot);
+        $base = 'class="list-group-item list-group-item-action usage-row d-flex flex-wrap align-items-center column-gap-2 py-1 px-2 small';
+        // 実施済み：ラベルなし（空欄で列の位置はそろえる）。飾らない
+        $this->assertStringContainsString($base.'"', $this->rowHtml($html, $past));
+        $this->assertStringStartsWith('<span class="usage-row-label"></span><span class="usage-row-date">2026/11/20(金)</span>', $this->rowCells($html, $past));
+        // 今日：左端に太い線と「今日」
+        $this->assertStringContainsString($base.' usage-row-today"', $this->rowHtml($html, $today));
+        $this->assertStringStartsWith('<span class="usage-row-label"><span class="badge text-bg-dark">今日</span></span>', $this->rowCells($html, $today));
+        // 予定：薄い青の背景と「予定」
+        $this->assertStringContainsString($base.' bg-info-subtle"', $this->rowHtml($html, $upcoming));
+        $this->assertStringStartsWith('<span class="usage-row-label"><span class="badge text-bg-info">予定</span></span><span class="usage-row-date">2026/11/26(木)</span><span class="usage-row-time">13:00〜19:00</span>', $this->rowCells($html, $upcoming));
+        // 左端の太い線の指定
+        $this->assertMatchesRegularExpression('/\.usage-row-today\s*\{\s*box-shadow:\s*inset 4px 0 0 var\(--bs-dark\);/u', $html);
     }
 
-    public function test_マスの2行目にトレーニーの表示名と時刻を出し_時の先頭の0は付けない(): void
+    public function test_利用の行のトレーニーは名前未登録と出し_トレーニーなしは空欄(): void
     {
         $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
-        $ai = $this->trainee($client, 'アイ');
         $blank = $this->trainee($client, null);
-        $named = $this->usageWith($client, '2026-11-20', $ai, '08:05:00', '19:00:00');
         $unnamed = $this->usageWith($client, '2026-11-20', $blank, '13:00:00', '14:30:00');
         $noTrainee = $this->usageWith($client, '2026-11-20', null, '09:00:00', '10:00:00');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('<span class="d-flex justify-content-center gap-1 small"><span class="text-truncate ticket-slot-trainee">アイ</span><span class="text-nowrap">8:05〜19:00</span></span>', $this->slotHtml($html, $named));
-        // 名前が未登録のトレーニーはトレーナー側の表示名「名前未登録」
-        $this->assertStringContainsString('<span class="text-truncate ticket-slot-trainee">名前未登録</span><span class="text-nowrap">13:00〜14:30</span>', $this->slotHtml($html, $unnamed));
-        // トレーニーなしは時刻だけ
-        $this->assertStringContainsString('<span class="d-flex justify-content-center gap-1 small"><span class="text-nowrap">9:00〜10:00</span></span>', $this->slotHtml($html, $noTrainee));
-        // 編集モーダルに渡す値（時刻は HH:MM）
-        $this->assertStringContainsString('data-trainee-id="'.$ai.'"', $this->slotHtml($html, $named));
-        $this->assertStringContainsString('data-start-time="08:05"', $this->slotHtml($html, $named));
-        $this->assertStringContainsString('data-end-time="19:00"', $this->slotHtml($html, $named));
-        $this->assertStringContainsString('data-trainee-id=""', $this->slotHtml($html, $noTrainee));
-        // 同じ日のマスは開始時刻の順
-        $this->assertLessThan(strpos($html, 'data-id="'.$noTrainee->id.'"'), strpos($html, 'data-id="'.$named->id.'"'));
+        $this->assertStringContainsString('<span class="usage-row-time">13:00〜14:30</span><span class="usage-row-trainee text-truncate">名前未登録</span>', $this->rowCells($html, $unnamed));
+        $this->assertStringEndsWith('<span class="usage-row-time">9:00〜10:00</span><span class="usage-row-trainee text-truncate"></span>', $this->rowCells($html, $noTrainee));
+        $this->assertStringContainsString('data-trainee-id=""', $this->rowHtml($html, $noTrainee));
+        // 同じ日の行は開始時刻の順
         $this->assertLessThan(strpos($html, 'data-id="'.$unnamed->id.'"'), strpos($html, 'data-id="'.$noTrainee->id.'"'));
+    }
+
+    public function test_未割り当ての利用も利用の行の形で出る(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+        $this->contract($client, '2026-11-01', 2);
+        $unassigned = $this->usageWith($client, '2026-11-25', $ai);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('<span class="badge bg-warning text-dark">未割り当て 1</span>', $html);
+        $this->assertStringStartsWith('<span class="usage-row-label"><span class="badge text-bg-info">予定</span></span><span class="usage-row-date">2026/11/25(水)</span>', $this->rowCells($html, $unassigned));
+        $this->assertStringContainsString('data-client-contract-id=""', $this->rowHtml($html, $unassigned));
+        // 「（契約なし）」のまとまりは契約の上。未割り当てには「未利用」の行はない（契約の「未利用 2回」だけ）
+        $this->assertLessThan(strpos($html, '2026/11/01 契約（2回）'), strpos($html, 'data-id="'.$unassigned->id.'"'));
+        $this->assertSame(1, substr_count($html, 'data-usage-unused'));
+        $this->assertStringContainsString('>未利用 2回</span>', $html);
     }
 
     public function test_使い切った契約は予定を含めばすべてご予約済み_含まなければすべてご利用済み(): void
@@ -645,8 +694,9 @@ class ClientCountRenderingTest extends TestCase
 
         $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary flex-shrink-0">すべてご予約済み</span>'));
         $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary flex-shrink-0">すべてご利用済み</span>'));
-        // 新しい契約（予約済み）が上
+        // 新しい契約（予約済み）が上。どちらも使い切りなので未利用の行は出ない
         $this->assertLessThan(strpos($html, 'すべてご利用済み</span>'), strpos($html, 'すべてご予約済み</span>'));
+        $this->assertStringNotContainsString('data-usage-unused', $html);
     }
 
     // ---- 利用のモーダルのトレーニーの選択肢・初期値と時刻の初期値（2026-11 追加。設計書 S-0305-M05） ----

@@ -66,6 +66,24 @@ class ContractTicketServiceTest extends TestCase
         $this->fail("contract {$contractId} not found");
     }
 
+    public function test_曜日付きの利用日と_契約ごとの割り当てた利用だけの並びを返す(): void
+    {
+        // 会員詳細の 1 行に 1 利用の表示に使う（2026-11 追加）。曜日は日本語の 1 文字
+        $contracts = collect([$this->contract(1, '2026-11-01', 3)]);
+        $usages = collect([
+            $this->usage(1, 1, '2026-11-23', '13:00:00'),
+            $this->usage(2, 1, '2026-11-22'),
+        ]);
+
+        $ticket = (new ContractTicketService)->build($contracts, $usages);
+
+        $this->assertSame([2 => '2026/11/22(日)', 1 => '2026/11/23(月)'], $ticket['usageDates']);
+        // usages は割り当てた利用だけ（未利用の null を含まない）。slots は今までどおり未利用の null を含む（会員側 S-1412 が使う）
+        $this->assertSame([2, 1], array_map(fn ($usage) => $usage->id, $ticket['contracts'][0]['usages']));
+        $this->assertCount(3, $ticket['contracts'][0]['slots']);
+        $this->assertNull($ticket['contracts'][0]['slots'][2]);
+    }
+
     public function test_利用の状態は今日より前が実施済み_今日が今日_今日より後が予定(): void
     {
         // 「今日」はアプリのタイムゾーンでの日付。時刻は使わない（2026-11 追加。requirements.md 6-17-9）

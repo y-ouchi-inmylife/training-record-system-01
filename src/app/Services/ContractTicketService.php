@@ -43,6 +43,9 @@ class ContractTicketService
     /** 利用の状態：利用日が今日より後（予定） */
     public const STATE_UPCOMING = 'upcoming';
 
+    /** 曜日の表示（Carbon の dayOfWeek：0＝日曜〜6＝土曜） */
+    private const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
     /**
      * 回数券型の表示データと、利用モーダルの選択肢を組み立てる。
      *
@@ -63,6 +66,8 @@ class ContractTicketService
      *       'usageCount' => int,                   // 割り当てた利用の件数（削除の確認ダイアログ用。＝使ったマスの数）
      *       'expired'    => bool,                  // 有効期限を過ぎていて残りがあるか（有効期限の日付を赤字にする）
      *       'reserved'   => bool,                  // 使い切っていて、今日より後の利用（予定）を 1 件でも含むか（「すべてご予約済み」。2026-11 追加）
+     *       'usages'     => ClientUsage[],         // 割り当てた利用だけ（未利用の null を含まない）。利用日 → 開始時刻 → id の昇順。
+     *                                              // 会員詳細（S-0305）の 1 行に 1 利用の表示に使う（2026-11 追加）
      *     ],
      *     ...
      *   ],
@@ -72,6 +77,10 @@ class ContractTicketService
      *   ],
      *   'defaultContractId' => ?int,  // 登録時の初期値（残りがある契約のうち一番古いもの。なければ null＝「契約なし」）
      *   'usageStates'       => [      // 利用の id ごとの状態（STATE_PAST / STATE_TODAY / STATE_UPCOMING。2026-11 追加）
+     *     int => string,
+     *     ...
+     *   ],
+     *   'usageDates'        => [      // 利用の id ごとの、曜日付きの利用日（「2026/11/26(木)」。会員詳細の利用の行。2026-11 追加）
      *     int => string,
      *     ...
      *   ],
@@ -119,8 +128,10 @@ class ContractTicketService
         // today() は Carbon::setTestNow() で固定できる。日付どうしを Y-m-d の文字列で比べる（時刻は使わない）
         $today = today()->format('Y-m-d');
         $usageStates = [];
+        $usageDates = [];
         foreach ($sortedUsages as $usage) {
             $usageStates[$usage->id] = self::usageState($usage, $today);
+            $usageDates[$usage->id] = self::dateWithWeekday($usage);
         }
 
         $contractRows = [];
@@ -152,6 +163,7 @@ class ContractTicketService
                 'reserved' => $usedUp && collect($assigned)->contains(
                     fn (ClientUsage $usage) => $usageStates[$usage->id] === self::STATE_UPCOMING
                 ),
+                'usages' => $assigned,
             ];
 
             $contractOptions[] = [
@@ -179,7 +191,16 @@ class ContractTicketService
             'contractOptions' => $contractOptions,
             'defaultContractId' => $defaultContractId,
             'usageStates' => $usageStates,
+            'usageDates' => $usageDates,
         ];
+    }
+
+    /**
+     * 曜日付きの利用日「2026/11/26(木)」（曜日は日本語の 1 文字。2026-11 追加）
+     */
+    private static function dateWithWeekday(ClientUsage $usage): string
+    {
+        return $usage->used_on->format('Y/m/d').'('.self::WEEKDAYS[$usage->used_on->dayOfWeek].')';
     }
 
     /**

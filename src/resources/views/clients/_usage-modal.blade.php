@@ -8,10 +8,10 @@
                 'defaultStartTime' => $usageForm['defaultStartTime'], 'defaultEndTime' => $usageForm['defaultEndTime']])
        // ボタン側:
        //   新規登録: onclick="window.usageModal.openForCreate()"
-       //            （「未利用」のマスからは openForCreate(this.dataset.clientContractId) で、その契約を選んで開く）
+       //            （「未利用」の行の［＋］からは openForCreate(this.dataset.clientContractId) で、その契約を選んで開く）
        //   編集   : onclick="window.usageModal.openForEdit(this.dataset)"
        //            （data-id / data-client-contract-id / data-trainee-id / data-used-on / data-start-time / data-end-time / data-note。
-       //              clients/_usage-slot.blade.php。時刻は HH:MM）
+       //              clients/_usage-row.blade.php。時刻は HH:MM）
 
      期待する変数:
        - $client            : App\Models\Client（store URL の生成に使う）
@@ -236,10 +236,10 @@
         applyTraineeBlank();
     }
 
-    // 利用済みのマス（data-client-contract-id を持つ）から、その利用の今の契約を読む。
+    // 利用の行（data-client-contract-id を持つ。clients/_usage-row.blade.php）から、その利用の今の契約を読む。
     // エラーで編集モードに開き直したときに使う（未割り当ては null）。
     function currentContractOf(usageId) {
-        const slot = document.querySelector('button.ticket-slot[data-id="' + CSS.escape(String(usageId)) + '"]');
+        const slot = document.querySelector('button.usage-row[data-id="' + CSS.escape(String(usageId)) + '"]');
         return slot && slot.dataset.clientContractId ? slot.dataset.clientContractId : null;
     }
 
@@ -291,9 +291,9 @@
         deleteForm.action = DESTROY_URL_TEMPLATE.replace('__ID__', encodeURIComponent(id));
     }
 
-    // contractId を渡すと、その契約を選んだ状態で開く（「未利用」のマスから）。
+    // contractId を渡すと、その契約を選んだ状態で開く（「未利用」の行の［＋］から）。
     // 渡さないとき（「利用を追加」ボタン）は、登録時の初期値（残りがある一番古い契約）を選ぶ。
-    // どちらも登録モードなので、使い切りの契約は無効のまま（未利用のマスは残りがある契約にしかない）。
+    // どちらも登録モードなので、使い切りの契約は無効のまま（「未利用」の行は残りがある契約にしかない）。
     function openForCreate(contractId) {
         initRefs();
         if (!modal) return;

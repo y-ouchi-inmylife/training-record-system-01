@@ -137,31 +137,30 @@
     max-height: 35vh;
     overflow-y: auto;
 }
-/* 回数券型のマス。利用済みと未利用（どちらも button）で幅をそろえ、折り返して並べる */
-.ticket-slot {
-    min-width: 6.5rem;
+/* 利用の行（1 行に 1 利用。2026-11 変更：その前は回数券型のマス）。ラベル・日付・時刻の列は幅をそろえ、
+   行ごとに位置がずれないようにする。狭い幅では行の中で折り返す（.flex-wrap）。トレーニーは残りの幅で、入らなければ「…」 */
+.usage-row-label {
+    width: 2.75em;
+    flex-shrink: 0;
 }
-/* マスの 2 行目のトレーニーの表示名（2026-11 追加）。長いときは「…」で省く（.text-truncate）。
-   時刻（8:00〜19:00）と並べてもマスが横に広がりすぎないよう、名前の幅だけを抑える */
-.ticket-slot-trainee {
-    max-width: 5em;
+.usage-row-date,
+.usage-row-time {
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
 }
-.ticket-slot-empty {
-    /* 未利用のマス（btn btn-sm）。点線の枠で、実線の枠の利用済みのマスと見分ける。
-       普段は文字と枠を薄くし（文字は本文の色 --bs-body-color の 50%。白の上で #909294 相当、
-       コントラスト比 3.12:1。会員側 S-1412 と同じ濃さ）、利用済みの日付を浮き上がらせる。
-       押すとその契約で利用を登録できるので、マウスを乗せたとき・キーボードで選んだときは
-       文字を本文の色に戻し、枠と背景の色を少し変える（Bootstrap 5.3 の .btn:focus-visible は
-       hover の変数を使う。カーソルの指の形・フォーカスの枠は .btn が持つ） */
-    --bs-btn-color: rgba(var(--bs-body-color-rgb), 0.5);
-    --bs-btn-border-color: rgba(var(--bs-body-color-rgb), 0.12);
-    --bs-btn-hover-color: var(--bs-body-color);
-    --bs-btn-hover-bg: var(--bs-tertiary-bg);
-    --bs-btn-hover-border-color: var(--bs-secondary-color);
-    --bs-btn-active-color: var(--bs-body-color);
-    --bs-btn-active-bg: var(--bs-secondary-bg);
-    --bs-btn-active-border-color: var(--bs-secondary-color);
-    border-style: dashed;
+.usage-row-date {
+    width: 7.5em;
+}
+.usage-row-time {
+    width: 7em;
+}
+.usage-row-trainee {
+    flex: 1 1 4em;
+    min-width: 4em;
+}
+/* 今日の行は左端に太い線（list-group-flush の左右の枠を使わず、内側の影で引く。太さは 4px） */
+.usage-row-today {
+    box-shadow: inset 4px 0 0 var(--bs-dark);
 }
 </style>
 @endpush
@@ -502,7 +501,8 @@
                     <div class="card-body contract-ticket-scroll">
                         {{-- （契約なし）の行：契約に割り当てていない利用（未割り当て）。あるときだけ一番上に出す。
                              バッジは §2-5「要対応」の bg-warning text-dark で「未割り当て n」（n は未割り当ての利用の件数。利用 1 件は 1 回分）。
-                             契約に割り当て直すには、マスを押して利用の編集モーダルで契約を選び直す。 --}}
+                             契約に割り当て直すには、利用の行を押して利用の編集モーダルで契約を選び直す。
+                             中の利用は、契約の下と同じ 1 行に 1 利用の形（2026-11 変更：その前はマス） --}}
                         @if($ticket['unassigned']['count'] > 0)
                             <div class="mb-3">
                                 {{-- 「未割り当て n」は「（契約なし）」のすぐ後ろ（契約の状態と同じ並べ方。右端には寄せない） --}}
@@ -510,14 +510,15 @@
                                     <span>（契約なし）</span>
                                     <span class="badge bg-warning text-dark">未割り当て {{ $ticket['unassigned']['count'] }}</span>
                                 </div>
-                                <div class="d-flex flex-wrap gap-1">
+                                <div class="list-group list-group-flush usage-rows">
                                     @foreach($ticket['unassigned']['slots'] as $usage)
-                                        @include('clients._usage-slot', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id]])
+                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
                         @endif
-                        {{-- 契約ごとの行（契約日の新しいものが上。マスはその契約に割り当てた利用で、古い利用が左）。
+                        {{-- 契約ごとのまとまり（契約日の新しいものが上。その契約に割り当てた利用を 1 行に 1 件ずつ、古い利用が上。
+                             その下に残りを「未利用 n回」の 1 行で出す。2026-11 変更：その前はマス）。
                              data-usage-count は割り当てた利用の件数（削除の確認ダイアログの文言に使う。回数ではない） --}}
                         @foreach($ticket['contracts'] as $row)
                             <div @class(['mb-3' => ! $loop->last])>
@@ -548,19 +549,21 @@
                                         <span class="flex-shrink-0">あと {{ $row['remaining'] }}回</span>
                                     @endif
                                 </div>
-                                <div class="d-flex flex-wrap gap-1">
-                                    @foreach($row['slots'] as $usage)
-                                        @if($usage)
-                                            @include('clients._usage-slot', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id]])
-                                        @else
-                                            {{-- 未利用のマス。押すと、この契約を選んだ状態で利用の登録モーダル（S-0305-M05）を開く
-                                                 （何番目のマスかは関係しない）。使い切りの契約には未利用のマスがない --}}
-                                            <button type="button" class="btn btn-sm ticket-slot ticket-slot-empty"
-                                                    data-client-contract-id="{{ $row['contract']->id }}"
-                                                    aria-label="未利用。{{ $row['contract']->contracted_on->format('Y/m/d') }} の契約で利用を追加"
-                                                    onclick="window.usageModal.openForCreate(this.dataset.clientContractId)">未利用</button>
-                                        @endif
+                                <div class="list-group list-group-flush usage-rows">
+                                    @foreach($row['usages'] as $usage)
+                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id]])
                                     @endforeach
+                                    {{-- 未利用の行（2026-11 変更：その前は未利用のマスを残りの数だけ並べていた）。残りが 0 の契約では出さない。
+                                         ［＋］を押すと、この契約を選んだ状態で利用の登録モーダル（S-0305-M05）を開く --}}
+                                    @if($row['remaining'] > 0)
+                                        <div class="list-group-item d-flex align-items-center column-gap-2 py-1 px-2 small" data-usage-unused>
+                                            <span class="text-muted">未利用 {{ $row['remaining'] }}回</span>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-auto"
+                                                    data-client-contract-id="{{ $row['contract']->id }}"
+                                                    aria-label="{{ $row['contract']->contracted_on->format('Y/m/d') }} の契約で利用を追加"
+                                                    onclick="window.usageModal.openForCreate(this.dataset.clientContractId)"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
