@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\SystemSetting;
+use App\Support\ScheduleSetting;
 use Illuminate\Database\Seeder;
 
 /**
@@ -23,6 +24,10 @@ class SystemSettingSeeder extends Seeder
         $settings = [
             ['key' => 'enable_ip_restriction', 'value' => '0'],
             ['key' => 'summary_prompt_current', 'value' => $currentPrompt],
+            // 予定の設定（S-1601。2026-11 追加）。営業開始時刻・営業終了時刻（HH:MM）。
+            // 行がなくても ScheduleSetting の初期値で動く（本番はシーダーを流さないため）。値は ScheduleSetting の初期値とそろえる
+            ['key' => ScheduleSetting::OPEN_TIME_KEY, 'value' => ScheduleSetting::DEFAULT_OPEN_TIME],
+            ['key' => ScheduleSetting::CLOSE_TIME_KEY, 'value' => ScheduleSetting::DEFAULT_CLOSE_TIME],
         ];
 
         foreach ($settings as $setting) {

@@ -293,6 +293,10 @@ return [
             'other_client' => '選んだ契約はこの会員の契約ではありません。',
             'no_remaining' => '選んだ契約には残りがありません。',
         ],
+        // 予定の設定（S-1601。2026-11 追加）。同じ時刻も不可
+        'schedule_close_time' => [
+            'after_open_time' => '営業終了時刻は営業開始時刻より後の時刻で入力してください。',
+        ],
         // 契約の回数（S-0305-M04）。編集で、割り当て済みの利用の件数より少なくしたとき。
         // ClientContractRequest の withValidator（after）から載せる。:assigned は割り当て済みの利用の件数
         // （呼び出し側で数を渡す。file_size.max の :limit と同じ書き方）
@@ -401,6 +405,9 @@ return [
         'client_contract_id' => '契約',
         'count' => '回数',
         'note' => 'メモ',
+        // 予定の設定（S-1601。2026-11 追加）
+        'schedule_open_time' => '営業開始時刻',
+        'schedule_close_time' => '営業終了時刻',
     ],
 
 ];

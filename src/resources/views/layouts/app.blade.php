@@ -98,7 +98,7 @@
                     @if(Auth::user()->isAdmin())
                         {{-- 管理者メニュー（admin+system_admin。トレーナー管理はsystem_adminにも表示、他はadminのみ） --}}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle {{ request()->is('trainers*') || request()->is('access-logs*') || request()->is('settings/summary-prompts*') || request()->is('settings/evaluation-prompts*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
+                            <a class="nav-link dropdown-toggle {{ request()->is('trainers*') || request()->is('access-logs*') || request()->is('settings/summary-prompts*') || request()->is('settings/evaluation-prompts*') || request()->is('settings/schedule*') ? 'active' : '' }}" href="#" role="button" data-bs-toggle="dropdown">
                                 【管理者】
                             </a>
                             <ul class="dropdown-menu">
@@ -111,6 +111,8 @@
                                          同じ日に、名前も変えた（その前は「…のアドバイスのプロンプト」） --}}
                                     <li><a class="dropdown-item" href="{{ route('settings.evaluation-prompts.edit') }}">{{ __('messages.personality_diagnosis_name') }}のプロンプト</a></li>
                                     <li><a class="dropdown-item" href="{{ route('settings.summary-prompts.edit') }}">要約プロンプト</a></li>
+                                    {{-- 予定の設定（S-1601。2026-11 追加）。プロンプトの設定の項目の後（設計書 §2-1-1 8-5） --}}
+                                    <li><a class="dropdown-item" href="{{ route('settings.schedule.edit') }}">予定の設定</a></li>
                                 @endif
                             </ul>
                         </li>

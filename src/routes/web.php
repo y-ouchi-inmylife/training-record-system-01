@@ -22,6 +22,7 @@ use App\Http\Controllers\MediaRecordController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AudioRecordController;
 use App\Http\Controllers\RecordingV2Controller;
+use App\Http\Controllers\ScheduleSettingController;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\EvaluationPromptController;
 use App\Http\Controllers\SummaryPromptController;
@@ -267,6 +268,10 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 愛犬性格診断のプロンプト（S-0602。S-0313 の［AIで下書き］の指示文。2026-10-19 追加）
             Route::get('settings/evaluation-prompts', [EvaluationPromptController::class, 'edit'])->name('settings.evaluation-prompts.edit');
             Route::put('settings/evaluation-prompts', [EvaluationPromptController::class, 'update'])->name('settings.evaluation-prompts.update');
+            // 予定の設定（S-1601。2026-11 追加）。利用を登録するときの開始時刻・終了時刻の初期値（営業時間）。
+            // アクセスログは記録しない（LogAccess の ACTION_MAP に足さない。プロンプトの設定の更新と同じ）
+            Route::get('settings/schedule', [ScheduleSettingController::class, 'edit'])->name('settings.schedule.edit');
+            Route::put('settings/schedule', [ScheduleSettingController::class, 'update'])->name('settings.schedule.update');
 
             // トレーナー操作履歴
             Route::get('access-logs', [AccessLogController::class, 'index'])->name('access-logs.index');
