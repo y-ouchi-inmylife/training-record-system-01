@@ -132,8 +132,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 要約 | S-0601 要約プロンプト画面 | PUT | `/settings/summary-prompts` | 要約プロンプトを更新する | auth | 管理者 |
 | 愛犬性格診断 | S-0602 愛犬性格診断のプロンプト画面 | GET | `/settings/evaluation-prompts` | 愛犬性格診断のプロンプト画面を表示する（**2026-10-19 追加**。同じ日に名前を「愛犬性格診断のアドバイスのプロンプト」から変えた） | auth | 管理者 |
 | 愛犬性格診断 | S-0602 愛犬性格診断のプロンプト画面 | PUT | `/settings/evaluation-prompts` | 愛犬性格診断のプロンプトを更新する（**2026-10-19 追加**） | auth | 管理者 |
-| 予定 | S-1601 予定の設定画面 | GET | `/settings/schedule` | 予定の設定画面を表示する（ルート名 `settings.schedule.edit`。**2026-11 追加**） | auth | 管理者 |
-| 予定 | S-1601 予定の設定画面 | PUT | `/settings/schedule` | 営業開始時刻・営業終了時刻を更新する（ルート名 `settings.schedule.update`。**2026-11 追加**） | auth | 管理者 |
+| 予定 | S-1601 事業所情報の設定画面 | GET | `/settings/schedule` | 事業所情報の設定画面を表示する（ルート名 `settings.schedule.edit`。**2026-11 追加**） | auth | 管理者 |
+| 予定 | S-1601 事業所情報の設定画面 | PUT | `/settings/schedule` | 営業開始時刻・営業終了時刻を更新する（ルート名 `settings.schedule.update`。**2026-11 追加**） | auth | 管理者 |
 | 音声ファイル容量管理 | S-0701 音声ファイル一覧画面 | GET | `/usage-stats` | 音声ファイル一覧画面を表示する（サーバー容量管理用） | auth | システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | GET | `/trainers/create` | トレーナー登録画面を表示する | auth | 管理者、システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | POST | `/trainers` | トレーナーを登録する | auth | 管理者、システム管理者 |
@@ -492,7 +492,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 **レスポンス**:
 - view `clients.show`（クライアント情報、トレーニング記録一覧。トレーニング記録は新しい順。**各記録のメディア件数を先読みする**（`withCount('mediaRecords')`。派生カラム `media_records_count` を各記録に付与し、タイムラインの担当行の次の行に「メディア数 N」を表示する。0 件時は行ごと非表示。Blade で N+1 を発生させないため）。**クライアントの状態**〔メールアドレスなし／メールアドレス登録待ち／初回設定待ち／利用中〕はヘッダーに強調バッジで表示する。導出は clients.email・clients.password・対応する `client_email_registration_tokens` の有無から。**期限判定の参照元は `client_email_registration_tokens.expires_at`**（ログイン用リンクの `expires_at` は参照しない）。判定順序と具体的なクエリ例は screen-design.md の S-0305 状態一覧を参照。**状態別ボタンは基本 1 つだけ**（メールアドレスなし・期限切れなら「マイページ登録の案内を発行」、利用中なら「メールアドレスを削除」、初回設定待ちは無し）だが、**「メールアドレス登録待ち（期限内）」のときだけ「マイページ登録の案内を表示」と「取消」の 2 つが並ぶ**（表示と取消は性質の違う操作で、どちらも必要なため）。URL 文字列・QR コード・有効期限は詳細画面には出さず、印刷ページ〔S-0307〕に集約する）
 - **公開済みの愛犬性格診断のアドバイスを混ぜる**（**2026-10-18 追加**。requirements.md 6-3-3・6-16-16）：会員のトレーニーの結果のうち `evaluation_published_at` が NULL でないものを、トレーニーと公開したトレーナー（`evaluation_published_by`）と一緒に読み込み（eager load。件数でクエリが増えない）、トレーニング記録と 1 本の並び（日付・時刻の新しい順。アドバイスは `evaluation_published_at` の日付・時刻。時刻のない記録はその日のいちばん後ろ。日付と時刻がまったく同じなら記録が先）にコントローラで組み立てて view に渡す（`App\Support\RecordTimeline::merge`。S-1402 と共通。結果は `TraineePersonalityDiagnosisResult::publishedEvaluationsOfClient` で 1 本のクエリで読む）。件数の上限・ページ送りはない（記録と同じく全件）。カードの見出しの件数はトレーニング記録だけを数える
-- 同じ view に、**残り回数**（「回数」カードの見出し）と**契約・利用の一覧**（「回数」カード、1 行に 1 利用の表示。**2026-11 変更**：その前は回数券型のマス）も含める。各契約の下には、その契約に割り当てた利用（`client_usages.client_contract_id`）を 1 行ずつ並べる。表示のときに自動で割り当てる処理は持たない（screen-design.md S-0305 セクション5「回数」参照）。利用のモーダル（S-0305-M05）のトレーニーの選択肢と初期値、開始時刻・終了時刻の初期値（予定の設定〔S-1601〕の営業開始時刻・営業終了時刻）も同じ view に渡す（**2026-11 追加**）
+- 同じ view に、**残り回数**（「回数」カードの見出し）と**契約・利用の一覧**（「回数」カード、1 行に 1 利用の表示。**2026-11 変更**：その前は回数券型のマス）も含める。各契約の下には、その契約に割り当てた利用（`client_usages.client_contract_id`）を 1 行ずつ並べる。表示のときに自動で割り当てる処理は持たない（screen-design.md S-0305 セクション5「回数」参照）。利用のモーダル（S-0305-M05）のトレーニーの選択肢と初期値、開始時刻・終了時刻の初期値（事業所情報の設定〔S-1601〕の営業開始時刻・営業終了時刻）も同じ view に渡す（**2026-11 追加**）
 
 
 ###### POST /clients/{client}/email-registration-tokens
@@ -2782,11 +2782,11 @@ POST /training-records に以下を追加する。
 
 （**2026-11 追加**）
 
-##### S-1601 予定の設定画面
+##### S-1601 事業所情報の設定画面
 
 ###### GET /settings/schedule
 
-**概要**: 予定の設定画面を表示する。管理者のみ（`admin-only`。S-0601・S-0602 と同じ）。
+**概要**: 事業所情報の設定画面を表示する。管理者のみ（`admin-only`。S-0601・S-0602 と同じ）。
 
 **レスポンス**: view（`system_settings` の `schedule_open_time`・`schedule_close_time`。行がなければコード側の初期値 08:00・19:00）
 
@@ -2802,7 +2802,7 @@ POST /training-records に以下を追加する。
 
 **処理**: `system_settings` の `schedule_open_time`・`schedule_close_time` を作る・更新する（値は `HH:MM` の文字列）。登録済みの利用の時刻は変えない。アクセスログは記録しない（S-0601・S-0602 の更新と同じ）
 
-**レスポンス**: `redirect('/settings/schedule')`。フラッシュ `success` に「予定の設定を更新しました。」
+**レスポンス**: `redirect('/settings/schedule')`。フラッシュ `success` に「事業所情報の設定を更新しました。」
 
 ---
 
