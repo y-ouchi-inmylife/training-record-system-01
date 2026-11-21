@@ -243,12 +243,16 @@ erDiagram
         bigint id PK
         bigint client_id FK
         bigint client_contract_id FK
+        bigint trainee_id FK
         date used_on
+        time start_time
+        time end_time
     }
 
     clients ||--o{ client_contracts : "回数で契約する"
     clients ||--o{ client_usages : "契約回数を利用する"
     client_contracts |o--o{ client_usages : "割り当てる（NULL は契約なし）"
+    trainees |o--o{ client_usages : "どのトレーニーの分か（NULL はトレーニーなし）"
 ```
 
 ※ER図はテーブル間の関連と主要カラム（主キー・ユニークキー・外部キー・主な業務識別/区分カラム）のみを示す。`created_at`/`updated_at`/`updated_by` 等の共通カラムおよび非識別カラムは省略しているため、全カラムは4章のテーブル定義を参照。clientsテーブルは7カテゴリー50業務項目＋共通カラムで構成され、ER図には代表カラムのみ掲載している。
@@ -671,6 +675,7 @@ erDiagram
   - **変換状態カラム（`conversion_status` / `thumbnail_status`）は持たない**：常に同期でリサイズ・JPEG 変換してから DB に書くため、pending 状態が存在しない。DB レコードに `photo_path` が入っていれば「その実ファイルは表示可能な状態」であることが常に成り立つ
   - **削除時**：会員が「削除」を実行するか、写真差し替え（同じトレーニーで再アップロード）で旧ファイルは対象。ファイルの実削除は既存 `MediaRecordController::destroy` と同型で「ファイル先削除 → DB カラムを NULL 化」の順とする（アプリ側の責務。DB の外部キー制約はストレージ上のファイルには作用しない）
   - **トレーニーの削除時**（**2026-11 追加**、要件定義書 6-16-4）：トレーニーの行を消したあと、`photo_path`・`trainer_photo_path` のファイルをストレージから消す。ファイルの削除に失敗しても、トレーニーの削除は取り消さず、ログに残して続ける（孤児ファイルはキーの頭のフォルダで探して掃除できる）。それまでは、トレーニーを削除しても会員写真のファイルが残っていた。会員の削除で空のトレーニーを一緒に消すときも同じ扱い（空のトレーニーの判定に両方の写真のカラムが入るため、実際には写真のあるトレーニーは消えない）
+- **トレーニーを削除しても、そのトレーニーの利用（D-1000）は消さない**（**2026-11 追加**）。`client_usages.trainee_id` の外部キーは ON DELETE SET NULL で、利用は「トレーニーなし」になる（残り回数が変わらないようにするため。要件定義書 6-16-4・6-17-9）
 - **トレーナー用写真の扱い**（**2026-11 追加**、要件定義書 6-16-20 参照）：
   - **コピー方式**：トレーナーがメディア一覧から写真を選んだ時点で、そのメディアの表示用の画像（`media_records.display_path`）から、会員写真と同じ形式の画像（`-auto-orient`・長辺 400px・JPEG 品質 85）を作って保存し、キーを `trainer_photo_path` に入れる。**元のメディアの ID は持たない**ので、元のメディアを削除・変更してもトレーナー用写真は残り、メディアの削除にも影響しない（`media_records` への外部キーを作らない）
   - **保存先のキー形式は `trainee-trainer-photos/YYYYMM/{uuid}.jpg` 固定**（YYYYMM は設定した月）。ディスクは会員写真と同じ `media` だが、**キーの頭のフォルダを分ける**（会員写真の `trainees/` とストレージ上で見分けられ、孤児ファイルの掃除などの保守がしやすいため）
@@ -777,7 +782,10 @@ erDiagram
 | id | BIGINT UNSIGNED | NO | auto_increment | 主キー |
 | client_id | BIGINT UNSIGNED | NO | — | 会員のID（外部キー） |
 | client_contract_id | BIGINT UNSIGNED | YES | NULL | 割り当てた契約のID（外部キー）。**NULL は「契約なし」（未割り当て）**。割り当てる契約は、利用と同じ会員の契約に限る（アプリ側でチェック。下の注記参照） |
-| used_on | DATE | NO | — | 利用日 |
+| trainee_id | BIGINT UNSIGNED | YES | NULL | どのトレーニーの分か（トレーニーのID。外部キー）（**2026-11 追加**）。**NULL は「トレーニーなし」**。NULL になるのは、既存の利用の移し替えでトレーニーが決まらなかった場合と、トレーニーが削除された場合だけ（下の注記参照）。トレーニーは、利用と同じ会員のトレーニーに限る（アプリ側でチェック） |
+| used_on | DATE | NO | — | 利用日。今日より後の利用は予定として表示する（requirements.md 6-17-9） |
+| start_time | TIME | NO | — | 開始時刻（**2026-11 追加**）。DB のデフォルト値は持たない |
+| end_time | TIME | NO | — | 終了時刻（**2026-11 追加**）。開始時刻より後（アプリ側でチェック。日付をまたぐ利用は扱わない）。DB のデフォルト値は持たない |
 | note | VARCHAR(255) | YES | NULL | メモ（「当日キャンセル」など） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
@@ -790,6 +798,7 @@ erDiagram
 | PRIMARY | id | PRIMARY KEY | 主キー |
 | client_usages_client_id_used_on_idx | client_id, used_on | INDEX（複合） | 会員ごとの利用の一覧（利用日順）と、会員ごとの利用の件数の集計に使用。`client_id` の外部キーもこのインデックスを使う。**ユニーク制約は付けない**（同じ日に複数件の利用を登録できる） |
 | client_usages_client_contract_id_foreign | client_contract_id | INDEX | 契約ごとに割り当てた利用の検索・件数の集計。外部キー制約に伴い自動付与 |
+| client_usages_trainee_id_foreign | trainee_id | INDEX | トレーニーごとの利用の検索。外部キー制約に伴い自動付与（**2026-11 追加**） |
 | client_usages_updated_by_foreign | updated_by | INDEX | 最終更新者による検索。外部キー制約に伴い自動付与 |
 
 ##### 制約
@@ -798,6 +807,7 @@ erDiagram
 |--------|------|------|-----------|------|
 | client_usages_client_id_foreign | FOREIGN KEY | client_id → clients(id) | CASCADE | 会員削除時は利用も削除。**利用があっても会員の削除は拒否しない**（D-0900 の注記参照） |
 | client_usages_client_contract_id_foreign | FOREIGN KEY | client_contract_id → client_contracts(id) | SET NULL | 契約削除時は、その契約に割り当てられていた利用を「契約なし」（NULL）にする。利用そのものは消さない |
+| client_usages_trainee_id_foreign | FOREIGN KEY | trainee_id → trainees(id) | SET NULL | トレーニー削除時は、そのトレーニーの利用を「トレーニーなし」（NULL）にする。**利用そのものは消さない**（CASCADE にしない。残り回数が変わらないようにするため）（**2026-11 追加**） |
 | client_usages_updated_by_foreign | FOREIGN KEY | updated_by → trainers(id) | SET NULL | トレーナー削除時は最終更新者をNULLにする |
 
 ##### 注記
@@ -810,6 +820,13 @@ erDiagram
 - 会員の残り回数がマイナスになる利用も登録できる（「契約なし」の利用は契約の残りに関係なく登録できる）
 - 会員削除時の扱いは D-0900 と同じ（CASCADE で一緒に削除し、アプリ側でも拒否しない）
 - `created_by` は持たない（既存テーブルと同様、`updated_by` のみ）
+- **トレーニー（D-0700）には `trainee_id` でひも付ける**（**2026-11 追加**）。契約は会員にひも付け、利用だけをトレーニーにひも付ける。トレーニーは、その会員にトレーニーが 1 頭以上いるときは必須、1 頭もいないときは NULL（アプリ側の登録・編集のバリデーションでチェック。screen-design.md S-0305-M05）。同じトレーニーの利用が同じ日に 2 件以上あってもよい（ユニーク制約は付けない）
+- **開始時刻・終了時刻**（**2026-11 追加**）：登録時の初期値は、予定の設定（DS-0100 の `schedule_open_time`・`schedule_close_time`）の値。初期値はアプリ側で入れ、DB のデフォルト値は持たない
+- **利用の並び順**は、利用日 → 開始時刻 → `id` の順（**2026-11 変更**：その前は利用日 → `id`。requirements.md 6-17-9）
+- **予定**（**2026-11 追加**）：利用日が今日より後の利用を予定、今日の利用を今日、今日より前の利用を実施済みとして表示で区別する。状態のカラムは持たない（requirements.md 6-17-9）
+- **既存データの移し替え**（**2026-11 追加**。カラムを足すマイグレーションの中で行う）：
+  - `start_time` = 08:00、`end_time` = 19:00（マイグレーションに固定値で書く。予定の設定の値は読まない）
+  - `trainee_id` は次の規則で決める：その会員の**空でない**トレーニー（`Trainee::scopeNotBlank`）が 1 頭 → その 1 頭／空でないトレーニーが 0 頭で、トレーニーが全体で 1 頭 → その 1 頭／それ以外 → NULL
 
 
 ---
@@ -962,6 +979,7 @@ erDiagram
 **対応する要件**: 
 - IPアドレス制限
 - 要約プロンプト設定
+- 予定の設定（営業開始時刻・営業終了時刻。requirements.md 6-17-10。**2026-11 追加**）
 
 ##### カラム定義
 
@@ -1615,7 +1633,7 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（愛犬アンケート�
 | 16 | trainees | clients, trainers |
 | 17 | trainee_measurements | trainees, trainers |
 | 18 | client_contracts | clients, trainers |
-| 19 | client_usages | clients, client_contracts, trainers |
+| 19 | client_usages | clients, client_contracts, trainees, trainers |
 | 20 | trainee_intake_survey_tokens | trainees, trainers |
 | 21 | trainee_intake_survey_responses | trainees, trainee_intake_survey_tokens |
 | 22 | trainee_personality_diagnosis_tokens | trainees, trainers |
@@ -1679,3 +1697,5 @@ D-1100 `trainee_intake_survey_responses.neuter_status`（愛犬アンケート�
 |------|-----|------|
 | enable_ip_restriction | false | IPアドレス制限（false: 無効、true: 有効）。許可IPアドレスは ip_whitelist テーブルで管理 |
 | summary_prompt_current | （初期プロンプト本文） | 音声要約に使用するプロンプト。初期値を投入。設定画面（要約プロンプト）からトレーナーが編集可能。本文の実体はシーダーを参照（2026-10 に、Markdown の記号を使わない書き方に改めた。画面設計書 S-0601 の備考） |
+| schedule_open_time | 08:00 | 営業開始時刻（`HH:MM` の文字列）。利用を登録するときの開始時刻の初期値。予定の設定画面（S-1601）から管理者が編集可能。行がないときは、コード側に持つ同じ初期値で動く（**2026-11 追加**） |
+| schedule_close_time | 19:00 | 営業終了時刻（`HH:MM` の文字列）。利用を登録するときの終了時刻の初期値。予定の設定画面（S-1601）から管理者が編集可能。行がないときは、コード側に持つ同じ初期値で動く（**2026-11 追加**） |
