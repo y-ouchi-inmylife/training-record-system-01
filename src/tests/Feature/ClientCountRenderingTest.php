@@ -957,7 +957,7 @@ class ClientCountRenderingTest extends TestCase
         $admin->id = 201;
         $admin->exists = true;
         $this->actingAs($admin, 'web');
-        $this->put(route('settings.schedule.update'), ['schedule_open_time' => '09:30', 'schedule_close_time' => '17:00'])
+        $this->put(route('settings.schedule.update'), ['schedule_open_time' => '09:30', 'schedule_close_time' => '17:00', 'schedule_capacity' => '3'])
             ->assertSessionHasNoErrors();
 
         $this->assertSame('"09:30"', $this->usageModalConst($client, 'DEFAULT_START_TIME'));

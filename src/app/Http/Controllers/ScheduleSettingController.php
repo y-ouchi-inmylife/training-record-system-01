@@ -10,7 +10,7 @@ use Illuminate\View\View;
 /**
  * 事業所情報の設定画面（S-1601。2026-11 追加。設計書 screen-design.md 3-16・requirements.md 6-17-10）。
  *
- * 利用を登録するときの開始時刻・終了時刻の初期値（営業開始時刻・営業終了時刻）を、管理者が変える。
+ * 利用を登録するときの開始時刻・終了時刻の初期値（営業開始時刻・営業終了時刻）と、同時に預かれる頭数（2026-11 追加）を、管理者が変える。
  * 変えても登録済みの利用の時刻は変わらない。
  * アクセスログは記録しない（要約プロンプト・愛犬性格診断のプロンプトの設定の更新と同じ。LogAccess の対象にしない）。
  */
@@ -24,6 +24,7 @@ class ScheduleSettingController extends Controller
         return view('settings.schedule', [
             'openTime' => ScheduleSetting::openTime(),
             'closeTime' => ScheduleSetting::closeTime(),
+            'capacity' => ScheduleSetting::capacity(),
         ]);
     }
 
@@ -33,7 +34,7 @@ class ScheduleSettingController extends Controller
     public function update(ScheduleSettingRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        ScheduleSetting::save($validated['schedule_open_time'], $validated['schedule_close_time']);
+        ScheduleSetting::save($validated['schedule_open_time'], $validated['schedule_close_time'], (int) $validated['schedule_capacity']);
 
         return redirect()->route('settings.schedule.edit')
             ->with('success', '事業所情報の設定を更新しました。');

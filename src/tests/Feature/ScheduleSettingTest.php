@@ -20,6 +20,7 @@ use Tests\TestCase;
  * - **行がないときは初期値（08:00・19:00）で動く**（本番ではシーダーを流さないため）
  * - 保存は行がなければ作り、あれば更新する
  * - アクセスログは記録しない
+ * - 同時に預かれる頭数（2026-11 追加。requirements.md 6-17-11）：必須・整数・1〜99。行がないときは 3
  */
 class ScheduleSettingTest extends TestCase
 {
@@ -46,9 +47,10 @@ class ScheduleSettingTest extends TestCase
         $this->actingAs($trainer, 'web');
     }
 
+    /** 更新を送る。同時に預かれる頭数（2026-11 追加）を渡さないときは、正しい値（3）を足す */
     private function update(array $input): TestResponse
     {
-        return $this->from(route('settings.schedule.edit'))->put(route('settings.schedule.update'), $input);
+        return $this->from(route('settings.schedule.edit'))->put(route('settings.schedule.update'), $input + ['schedule_capacity' => '3']);
     }
 
     public function test_行がないときは初期値で表示される(): void
@@ -163,7 +165,7 @@ class ScheduleSettingTest extends TestCase
         $this->assertSame('18:30', ScheduleSetting::closeTime());
 
         $this->update(['schedule_open_time' => '07:45', 'schedule_close_time' => '20:00'])->assertRedirect(route('settings.schedule.edit'));
-        $this->assertSame(2, SystemSetting::query()->count());
+        $this->assertSame(3, SystemSetting::query()->count(), '営業開始時刻・営業終了時刻・同時に預かれる頭数の 3 行');
         $this->assertSame('07:45', ScheduleSetting::openTime());
         $this->assertSame('20:00', ScheduleSetting::closeTime());
     }
@@ -225,5 +227,95 @@ class ScheduleSettingTest extends TestCase
         $this->assertStringContainsString('<div class="invalid-feedback d-block">営業終了時刻は営業開始時刻より後の時刻で入力してください。</div>', $html);
         // 上部の案内は出さない（小さなフォーム）
         $this->assertStringNotContainsString('入力内容に誤りがあります。', $html);
+    }
+
+    // ---- 同時に預かれる頭数（2026-11 追加） ----
+
+    public function test_同時に預かれる頭数は時刻の下にあり_行がないときは3で欄の右に頭(): void
+    {
+        $this->actingAsRole('admin');
+
+        $html = $this->get(route('settings.schedule.edit'))->assertOk()->getContent();
+
+        $this->assertSame(3, ScheduleSetting::capacity());
+        $this->assertMatchesRegularExpression(
+            '/<label for="schedule_capacity" class="form-label">同時に預かれる頭数 <span class="text-danger">\*<\/span><\/label>\s*'
+            .'<div class="input-group"[^>]*data-schedule-capacity>\s*'
+            .'<input type="number" class="form-control\s*"\s+id="schedule_capacity" name="schedule_capacity"\s+value="3"\s+'
+            .'min="1" max="99" step="1" inputmode="numeric"[^>]*>\s*'
+            .'<span class="input-group-text">頭<\/span>/u',
+            $html
+        );
+        // 営業開始時刻・営業終了時刻のまとまりの下
+        $this->assertGreaterThan(strpos($html, 'data-schedule-time-range'), strpos($html, 'data-schedule-capacity'));
+    }
+
+    public function test_同時に預かれる頭数を保存して表示する(): void
+    {
+        $this->actingAsRole('admin');
+
+        $this->update(['schedule_open_time' => '08:00', 'schedule_close_time' => '19:00', 'schedule_capacity' => '5'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', '事業所情報の設定を更新しました。');
+
+        $this->assertSame('5', SystemSetting::query()->where('key', 'schedule_capacity')->value('value'));
+        $this->assertSame(5, ScheduleSetting::capacity());
+        $html = $this->get(route('settings.schedule.edit'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/name="schedule_capacity"\s+value="5"/', $html);
+    }
+
+    public function test_同時に預かれる頭数は1と99を保存できる(): void
+    {
+        $this->actingAsRole('admin');
+
+        foreach (['1' => 1, '99' => 99] as $input => $expected) {
+            $this->update(['schedule_open_time' => '08:00', 'schedule_close_time' => '19:00', 'schedule_capacity' => $input])
+                ->assertSessionHasNoErrors();
+            $this->assertSame($expected, ScheduleSetting::capacity());
+        }
+    }
+
+    public function test_同時に預かれる頭数の必須_整数_範囲の文言(): void
+    {
+        $this->actingAsRole('admin');
+        $cases = [
+            '' => '同時に預かれる頭数を入力してください。',
+            '2.5' => '同時に預かれる頭数は整数で入力してください。',
+            'abc' => '同時に預かれる頭数は整数で入力してください。',
+            '0' => '同時に預かれる頭数は1〜99の範囲で指定してください。',
+            '100' => '同時に預かれる頭数は1〜99の範囲で指定してください。',
+        ];
+
+        foreach ($cases as $input => $message) {
+            $this->update(['schedule_open_time' => '08:00', 'schedule_close_time' => '19:00', 'schedule_capacity' => (string) $input])
+                ->assertSessionHasErrors(['schedule_capacity' => $message]);
+        }
+        $this->assertSame(0, SystemSetting::query()->count());
+    }
+
+    public function test_同時に預かれる頭数のエラーは欄のまとまりの下に出し入力した値を戻す(): void
+    {
+        $this->actingAsRole('admin');
+
+        $this->update(['schedule_open_time' => '08:00', 'schedule_close_time' => '19:00', 'schedule_capacity' => '0']);
+        $html = $this->get(route('settings.schedule.edit'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/class="form-control\s+is-invalid\s*"\s+id="schedule_capacity" name="schedule_capacity"\s+value="0"/', $html);
+        $this->assertMatchesRegularExpression(
+            '/<span class="input-group-text">頭<\/span>\s*<\/div>\s*<div class="invalid-feedback d-block">同時に預かれる頭数は1〜99の範囲で指定してください。<\/div>/u',
+            $html
+        );
+    }
+
+    public function test_保存した値が読めないときは3で動く(): void
+    {
+        SystemSetting::query()->create(['key' => 'schedule_capacity', 'value' => 'abc']);
+        $this->assertSame(3, ScheduleSetting::capacity());
+
+        SystemSetting::query()->where('key', 'schedule_capacity')->update(['value' => '0']);
+        $this->assertSame(3, ScheduleSetting::capacity());
+
+        SystemSetting::query()->where('key', 'schedule_capacity')->update(['value' => '7']);
+        $this->assertSame(7, ScheduleSetting::capacity());
     }
 }
