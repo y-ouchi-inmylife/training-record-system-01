@@ -86,7 +86,7 @@ class ClientContactDetailsTest extends TestCase
             ClientContract::query()->create(['client_id' => $client->id, 'contracted_on' => '2026-09-01', 'count' => 4]);
         }
         if ($usage) {
-            ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => '2026-10-01']);
+            ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => '2026-10-01', 'start_time' => '08:00', 'end_time' => '19:00']);
         }
 
         return $client;

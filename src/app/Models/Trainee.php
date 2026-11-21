@@ -157,6 +157,16 @@ class Trainee extends Model
     }
 
     /**
+     * このトレーニーの利用（D-1000。2026-11 追加）。トレーニーを削除しても利用は消えず、
+     * DB の外部キー（ON DELETE SET NULL）で「トレーニーなし」になる。
+     * 空のトレーニーの判定（CONTENT_RELATIONS）には入れない（トレーニーを消しても利用は消えないため。CONTENT_RELATIONS は一緒に消える表）
+     */
+    public function usages(): HasMany
+    {
+        return $this->hasMany(ClientUsage::class);
+    }
+
+    /**
      * 愛犬アンケート用 URL のトークン（DS-1000。回答済みのものを含む）
      */
     public function intakeSurveyTokens(): HasMany

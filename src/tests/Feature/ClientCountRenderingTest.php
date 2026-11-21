@@ -143,7 +143,7 @@ class ClientCountRenderingTest extends TestCase
         for ($i = 0; $i < $times; $i++) {
             $usage = ClientUsage::query()->create([
                 'client_id' => $client->id, 'client_contract_id' => $contract?->id,
-                'used_on' => $usedOn, 'note' => $note,
+                'used_on' => $usedOn, 'start_time' => '08:00', 'end_time' => '19:00', 'note' => $note,
             ]);
         }
 

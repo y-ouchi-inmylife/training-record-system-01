@@ -59,7 +59,17 @@ trait CreatesClientCountTables
             // SQLite は接続設定 foreign_key_constraints（config/database.php、既定 true）で外部キーが効く。
             $table->unsignedBigInteger('client_contract_id')->nullable();
             $table->foreign('client_contract_id')->references('id')->on('client_contracts')->nullOnDelete();
+            // どのトレーニーの分か（2026-11 追加。NULL は「トレーニーなし」）。trainees の表を先に作ったテストでは、
+            // 本番と同じく、トレーニーの削除で NULL に戻る外部キーを付ける（SQLite は親の表がないと、外部キーのある表に行を入れられないため、
+            // trainees の表がないテストでは付けない）
+            $table->unsignedBigInteger('trainee_id')->nullable();
+            if (Schema::hasTable('trainees')) {
+                $table->foreign('trainee_id')->references('id')->on('trainees')->nullOnDelete();
+            }
             $table->date('used_on');
+            // 開始時刻・終了時刻（2026-11 追加）。本番と同じく NOT NULL で、デフォルト値は持たない
+            $table->time('start_time');
+            $table->time('end_time');
             $table->string('note', 255)->nullable();
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();

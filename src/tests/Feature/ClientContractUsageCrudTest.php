@@ -290,6 +290,8 @@ class ClientContractUsageCrudTest extends TestCase
             'client_id' => $this->client->id,
             'client_contract_id' => $contract?->id,
             'used_on' => $usedOn,
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ]);
     }
 

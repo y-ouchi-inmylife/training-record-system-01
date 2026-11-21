@@ -121,7 +121,7 @@ class ContractListTest extends TestCase
     private function usages(Client $client, ?ClientContract $contract, int $times): void
     {
         for ($i = 0; $i < $times; $i++) {
-            ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => $contract?->id, 'used_on' => '2026-10-01']);
+            ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => $contract?->id, 'used_on' => '2026-10-01', 'start_time' => '08:00', 'end_time' => '19:00']);
         }
     }
 

@@ -15,7 +15,7 @@ use Illuminate\Support\Collection;
  * セクション5「マスの並べ方」）。表示のときに古い契約から自動で割り当てる処理は持たない。
  *
  *   1. 各契約に、回数ぶんのマスを用意する
- *   2. その契約に割り当てた利用を、利用日の昇順（同じ日は id の昇順）に並べ、左のマスから埋める。
+ *   2. その契約に割り当てた利用を、利用日 → 開始時刻 → id の昇順に並べ、左のマスから埋める。
  *      利用 1 件は 1 回分で、1 マスを使う（利用は回数を持たない。D-1000 注記）
  *   3. 埋まらなかったマスは「未利用」
  *   4. 契約に割り当てていない利用は「（契約なし）」の行（未割り当て）に並べる
@@ -37,13 +37,13 @@ class ContractTicketService
      *   'remaining'  => ?int,  // 会員の残り回数（契約回数の合計 − 利用の件数。未割り当ても数える）。契約も利用も 0 件なら null
      *   'isEmpty'    => bool,  // 契約も利用も 1 件もないか（カード本文の空の状態の判定用）
      *   'unassigned' => [      // 「（契約なし）」の行
-     *     'slots' => ClientUsage[],  // 1 要素 = 1 マス。利用日の昇順（同じ日は id の昇順）
+     *     'slots' => ClientUsage[],  // 1 要素 = 1 マス。利用日 → 開始時刻 → id の昇順
      *     'count' => int,            // 未割り当ての利用の件数（＝マスの数。バッジ「未割り当て n」の n）
      *   ],
      *   'contracts'  => [      // 表示順（契約日の新しいものが先頭）
      *     [
      *       'contract'   => ClientContract,
-     *       'slots'      => (ClientUsage|null)[],  // 1 要素 = 1 マス。null は未利用。利用日の昇順
+     *       'slots'      => (ClientUsage|null)[],  // 1 要素 = 1 マス。null は未利用。利用日 → 開始時刻 → id の昇順
      *       'remaining'  => int,                   // この契約の残り（回数 − 割り当てた利用の件数。0 未満にはしない）
      *       'usedUp'     => bool,                  // 残りが 0 か
      *       'usageCount' => int,                   // 割り当てた利用の件数（削除の確認ダイアログ用。＝使ったマスの数）
@@ -72,10 +72,12 @@ class ContractTicketService
             ])
             ->values();
 
-        // 利用日の昇順・同じ日は id の昇順（マスの並び）
+        // 利用日 → 開始時刻 → id の昇順（マスの並び。2026-11 変更：その前は利用日 → id。設計書 requirements.md 6-17-9）。
+        // 開始時刻は「HH:MM:SS」（または「HH:MM」）の文字列なので、そろえてから文字列で比べる
         $sortedUsages = $usages
             ->sortBy([
                 fn (ClientUsage $a, ClientUsage $b) => $a->used_on->format('Y-m-d') <=> $b->used_on->format('Y-m-d'),
+                fn (ClientUsage $a, ClientUsage $b) => ClientUsage::toInputTime($a->start_time) <=> ClientUsage::toInputTime($b->start_time),
                 fn (ClientUsage $a, ClientUsage $b) => $a->id <=> $b->id,
             ])
             ->values();

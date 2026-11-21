@@ -355,12 +355,13 @@ class Client extends Authenticatable
     /**
      * 利用（D-1000）
      *
-     * 並び順は割り当てルールと同じ利用日の昇順（同じ日は `id` の昇順）。
+     * 並び順は利用日 → 開始時刻 → `id` の昇順（2026-11 変更：その前は利用日 → `id`。設計書 requirements.md 6-17-9）。
      */
     public function usages(): HasMany
     {
         return $this->hasMany(ClientUsage::class)
             ->orderBy('used_on')
+            ->orderBy('start_time')
             ->orderBy('id');
     }
 

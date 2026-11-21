@@ -35,9 +35,10 @@ class ContractTicketServiceTest extends TestCase
         return $contract;
     }
 
-    private function usage(int $id, ?int $contractId, string $usedOn): ClientUsage
+    private function usage(int $id, ?int $contractId, string $usedOn, string $startTime = '08:00:00'): ClientUsage
     {
-        $usage = new ClientUsage(['client_contract_id' => $contractId, 'used_on' => $usedOn]);
+        // 開始時刻（2026-11 追加）は、DB から返るときと同じ「HH:MM:SS」を既定にする
+        $usage = new ClientUsage(['client_contract_id' => $contractId, 'used_on' => $usedOn, 'start_time' => $startTime, 'end_time' => '19:00:00']);
         $usage->id = $id;
 
         return $usage;
@@ -63,6 +64,34 @@ class ContractTicketServiceTest extends TestCase
             }
         }
         $this->fail("contract {$contractId} not found");
+    }
+
+    public function test_同じ日の利用は開始時刻の順に並び_同じ時刻ならidの順(): void
+    {
+        // 利用日 → 開始時刻 → id の順（2026-11 変更。設計書 requirements.md 6-17-9）。id の小さい利用ほど開始時刻が遅い
+        $contracts = collect([$this->contract(1, '2026-10-01', 4)]);
+        $usages = collect([
+            $this->usage(1, 1, '2026-10-05', '15:00:00'),
+            $this->usage(2, 1, '2026-10-05', '09:30:00'),
+            $this->usage(3, 1, '2026-10-04', '18:00:00'),
+            $this->usage(4, 1, '2026-10-05', '09:30:00'),
+        ]);
+
+        $ticket = (new ContractTicketService)->build($contracts, $usages);
+
+        $this->assertSame([3, 2, 4, 1], array_map(fn ($usage) => $usage->id, $ticket['contracts'][0]['slots']));
+    }
+
+    public function test_未割り当ての利用も開始時刻の順に並ぶ(): void
+    {
+        $usages = collect([
+            $this->usage(1, null, '2026-10-05', '13:00:00'),
+            $this->usage(2, null, '2026-10-05', '08:00:00'),
+        ]);
+
+        $ticket = (new ContractTicketService)->build(collect(), $usages);
+
+        $this->assertSame([2, 1], array_map(fn ($usage) => $usage->id, $ticket['unassigned']['slots']));
     }
 
     public function test_契約1件で利用なしならすべて未利用(): void

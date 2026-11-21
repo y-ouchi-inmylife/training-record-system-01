@@ -16,13 +16,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * 残りのない契約への割り当ては ClientUsageRequest でエラーにするが、
  * 会員の残り回数がマイナスになる登録は止めない。
  * 削除は物理削除、権限は一般トレーナーも可（設計書 requirements.md 6-17-6）。
+ *
+ * どのトレーニー（Trainee）の分かを trainee_id で持つ（2026-11 追加。NULL は「トレーニーなし」）。
+ * トレーニーを削除すると DB の外部キー（ON DELETE SET NULL）で「トレーニーなし」になり、利用そのものは残る。
+ * 開始時刻・終了時刻（start_time・end_time）も持つ（2026-11 追加）。DB からは「HH:MM:SS」の文字列で返る。
+ * 利用日が今日より後の利用は予定として扱う（状態の列は持たない。設計書 requirements.md 6-17-9）。
  */
 class ClientUsage extends Model
 {
     protected $fillable = [
         'client_id',
         'client_contract_id',
+        'trainee_id',
         'used_on',
+        'start_time',
+        'end_time',
         'note',
         'updated_by',
     ];
@@ -48,6 +56,60 @@ class ClientUsage extends Model
     public function contract(): BelongsTo
     {
         return $this->belongsTo(ClientContract::class, 'client_contract_id');
+    }
+
+    /**
+     * どのトレーニーの分か（2026-11 追加）。「トレーニーなし」なら null
+     */
+    public function trainee(): BelongsTo
+    {
+        return $this->belongsTo(Trainee::class);
+    }
+
+    /**
+     * 開始時刻を「HH:MM」で返す（入力欄に入れる値。DB からは「HH:MM:SS」で返るため。2026-11 追加）
+     */
+    public function getStartTimeInputAttribute(): string
+    {
+        return self::toInputTime($this->start_time);
+    }
+
+    /**
+     * 終了時刻を「HH:MM」で返す（入力欄に入れる値。2026-11 追加）
+     */
+    public function getEndTimeInputAttribute(): string
+    {
+        return self::toInputTime($this->end_time);
+    }
+
+    /**
+     * 時刻の表示「8:00〜19:00」（時は先頭の 0 を付けない、分は 2 桁。設計書 screen-design.md S-0305 セクション5。2026-11 追加）
+     */
+    public function getTimeRangeLabelAttribute(): string
+    {
+        return self::toDisplayTime($this->start_time).'〜'.self::toDisplayTime($this->end_time);
+    }
+
+    /**
+     * 「HH:MM:SS」または「HH:MM」を「HH:MM」に直す。空なら空文字
+     */
+    public static function toInputTime(?string $time): string
+    {
+        return $time === null || $time === '' ? '' : substr($time, 0, 5);
+    }
+
+    /**
+     * 「HH:MM:SS」または「HH:MM」を「G:i」（時は先頭の 0 なし、分は 2 桁）に直す。空なら空文字
+     */
+    public static function toDisplayTime(?string $time): string
+    {
+        $hm = self::toInputTime($time);
+        if ($hm === '') {
+            return '';
+        }
+        [$hour, $minute] = explode(':', $hm);
+
+        return ((int) $hour).':'.$minute;
     }
 
     /**

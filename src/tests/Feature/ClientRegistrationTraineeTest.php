@@ -223,13 +223,15 @@ class ClientRegistrationTraineeTest extends TestCase
 
     public function test_判定に入れた表はトレーニーに結び付く表のすべて(): void
     {
-        // トレーニーに結び付く表を足したら、判定（Trainee::CONTENT_RELATIONS）にも足す
+        // トレーニーに結び付く表を足したら、判定（Trainee::CONTENT_RELATIONS）にも足す。
+        // 対象は、トレーニーの削除で一緒に消える（外部キーが ON DELETE CASCADE の）表（2026-11 変更：利用〔client_usages〕の
+        // trainee_id は ON DELETE SET NULL で、トレーニーを消しても利用は残るため、数えない。その前は ->on('trainees') の表をすべて数えていた）
         $this->assertSame([
             'measurements', 'intakeSurveyTokens', 'intakeSurveyResponses', 'personalityDiagnosisTokens', 'personalityDiagnosisResults',
         ], Trainee::CONTENT_RELATIONS);
         $tables = [];
         foreach (glob(database_path('migrations/*.php')) as $file) {
-            if (preg_match_all("/->on\\('trainees'\\)/", file_get_contents($file)) && preg_match("/Schema::(?:create|table)\\('([a-z_]+)'/", file_get_contents($file), $m)) {
+            if (preg_match_all("/->on\\('trainees'\\)->cascadeOnDelete\\(\\)/", file_get_contents($file)) && preg_match("/Schema::(?:create|table)\\('([a-z_]+)'/", file_get_contents($file), $m)) {
                 $tables[] = $m[1];
             }
         }

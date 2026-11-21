@@ -78,8 +78,8 @@ class ClientContractNavRenderingTest extends TestCase
         $client = Client::query()->create(['internal_id' => 'C-1', 'last_name' => '山田', 'first_name' => '太郎']);
         $c = ClientContract::query()->create(['client_id' => $client->id, 'contracted_on' => '2026-09-01', 'count' => 4]);
         ClientContract::query()->create(['client_id' => $client->id, 'contracted_on' => '2026-10-01', 'count' => 3]);
-        ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => $c->id, 'used_on' => '2026-09-05']);
-        ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => '2026-09-06']);
+        ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => $c->id, 'used_on' => '2026-09-05', 'start_time' => '08:00', 'end_time' => '19:00']);
+        ClientUsage::query()->create(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => '2026-09-06', 'start_time' => '08:00', 'end_time' => '19:00']);
 
         return $client;
     }

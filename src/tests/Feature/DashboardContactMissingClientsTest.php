@@ -89,7 +89,7 @@ class DashboardContactMissingClientsTest extends TestCase
             DB::table('client_contracts')->insert(['client_id' => $client->id, 'contracted_on' => $date, 'count' => 4]);
         }
         foreach ($usedOn as $date) {
-            DB::table('client_usages')->insert(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => $date]);
+            DB::table('client_usages')->insert(['client_id' => $client->id, 'client_contract_id' => null, 'used_on' => $date, 'start_time' => '08:00', 'end_time' => '19:00']);
         }
 
         return $client;
