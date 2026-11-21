@@ -21,9 +21,10 @@ import {
     capacityCheckQuery,
     capacityConfirmMessage,
     capacityState,
-    countText,
+    cellCountText,
     dayCellClasses,
     dayHeadingParts,
+    isPastDay,
     initialState,
     monthHeading,
     monthWeeks,
@@ -46,6 +47,7 @@ class UsageSchedule {
         this.today = null;          // サーバーの今日（月の JSON の today）
         this.capacity = null;       // 同時に預かれる数（JSON の capacity）
         this.counts = {};           // 出している月の日ごとの預かる数
+        this.countsLoaded = false;  // 出している月の預かる数を読み込んだか（読み込む前・失敗は「n/上限」を出さない。2026-11 追加）
         this.monthSeq = 0;
         this.daySeq = 0;
 
@@ -70,6 +72,7 @@ class UsageSchedule {
         this.excludeUsageId = excludeUsageId === null || excludeUsageId === '' ? null : String(excludeUsageId);
         this.state = initialState(ymd, fallbackDate);
         this.counts = {};
+        this.countsLoaded = false;
         this.renderMonth();
         this.loadMonth();
         this.loadDay();
@@ -97,6 +100,7 @@ class UsageSchedule {
         this.state = next;
         if (monthChanged) {
             this.counts = {};
+        this.countsLoaded = false;
         }
         this.renderMonth();
         if (monthChanged) this.loadMonth();
@@ -136,6 +140,7 @@ class UsageSchedule {
             const data = await this.fetchJson(`${this.monthUrl}?${this.params({ month })}`);
             if (seq !== this.monthSeq) return;
             this.counts = data.days || {};
+            this.countsLoaded = true;
             this.capacity = data.capacity;
             this.today = data.today;
             this.renderMonth();
@@ -191,14 +196,16 @@ class UsageSchedule {
 
     dayButton(ymd) {
         const count = this.counts[ymd] || 0;
-        // 空きあり・満・超過（判定は usage-schedule-core.js）。上限をまだ読んでいない間は色を付けない
-        const state = this.capacity === null ? null : capacityState(count, this.capacity);
+        // 空きあり・満・超過（判定は usage-schedule-core.js）。月の預かる数をまだ読んでいない間は色を付けない
+        const loaded = this.countsLoaded && this.capacity !== null;
+        const state = loaded ? capacityState(count, this.capacity) : null;
+        const past = isPastDay(ymd, this.today);
         const selected = ymd === this.state.selected;
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.date = ymd;
         // 「n/上限」の文字の色（空きあり・満・超過）・今日の背景・選んでいる日の枠は usage-schedule-core.js の dayCellClasses で決める
-        const classes = dayCellClasses({ state, selected, today: ymd === this.today });
+        const classes = dayCellClasses({ state, selected, today: ymd === this.today, past });
         button.className = classes.button.join(' ');
         if (selected) button.setAttribute('aria-pressed', 'true');
 
@@ -209,15 +216,16 @@ class UsageSchedule {
 
         const countEl = document.createElement('span');
         countEl.className = classes.count.join(' ');
-        // 預かる数がない日も高さをそろえるため、ノーブレークスペースを入れる
-        const text = this.capacity === null ? '' : countText(count, this.capacity);
+        // 読み込む前は「n/上限」を出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
+        const text = cellCountText({ count, capacity: this.capacity, loaded: this.countsLoaded });
         countEl.textContent = text === '' ? '\u00a0' : text;
         button.appendChild(countEl);
 
         const weekday = WEEKDAYS[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
         const label = [`${parseInt(ymd.slice(5, 7), 10)}月${parseInt(ymd.slice(8), 10)}日(${weekday})`];
-        if (count > 0 && this.capacity !== null) label.push(`${count}/${this.capacity}`);
+        if (text !== '') label.push(text);
         if (ymd === this.today) label.push('今日');
+        if (past) label.push('過去の日');
         button.setAttribute('aria-label', label.join(' '));
 
         return button;

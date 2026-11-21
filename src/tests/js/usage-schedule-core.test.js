@@ -8,12 +8,14 @@ import {
     capacityConfirmMessage,
     capacityState,
     countColorClasses,
+    cellCountText,
     countText,
     dayCellClasses,
     dayHeading,
     dayHeadingParts,
     dayLabel,
     initialState,
+    isPastDay,
     monthHeading,
     monthWeeks,
     moveMonth,
@@ -82,9 +84,10 @@ describe('monthWeeks', () => {
 });
 
 describe('預かる数の表示', () => {
-    it('預かる数が 1 以上なら「n/上限」、0 なら空', () => {
+    it('預かる数と上限の文は「n/上限」（0 も「0/上限」）', () => {
         expect(countText(2, 3)).toBe('2/3');
-        expect(countText(0, 3)).toBe('');
+        // 2026-11 変更：0 も「0/3」（その前は空）
+        expect(countText(0, 3)).toBe('0/3');
     });
 
     // 2026-11 変更：満（上限ちょうど）は緑、超過（上限を超える）は赤に分けた。その前は上限以上をひとまとめに赤にしていた
@@ -287,6 +290,62 @@ describe('「n/上限」の太字と色', () => {
             const heading = dayHeadingParts('2026-11-20', count, capacity);
             expect(cell.count.filter((c) => c.startsWith('usage-schedule-count-'))).toEqual(heading.countClasses);
         }
+    });
+});
+
+// 過去の日は灰色の背景、予約がない日も「0/上限」（2026-11 追加。設計書 S-0305-M05「予約状況」）
+describe('過去の日と「0/上限」', () => {
+    const cell = (opts) => dayCellClasses({ state: CAPACITY_AVAILABLE, selected: false, today: false, past: false, ...opts });
+
+    it('過去の日かどうかはサーバーの今日で決め、今日を知らない間は過去にしない', () => {
+        expect(isPastDay('2026-11-20', '2026-11-21')).toBe(true);
+        expect(isPastDay('2026-10-31', '2026-11-21')).toBe(true);
+        expect(isPastDay('2026-11-21', '2026-11-21')).toBe(false);
+        expect(isPastDay('2026-11-22', '2026-11-21')).toBe(false);
+        expect(isPastDay('2026-11-20', null)).toBe(false);
+    });
+
+    it('過去の日のマスは灰色の背景、日付の数字は薄い色', () => {
+        const { button, day } = cell({ past: true });
+        expect(button).toEqual(expect.arrayContaining(['usage-schedule-past', 'bg-secondary-subtle']));
+        expect(button).not.toContain('btn-light');
+        expect(day).toEqual(['d-block', 'text-body-secondary']);
+    });
+
+    it('今日・今日より後の日には、灰色の背景も薄い色も付かない', () => {
+        for (const opts of [{ today: true }, {}]) {
+            const { button, day } = cell(opts);
+            expect(button).not.toContain('bg-secondary-subtle');
+            expect(button).not.toContain('usage-schedule-past');
+            expect(day).not.toContain('text-body-secondary');
+        }
+    });
+
+    it.each([
+        [CAPACITY_FULL, 'usage-schedule-count-full'],
+        [CAPACITY_OVER, 'usage-schedule-count-over'],
+    ])('過去の日が %s のとき、灰色の背景と色の文字が両方付く（太字も）', (state, colorClass) => {
+        const { button, count } = cell({ state, past: true });
+        expect(button).toContain('bg-secondary-subtle');
+        expect(count).toEqual(['d-block', 'small', 'usage-schedule-count', colorClass]);
+    });
+
+    it('過去の日を選んでいるとき、灰色の背景と枠が両方付く', () => {
+        const { button } = cell({ past: true, selected: true });
+        expect(button).toEqual(expect.arrayContaining(['bg-secondary-subtle', 'usage-schedule-selected']));
+    });
+
+    it('予約がない日にも「0/上限」が出て、空きあり（色なし・太字）になる', () => {
+        expect(cellCountText({ count: 0, capacity: 3, loaded: true })).toBe('0/3');
+        expect(capacityState(0, 3)).toBe(CAPACITY_AVAILABLE);
+        expect(cell({ state: capacityState(0, 3) }).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
+        expect(cellCountText({ count: 2, capacity: 3, loaded: true })).toBe('2/3');
+    });
+
+    it('月の預かる数を読み込む前は「n/上限」を出さない（上限を知っていても）', () => {
+        expect(cellCountText({ count: 0, capacity: 3, loaded: false })).toBe('');
+        expect(cellCountText({ count: 2, capacity: 3, loaded: false })).toBe('');
+        expect(cellCountText({ count: 0, capacity: null, loaded: true })).toBe('');
     });
 });
 

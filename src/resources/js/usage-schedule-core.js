@@ -103,9 +103,36 @@ export function dayLabel(ymd) {
     return `${d.month}/${d.day}(${WEEKDAYS[weekday]})`;
 }
 
-/** カレンダーのマスに出す預かる数（「2/3」）。預かる数が 0 なら空 */
+/** 預かる数と上限の文（「2/3」。0 も「0/3」。2026-11 変更：その前は 0 なら空にしていた） */
 export function countText(count, capacity) {
-    return count > 0 ? `${count}/${capacity}` : '';
+    return `${count}/${capacity}`;
+}
+
+/**
+ * カレンダーのマスに出す「n/上限」（2026-11 変更。設計書 S-0305-M05「予約状況」）。
+ * 月の預かる数を読み込んだあとは、予約がない日も「0/上限」を出す（月のすべての日）。
+ * 読み込む前（読み込み中・失敗）は出さない（空）
+ *
+ * @param {{count: number, capacity: (number|null), loaded: boolean}} cell
+ * @returns {string}
+ */
+export function cellCountText({ count, capacity, loaded }) {
+    if (!loaded || capacity === null) {
+        return '';
+    }
+
+    return countText(count, capacity);
+}
+
+/**
+ * 今日より前の日（過去の日）か（2026-11 追加）。今日はサーバーの今日（月の JSON の today）。
+ * 今日をまだ知らない間（null）は過去の日として扱わない
+ *
+ * @param {string} ymd 「YYYY-MM-DD」
+ * @param {(string|null)} today 「YYYY-MM-DD」
+ */
+export function isPastDay(ymd, today) {
+    return today !== null && today !== undefined && ymd < today;
 }
 
 /** 預かる数の状態：空きあり（上限未満。0 も含む）・満（上限ちょうど）・超過（上限を超える）。2026-11 追加 */
@@ -144,14 +171,20 @@ export function capacityState(count, capacity) {
  *   （2026-11 変更：その前は日付の数字を青の太字〔text-primary・fw-bold〕にしていた）
  * - 選んでいる日（＝利用日）は太い青の枠（usage-schedule-selected。app.scss で内側に描くので、マスの大きさは変わらない）
  * - 今日を選んでいるときは、薄い青の背景と枠の両方。上限をまだ読んでいない間（state が null）は空きありと同じ
+ * - 今日より前の日（past。isPastDay）は、マスの背景を灰色（bg-secondary-subtle）、日付の数字を少し薄い色（text-body-secondary）。
+ *   「n/上限」の色と太字は変えない。過去の日を選んでいるときは、灰色の背景と枠の両方（2026-11 追加）
  *
- * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean}} cell
+ * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean, past?: boolean}} cell
  * @returns {{button: string[], day: string[], count: string[]}}
  */
-export function dayCellClasses({ state, selected, today }) {
+export function dayCellClasses({ state, selected, today, past = false }) {
     const button = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
+    const day = ['d-block'];
     if (today) {
         button.push('usage-schedule-today', 'bg-primary-subtle');
+    } else if (past) {
+        button.push('usage-schedule-past', 'bg-secondary-subtle');
+        day.push('text-body-secondary');
     } else {
         button.push('btn-light');
     }
@@ -162,7 +195,7 @@ export function dayCellClasses({ state, selected, today }) {
     // 「n/上限」はどれも太字（usage-schedule-count。app.scss）。色は満・超過だけ（countColorClasses）
     const count = ['d-block', 'small', 'usage-schedule-count', ...countColorClasses(state)];
 
-    return { button, day: ['d-block'], count };
+    return { button, day, count };
 }
 
 /**
