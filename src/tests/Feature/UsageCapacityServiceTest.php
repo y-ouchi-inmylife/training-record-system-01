@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientUsage;
 use App\Services\UsageCapacityService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesClientCountTables;
 use Tests\TestCase;
@@ -218,4 +219,111 @@ class UsageCapacityServiceTest extends TestCase
         $this->assertSame(1, UsageCapacityService::maxOverlap([['08:00', '12:00'], ['12:00', '19:00']]));
         $this->assertSame(3, UsageCapacityService::maxOverlap([['08:00', '19:00'], ['09:00', '10:00'], ['09:30', '09:45'], ['12:00', '13:00']]));
     }
+
+    // ---- 同じトレーニーの重なり（2026-11 追加。requirements.md 6-17-11「保存時の確認」の重なりの確認） ----
+
+    /** トレーニーを作って id を返す */
+    private function trainee(string $name = 'アムロ', ?Client $client = null): int
+    {
+        return DB::table('trainees')->insertGetId(['client_id' => ($client ?? $this->client)->id, 'name' => $name]);
+    }
+
+    public function test_重なり_同じトレーニーで時間帯が重なる利用を返す(): void
+    {
+        $amuro = $this->trainee();
+        $usage = $this->usage('2026-11-26', '13:00', '19:00', traineeId: $amuro);
+
+        $this->assertSame($usage->id, $this->service->overlappingUsage('2026-11-26', '14:00', '15:00', $amuro)?->id);
+    }
+
+    public function test_重なり_終わりと始まりが同じ時刻なら重ならない(): void
+    {
+        $amuro = $this->trainee();
+        $this->usage('2026-11-26', '08:00', '12:00', traineeId: $amuro);
+
+        $this->assertNull($this->service->overlappingUsage('2026-11-26', '12:00', '19:00', $amuro));
+        $this->assertNull($this->service->overlappingUsage('2026-11-26', '07:00', '08:00', $amuro));
+    }
+
+    public function test_重なり_一部だけ重なっても重なりとする(): void
+    {
+        $amuro = $this->trainee();
+        $usage = $this->usage('2026-11-26', '08:00', '12:00', traineeId: $amuro);
+
+        $this->assertSame($usage->id, $this->service->overlappingUsage('2026-11-26', '11:59', '19:00', $amuro)?->id);
+    }
+
+    public function test_重なり_別のトレーニー_トレーニーなし_別の日の利用は数えない(): void
+    {
+        $amuro = $this->trainee();
+        $other = $this->trainee('ポチ');
+        $this->usage('2026-11-26', '08:00', '19:00', traineeId: $other);
+        $this->usage('2026-11-26', '08:00', '19:00'); // トレーニーなし
+        $this->usage('2026-11-25', '08:00', '19:00', traineeId: $amuro);
+
+        $this->assertNull($this->service->overlappingUsage('2026-11-26', '10:00', '12:00', $amuro));
+    }
+
+    public function test_重なり_編集では自身を除く(): void
+    {
+        $amuro = $this->trainee();
+        $self = $this->usage('2026-11-26', '10:00', '12:00', traineeId: $amuro);
+
+        $this->assertSame($self->id, $this->service->overlappingUsage('2026-11-26', '10:00', '12:00', $amuro)?->id);
+        $this->assertNull($this->service->overlappingUsage('2026-11-26', '10:00', '12:00', $amuro, $self->id));
+    }
+
+    public function test_重なり_複数あるときは開始時刻がいちばん早いもの(): void
+    {
+        $amuro = $this->trainee();
+        $this->usage('2026-11-26', '13:00', '19:00', traineeId: $amuro);
+        $early = $this->usage('2026-11-26', '09:00', '14:00', traineeId: $amuro);
+        $this->usage('2026-11-26', '11:00', '12:00', traineeId: $amuro);
+
+        $this->assertSame($early->id, $this->service->overlappingUsage('2026-11-26', '08:00', '19:00', $amuro)?->id);
+    }
+
+    public function test_確認の判定_トレーニーなしは重なりを確かめず_過去の日は重なりだけ確かめる(): void
+    {
+        $this->createSystemSettingsTable();
+        Carbon::setTestNow('2026-11-21 10:00:00');
+        try {
+            $amuro = $this->trainee('');
+            $this->usage('2026-11-20', '08:00', '19:00', traineeId: $amuro);
+            $this->usage('2026-11-20', '08:00', '19:00');
+            $this->usage('2026-11-20', '08:00', '19:00'); // 上限 3 に 1 件足すと 4（過去なので上限は確かめない）
+
+            $past = $this->service->confirmation('2026-11-20', '10:00', '12:00', null, $amuro);
+            $this->assertTrue($past['needs_confirmation']);
+            $this->assertFalse($past['needs_capacity_confirmation'], '過去の日は上限を確かめない');
+            $this->assertTrue($past['needs_overlap_confirmation'], '過去の日も重なりは確かめる');
+            $this->assertSame(['start' => '08:00', 'end' => '19:00'], $past['overlap']);
+            $this->assertSame('名前未登録', $past['trainee_label']);
+
+            $noTrainee = $this->service->confirmation('2026-11-20', '10:00', '12:00');
+            $this->assertFalse($noTrainee['needs_overlap_confirmation']);
+            $this->assertNull($noTrainee['overlap']);
+            $this->assertNull($noTrainee['trainee_label']);
+            $this->assertFalse($noTrainee['needs_confirmation']);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_確認の文_重なり_上限_両方(): void
+    {
+        $overlap = ['needs_overlap_confirmation' => true, 'needs_capacity_confirmation' => false, 'trainee_label' => 'アムロ',
+            'overlap' => ['start' => '13:00', 'end' => '19:00'], 'count' => 2, 'capacity' => 3, 'start' => '14:00', 'end' => '18:00'];
+        $tail = 'このまま登録する場合は、もう一度［登録］を押してください。';
+
+        $this->assertSame('アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。'.$tail,
+            UsageCapacityService::confirmationMessage('2026-11-26', $overlap, $tail));
+        $this->assertSame('この利用を入れると、11/26(木) 14:00〜18:00 に同時に預かる数が 4 になり、上限（3）を超えます。'.$tail,
+            UsageCapacityService::confirmationMessage('2026-11-26',
+                ['needs_overlap_confirmation' => false, 'needs_capacity_confirmation' => true, 'count' => 4] + $overlap, $tail));
+        $this->assertSame('アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。'
+            .'この利用を入れると、11/26(木) 14:00〜18:00 に同時に預かる数が 4 になり、上限（3）を超えます。'.$tail,
+            UsageCapacityService::confirmationMessage('2026-11-26', ['needs_capacity_confirmation' => true, 'count' => 4] + $overlap, $tail));
+    }
 }
+

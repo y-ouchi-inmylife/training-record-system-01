@@ -23,14 +23,16 @@
        - $defaultTraineeId  : ?int 登録時の「トレーニー」の初期値（Client::defaultUsageTraineeId()。null は初期選択なし。2026-11 追加）
        - $defaultStartTime  : string 登録時の開始時刻の初期値（事業所情報の設定の営業開始時刻。HH:MM。2026-11 追加）
        - $defaultEndTime    : string 登録時の終了時刻の初期値（事業所情報の設定の営業終了時刻。HH:MM。2026-11 追加）
-       - $capacityWarning   : ?string 保存時の上限の確認で戻ったときの注意の文（なければ null。渡さなくてもよい。2026-11 追加）
+       - $confirmationWarning : ?string 保存時の確認（上限・重なり）で戻ったときの注意の文（なければ null。渡さなくてもよい。2026-11 追加）
 
-     ## 保存時の上限の確認（設計書 S-0305-M05「保存時の上限の確認」。2026-11 追加）
+     ## 保存時の確認（設計書 S-0305-M05「保存時の確認」。2026-11 追加）
 
-     同時に預かれる数を超える保存は、サーバー（ClientUsageController）が保存せずに戻す。そのときは上部に
-     alert-warning で注意を出し、確認済みの印（hidden _capacity_confirmed）に 1 を入れる。もう一度押すと保存する。
-     利用日・開始時刻・終了時刻を変えたら、印を外して注意を消す（契約・トレーニー・メモでは外さない）。
-     この注意は入力エラーではない（§2-7 の対象外）。
+     保存の前に、上限の確認（同時に預かれる数を超える）と重なりの確認（同じトレーニー・同じ日で時間帯が重なる。2026-11 追加）を
+     サーバーに問い合わせ、要るときは確認ダイアログを 1 つ出す（onSubmit）。［OK］で確認済みの印（hidden _usage_confirmed）を付けて送る。
+     問い合わせに失敗したときなどは、サーバー（ClientUsageController）が保存せずに戻す。そのときは上部に
+     alert-warning で注意を出し、確認済みの印に 1 を入れる。もう一度押すと保存する。
+     利用日・開始時刻・終了時刻・トレーニーを変えたら、印を外して注意を消す（契約・メモでは外さない。
+     2026-11 変更：重なりはトレーニーで変わるため、トレーニーを足した）。この注意は入力エラーではない（§2-7 の対象外）。
 
      ## 項目の並び（設計書 S-0305-M05。2026-11 変更）
 
@@ -79,8 +81,9 @@
                 <input type="hidden" name="_usage_id" id="usageFormIdInput" value="">
                 {{-- 送信元のモーダルの種別。ClientUsageRequest はルールに持たないため validated() に混入しない。 --}}
                 <input type="hidden" name="_form_type" value="usage">
-                {{-- 確認済みの印（2026-11 追加）。上限の確認で戻ったときだけ 1。ClientUsageRequest のルールに持たない --}}
-                <input type="hidden" name="_capacity_confirmed" id="usageCapacityConfirmedInput" value="{{ ($capacityWarning ?? null) !== null ? '1' : '' }}">
+                {{-- 確認済みの印（2026-11 追加）。保存時の確認（上限・重なり）で戻ったときだけ 1。ClientUsageRequest のルールに持たない。
+                     2026-11 変更：名前を _capacity_confirmed から改めた --}}
+                <input type="hidden" name="_usage_confirmed" id="usageConfirmedInput" value="{{ ($confirmationWarning ?? null) !== null ? '1' : '' }}">
 
                 <div class="modal-header">
                     <h5 class="modal-title" id="usageModalLabel">利用の登録</h5>
@@ -88,9 +91,9 @@
                 </div>
 
                 <div class="modal-body">
-                    {{-- 保存時の上限の確認の注意（入力欄と予約状況の上。入力エラーではない。2026-11 追加） --}}
-                    @if(($capacityWarning ?? null) !== null)
-                        <div class="alert alert-warning" role="alert" id="usageCapacityWarning">{{ $capacityWarning }}</div>
+                    {{-- 保存時の確認（上限・重なり）の注意（入力欄と予約状況の上。入力エラーではない。2026-11 追加） --}}
+                    @if(($confirmationWarning ?? null) !== null)
+                        <div class="alert alert-warning" role="alert" id="usageConfirmationWarning">{{ $confirmationWarning }}</div>
                     @endif
                     <div class="row g-4">
                     {{-- 左：入力欄（並びは今のまま） --}}
@@ -212,8 +215,8 @@
 <script>
 (function () {
     const STORE_URL = @json(route('client-usages.store', $client));
-    // 保存の前の確認（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」の 1）
-    const CAPACITY_CHECK_URL = @json(route('api.usage-schedule.check'));
+    // 保存の前の確認（2026-11 追加。設計書 S-0305-M05「保存時の確認」の 1）
+    const USAGE_CHECK_URL = @json(route('api.usage-schedule.check'));
     const UPDATE_URL_TEMPLATE = @json(route('client-usages.update', ['usage' => '__ID__']));
     const DESTROY_URL_TEMPLATE = @json(route('client-usages.destroy', ['usage' => '__ID__']));
     // 登録時の「契約」の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
@@ -247,22 +250,23 @@
     let endTimeInput = null;
     let schedule = null;        // 予約状況（window.UsageSchedule。2026-11 追加）
     let confirmedInput = null;  // 確認済みの印（2026-11 追加）
-    let confirmedValues = null; // 印を入れたときの利用日・開始時刻・終了時刻（変わったら印を外す）
+    let confirmedValues = null; // 印を入れたときの利用日・開始時刻・終了時刻・トレーニー（変わったら印を外す）
 
     // 確認済みの印を外し、注意を消す（2026-11 追加）
-    function clearCapacityConfirmation() {
+    function clearConfirmation() {
         confirmedInput.value = '';
         confirmedValues = null;
-        const warning = document.getElementById('usageCapacityWarning');
+        const warning = document.getElementById('usageConfirmationWarning');
         if (warning) warning.remove();
     }
-    function timeValues() {
-        return [usedOnInput.value, startTimeInput.value, endTimeInput.value].join('|');
+    // 印を外すかを決める値：利用日・開始時刻・終了時刻・トレーニー（2026-11 変更：重なりはトレーニーで変わるため、トレーニーを足した）
+    function confirmationValues() {
+        return [usedOnInput.value, startTimeInput.value, endTimeInput.value, traineeSelect ? traineeSelect.value : ''].join('|');
     }
-    // 利用日・開始時刻・終了時刻が、印を入れたときから変わったら印を外す（契約・トレーニー・メモでは外さない）
-    function onTimeValuesChanged() {
-        if (confirmedValues !== null && timeValues() !== confirmedValues) {
-            clearCapacityConfirmation();
+    // 利用日・開始時刻・終了時刻・トレーニーが、印を入れたときから変わったら印を外す（契約・メモでは外さない）
+    function onConfirmationValuesChanged() {
+        if (confirmedValues !== null && confirmationValues() !== confirmedValues) {
+            clearConfirmation();
         }
     }
 
@@ -332,13 +336,13 @@
         usedOnInput.addEventListener('change', function () { schedule.setDate(usedOnInput.value); });
 
         // 確認済みの印（2026-11 追加）
-        confirmedInput = document.getElementById('usageCapacityConfirmedInput');
-        [usedOnInput, startTimeInput, endTimeInput].forEach(function (input) {
-            input.addEventListener('input', onTimeValuesChanged);
-            input.addEventListener('change', onTimeValuesChanged);
+        confirmedInput = document.getElementById('usageConfirmedInput');
+        [usedOnInput, startTimeInput, endTimeInput, traineeSelect].filter(Boolean).forEach(function (input) {
+            input.addEventListener('input', onConfirmationValuesChanged);
+            input.addEventListener('change', onConfirmationValuesChanged);
         });
 
-        // 保存の前の確認（2026-11 追加）。上限を超えるときは確認ダイアログを出し、［OK］なら確認済みの印を付けて送る
+        // 保存の前の確認（2026-11 追加）。上限・重なりの確認が要るときは確認ダイアログを出し、［OK］なら確認済みの印を付けて送る
         formEl.addEventListener('submit', onSubmit);
 
         deleteBtn.addEventListener('click', function () {
@@ -348,12 +352,12 @@
         });
     }
 
-    // ［登録］（［更新］）を押したとき（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」の 1）。
+    // ［登録］（［更新］）を押したとき（2026-11 追加。設計書 S-0305-M05「保存時の確認」の 1）。
     // - 確認済みの印がすでにあれば、問い合わせずに送る（サーバーの確認から戻ったあとなど）
-    // - サーバーに、この利用を入れたときの預かる数を問い合わせる（判定はサーバー。画面では数えない）。問い合わせの間はボタンを押せない
-    // - 上限を超えるなら確認ダイアログ。［OK］で印を付けて送り、［キャンセル］なら送らずにモーダルに戻る（入力はそのまま）
-    // - 超えないとき・問い合わせに失敗したとき（通信の失敗・サーバーのエラー・422）は、確認せずにそのまま送る
-    //   （入力の検証と上限の確認は、サーバー側で今までどおり行う〔安全網〕）
+    // - サーバーに、この利用を入れたときの預かる数と、同じトレーニーの重なりを問い合わせる（判定はサーバー。画面では数えない）。問い合わせの間はボタンを押せない
+    // - 上限の確認・重なりの確認のどちらかが要るなら、確認ダイアログを 1 つ。［OK］で印を付けて送り、［キャンセル］なら送らずにモーダルに戻る（入力はそのまま）
+    // - 確認が要らないとき・問い合わせに失敗したとき（通信の失敗・サーバーのエラー・422）は、確認せずにそのまま送る
+    //   （入力の検証と 2 つの確認は、サーバー側で今までどおり行う〔安全網〕）
     let checking = false;
     function submitNow() {
         // form.submit() は submit の出来事を起こさないので、この関数に戻ってこない
@@ -370,13 +374,15 @@
 
         let check = null;
         try {
-            const query = window.UsageSchedule.capacityCheckQuery({
+            const query = window.UsageSchedule.usageCheckQuery({
                 usedOn: usedOnInput.value,
                 startTime: startTimeInput.value,
                 endTime: endTimeInput.value,
+                // トレーニー（同じトレーニーの重なりの確認。2026-11 追加。欄がない・選ばれていなければ送らない）
+                traineeId: traineeSelect ? traineeSelect.value : null,
                 excludeUsageId: idInput.value || null,
             });
-            const response = await fetch(CAPACITY_CHECK_URL + '?' + query, {
+            const response = await fetch(USAGE_CHECK_URL + '?' + query, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             });
@@ -389,14 +395,14 @@
 
         if (check && check.needs_confirmation) {
             const button = idInput.value ? '更新' : '登録';
-            if (!confirm(window.UsageSchedule.capacityConfirmMessage(check, button))) {
+            if (!confirm(window.UsageSchedule.usageConfirmMessage(check, button))) {
                 // ［キャンセル］：送らずにモーダルに戻る
                 checking = false;
                 submitBtn.disabled = false;
                 return;
             }
             confirmedInput.value = '1';
-            confirmedValues = timeValues();
+            confirmedValues = confirmationValues();
         }
         submitNow();
     }
@@ -426,7 +432,7 @@
         initRefs();
         if (!modal) return;
         // 新しく開くときは、前の確認を持ち越さない
-        clearCapacityConfirmation();
+        clearConfirmation();
         setCreateMode();
         applyDisabled(null);
         contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
@@ -443,7 +449,7 @@
         // data: { id, clientContractId, traineeId, usedOn, startTime, endTime, note }（data-* 属性はキャメルケースになる。時刻は HH:MM）
         initRefs();
         if (!modal) return;
-        clearCapacityConfirmation();
+        clearConfirmation();
         setEditMode(data.id);
         const currentContractId = data.clientContractId || null;
         applyDisabled(currentContractId);
@@ -477,9 +483,9 @@
             }
             // トレーニー・時刻は Blade の old() で戻し済み。未選択の選択肢の表示だけを合わせる
             applyTraineeBlank();
-            // 上限の確認で戻ったときは、印を入れたときの値を覚えておく（変わったら印を外す）
+            // 保存時の確認で戻ったときは、印を入れたときの値を覚えておく（変わったら印を外す）
             if (confirmedInput.value === '1') {
-                confirmedValues = timeValues();
+                confirmedValues = confirmationValues();
             }
             // 予約状況は入力していた利用日の月で開く（正しくない日付なら今日）
             schedule.open(usedOnInput.value, { excludeUsageId: oldUsageId || null, fallbackDate: todayString() });

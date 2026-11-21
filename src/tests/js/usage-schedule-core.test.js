@@ -4,8 +4,8 @@ import {
     CAPACITY_FULL,
     CAPACITY_OVER,
     applyInput,
-    capacityCheckQuery,
-    capacityConfirmMessage,
+    usageCheckQuery,
+    usageConfirmMessage,
     capacityState,
     countBadgeClasses,
     cellCountText,
@@ -222,36 +222,63 @@ describe('dayCellClasses', () => {
     });
 });
 
-// 上限を超えるときの確認ダイアログ（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）
+// 保存の前の確認ダイアログ（2026-11 追加。設計書 S-0305-M05「保存時の確認」。重なりの確認は 2026-11 追加）
 describe('保存の前の確認', () => {
-    const check = { needs_confirmation: true, count: 4, capacity: 3, peak_start: '15:00', peak_end: '17:00', date_label: '11/26(木)' };
+    const capacity = {
+        needs_confirmation: true, needs_capacity_confirmation: true, count: 4, capacity: 3, peak_start: '15:00', peak_end: '17:00',
+        needs_overlap_confirmation: false, overlap_start: null, overlap_end: null, trainee_label: 'アムロ', date_label: '11/26(木)',
+    };
+    const overlap = {
+        ...capacity, needs_capacity_confirmation: false, count: 2,
+        needs_overlap_confirmation: true, overlap_start: '13:00', overlap_end: '19:00',
+    };
+    const both = { ...capacity, needs_overlap_confirmation: true, overlap_start: '13:00', overlap_end: '19:00' };
 
-    it('登録のダイアログの文', () => {
-        expect(capacityConfirmMessage(check, '登録')).toBe(
+    it('上限だけ：登録', () => {
+        expect(usageConfirmMessage(capacity, '登録')).toBe(
             'この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。\n\n登録しますか？',
         );
     });
 
-    it('編集のダイアログの文は、最後が「更新しますか？」', () => {
-        expect(capacityConfirmMessage({ ...check, count: 5, peak_start: '8:00', peak_end: '19:00' }, '更新')).toBe(
+    it('上限だけ：編集は最後が「更新しますか？」', () => {
+        expect(usageConfirmMessage({ ...capacity, count: 5, peak_start: '8:00', peak_end: '19:00' }, '更新')).toBe(
             'この利用を入れると、11/26(木) 8:00〜19:00 に同時に預かる数が 5 になり、上限（3）を超えます。\n\n更新しますか？',
         );
     });
 
-    it('ダイアログの文に「頭」「匹」を使わない', () => {
-        const message = capacityConfirmMessage(check, '登録');
-        expect(message).not.toMatch(/[頭匹]/);
+    it('重なりだけ：登録・編集', () => {
+        expect(usageConfirmMessage(overlap, '登録')).toBe('アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。\n\n登録しますか？');
+        expect(usageConfirmMessage(overlap, '更新')).toBe('アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。\n\n更新しますか？');
     });
 
-    it('問い合わせのクエリ：登録は除く利用なし、編集は除く利用の id を付ける', () => {
-        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00' }))
+    it('重なりの文のトレーニーは表示名のまま（名前未登録も）', () => {
+        expect(usageConfirmMessage({ ...overlap, trainee_label: '名前未登録' }, '登録'))
+            .toBe('名前未登録 は、11/26(木) 13:00〜19:00 にすでに予約があります。\n\n登録しますか？');
+    });
+
+    it('両方：重なり → 上限の順に 1 行ずつ並べ、最後に 1 回だけ問う', () => {
+        expect(usageConfirmMessage(both, '登録')).toBe(
+            'アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。\n'
+            + 'この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。\n\n登録しますか？',
+        );
+        expect(usageConfirmMessage(both, '更新').endsWith('\n\n更新しますか？')).toBe(true);
+        expect(usageConfirmMessage(both, '更新').match(/しますか？/g)).toHaveLength(1);
+    });
+
+    it('ダイアログの文に「頭」「匹」を使わない', () => {
+        expect(usageConfirmMessage(both, '登録')).not.toMatch(/[頭匹]/);
+    });
+
+    it('問い合わせのクエリ：トレーニー・除く利用は、あるときだけ付ける', () => {
+        expect(usageCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00' }))
             .toBe('used_on=2026-11-26&start_time=14%3A00&end_time=18%3A00');
-        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: null }))
-            .not.toContain('exclude_usage_id');
-        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: '' }))
-            .not.toContain('exclude_usage_id');
-        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: 12 }))
-            .toBe('used_on=2026-11-26&start_time=14%3A00&end_time=18%3A00&exclude_usage_id=12');
+        for (const empty of [null, '']) {
+            const query = usageCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', traineeId: empty, excludeUsageId: empty });
+            expect(query).not.toContain('trainee_id');
+            expect(query).not.toContain('exclude_usage_id');
+        }
+        expect(usageCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', traineeId: '10', excludeUsageId: 12 }))
+            .toBe('used_on=2026-11-26&start_time=14%3A00&end_time=18%3A00&trainee_id=10&exclude_usage_id=12');
     });
 });
 

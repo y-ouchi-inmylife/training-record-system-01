@@ -18,8 +18,8 @@
 import {
     WEEKDAYS,
     applyInput,
-    capacityCheckQuery,
-    capacityConfirmMessage,
+    usageCheckQuery,
+    usageConfirmMessage,
     capacityState,
     cellCountText,
     dayCellClasses,
@@ -262,7 +262,7 @@ class UsageSchedule {
 }
 
 // 利用の保存の前の確認（2026-11 追加）で使う、DOM に触れない計算。利用モーダルのスクリプト（インライン）から使う
-UsageSchedule.capacityCheckQuery = capacityCheckQuery;
-UsageSchedule.capacityConfirmMessage = capacityConfirmMessage;
+UsageSchedule.usageCheckQuery = usageCheckQuery;
+UsageSchedule.usageConfirmMessage = usageConfirmMessage;
 
 window.UsageSchedule = UsageSchedule;

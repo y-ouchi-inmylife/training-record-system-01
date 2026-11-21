@@ -281,14 +281,18 @@ export function dayHeadingParts(ymd, count, capacity) {
 }
 
 /**
- * 利用の保存の前の確認（GET /api/usage-schedule/check）に送るクエリ（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）。
- * 編集のときは、編集中の利用自身を数えないよう exclude_usage_id を付ける
+ * 利用の保存の前の確認（GET /api/usage-schedule/check）に送るクエリ（2026-11 追加。設計書 S-0305-M05「保存時の確認」）。
+ * 編集のときは、編集中の利用自身を数えないよう exclude_usage_id を付ける。
+ * トレーニーが選ばれているときは trainee_id を付ける（同じトレーニーの重なりの確認。2026-11 追加。選ばれていなければ付けない）
  *
- * @param {{usedOn: string, startTime: string, endTime: string, excludeUsageId?: (string|number|null)}} input
+ * @param {{usedOn: string, startTime: string, endTime: string, traineeId?: (string|number|null), excludeUsageId?: (string|number|null)}} input
  * @returns {string}
  */
-export function capacityCheckQuery({ usedOn, startTime, endTime, excludeUsageId = null }) {
+export function usageCheckQuery({ usedOn, startTime, endTime, traineeId = null, excludeUsageId = null }) {
     const params = new URLSearchParams({ used_on: usedOn, start_time: startTime, end_time: endTime });
+    if (traineeId !== null && traineeId !== '') {
+        params.set('trainee_id', String(traineeId));
+    }
     if (excludeUsageId !== null && excludeUsageId !== '') {
         params.set('exclude_usage_id', String(excludeUsageId));
     }
@@ -297,16 +301,28 @@ export function capacityCheckQuery({ usedOn, startTime, endTime, excludeUsageId 
 }
 
 /**
- * 上限を超えるときの確認ダイアログ（confirm()）の文（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）。
- * 中身は問い合わせの答え（date_label・peak_start・peak_end・count・capacity。判定はサーバー）。画面では預かる数を計算しない。
- * 文の頭の「この利用を入れると」は、カレンダーの「n/上限」（入れる前の数）と count が食い違って見えないように付ける
+ * 保存の前の確認ダイアログ（confirm()）の文（2026-11 追加。設計書 S-0305-M05「保存時の確認」）。
+ * 中身は問い合わせの答え（判定はサーバー。画面では預かる数も重なりも計算しない）。
+ * 要る確認の文を、重なり → 上限の順に 1 行ずつ並べ、空行のあとに 1 回だけ「登録しますか？」（編集は「更新しますか？」）を付ける。
+ * - 重なり：「アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。」（trainee_label・overlap_start・overlap_end）
+ * - 上限：「この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。」
+ *   文の頭の「この利用を入れると」は、カレンダーの「n/上限」（入れる前の数）と count が食い違って見えないように付ける
+ * サーバー側の黄色の注意は、同じ文を UsageCapacityService::confirmationMessage で組み立てる
  *
- * @param {{date_label: string, peak_start: string, peak_end: string, count: number, capacity: number}} check
+ * @param {{date_label: string, needs_overlap_confirmation?: boolean, trainee_label?: string, overlap_start?: string, overlap_end?: string,
+ *          needs_capacity_confirmation?: boolean, peak_start?: string, peak_end?: string, count?: number, capacity?: number}} check
  * @param {'登録'|'更新'} button 押したボタンの名前
  * @returns {string}
  */
-export function capacityConfirmMessage(check, button) {
-    return `この利用を入れると、${check.date_label} ${check.peak_start}〜${check.peak_end} に同時に預かる数が ${check.count} になり、`
-        + `上限（${check.capacity}）を超えます。\n\n${button}しますか？`;
-}
+export function usageConfirmMessage(check, button) {
+    const lines = [];
+    if (check.needs_overlap_confirmation) {
+        lines.push(`${check.trainee_label} は、${check.date_label} ${check.overlap_start}〜${check.overlap_end} にすでに予約があります。`);
+    }
+    if (check.needs_capacity_confirmation) {
+        lines.push(`この利用を入れると、${check.date_label} ${check.peak_start}〜${check.peak_end} に同時に預かる数が ${check.count} になり、`
+            + `上限（${check.capacity}）を超えます。`);
+    }
 
+    return `${lines.join('\n')}\n\n${button}しますか？`;
+}

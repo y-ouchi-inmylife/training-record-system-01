@@ -226,10 +226,16 @@ class UsageScheduleApiTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'needs_confirmation' => true,
+                'needs_capacity_confirmation' => true,
                 'count' => 4,
                 'capacity' => 3,
                 'peak_start' => '10:00',
                 'peak_end' => '12:00',
+                // トレーニーを渡さないときは重なりを確かめない（2026-11 追加）
+                'needs_overlap_confirmation' => false,
+                'overlap_start' => null,
+                'overlap_end' => null,
+                'trainee_label' => null,
                 'date_label' => '11/26(木)',
             ]);
     }
@@ -323,6 +329,91 @@ class UsageScheduleApiTest extends TestCase
         $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))->assertOk();
 
         $this->assertSame(3, ClientUsage::query()->count());
+    }
+
+    // ---- 保存の前の確認：同じトレーニーの重なり（2026-11 追加） ----
+
+    public function test_確認_重なりだけ(): void
+    {
+        DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => 'アムロ']);
+        $this->usage($this->sato, '2026-11-26', '13:00', '19:00', 10);
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['start_time' => '14:00', 'end_time' => '15:00', 'trainee_id' => 10])))
+            ->assertOk()
+            ->assertExactJson([
+                'needs_confirmation' => true,
+                'needs_capacity_confirmation' => false,
+                'count' => 2,
+                'capacity' => 3,
+                'peak_start' => '14:00',
+                'peak_end' => '15:00',
+                'needs_overlap_confirmation' => true,
+                'overlap_start' => '13:00',
+                'overlap_end' => '19:00',
+                'trainee_label' => 'アムロ',
+                'date_label' => '11/26(木)',
+            ]);
+    }
+
+    public function test_確認_上限と重なりの両方(): void
+    {
+        DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => null]);
+        $this->fill(2);
+        $this->usage($this->sato, '2026-11-26', '09:00', '11:00', 10);
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['trainee_id' => 10])))
+            ->assertOk()
+            ->assertJson([
+                'needs_confirmation' => true,
+                'needs_capacity_confirmation' => true,
+                'count' => 4,
+                'needs_overlap_confirmation' => true,
+                'overlap_start' => '9:00',
+                'overlap_end' => '11:00',
+                'trainee_label' => '名前未登録',
+            ]);
+    }
+
+    public function test_確認_どちらもなし_重ならないとき(): void
+    {
+        DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => 'アムロ']);
+        $this->usage($this->sato, '2026-11-26', '08:00', '10:00', 10); // 10:00 まで（10:00 からとは重ならない）
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['trainee_id' => 10])))
+            ->assertOk()
+            ->assertJson([
+                'needs_confirmation' => false,
+                'needs_capacity_confirmation' => false,
+                'needs_overlap_confirmation' => false,
+                'overlap_start' => null,
+                'overlap_end' => null,
+                'trainee_label' => 'アムロ',
+            ]);
+    }
+
+    public function test_確認_トレーニーを渡さない_空のときは重なりを確かめない(): void
+    {
+        DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => 'アムロ']);
+        $this->usage($this->sato, '2026-11-26', '08:00', '19:00', 10);
+
+        foreach ([[], ['trainee_id' => '']] as $overrides) {
+            $this->getJson(route('api.usage-schedule.check', $this->checkQuery($overrides)))
+                ->assertOk()
+                ->assertJson(['needs_confirmation' => false, 'needs_overlap_confirmation' => false, 'trainee_label' => null]);
+        }
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['trainee_id' => 'x'])))
+            ->assertStatus(422)->assertJsonValidationErrors('trainee_id');
+    }
+
+    public function test_確認_過去の日も重なりは確かめ_編集では自身を除く(): void
+    {
+        DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => 'アムロ']);
+        $self = $this->usage($this->sato, '2026-11-20', '10:00', '12:00', 10);
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['used_on' => '2026-11-20', 'trainee_id' => 10])))
+            ->assertOk()->assertJson(['needs_confirmation' => true, 'needs_overlap_confirmation' => true, 'date_label' => '11/20(金)']);
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['used_on' => '2026-11-20', 'trainee_id' => 10, 'exclude_usage_id' => $self->id])))
+            ->assertOk()->assertJson(['needs_confirmation' => false, 'needs_overlap_confirmation' => false]);
     }
 }
 

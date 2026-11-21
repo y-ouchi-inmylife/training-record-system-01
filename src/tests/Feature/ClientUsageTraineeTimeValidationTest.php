@@ -136,9 +136,18 @@ class ClientUsageTraineeTimeValidationTest extends TestCase
         $ai = $this->trainee($this->client, 'アイ');
 
         $this->store(['trainee_id' => (string) $ai->id, 'start_time' => '08:00', 'end_time' => '12:00'])->assertSessionHasNoErrors();
-        $this->store(['trainee_id' => (string) $ai->id, 'start_time' => '08:00', 'end_time' => '12:00'])->assertSessionHasNoErrors();
+        // 時間帯が重ならなければ、確認なしで登録できる（12:00 まで と 12:00 から は重ならない）
+        $this->store(['trainee_id' => (string) $ai->id, 'start_time' => '12:00', 'end_time' => '19:00'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionMissing('usage_confirmation_warning');
+        // 時間帯が重なると、エラーにはせず保存の前に確認する（2026-11 追加。requirements.md 6-17-11 の重なりの確認）。確認すれば登録できる
+        $this->store(['trainee_id' => (string) $ai->id, 'start_time' => '08:00', 'end_time' => '12:00'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('usage_confirmation_warning');
+        $this->store(['trainee_id' => (string) $ai->id, 'start_time' => '08:00', 'end_time' => '12:00', '_usage_confirmed' => '1'])
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame(2, ClientUsage::query()->where('trainee_id', $ai->id)->whereDate('used_on', '2026-11-25')->count());
+        $this->assertSame(3, ClientUsage::query()->where('trainee_id', $ai->id)->whereDate('used_on', '2026-11-25')->count());
     }
 
     public function test_編集でもトレーニーと時刻を変えられ_検証は登録と同じ(): void

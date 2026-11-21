@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClientUsage;
+use App\Models\Trainee;
 use App\Support\ScheduleSetting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -129,43 +130,90 @@ class UsageCapacityService
     }
 
     /**
-     * 利用の保存の前・保存時の上限の確認の判定（2026-11 追加。requirements.md 6-17-11）。
+     * 利用の保存の前・保存時の確認の判定（2026-11 追加。requirements.md 6-17-11「保存時の確認」）。
      * 保存時の確認（ClientUsageController）と、保存の前の問い合わせ（UsageScheduleController::check）で同じものを使う。
      *
+     * 上限の確認：
      * - 利用日が今日（アプリのタイムゾーン）より前なら確認しない
      * - その利用を入れたときの時間帯の預かる数（peakWith）が上限（ScheduleSetting::capacity()）を超えるときだけ確認する
-     *   （上限ちょうどは確認しない）
+     *   （上限ちょうどは確認しない）。start・end は預かる数が最も多くなる時間帯（「HH:MM」）
      *
-     * start・end は預かる数が最も多くなる時間帯（「HH:MM」）
+     * 重なりの確認（2026-11 追加）：
+     * - 同じトレーニー・同じ利用日で、時間帯が重なる利用がすでにあるとき（overlappingUsage）。過去の日も確かめる
+     * - トレーニーが選ばれていない（null）ときは確かめない。overlap はいちばん早い重なる利用の時間帯（「HH:MM」）
      *
-     * @return array{needs_confirmation: bool, count: int, capacity: int, start: string, end: string}
+     * needs_confirmation は、どちらかが要るとき true
+     *
+     * @return array{needs_confirmation: bool, needs_capacity_confirmation: bool, count: int, capacity: int, start: string, end: string,
+     *               needs_overlap_confirmation: bool, overlap: array{start: string, end: string}|null, trainee_label: string|null}
      */
-    public function confirmation(string $date, string $startTime, string $endTime, ?int $excludeUsageId = null): array
+    public function confirmation(string $date, string $startTime, string $endTime, ?int $excludeUsageId = null, ?int $traineeId = null): array
     {
         $date = Carbon::parse($date)->toDateString();
         $peak = $this->peakWith($date, $startTime, $endTime, $excludeUsageId);
         $capacity = ScheduleSetting::capacity();
+        $needsCapacity = $date >= today()->toDateString() && $peak['count'] > $capacity;
+
+        $overlapping = $traineeId === null ? null : $this->overlappingUsage($date, $startTime, $endTime, $traineeId, $excludeUsageId);
+        $trainee = $traineeId === null ? null : Trainee::find($traineeId);
 
         return [
-            'needs_confirmation' => $date >= today()->toDateString() && $peak['count'] > $capacity,
+            'needs_confirmation' => $needsCapacity || $overlapping !== null,
+            'needs_capacity_confirmation' => $needsCapacity,
             'count' => $peak['count'],
             'capacity' => $capacity,
             'start' => $peak['start'],
             'end' => $peak['end'],
+            'needs_overlap_confirmation' => $overlapping !== null,
+            'overlap' => $overlapping === null ? null : [
+                'start' => self::hm($overlapping->start_time),
+                'end' => self::hm($overlapping->end_time),
+            ],
+            // トレーナー側の表示名（名前が未登録なら「名前未登録」。Trainee::display_name）
+            'trainee_label' => $trainee?->display_name,
         ];
     }
 
     /**
-     * 確認の文の頭（「この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。」。2026-11 追加）。
-     * 保存時の確認の黄色の注意に使う。画面の確認ダイアログは同じ文を usage-schedule-core.js の capacityConfirmMessage で組み立てる
-     *
-     * @param  array{count: int, capacity: int, start: string, end: string}  $confirmation
+     * 同じトレーニー・同じ利用日で、時間帯が重なる利用（2026-11 追加。重なりの確認）。
+     * 時間帯は終わりを含まない（「12:00 まで」と「12:00 から」は重ならない。預かる数の数え方と同じ）。
+     * $excludeUsageId（編集中の利用自身）は除く。2 件以上あるときは、開始時刻 → 終了時刻 → id の順でいちばん早いもの。なければ null
      */
-    public static function confirmationLead(string $date, array $confirmation): string
+    public function overlappingUsage(string $date, string $startTime, string $endTime, int $traineeId, ?int $excludeUsageId = null): ?ClientUsage
     {
-        return 'この利用を入れると、'.ClientUsage::toShortDateLabel($date).' '
-            .ClientUsage::toDisplayTime($confirmation['start']).'〜'.ClientUsage::toDisplayTime($confirmation['end'])
-            .' に同時に預かる数が '.$confirmation['count'].' になり、上限（'.$confirmation['capacity'].'）を超えます。';
+        $start = self::hm($startTime);
+        $end = self::hm($endTime);
+
+        return $this->usagesOn($date, $excludeUsageId)
+            ->first(fn (ClientUsage $usage) => (int) $usage->trainee_id === $traineeId
+                && self::hm($usage->start_time) < $end
+                && self::hm($usage->end_time) > $start);
+    }
+
+    /**
+     * 確認の文（2026-11 追加。保存時の確認の黄色の注意に使う）。要る確認の文を、重なり → 上限の順に並べ、最後に $tail を 1 回だけ付ける。
+     * - 重なり：「アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。」
+     * - 上限：「この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。」
+     * 画面の確認ダイアログは、同じ文を usage-schedule-core.js の usageConfirmMessage で組み立てる
+     *
+     * @param  array<string, mixed>  $confirmation  confirmation() の戻り値
+     */
+    public static function confirmationMessage(string $date, array $confirmation, string $tail): string
+    {
+        $dateLabel = ClientUsage::toShortDateLabel($date);
+        $message = '';
+        if ($confirmation['needs_overlap_confirmation']) {
+            $message .= $confirmation['trainee_label'].' は、'.$dateLabel.' '
+                .ClientUsage::toDisplayTime($confirmation['overlap']['start']).'〜'.ClientUsage::toDisplayTime($confirmation['overlap']['end'])
+                .' にすでに予約があります。';
+        }
+        if ($confirmation['needs_capacity_confirmation']) {
+            $message .= 'この利用を入れると、'.$dateLabel.' '
+                .ClientUsage::toDisplayTime($confirmation['start']).'〜'.ClientUsage::toDisplayTime($confirmation['end'])
+                .' に同時に預かる数が '.$confirmation['count'].' になり、上限（'.$confirmation['capacity'].'）を超えます。';
+        }
+
+        return $message.$tail;
     }
 
     /**

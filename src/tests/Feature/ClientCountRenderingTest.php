@@ -949,15 +949,15 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->withSession([
             '_old_input' => ['_form_type' => 'usage', 'used_on' => '2026-11-26', 'start_time' => '14:00', 'end_time' => '18:00', 'note' => 'メモ'],
-            'usage_capacity_warning' => self::CAPACITY_WARNING,
+            'usage_confirmation_warning' => self::CAPACITY_WARNING,
         ])->get(route('clients.show', $client))->assertOk()->getContent();
 
         // 入力欄と予約状況の上に、黄色の注意（入力エラーではないので、上部のエラーの案内・赤枠は出さない）
         $this->assertMatchesRegularExpression(
-            '/<div class="modal-body">\s*<div class="alert alert-warning" role="alert" id="usageCapacityWarning">'.preg_quote(self::CAPACITY_WARNING, '/').'<\/div>\s*<div class="row g-4">/u',
+            '/<div class="modal-body">\s*<div class="alert alert-warning" role="alert" id="usageConfirmationWarning">'.preg_quote(self::CAPACITY_WARNING, '/').'<\/div>\s*<div class="row g-4">/u',
             $html
         );
-        $this->assertMatchesRegularExpression('/<input type="hidden" name="_capacity_confirmed" id="usageCapacityConfirmedInput" value="1">/u', $html);
+        $this->assertMatchesRegularExpression('/<input type="hidden" name="_usage_confirmed" id="usageConfirmedInput" value="1">/u', $html);
         $this->assertStringNotContainsString('入力内容に誤りがあります。', $html);
         $this->assertStringNotContainsString('is-invalid', substr($html, strpos($html, 'id="usageModal"'), 20000));
         // 入力した値を戻し、モーダルを開き直す
@@ -974,13 +974,13 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('const CAPACITY_CHECK_URL = '.json_encode(route('api.usage-schedule.check')).';', $html);
+        $this->assertStringContainsString('const USAGE_CHECK_URL = '.json_encode(route('api.usage-schedule.check')).';', $html);
         $this->assertStringContainsString("formEl.addEventListener('submit', onSubmit);", $html);
         // 確認済みの印があれば問い合わせずに送る・問い合わせの間はボタンを押せない・［OK］で印を付ける
         $this->assertStringContainsString("if (confirmedInput.value === '1') {\n            return; // そのまま送る", $html);
         $this->assertStringContainsString('submitBtn.disabled = true;', $html);
         $this->assertStringContainsString("const button = idInput.value ? '更新' : '登録';", $html);
-        $this->assertStringContainsString('if (!confirm(window.UsageSchedule.capacityConfirmMessage(check, button))) {', $html);
+        $this->assertStringContainsString('if (!confirm(window.UsageSchedule.usageConfirmMessage(check, button))) {', $html);
         $this->assertStringContainsString("confirmedInput.value = '1';", $html);
     }
 
@@ -992,7 +992,7 @@ class ClientCountRenderingTest extends TestCase
         foreach ([
             [],
             ['_old_input' => ['_form_type' => 'usage', 'used_on' => '2026-11-26', 'start_time' => '14:00', 'end_time' => '18:00'],
-                'usage_capacity_warning' => self::CAPACITY_WARNING],
+                'usage_confirmation_warning' => self::CAPACITY_WARNING],
         ] as $session) {
             $html = $this->withSession($session)->get(route('clients.show', $client))->assertOk()->getContent();
             $start = strpos($html, 'id="usageModal"');
@@ -1009,8 +1009,8 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertMatchesRegularExpression('/<input type="hidden" name="_capacity_confirmed" id="usageCapacityConfirmedInput" value="">/u', $html);
-        $this->assertStringNotContainsString('id="usageCapacityWarning"', $html);
+        $this->assertMatchesRegularExpression('/<input type="hidden" name="_usage_confirmed" id="usageConfirmedInput" value="">/u', $html);
+        $this->assertStringNotContainsString('id="usageConfirmationWarning"', $html);
         $this->assertStringNotContainsString('const oldUsageId', $html);
     }
 
@@ -1020,25 +1020,27 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->withSession([
             '_old_input' => ['_form_type' => 'contract'],
-            'usage_capacity_warning' => self::CAPACITY_WARNING,
+            'usage_confirmation_warning' => self::CAPACITY_WARNING,
         ])->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('id="usageCapacityWarning"', $html);
+        $this->assertStringNotContainsString('id="usageConfirmationWarning"', $html);
         $this->assertStringNotContainsString('const oldUsageId', $html);
     }
 
-    public function test_利用日と時刻を変えたら印を外し_契約トレーニーメモでは外さない(): void
+    public function test_利用日と時刻とトレーニーを変えたら印を外し_契約メモでは外さない(): void
     {
+        // 2026-11 変更：重なりの確認を足したので、トレーニーの変更でも印を外す
         $client = $this->makeClient('0001', '山田');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 印を外すのは利用日・開始時刻・終了時刻の入力だけ（契約・トレーニー・メモの欄には付けない）
-        $this->assertStringContainsString('[usedOnInput, startTimeInput, endTimeInput].forEach(function (input) {', $html);
-        $this->assertStringContainsString("input.addEventListener('input', onTimeValuesChanged);", $html);
-        $this->assertSame(1, substr_count($html, 'onTimeValuesChanged);') / 2);
+        // 印を外すのは利用日・開始時刻・終了時刻・トレーニーの入力だけ（契約・メモの欄には付けない）
+        $this->assertStringContainsString('[usedOnInput, startTimeInput, endTimeInput, traineeSelect].filter(Boolean).forEach(function (input) {', $html);
+        $this->assertStringContainsString("input.addEventListener('input', onConfirmationValuesChanged);", $html);
+        $this->assertStringContainsString("input.addEventListener('change', onConfirmationValuesChanged);", $html);
+        $this->assertStringContainsString("return [usedOnInput.value, startTimeInput.value, endTimeInput.value, traineeSelect ? traineeSelect.value : ''].join('|');", $html);
         // 新しく開くときは前の確認を持ち越さない
-        $this->assertSame(2, substr_count($html, '        clearCapacityConfirmation();'."\n".'        set'));
+        $this->assertSame(2, substr_count($html, '        clearConfirmation();'."\n".'        set'));
     }
 
     // ---- 利用のモーダルのトレーニーの選択肢・初期値と時刻の初期値（2026-11 追加。設計書 S-0305-M05） ----

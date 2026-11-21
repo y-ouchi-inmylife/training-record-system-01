@@ -874,8 +874,8 @@
                 'defaultTraineeId' => $usageForm['defaultTraineeId'],
                 'defaultStartTime' => $usageForm['defaultStartTime'],
                 'defaultEndTime' => $usageForm['defaultEndTime'],
-                // 保存時の上限の確認の注意（2026-11 追加。なければ null）
-                'capacityWarning' => $usageForm['capacityWarning'],
+                // 保存時の確認（上限・重なり）の注意（2026-11 追加。なければ null）
+                'confirmationWarning' => $usageForm['confirmationWarning'],
             ])
         </div>
     </div>
