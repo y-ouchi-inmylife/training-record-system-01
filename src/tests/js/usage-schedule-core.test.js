@@ -4,6 +4,8 @@ import {
     CAPACITY_FULL,
     CAPACITY_OVER,
     applyInput,
+    capacityCheckQuery,
+    capacityConfirmMessage,
     capacityState,
     countText,
     dayCellClasses,
@@ -210,3 +212,37 @@ describe('dayCellClasses', () => {
         });
     });
 });
+
+// 上限を超えるときの確認ダイアログ（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）
+describe('保存の前の確認', () => {
+    const check = { needs_confirmation: true, count: 4, capacity: 3, peak_start: '15:00', peak_end: '17:00', date_label: '11/26(木)' };
+
+    it('登録のダイアログの文', () => {
+        expect(capacityConfirmMessage(check, '登録')).toBe(
+            'この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。\n\n登録しますか？',
+        );
+    });
+
+    it('編集のダイアログの文は、最後が「更新しますか？」', () => {
+        expect(capacityConfirmMessage({ ...check, count: 5, peak_start: '8:00', peak_end: '19:00' }, '更新')).toBe(
+            'この利用を入れると、11/26(木) 8:00〜19:00 に同時に預かる数が 5 になり、上限（3）を超えます。\n\n更新しますか？',
+        );
+    });
+
+    it('ダイアログの文に「頭」「匹」を使わない', () => {
+        const message = capacityConfirmMessage(check, '登録');
+        expect(message).not.toMatch(/[頭匹]/);
+    });
+
+    it('問い合わせのクエリ：登録は除く利用なし、編集は除く利用の id を付ける', () => {
+        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00' }))
+            .toBe('used_on=2026-11-26&start_time=14%3A00&end_time=18%3A00');
+        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: null }))
+            .not.toContain('exclude_usage_id');
+        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: '' }))
+            .not.toContain('exclude_usage_id');
+        expect(capacityCheckQuery({ usedOn: '2026-11-26', startTime: '14:00', endTime: '18:00', excludeUsageId: 12 }))
+            .toBe('used_on=2026-11-26&start_time=14%3A00&end_time=18%3A00&exclude_usage_id=12');
+    });
+});
+

@@ -213,3 +213,34 @@ export function usageLine(usage) {
 export function dayHeading(ymd, count, capacity) {
     return `${dayLabel(ymd)} の予約　${count}/${capacity}`;
 }
+
+/**
+ * 利用の保存の前の確認（GET /api/usage-schedule/check）に送るクエリ（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）。
+ * 編集のときは、編集中の利用自身を数えないよう exclude_usage_id を付ける
+ *
+ * @param {{usedOn: string, startTime: string, endTime: string, excludeUsageId?: (string|number|null)}} input
+ * @returns {string}
+ */
+export function capacityCheckQuery({ usedOn, startTime, endTime, excludeUsageId = null }) {
+    const params = new URLSearchParams({ used_on: usedOn, start_time: startTime, end_time: endTime });
+    if (excludeUsageId !== null && excludeUsageId !== '') {
+        params.set('exclude_usage_id', String(excludeUsageId));
+    }
+
+    return params.toString();
+}
+
+/**
+ * 上限を超えるときの確認ダイアログ（confirm()）の文（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）。
+ * 中身は問い合わせの答え（date_label・peak_start・peak_end・count・capacity。判定はサーバー）。画面では預かる数を計算しない。
+ * 文の頭の「この利用を入れると」は、カレンダーの「n/上限」（入れる前の数）と count が食い違って見えないように付ける
+ *
+ * @param {{date_label: string, peak_start: string, peak_end: string, count: number, capacity: number}} check
+ * @param {'登録'|'更新'} button 押したボタンの名前
+ * @returns {string}
+ */
+export function capacityConfirmMessage(check, button) {
+    return `この利用を入れると、${check.date_label} ${check.peak_start}〜${check.peak_end} に同時に預かる数が ${check.count} になり、`
+        + `上限（${check.capacity}）を超えます。\n\n${button}しますか？`;
+}
+

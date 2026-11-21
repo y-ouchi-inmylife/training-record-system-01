@@ -31,6 +31,8 @@ Route::domain(config('subdomain.trainer_host'))
     // 権限は利用の登録・編集と同じ（practitioners）。参照なのでアクセスログには記録しない（LogAccess の ACTION_MAP に足さない）
     Route::get('/usage-schedule/month', [UsageScheduleController::class, 'month'])->name('api.usage-schedule.month');
     Route::get('/usage-schedule/day', [UsageScheduleController::class, 'day'])->name('api.usage-schedule.day');
+    // 利用の保存の前の確認（この利用を入れたときの預かる数と、確認ダイアログが要るか。2026-11 追加。api-design.md 4-2-6）
+    Route::get('/usage-schedule/check', [UsageScheduleController::class, 'check'])->name('api.usage-schedule.check');
     Route::post('/training-records/auto-create', [TrainingRecordController::class, 'autoCreate'])->name('api.training-records.auto-create');
     Route::get('/training-records/available-media', [TrainingRecordController::class, 'availableMedia'])->name('api.training-records.available-media');
     Route::post('/media-records/upload-url', [MediaRecordController::class, 'uploadUrl'])->name('api.media-records.upload-url');

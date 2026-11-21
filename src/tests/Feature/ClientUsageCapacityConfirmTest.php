@@ -99,7 +99,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $response->assertRedirect(route('clients.show', $this->client));
         $response->assertSessionHasNoErrors();
         $response->assertSessionHas('usage_capacity_warning',
-            '11/26(木) 15:00〜17:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。');
+            'この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。');
         $response->assertSessionHasInput('used_on', '2026-11-26');
         $response->assertSessionHasInput('note', 'メモ');
         $response->assertSessionHasInput('_form_type', 'usage');
@@ -155,7 +155,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
 
         $this->post(route('client-usages.store', $this->client), $this->input(['used_on' => '2026-11-21']))
             ->assertSessionHas('usage_capacity_warning',
-                '11/21(土) 14:00〜18:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。');
+                'この利用を入れると、11/21(土) 14:00〜18:00 に同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。');
 
         $this->post(route('client-usages.store', $this->client), $this->input(['used_on' => '2026-11-20']))
             ->assertSessionHas('success', '利用を登録しました。');
@@ -194,7 +194,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id]))
             ->assertRedirect(route('clients.show', $this->client))
             ->assertSessionHas('usage_capacity_warning',
-                '11/26(木) 15:00〜17:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま更新する場合は、もう一度［更新］を押してください。')
+                'この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 3 になり、上限（2）を超えます。このまま更新する場合は、もう一度［更新］を押してください。')
             ->assertSessionHasInput('_usage_id', (string) $self->id);
         $this->assertSame('2026-11-27', $self->fresh()->used_on->toDateString(), '保存していない');
 

@@ -6,7 +6,6 @@ use App\Http\Requests\ClientUsageRequest;
 use App\Models\Client;
 use App\Models\ClientUsage;
 use App\Services\UsageCapacityService;
-use App\Support\ScheduleSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Carbon;
 
@@ -81,11 +80,12 @@ class ClientUsageController extends Controller
     }
 
     /**
-     * 保存時の上限の確認（2026-11 追加）。確認が要るときは注意の文を、要らないときは null を返す。
+     * 保存時の上限の確認（2026-11 追加。安全網）。確認が要るときは注意の文を、要らないときは null を返す。
      *
+     * ふだんは画面が保存の前に GET /api/usage-schedule/check で問い合わせ、確認ダイアログで［OK］なら確認済みの印を付けて送る
+     * （2026-11 変更）。ここは、問い合わせに失敗したときや、確認している間にほかの人が予約を入れたときの安全網。
      * - 確認済みの印があれば確かめない
-     * - 利用日が今日（アプリのタイムゾーン）より前なら確かめない
-     * - その利用を入れたときの時間帯の預かる数が上限を超えるときだけ確認する（上限と同じ預かる数なら確認しない）
+     * - 判定（今日以降だけ・上限を超えるときだけ）は UsageCapacityService::confirmation（問い合わせと同じ）
      *
      * @param  array<string, mixed>  $validated
      * @param  string  $button  最後の文のボタンの名前（「登録」「更新」）
@@ -102,19 +102,13 @@ class ClientUsageController extends Controller
         }
 
         $date = Carbon::parse($validated['used_on'])->toDateString();
-        if ($date < today()->toDateString()) {
+        $confirmation = $capacityService->confirmation($date, $validated['start_time'], $validated['end_time'], $excludeUsageId);
+        if (! $confirmation['needs_confirmation']) {
             return null;
         }
 
-        $peak = $capacityService->peakWith($date, $validated['start_time'], $validated['end_time'], $excludeUsageId);
-        $capacity = ScheduleSetting::capacity();
-        if ($peak['count'] <= $capacity) {
-            return null;
-        }
-
-        return ClientUsage::toShortDateLabel($date).' '
-            .ClientUsage::toDisplayTime($peak['start']).'〜'.ClientUsage::toDisplayTime($peak['end'])
-            .' は、同時に預かる数が '.$peak['count'].' になり、上限（'.$capacity.'）を超えます。'
+        // 2026-11 変更：文の頭に「この利用を入れると」を足した（確認ダイアログと同じ考え方）
+        return UsageCapacityService::confirmationLead($date, $confirmation)
             .'このまま'.$button.'する場合は、もう一度［'.$button.'］を押してください。';
     }
 

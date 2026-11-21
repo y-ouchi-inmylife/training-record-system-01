@@ -212,6 +212,8 @@
 <script>
 (function () {
     const STORE_URL = @json(route('client-usages.store', $client));
+    // 保存の前の確認（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」の 1）
+    const CAPACITY_CHECK_URL = @json(route('api.usage-schedule.check'));
     const UPDATE_URL_TEMPLATE = @json(route('client-usages.update', ['usage' => '__ID__']));
     const DESTROY_URL_TEMPLATE = @json(route('client-usages.destroy', ['usage' => '__ID__']));
     // 登録時の「契約」の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
@@ -336,11 +338,67 @@
             input.addEventListener('change', onTimeValuesChanged);
         });
 
+        // 保存の前の確認（2026-11 追加）。上限を超えるときは確認ダイアログを出し、［OK］なら確認済みの印を付けて送る
+        formEl.addEventListener('submit', onSubmit);
+
         deleteBtn.addEventListener('click', function () {
             if (confirm('この利用を削除しますか？')) {
                 deleteForm.submit();
             }
         });
+    }
+
+    // ［登録］（［更新］）を押したとき（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」の 1）。
+    // - 確認済みの印がすでにあれば、問い合わせずに送る（サーバーの確認から戻ったあとなど）
+    // - サーバーに、この利用を入れたときの預かる数を問い合わせる（判定はサーバー。画面では数えない）。問い合わせの間はボタンを押せない
+    // - 上限を超えるなら確認ダイアログ。［OK］で印を付けて送り、［キャンセル］なら送らずにモーダルに戻る（入力はそのまま）
+    // - 超えないとき・問い合わせに失敗したとき（通信の失敗・サーバーのエラー・422）は、確認せずにそのまま送る
+    //   （入力の検証と上限の確認は、サーバー側で今までどおり行う〔安全網〕）
+    let checking = false;
+    function submitNow() {
+        // form.submit() は submit の出来事を起こさないので、この関数に戻ってこない
+        formEl.submit();
+    }
+    async function onSubmit(event) {
+        if (confirmedInput.value === '1') {
+            return; // そのまま送る
+        }
+        event.preventDefault();
+        if (checking) return;
+        checking = true;
+        submitBtn.disabled = true;
+
+        let check = null;
+        try {
+            const query = window.UsageSchedule.capacityCheckQuery({
+                usedOn: usedOnInput.value,
+                startTime: startTimeInput.value,
+                endTime: endTimeInput.value,
+                excludeUsageId: idInput.value || null,
+            });
+            const response = await fetch(CAPACITY_CHECK_URL + '?' + query, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (response.ok) {
+                check = await response.json();
+            }
+        } catch (error) {
+            console.error('保存の前の確認を問い合わせられませんでした', error);
+        }
+
+        if (check && check.needs_confirmation) {
+            const button = idInput.value ? '更新' : '登録';
+            if (!confirm(window.UsageSchedule.capacityConfirmMessage(check, button))) {
+                // ［キャンセル］：送らずにモーダルに戻る
+                checking = false;
+                submitBtn.disabled = false;
+                return;
+            }
+            confirmedInput.value = '1';
+            confirmedValues = timeValues();
+        }
+        submitNow();
     }
 
     function setCreateMode() {

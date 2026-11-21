@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClientUsage;
+use App\Support\ScheduleSetting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -125,6 +126,46 @@ class UsageCapacityService
         }
 
         return $best;
+    }
+
+    /**
+     * 利用の保存の前・保存時の上限の確認の判定（2026-11 追加。requirements.md 6-17-11）。
+     * 保存時の確認（ClientUsageController）と、保存の前の問い合わせ（UsageScheduleController::check）で同じものを使う。
+     *
+     * - 利用日が今日（アプリのタイムゾーン）より前なら確認しない
+     * - その利用を入れたときの時間帯の預かる数（peakWith）が上限（ScheduleSetting::capacity()）を超えるときだけ確認する
+     *   （上限ちょうどは確認しない）
+     *
+     * start・end は預かる数が最も多くなる時間帯（「HH:MM」）
+     *
+     * @return array{needs_confirmation: bool, count: int, capacity: int, start: string, end: string}
+     */
+    public function confirmation(string $date, string $startTime, string $endTime, ?int $excludeUsageId = null): array
+    {
+        $date = Carbon::parse($date)->toDateString();
+        $peak = $this->peakWith($date, $startTime, $endTime, $excludeUsageId);
+        $capacity = ScheduleSetting::capacity();
+
+        return [
+            'needs_confirmation' => $date >= today()->toDateString() && $peak['count'] > $capacity,
+            'count' => $peak['count'],
+            'capacity' => $capacity,
+            'start' => $peak['start'],
+            'end' => $peak['end'],
+        ];
+    }
+
+    /**
+     * 確認の文の頭（「この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。」。2026-11 追加）。
+     * 保存時の確認の黄色の注意に使う。画面の確認ダイアログは同じ文を usage-schedule-core.js の capacityConfirmMessage で組み立てる
+     *
+     * @param  array{count: int, capacity: int, start: string, end: string}  $confirmation
+     */
+    public static function confirmationLead(string $date, array $confirmation): string
+    {
+        return 'この利用を入れると、'.ClientUsage::toShortDateLabel($date).' '
+            .ClientUsage::toDisplayTime($confirmation['start']).'〜'.ClientUsage::toDisplayTime($confirmation['end'])
+            .' に同時に預かる数が '.$confirmation['count'].' になり、上限（'.$confirmation['capacity'].'）を超えます。';
     }
 
     /**

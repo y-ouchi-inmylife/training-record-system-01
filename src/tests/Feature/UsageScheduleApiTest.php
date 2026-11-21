@@ -201,4 +201,128 @@ class UsageScheduleApiTest extends TestCase
         $this->getJson(route('api.usage-schedule.month', ['month' => '2026-11']))->assertUnauthorized();
         $this->getJson(route('api.usage-schedule.day', ['date' => '2026-11-26']))->assertUnauthorized();
     }
+
+    // ---- 保存の前の確認（GET /api/usage-schedule/check。2026-11 追加） ----
+
+    /** @return array<string, string> */
+    private function checkQuery(array $overrides = []): array
+    {
+        return array_merge(['used_on' => '2026-11-26', 'start_time' => '10:00', 'end_time' => '12:00'], $overrides);
+    }
+
+    /** 11/26 8:00〜19:00 に、ほかの会員の利用を n 件入れる */
+    private function fill(int $n, string $date = '2026-11-26'): void
+    {
+        for ($i = 0; $i < $n; $i++) {
+            $this->usage($this->sato, $date, '08:00', '19:00');
+        }
+    }
+
+    public function test_確認_上限を超えるときは確認が要り_入れたときの数と時間帯と日付の表記を返す(): void
+    {
+        $this->fill(3); // 上限 3 に 1 件足すと 4
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))
+            ->assertOk()
+            ->assertExactJson([
+                'needs_confirmation' => true,
+                'count' => 4,
+                'capacity' => 3,
+                'peak_start' => '10:00',
+                'peak_end' => '12:00',
+                'date_label' => '11/26(木)',
+            ]);
+    }
+
+    public function test_確認_最も多くなる時間帯は保存時の判定と同じ(): void
+    {
+        $this->fill(2);
+        $this->usage($this->ouchi, '2026-11-26', '09:00', '10:30');
+
+        // 8:00〜12:00 に入れると、9:00〜10:30 が 4（8:00〜19:00 × 2・9:00〜10:30・入れる利用）
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['start_time' => '08:00'])))
+            ->assertOk()
+            ->assertJson(['needs_confirmation' => true, 'count' => 4, 'peak_start' => '9:00', 'peak_end' => '10:30']);
+    }
+
+    public function test_確認_上限を超えないときと_ちょうど上限のときは確認しない(): void
+    {
+        $this->fill(1);
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))
+            ->assertOk()->assertJson(['needs_confirmation' => false, 'count' => 2, 'capacity' => 3]);
+
+        $this->fill(1);
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))
+            ->assertOk()->assertJson(['needs_confirmation' => false, 'count' => 3, 'capacity' => 3]);
+    }
+
+    public function test_確認_今日の利用は確認し_今日より前の利用は確認しない(): void
+    {
+        $this->fill(3, '2026-11-21');
+        $this->fill(3, '2026-11-20');
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['used_on' => '2026-11-21'])))
+            ->assertOk()->assertJson(['needs_confirmation' => true, 'count' => 4, 'date_label' => '11/21(土)']);
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['used_on' => '2026-11-20'])))
+            ->assertOk()->assertJson(['needs_confirmation' => false, 'count' => 4]);
+    }
+
+    public function test_確認_編集では自身を数えない(): void
+    {
+        $this->fill(2);
+        $self = $this->usage($this->ouchi, '2026-11-26', '10:00', '12:00'); // 今 3（上限ちょうど）
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))
+            ->assertOk()->assertJson(['needs_confirmation' => true, 'count' => 4]);
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['exclude_usage_id' => $self->id])))
+            ->assertOk()->assertJson(['needs_confirmation' => false, 'count' => 3]);
+    }
+
+    public function test_確認_上限は設定の値を使う(): void
+    {
+        SystemSetting::query()->create(['key' => 'schedule_capacity', 'value' => '1']);
+        $this->fill(1);
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))
+            ->assertOk()->assertJson(['needs_confirmation' => true, 'count' => 2, 'capacity' => 1]);
+    }
+
+    public function test_確認_入力が正しくなければ422(): void
+    {
+        $cases = [
+            ['used_on' => ''], ['used_on' => '2026-11-31'], ['used_on' => '2026/11/26'],
+            ['start_time' => ''], ['start_time' => '8時'], ['end_time' => '25:00'],
+            ['end_time' => '10:00'], ['end_time' => '09:00'], ['exclude_usage_id' => 'x'],
+        ];
+        foreach ($cases as $overrides) {
+            $this->getJson(route('api.usage-schedule.check', $this->checkQuery($overrides)))
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(array_keys($overrides));
+        }
+    }
+
+    public function test_確認_権限は予約状況と同じで_アクセスログに記録しない(): void
+    {
+        foreach (['staff', 'admin'] as $role) {
+            $this->actingAsRole($role);
+            $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))->assertOk();
+        }
+        $this->assertSame(0, AccessLog::query()->count());
+
+        $this->actingAsRole('system_admin');
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))->assertForbidden();
+
+        auth()->guard('web')->logout();
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))->assertUnauthorized();
+    }
+
+    public function test_確認_何も変えない(): void
+    {
+        $this->fill(3);
+
+        $this->getJson(route('api.usage-schedule.check', $this->checkQuery()))->assertOk();
+
+        $this->assertSame(3, ClientUsage::query()->count());
+    }
 }
+

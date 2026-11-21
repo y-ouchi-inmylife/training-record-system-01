@@ -941,7 +941,7 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 保存時の上限の確認で開き直したモーダル（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」） ----
 
-    private const CAPACITY_WARNING = '11/26(木) 15:00〜17:00 は、同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。';
+    private const CAPACITY_WARNING = 'この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 3 になり、上限（2）を超えます。このまま登録する場合は、もう一度［登録］を押してください。';
 
     public function test_上限の確認で戻ると利用のモーダルを開き直し_上部に注意を出して印を入れる(): void
     {
@@ -967,6 +967,23 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString("if (confirmedInput.value === '1') {", $html);
     }
 
+    public function test_利用のモーダルは保存の前に上限を問い合わせて確認ダイアログを出す(): void
+    {
+        // 2026-11 変更：上限を超えるときは、保存の前に確認ダイアログ（confirm()）を出す（設計書 S-0305-M05「保存時の上限の確認」の 1）
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringContainsString('const CAPACITY_CHECK_URL = '.json_encode(route('api.usage-schedule.check')).';', $html);
+        $this->assertStringContainsString("formEl.addEventListener('submit', onSubmit);", $html);
+        // 確認済みの印があれば問い合わせずに送る・問い合わせの間はボタンを押せない・［OK］で印を付ける
+        $this->assertStringContainsString("if (confirmedInput.value === '1') {\n            return; // そのまま送る", $html);
+        $this->assertStringContainsString('submitBtn.disabled = true;', $html);
+        $this->assertStringContainsString("const button = idInput.value ? '更新' : '登録';", $html);
+        $this->assertStringContainsString('if (!confirm(window.UsageSchedule.capacityConfirmMessage(check, button))) {', $html);
+        $this->assertStringContainsString("confirmedInput.value = '1';", $html);
+    }
+
     public function test_利用のモーダルに頭の字が出ない_注意が出ているときも(): void
     {
         // 2026-11 変更：犬を「頭」で数える表現は使わない（予約の一覧の見出し・注意の文・項目名）
@@ -983,7 +1000,7 @@ class ClientCountRenderingTest extends TestCase
             $this->assertStringNotContainsString('頭', strip_tags($modal));
         }
         // 注意の文は新しい形
-        $this->assertStringContainsString('は、同時に預かる数が 3 になり、上限（2）を超えます。', $html);
+        $this->assertStringContainsString('この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 3 になり、上限（2）を超えます。', $html);
     }
 
     public function test_注意がなければ印は空で_注意も出さない(): void

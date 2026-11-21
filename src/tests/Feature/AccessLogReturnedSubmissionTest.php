@@ -38,6 +38,8 @@ class AccessLogReturnedSubmissionTest extends TestCase
         $this->createTraineesTableForUsage();
         $this->createClientCountTables();
         $this->createAccessLogsTable();
+        // 利用の保存時の上限の確認で、同時に預かれる数を読む（2026-11 追加）
+        $this->createSystemSettingsTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;
