@@ -35,6 +35,8 @@ class ClientUsageTraineeTimeValidationTest extends TestCase
         $this->createTraineesTableForUsage();
         $this->createClientCountTables();
         $this->createAccessLogsTable();
+        // 今日以降の利用の保存で、同時に預かれる頭数（2026-11 追加）を読む
+        $this->createSystemSettingsTable();
 
         $staff = new Trainer(['name' => '一般花子', 'role' => 'staff']);
         $staff->id = 200;

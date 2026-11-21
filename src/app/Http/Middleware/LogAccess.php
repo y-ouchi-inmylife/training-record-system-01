@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Controllers\ClientUsageController;
 use App\Models\AccessLog;
 use Closure;
 use Illuminate\Http\Request;
@@ -72,9 +73,11 @@ class LogAccess
      *
      * - errors：入力エラー。FormRequest・$request->validate()・ValidationException・withErrors() は、
      *   どれもエラーの一覧をこのキーでセッションに載せて前の画面に戻す（Laravel 標準）
+     * - 利用の保存時の上限の確認で戻ったときの注意（ClientUsageController::CAPACITY_WARNING_SESSION_KEY。requirements.md 6-17-11）
      */
     private const RETURNED_FLASH_KEYS = [
         'errors',
+        ClientUsageController::CAPACITY_WARNING_SESSION_KEY,
     ];
 
     public function handle(Request $request, Closure $next): Response

@@ -23,6 +23,14 @@
        - $defaultTraineeId  : ?int 登録時の「トレーニー」の初期値（Client::defaultUsageTraineeId()。null は初期選択なし。2026-11 追加）
        - $defaultStartTime  : string 登録時の開始時刻の初期値（事業所情報の設定の営業開始時刻。HH:MM。2026-11 追加）
        - $defaultEndTime    : string 登録時の終了時刻の初期値（事業所情報の設定の営業終了時刻。HH:MM。2026-11 追加）
+       - $capacityWarning   : ?string 保存時の上限の確認で戻ったときの注意の文（なければ null。渡さなくてもよい。2026-11 追加）
+
+     ## 保存時の上限の確認（設計書 S-0305-M05「保存時の上限の確認」。2026-11 追加）
+
+     同時に預かれる頭数を超える保存は、サーバー（ClientUsageController）が保存せずに戻す。そのときは上部に
+     alert-warning で注意を出し、確認済みの印（hidden _capacity_confirmed）に 1 を入れる。もう一度押すと保存する。
+     利用日・開始時刻・終了時刻を変えたら、印を外して注意を消す（契約・トレーニー・メモでは外さない）。
+     この注意は入力エラーではない（§2-7 の対象外）。
 
      ## 項目の並び（設計書 S-0305-M05。2026-11 変更）
 
@@ -71,6 +79,8 @@
                 <input type="hidden" name="_usage_id" id="usageFormIdInput" value="">
                 {{-- 送信元のモーダルの種別。ClientUsageRequest はルールに持たないため validated() に混入しない。 --}}
                 <input type="hidden" name="_form_type" value="usage">
+                {{-- 確認済みの印（2026-11 追加）。上限の確認で戻ったときだけ 1。ClientUsageRequest のルールに持たない --}}
+                <input type="hidden" name="_capacity_confirmed" id="usageCapacityConfirmedInput" value="{{ ($capacityWarning ?? null) !== null ? '1' : '' }}">
 
                 <div class="modal-header">
                     <h5 class="modal-title" id="usageModalLabel">利用の登録</h5>
@@ -78,6 +88,10 @@
                 </div>
 
                 <div class="modal-body">
+                    {{-- 保存時の上限の確認の注意（入力欄と予約状況の上。入力エラーではない。2026-11 追加） --}}
+                    @if(($capacityWarning ?? null) !== null)
+                        <div class="alert alert-warning" role="alert" id="usageCapacityWarning">{{ $capacityWarning }}</div>
+                    @endif
                     <div class="row g-4">
                     {{-- 左：入力欄（並びは今のまま） --}}
                     <div class="col-lg-6" data-usage-inputs>
@@ -230,6 +244,25 @@
     let startTimeInput = null;
     let endTimeInput = null;
     let schedule = null;        // 予約状況（window.UsageSchedule。2026-11 追加）
+    let confirmedInput = null;  // 確認済みの印（2026-11 追加）
+    let confirmedValues = null; // 印を入れたときの利用日・開始時刻・終了時刻（変わったら印を外す）
+
+    // 確認済みの印を外し、注意を消す（2026-11 追加）
+    function clearCapacityConfirmation() {
+        confirmedInput.value = '';
+        confirmedValues = null;
+        const warning = document.getElementById('usageCapacityWarning');
+        if (warning) warning.remove();
+    }
+    function timeValues() {
+        return [usedOnInput.value, startTimeInput.value, endTimeInput.value].join('|');
+    }
+    // 利用日・開始時刻・終了時刻が、印を入れたときから変わったら印を外す（契約・トレーニー・メモでは外さない）
+    function onTimeValuesChanged() {
+        if (confirmedValues !== null && timeValues() !== confirmedValues) {
+            clearCapacityConfirmation();
+        }
+    }
 
     // 使い切った契約を選べなくする。currentContractId（編集中の利用が今割り当てられている契約）
     // だけは使い切りでも選べるようにする。登録モードでは null を渡す。
@@ -296,6 +329,13 @@
         usedOnInput.addEventListener('input', function () { schedule.setDate(usedOnInput.value); });
         usedOnInput.addEventListener('change', function () { schedule.setDate(usedOnInput.value); });
 
+        // 確認済みの印（2026-11 追加）
+        confirmedInput = document.getElementById('usageCapacityConfirmedInput');
+        [usedOnInput, startTimeInput, endTimeInput].forEach(function (input) {
+            input.addEventListener('input', onTimeValuesChanged);
+            input.addEventListener('change', onTimeValuesChanged);
+        });
+
         deleteBtn.addEventListener('click', function () {
             if (confirm('この利用を削除しますか？')) {
                 deleteForm.submit();
@@ -327,6 +367,8 @@
     function openForCreate() {
         initRefs();
         if (!modal) return;
+        // 新しく開くときは、前の確認を持ち越さない
+        clearCapacityConfirmation();
         setCreateMode();
         applyDisabled(null);
         contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
@@ -343,6 +385,7 @@
         // data: { id, clientContractId, traineeId, usedOn, startTime, endTime, note }（data-* 属性はキャメルケースになる。時刻は HH:MM）
         initRefs();
         if (!modal) return;
+        clearCapacityConfirmation();
         setEditMode(data.id);
         const currentContractId = data.clientContractId || null;
         applyDisabled(currentContractId);
@@ -376,6 +419,10 @@
             }
             // トレーニー・時刻は Blade の old() で戻し済み。未選択の選択肢の表示だけを合わせる
             applyTraineeBlank();
+            // 上限の確認で戻ったときは、印を入れたときの値を覚えておく（変わったら印を外す）
+            if (confirmedInput.value === '1') {
+                confirmedValues = timeValues();
+            }
             // 予約状況は入力していた利用日の月で開く（正しくない日付なら今日）
             schedule.open(usedOnInput.value, { excludeUsageId: oldUsageId || null, fallbackDate: todayString() });
             modal.show();

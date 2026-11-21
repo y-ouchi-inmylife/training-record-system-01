@@ -939,6 +939,72 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('schedule.open(usedOnInput.value, { excludeUsageId: null, fallbackDate: todayString() });', $html);
     }
 
+    // ---- 保存時の上限の確認で開き直したモーダル（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」） ----
+
+    private const CAPACITY_WARNING = '11/26(木) 15:00〜17:00 は 3頭になります（上限 2頭）。このまま登録する場合は、もう一度［登録］を押してください。';
+
+    public function test_上限の確認で戻ると利用のモーダルを開き直し_上部に注意を出して印を入れる(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->withSession([
+            '_old_input' => ['_form_type' => 'usage', 'used_on' => '2026-11-26', 'start_time' => '14:00', 'end_time' => '18:00', 'note' => 'メモ'],
+            'usage_capacity_warning' => self::CAPACITY_WARNING,
+        ])->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 入力欄と予約状況の上に、黄色の注意（入力エラーではないので、上部のエラーの案内・赤枠は出さない）
+        $this->assertMatchesRegularExpression(
+            '/<div class="modal-body">\s*<div class="alert alert-warning" role="alert" id="usageCapacityWarning">'.preg_quote(self::CAPACITY_WARNING, '/').'<\/div>\s*<div class="row g-4">/u',
+            $html
+        );
+        $this->assertMatchesRegularExpression('/<input type="hidden" name="_capacity_confirmed" id="usageCapacityConfirmedInput" value="1">/u', $html);
+        $this->assertStringNotContainsString('入力内容に誤りがあります。', $html);
+        $this->assertStringNotContainsString('is-invalid', substr($html, strpos($html, 'id="usageModal"'), 20000));
+        // 入力した値を戻し、モーダルを開き直す
+        $this->assertMatchesRegularExpression('/id="used_on" name="used_on"\s+value="2026-11-26"/u', $html);
+        $this->assertMatchesRegularExpression('/id="usage_note" name="note"\s+value="メモ"/u', $html);
+        $this->assertStringContainsString('const oldUsageId = null;', $html);
+        $this->assertStringContainsString("if (confirmedInput.value === '1') {", $html);
+    }
+
+    public function test_注意がなければ印は空で_注意も出さない(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<input type="hidden" name="_capacity_confirmed" id="usageCapacityConfirmedInput" value="">/u', $html);
+        $this->assertStringNotContainsString('id="usageCapacityWarning"', $html);
+        $this->assertStringNotContainsString('const oldUsageId', $html);
+    }
+
+    public function test_契約のモーダルから戻ったときは利用の注意を出さない(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->withSession([
+            '_old_input' => ['_form_type' => 'contract'],
+            'usage_capacity_warning' => self::CAPACITY_WARNING,
+        ])->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('id="usageCapacityWarning"', $html);
+        $this->assertStringNotContainsString('const oldUsageId', $html);
+    }
+
+    public function test_利用日と時刻を変えたら印を外し_契約トレーニーメモでは外さない(): void
+    {
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        // 印を外すのは利用日・開始時刻・終了時刻の入力だけ（契約・トレーニー・メモの欄には付けない）
+        $this->assertStringContainsString('[usedOnInput, startTimeInput, endTimeInput].forEach(function (input) {', $html);
+        $this->assertStringContainsString("input.addEventListener('input', onTimeValuesChanged);", $html);
+        $this->assertSame(1, substr_count($html, 'onTimeValuesChanged);') / 2);
+        // 新しく開くときは前の確認を持ち越さない
+        $this->assertSame(2, substr_count($html, '        clearCapacityConfirmation();'."\n".'        set'));
+    }
+
     // ---- 利用のモーダルのトレーニーの選択肢・初期値と時刻の初期値（2026-11 追加。設計書 S-0305-M05） ----
 
     /** 会員詳細の、利用のモーダルの JS の定数（例：DEFAULT_TRAINEE_ID）の値（JSON のまま） */

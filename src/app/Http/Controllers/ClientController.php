@@ -217,9 +217,14 @@ class ClientController extends Controller
         // 契約・利用のモーダル（S-0305-M04 / M05）で入力エラーになって戻ったとき、
         // 送信元のモーダルだけを開き直すための種別（'contract' / 'usage'）。
         // 2 つのモーダルは入力欄（count / note）の名前が重なるため、hidden `_form_type` で見分ける。
+        // 利用の保存時の上限の確認で戻ったとき（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」）も、
+        // 入力エラーと同じく利用のモーダルを開き直し、上部に注意を出す（注意は入力エラーではない）
+        $usageCapacityWarning = old('_form_type') === 'usage'
+            ? session(ClientUsageController::CAPACITY_WARNING_SESSION_KEY)
+            : null;
         $openModal = session('errors')?->any() && in_array(old('_form_type'), ['contract', 'usage'], true)
             ? old('_form_type')
-            : null;
+            : ($usageCapacityWarning !== null ? 'usage' : null);
 
         // 状態バッジ（4 状態＋期限切れ）判定に必要な派生値を先読みする。
         // 状態別ボタン（「マイページ登録の案内を発行」／「マイページ登録の案内を表示」／「取消」／
@@ -253,6 +258,8 @@ class ClientController extends Controller
             'defaultTraineeId' => $client->defaultUsageTraineeId(),
             'defaultStartTime' => ScheduleSetting::openTime(),
             'defaultEndTime' => ScheduleSetting::closeTime(),
+            // 保存時の上限の確認の注意（なければ null。2026-11 追加）
+            'capacityWarning' => $usageCapacityWarning,
         ];
 
         // 会員の削除を断る「トレーニー・契約・利用」の文言（2026-11 追加。設計書 S-0305［削除］）。
