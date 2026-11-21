@@ -845,6 +845,11 @@
                 'openModal' => $openModal,
                 'contractOptions' => $ticket['contractOptions'],
                 'defaultContractId' => $ticket['defaultContractId'],
+                // トレーニーの選択肢・初期値と、開始時刻・終了時刻の初期値（2026-11 追加。ClientController::show で組み立てる）
+                'traineeOptions' => $usageForm['traineeOptions'],
+                'defaultTraineeId' => $usageForm['defaultTraineeId'],
+                'defaultStartTime' => $usageForm['defaultStartTime'],
+                'defaultEndTime' => $usageForm['defaultEndTime'],
             ])
         </div>
     </div>

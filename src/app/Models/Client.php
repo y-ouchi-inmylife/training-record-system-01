@@ -253,6 +253,31 @@ class Client extends Authenticatable
     }
 
     /**
+     * 利用を登録するときの「トレーニー」の初期値（2026-11 追加。設計書 S-0305-M05・requirements.md 6-17-4）。
+     *
+     * - 空でないトレーニー（Trainee::scopeNotBlank）が 1 頭 → その 1 頭
+     * - 空でないトレーニーが 0 頭で、トレーニーが全体で 1 頭 → その 1 頭
+     * - それ以外 → null（初期選択なし）
+     *
+     * 既存の利用の移し替え（2026_11_21_000001 のマイグレーション）と同じ規則
+     */
+    public function defaultUsageTraineeId(): ?int
+    {
+        $nonBlankIds = $this->trainees()->notBlank()->pluck('id');
+        if ($nonBlankIds->count() === 1) {
+            return (int) $nonBlankIds->first();
+        }
+        if ($nonBlankIds->count() === 0) {
+            $allIds = $this->trainees()->pluck('id');
+            if ($allIds->count() === 1) {
+                return (int) $allIds->first();
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * 残り回数（契約回数の合計 − 利用の件数）。契約も利用も 0 件なら null。
      *
      * 会員一覧（S-0304）で `ClientController::index()` の addSelect が付ける

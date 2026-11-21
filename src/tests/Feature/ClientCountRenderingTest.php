@@ -45,6 +45,8 @@ class ClientCountRenderingTest extends TestCase
         $this->createClientsTable();
         $this->createClientCountTables();
         $this->createAccessLogsTable();
+        // 利用のモーダルの時刻の初期値（予定の設定）を読む（2026-11 追加）
+        $this->createSystemSettingsTable();
 
         Schema::create('trainers', function (Blueprint $table) {
             $table->id();
@@ -554,6 +556,89 @@ class ClientCountRenderingTest extends TestCase
         return DB::table('trainees')->insertGetId([
             'client_id' => $client->id, 'name' => $name, 'photo_path' => $photoPath,
         ]);
+    }
+
+    // ---- 利用のモーダルのトレーニーの選択肢・初期値と時刻の初期値（2026-11 追加。設計書 S-0305-M05） ----
+
+    /** 会員詳細の、利用のモーダルの JS の定数（例：DEFAULT_TRAINEE_ID）の値（JSON のまま） */
+    private function usageModalConst(Client $client, string $name): string
+    {
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertSame(1, preg_match('/const '.$name.' = (.*?);/u', $html, $m), $name);
+
+        return $m[1];
+    }
+
+    public function test_トレーニーの初期値は空でないトレーニーが1頭ならその1頭(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->trainee($client, null); // 空のトレーニー
+        $ai = $this->trainee($client, 'アイ');
+
+        $this->assertSame((string) $ai, $this->usageModalConst($client, 'DEFAULT_TRAINEE_ID'));
+    }
+
+    public function test_トレーニーの初期値は空でないトレーニーが0頭で全体で1頭ならその1頭(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $blank = $this->trainee($client, null);
+
+        $this->assertSame((string) $blank, $this->usageModalConst($client, 'DEFAULT_TRAINEE_ID'));
+    }
+
+    public function test_トレーニーの初期値はそれ以外なら選ばない(): void
+    {
+        $this->fakeMediaDisk();
+        // 空でないトレーニーが 2 頭
+        $two = $this->makeClient('0001', '山田');
+        $this->trainee($two, 'アイ');
+        $this->trainee($two, 'モモ');
+        $this->assertSame('null', $this->usageModalConst($two, 'DEFAULT_TRAINEE_ID'));
+        // 空のトレーニーだけが 2 頭
+        $blanks = $this->makeClient('0002', '佐藤');
+        $this->trainee($blanks, null);
+        $this->trainee($blanks, null);
+        $this->assertSame('null', $this->usageModalConst($blanks, 'DEFAULT_TRAINEE_ID'));
+        // トレーニーがいない
+        $none = $this->makeClient('0003', '鈴木');
+        $this->assertSame('null', $this->usageModalConst($none, 'DEFAULT_TRAINEE_ID'));
+    }
+
+    public function test_トレーニーの選択肢は空のトレーニーも含めてid順で名前未登録と出す(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $mo = $this->trainee($client, 'モモ');
+        $blank = $this->trainee($client, null);
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/name="trainee_id" required>\s*<option value="" ><\/option>\s*<option value="'.$mo.'"\s*>モモ<\/option>\s*<option value="'.$blank.'"\s*>名前未登録<\/option>/u',
+            $html
+        );
+    }
+
+    public function test_時刻の初期値は予定の設定の値で_行がなければ8時と19時(): void
+    {
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+
+        $this->assertSame('"08:00"', $this->usageModalConst($client, 'DEFAULT_START_TIME'));
+        $this->assertSame('"19:00"', $this->usageModalConst($client, 'DEFAULT_END_TIME'));
+
+        // 予定の設定（S-1601）を更新すると、利用のモーダルの初期値が変わる
+        $admin = new Trainer(['name' => '管理太郎', 'role' => 'admin']);
+        $admin->id = 201;
+        $admin->exists = true;
+        $this->actingAs($admin, 'web');
+        $this->put(route('settings.schedule.update'), ['schedule_open_time' => '09:30', 'schedule_close_time' => '17:00'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('"09:30"', $this->usageModalConst($client, 'DEFAULT_START_TIME'));
+        $this->assertSame('"17:00"', $this->usageModalConst($client, 'DEFAULT_END_TIME'));
     }
 
     // ---- 会員の削除の確認（2026-10-18 変更：空のトレーニーだけなら一緒に削除できる） ----
@@ -1422,9 +1507,11 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        // 有効な案内と、いちばん新しい案内（「期限切れ」の行。2026-10-19 追加）の 2 本。トレーニーの数では増えない
-        $this->assertSame(2, $count($one));
-        $this->assertSame(2, $count($three));
+        // 有効な案内と、いちばん新しい案内（「期限切れ」の行。2026-10-19 追加）の 2 本。トレーニーの数では増えない。
+        // 2026-11 変更：利用のモーダルのトレーニーの初期値を決める、空でないトレーニーの判定（Client::defaultUsageTraineeId。
+        // Trainee::scopeNotBlank がこの表も見る）の 1 本が増えて 3 本。これもトレーニーの数では増えない
+        $this->assertSame(3, $count($one));
+        $this->assertSame(3, $count($three));
     }
 
     // ---- 性格診断の行の最新の診断の日付（2026-10 追加。設計書 S-0305「性格診断の行」の「最新の診断の日付」） ----
@@ -1562,9 +1649,10 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みのアドバイス（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない
-        $this->assertSame(2, $count($one));
-        $this->assertSame(2, $count($three));
+        // トレーニーの結果（1 本）と、記録の一覧に混ぜる公開済みのアドバイス（1 本。2026-10-18 追加）。トレーニーが何頭いても増えない。
+        // 2026-11 変更：利用のモーダルのトレーニーの初期値を決める、空でないトレーニーの判定（Client::defaultUsageTraineeId）の 1 本が増えて 3 本
+        $this->assertSame(3, $count($one));
+        $this->assertSame(3, $count($three));
     }
 
     // ---- 連絡先の緊急連絡先（ご家族等）（2026-10-17 変更：その前は「電話番号（予備）」。
@@ -2100,9 +2188,10 @@ class ClientCountRenderingTest extends TestCase
             return $queries->count();
         };
 
-        // 有効な案内といちばん新しい案内の 2 本。トレーニーの数では増えない
-        $this->assertSame(2, $count($one));
-        $this->assertSame(2, $count($three));
+        // 有効な案内といちばん新しい案内の 2 本。トレーニーの数では増えない。
+        // 2026-11 変更：利用のモーダルのトレーニーの初期値を決める、空でないトレーニーの判定（Client::defaultUsageTraineeId）の 1 本が増えて 3 本
+        $this->assertSame(3, $count($one));
+        $this->assertSame(3, $count($three));
     }
 
     public function test_案内中の行はラベルと値を上下をそろえる箱に入れる(): void

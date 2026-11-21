@@ -22,7 +22,10 @@ use Tests\TestCase;
  */
 class ClientCountModalErrorRenderingTest extends TestCase
 {
-    private function renderModals(?string $openModal, array $errors, array $oldInput = []): string
+    /**
+     * @param  array<int, array{id: int, label: string}>  $traineeOptions  利用モーダルの「トレーニー」の選択肢（2026-11 追加。空ならその欄を出さない）
+     */
+    private function renderModals(?string $openModal, array $errors, array $oldInput = [], ?array $traineeOptions = null, ?int $defaultTraineeId = 21): string
     {
         $client = new Client;
         $client->id = 1;
@@ -36,7 +39,9 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $view = $this->withViewErrors($errors)->blade(
             "@include('clients._contract-modal', ['client' => \$client, 'openModal' => \$openModal, 'defaultExpiresOn' => '2026-10-31'])\n"
             ."@include('clients._usage-modal', ['client' => \$client, 'openModal' => \$openModal,"
-            ." 'contractOptions' => \$contractOptions, 'defaultContractId' => \$defaultContractId])\n"
+            ." 'contractOptions' => \$contractOptions, 'defaultContractId' => \$defaultContractId,"
+            ." 'traineeOptions' => \$traineeOptions, 'defaultTraineeId' => \$defaultTraineeId,"
+            ." 'defaultStartTime' => \$defaultStartTime, 'defaultEndTime' => \$defaultEndTime])\n"
             ."@stack('scripts')",
             [
                 'client' => $client,
@@ -47,6 +52,14 @@ class ClientCountModalErrorRenderingTest extends TestCase
                     ['id' => 8, 'label' => '2026/10/12 契約（4回） あと 3回', 'usedUp' => false],
                 ],
                 'defaultContractId' => 8,
+                // トレーニーの選択肢・初期値と、時刻の初期値（2026-11 追加。ClientController::show の $usageForm と同じ形）
+                'traineeOptions' => $traineeOptions ?? [
+                    ['id' => 21, 'label' => 'アイ'],
+                    ['id' => 22, 'label' => '名前未登録'],
+                ],
+                'defaultTraineeId' => $defaultTraineeId,
+                'defaultStartTime' => '09:30',
+                'defaultEndTime' => '18:00',
             ]
         );
 
@@ -161,7 +174,9 @@ class ClientCountModalErrorRenderingTest extends TestCase
     /** 利用モーダルの「契約」の <select> の HTML */
     private function contractSelect(string $html): string
     {
-        $start = strpos($html, '<select', strpos($html, 'id="usageModal"'));
+        // 2026-11 変更：利用モーダルの最初の select はトレーニーになったため、契約の select（id="client_contract_id"）を探す
+        $usageStart = strpos($html, 'id="usageModal"');
+        $start = strrpos(substr($html, 0, strpos($html, 'id="client_contract_id"', $usageStart)), '<select');
         $end = strpos($html, '</select>', $start);
 
         return preg_replace('/\s+/u', ' ', substr($html, $start, $end - $start));
@@ -244,16 +259,103 @@ class ClientCountModalErrorRenderingTest extends TestCase
         $this->assertStringContainsString('name="count"', $this->contractPart($html));
     }
 
-    public function test_利用モーダルの項目は利用日_契約_メモの順(): void
+    public function test_利用モーダルの項目は利用日_開始時刻_終了時刻_トレーニー_契約_メモの順(): void
+    {
+        // 2026-11 変更：時刻とトレーニーを足した（設計書 S-0305-M05「利用日 → 開始時刻・終了時刻（横並び） → トレーニー → 契約 → メモ」）
+        $usage = $this->usagePart($this->renderModals(null, []));
+
+        $positions = array_map(fn ($name) => strpos($usage, 'name="'.$name.'"'), ['used_on', 'start_time', 'end_time', 'trainee_id', 'client_contract_id', 'note']);
+        foreach ($positions as $position) {
+            $this->assertNotFalse($position);
+        }
+        $sorted = $positions;
+        sort($sorted);
+        $this->assertSame($sorted, $positions);
+    }
+
+    // ---- 利用モーダルの「トレーニー」と開始時刻・終了時刻（2026-11 追加。S-0305-M05） ----
+
+    /** 利用モーダルの「トレーニー」の select */
+    private function traineeSelect(string $html): string
+    {
+        $usage = $this->usagePart($html);
+        $start = strpos($usage, '<select', strpos($usage, 'id="usage_trainee_id"') - 200);
+        $end = strpos($usage, '</select>', $start);
+
+        return substr($usage, $start, $end - $start);
+    }
+
+    public function test_トレーニーの選択肢はその会員のトレーニーで先頭に未選択の選択肢がある(): void
+    {
+        $select = $this->traineeSelect($this->renderModals(null, []));
+
+        $this->assertMatchesRegularExpression('/^<select[^>]*name="trainee_id"[^>]*required>\s*<option value="" ><\/option>\s*<option value="21"\s*>アイ<\/option>\s*<option value="22"\s*>名前未登録<\/option>\s*$/u', $select);
+    }
+
+    public function test_トレーニーがいない会員ではトレーニーの欄を出さない(): void
+    {
+        $html = $this->renderModals(null, [], [], [], null);
+
+        $this->assertStringNotContainsString('name="trainee_id"', $this->usagePart($html));
+        $this->assertStringContainsString('const DEFAULT_TRAINEE_ID = null;', $this->usageScript($html));
+    }
+
+    public function test_登録時のトレーニーと時刻の初期値がサーバーから渡る(): void
+    {
+        $script = $this->usageScript($this->renderModals(null, []));
+
+        $this->assertStringContainsString('const DEFAULT_TRAINEE_ID = 21;', $script);
+        $this->assertStringContainsString('const DEFAULT_START_TIME = "09:30";', $script);
+        $this->assertStringContainsString('const DEFAULT_END_TIME = "18:00";', $script);
+        // 登録で開くときに初期値を入れ、編集で開くときはマスの値を入れる
+        $this->assertStringContainsString('startTimeInput.value = DEFAULT_START_TIME;', $script);
+        $this->assertStringContainsString('setTrainee(DEFAULT_TRAINEE_ID);', $script);
+        $this->assertStringContainsString('startTimeInput.value = data.startTime || \'\';', $script);
+        $this->assertStringContainsString('setTrainee(data.traineeId || null);', $script);
+    }
+
+    public function test_時刻はinput_typeがtimeで横に並べる(): void
     {
         $usage = $this->usagePart($this->renderModals(null, []));
 
-        $usedOn = strpos($usage, 'name="used_on"');
-        $contract = strpos($usage, 'name="client_contract_id"');
-        $note = strpos($usage, 'name="note"');
-        $this->assertNotFalse($usedOn);
-        $this->assertLessThan($contract, $usedOn, '利用日が契約より前');
-        $this->assertLessThan($note, $contract, '契約がメモより前');
+        $this->assertMatchesRegularExpression('/<input type="time"[^>]*id="usage_start_time" name="start_time"/u', $usage);
+        $this->assertMatchesRegularExpression('/<input type="time"[^>]*id="usage_end_time" name="end_time"/u', $usage);
+        $range = substr($usage, strpos($usage, 'data-usage-time-range'));
+        $this->assertLessThan(strpos($range, 'name="end_time"'), strpos($range, 'name="start_time"'));
+        $this->assertStringNotContainsString('datepicker', substr($range, 0, strpos($range, 'name="end_time"')));
+    }
+
+    public function test_時刻のエラーは範囲のまとまりの下に出し入力した値を戻す(): void
+    {
+        $html = $this->renderModals('usage', ['end_time' => 'ERR_end_time'], [
+            '_form_type' => 'usage', 'used_on' => '2026-10-01', 'start_time' => '12:00', 'end_time' => '11:00', 'trainee_id' => '22',
+        ]);
+        $usage = $this->usagePart($html);
+
+        $this->assertMatchesRegularExpression('/name="start_time"\s+value="12:00"/u', $usage);
+        $this->assertMatchesRegularExpression('/name="end_time"\s+value="11:00"/u', $usage);
+        $this->assertStringContainsString('<div class="invalid-feedback d-block">ERR_end_time</div>', $usage);
+        // 文言は時刻のまとまり（data-usage-time-range）の外の下、トレーニーの欄より前
+        $this->assertGreaterThan(strpos($usage, 'name="end_time"'), strpos($usage, 'ERR_end_time'));
+        $this->assertLessThan(strpos($usage, 'name="trainee_id"'), strpos($usage, 'ERR_end_time'));
+        // 選んでいたトレーニーが戻る
+        $this->assertMatchesRegularExpression('/<option value="22"\s*selected/u', $this->traineeSelect($html));
+        // モーダルでは上部の案内を出さない
+        $this->assertStringNotContainsString('入力内容に誤りがあります', $usage);
+    }
+
+    public function test_トレーニーが未選択でエラーのときは未選択のまま戻り欄の下に文言が出る(): void
+    {
+        $html = $this->renderModals('usage', ['trainee_id' => 'ERR_trainee'], [
+            '_form_type' => 'usage', 'used_on' => '2026-10-01', 'trainee_id' => null,
+        ]);
+
+        $select = $this->traineeSelect($html);
+        $this->assertMatchesRegularExpression('/<option value=""\s*selected/u', $select);
+        $this->assertStringContainsString('is-invalid', $select);
+        $this->assertStringContainsString('<div class="invalid-feedback">ERR_trainee</div>', $this->usagePart($html));
+        // 開き直したときに、未選択の選択肢を出すかを合わせる
+        $this->assertStringContainsString('applyTraineeBlank();', $this->usageScript($html));
     }
 
     public function test_登録時の初期値は残りがある一番古い契約として渡る(): void

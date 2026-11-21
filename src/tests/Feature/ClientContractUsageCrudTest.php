@@ -36,6 +36,8 @@ class ClientContractUsageCrudTest extends TestCase
         parent::setUp();
 
         $this->createClientsTable();
+        // 利用の検証がトレーニーを見る（2026-11 追加）。外部キーが効くよう、利用の表より先に作る
+        $this->createTraineesTableForUsage();
         $this->createClientCountTables();
         $this->createAccessLogsTable();
 
@@ -195,6 +197,8 @@ class ClientContractUsageCrudTest extends TestCase
         $response = $this->post(route('client-usages.store', $this->client), [
             '_form_type' => 'usage',
             'used_on' => '2026-10-12',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
             'note' => 'トレーニー2頭のうち1頭',
         ]);
 
@@ -218,13 +222,15 @@ class ClientContractUsageCrudTest extends TestCase
     public function test_一般トレーナーが利用を更新すると会員詳細に戻る(): void
     {
         $usage = ClientUsage::query()->create([
-            'client_id' => $this->client->id, 'used_on' => '2026-10-12',
+            'client_id' => $this->client->id, 'used_on' => '2026-10-12', 'start_time' => '08:00', 'end_time' => '19:00',
         ]);
 
         $response = $this->put(route('client-usages.update', $usage), [
             '_form_type' => 'usage',
             '_usage_id' => (string) $usage->id,
             'used_on' => '2026-10-14',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
             'note' => '当日キャンセル',
         ]);
 
@@ -243,7 +249,7 @@ class ClientContractUsageCrudTest extends TestCase
     public function test_一般トレーナーが利用を削除すると会員詳細に戻る(): void
     {
         $usage = ClientUsage::query()->create([
-            'client_id' => $this->client->id, 'used_on' => '2026-10-12',
+            'client_id' => $this->client->id, 'used_on' => '2026-10-12', 'start_time' => '08:00', 'end_time' => '19:00',
         ]);
 
         $response = $this->delete(route('client-usages.destroy', $usage));
@@ -263,6 +269,8 @@ class ClientContractUsageCrudTest extends TestCase
         $response = $this->post(route('client-usages.store', $this->client), [
             '_form_type' => 'usage',
             'used_on' => '',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ]);
 
         $response->assertSessionHasErrors([
@@ -303,6 +311,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage',
             'client_contract_id' => (string) $contract->id,
             'used_on' => '2026-10-12',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertRedirect(route('clients.show', $this->client))->assertSessionHasNoErrors();
 
         $this->assertSame($contract->id, (int) ClientUsage::query()->sole()->client_contract_id);
@@ -318,6 +328,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage',
             'client_contract_id' => '',
             'used_on' => '2026-10-12',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertRedirect(route('clients.show', $this->client))->assertSessionHasNoErrors();
 
         $this->assertSame(1, ClientUsage::query()->whereNull('client_contract_id')->count());
@@ -334,6 +346,8 @@ class ClientContractUsageCrudTest extends TestCase
                 '_form_type' => 'usage',
                 'client_contract_id' => (string) $contract->id,
                 'used_on' => '2026-10-12',
+                'start_time' => '08:00',
+                'end_time' => '19:00',
             ])
             ->assertRedirect(route('clients.show', $this->client))
             ->assertSessionHasErrors(['client_contract_id' => '選んだ契約には残りがありません。']);
@@ -352,6 +366,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage',
             'client_contract_id' => (string) $contract->id,
             'used_on' => '2026-10-12',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertSessionHasNoErrors();
 
         $this->assertSame(2, ClientUsage::query()->where('client_contract_id', $contract->id)->count());
@@ -367,6 +383,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage', '_usage_id' => (string) $target->id,
             'client_contract_id' => (string) $contract->id,
             'used_on' => '2026-10-05',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertSessionHasNoErrors();
 
         $this->assertSame('2026-10-05', $target->fresh()->used_on->format('Y-m-d'));
@@ -384,6 +402,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage', '_usage_id' => (string) $target->id,
             'client_contract_id' => (string) $to->id,
             'used_on' => '2026-10-02',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertSessionHasErrors(['client_contract_id' => '選んだ契約には残りがありません。']);
         $this->assertSame($from->id, (int) $target->fresh()->client_contract_id);
 
@@ -393,6 +413,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage', '_usage_id' => (string) $target->id,
             'client_contract_id' => (string) $to->id,
             'used_on' => '2026-10-02',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertSessionHasNoErrors();
         $this->assertSame($to->id, (int) $target->fresh()->client_contract_id);
     }
@@ -408,6 +430,8 @@ class ClientContractUsageCrudTest extends TestCase
             '_form_type' => 'usage',
             'client_contract_id' => (string) $otherContract->id,
             'used_on' => '2026-10-12',
+            'start_time' => '08:00',
+            'end_time' => '19:00',
         ])->assertSessionHasErrors(['client_contract_id' => '選んだ契約はこの会員の契約ではありません。']);
 
         $this->assertFalse(ClientUsage::query()->exists());

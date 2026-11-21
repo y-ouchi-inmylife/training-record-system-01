@@ -13,6 +13,7 @@ use App\Models\Trainer;
 use App\Models\TrainingRecord;
 use App\Services\ClientInternalIdService;
 use App\Services\ContractTicketService;
+use App\Support\ScheduleSetting;
 use App\Support\RecordTimeline;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -241,7 +242,20 @@ class ClientController extends Controller
         // 設計書 S-0305-M04「有効期限の初期値」）。契約日を変えたときに合わせて変えるのはモーダルの JS（contract-expires-on.js）
         $contractDefaultExpiresOn = now()->endOfMonth()->toDateString();
 
-        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline', 'contractDefaultExpiresOn'));
+        // 利用の登録・編集のモーダル（S-0305-M05）の「トレーニー」の選択肢と初期値、開始時刻・終了時刻の初期値（2026-11 追加）。
+        // 選択肢はその会員のトレーニー全部（空のトレーニーも含む。id 順。表示名はトレーナー側の表示規則）。
+        // 初期値の規則は Client::defaultUsageTraineeId()、時刻は予定の設定（S-1601。行がなければ 08:00・19:00）
+        $usageForm = [
+            'traineeOptions' => $client->trainees
+                ->map(fn ($trainee) => ['id' => $trainee->id, 'label' => $trainee->display_name])
+                ->values()
+                ->all(),
+            'defaultTraineeId' => $client->defaultUsageTraineeId(),
+            'defaultStartTime' => ScheduleSetting::openTime(),
+            'defaultEndTime' => ScheduleSetting::closeTime(),
+        ];
+
+        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline', 'contractDefaultExpiresOn', 'usageForm'));
     }
 
     /**

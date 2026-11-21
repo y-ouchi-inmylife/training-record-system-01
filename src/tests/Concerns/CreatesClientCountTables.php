@@ -77,6 +77,43 @@ trait CreatesClientCountTables
     }
 
     /**
+     * システム設定の表（DS-0100。2026-11 追加）。会員詳細（S-0305）が利用のモーダルの時刻の初期値に
+     * 予定の設定（schedule_open_time・schedule_close_time）を読むため。行がなければ初期値（08:00・19:00）で動く
+     */
+    protected function createSystemSettingsTable(): void
+    {
+        Schema::create('system_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key', 50)->unique();
+            $table->text('value')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * 利用のトレーニー（2026-11 追加）の確かめに使う、トレーニーの表（本番と同じ登録内容の列）。
+     * createClientCountTables() より先に呼ぶと、利用の trainee_id に本番と同じ外部キー（ON DELETE SET NULL）が付く
+     */
+    protected function createTraineesTableForUsage(): void
+    {
+        Schema::create('trainees', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('client_id');
+            $table->string('name', 50)->nullable();
+            $table->string('breed', 100)->nullable();
+            $table->string('sex', 20)->nullable();
+            $table->unsignedSmallInteger('birth_year')->nullable();
+            $table->unsignedTinyInteger('birth_month')->nullable();
+            $table->unsignedTinyInteger('birth_day')->nullable();
+            $table->string('neuter_status', 20)->nullable();
+            $table->string('photo_path', 500)->nullable();
+            $table->string('trainer_photo_path', 500)->nullable();
+            $table->timestamps();
+            $table->unsignedBigInteger('updated_by')->nullable();
+        });
+    }
+
+    /**
      * トレーナーの表（2026-11 追加）。トレーニー詳細（S-0309）がトレーナー用写真の選択モーダル（S-0309-M02）の
      * 登録者の選択肢を読むため、S-0309 を HTTP で開くテストで使う（Trainer::practitioners() の並びに要る列だけ）
      */

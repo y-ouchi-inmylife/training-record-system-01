@@ -3,13 +3,15 @@
 
      利用方法（S-0305 会員詳細）:
        @include('clients._usage-modal', ['client' => $client, 'openModal' => $openModal,
-                'contractOptions' => $ticket['contractOptions'], 'defaultContractId' => $ticket['defaultContractId']])
+                'contractOptions' => $ticket['contractOptions'], 'defaultContractId' => $ticket['defaultContractId'],
+                'traineeOptions' => $usageForm['traineeOptions'], 'defaultTraineeId' => $usageForm['defaultTraineeId'],
+                'defaultStartTime' => $usageForm['defaultStartTime'], 'defaultEndTime' => $usageForm['defaultEndTime']])
        // ボタン側:
        //   新規登録: onclick="window.usageModal.openForCreate()"
        //            （「未利用」のマスからは openForCreate(this.dataset.clientContractId) で、その契約を選んで開く）
        //   編集   : onclick="window.usageModal.openForEdit(this.dataset)"
-       //            （data-id / data-client-contract-id / data-used-on / data-note。
-       //              clients/_usage-slot.blade.php）
+       //            （data-id / data-client-contract-id / data-trainee-id / data-used-on / data-start-time / data-end-time / data-note。
+       //              clients/_usage-slot.blade.php。時刻は HH:MM）
 
      期待する変数:
        - $client            : App\Models\Client（store URL の生成に使う）
@@ -17,6 +19,23 @@
        - $contractOptions   : 「契約」の選択肢（ContractTicketService::build() の contractOptions。
                               契約日の古い順。[id, label, usedUp]）
        - $defaultContractId : ?int 登録時の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
+       - $traineeOptions    : 「トレーニー」の選択肢（その会員のトレーニー全部。空のトレーニーも含む。id 順。[id, label]。
+                              label はトレーナー側の表示名〔名前未登録なら「名前未登録」〕）。空の配列ならこの欄を出さない（2026-11 追加）
+       - $defaultTraineeId  : ?int 登録時の「トレーニー」の初期値（Client::defaultUsageTraineeId()。null は初期選択なし。2026-11 追加）
+       - $defaultStartTime  : string 登録時の開始時刻の初期値（予定の設定の営業開始時刻。HH:MM。2026-11 追加）
+       - $defaultEndTime    : string 登録時の終了時刻の初期値（予定の設定の営業終了時刻。HH:MM。2026-11 追加）
+
+     ## 項目の並び（設計書 S-0305-M05。2026-11 変更）
+
+     利用日 → 開始時刻・終了時刻（横並び） → トレーニー → 契約 → メモ。
+     開始時刻・終了時刻は input type="time"（計測値の計測時刻と同じ。Flatpickr は使わない）。範囲のエラーは各欄の下ではなく、
+     まとまりの下に出す（§2-7 の但し書き）。
+
+     ## 「トレーニー」の選択（設計書 S-0305-M05。2026-11 追加）
+
+     - その会員にトレーニーが 1 頭以上いるときは必須。1 頭もいないときは欄を出さない（送らない＝NULL）
+     - 先頭に未選択の選択肢（value は空）を置き、初期選択があるときは JS で隠す（applyTraineeBlank()）。
+       初期選択がないとき（登録で初期値がない・編集で「トレーニーなし」の利用）は、未選択の選択肢を出して選んだ状態で開く
 
      ## 「契約」の選択（設計書 S-0305-M05）
 
@@ -63,7 +82,50 @@
                                 <x-form-error field="used_on" />
                             @endif
                         </div>
-                        {{-- 契約（利用日の次の項目。任意）。エラーで開き直したときは選んでいた値を選び直す。
+                        {{-- 開始時刻・終了時刻（利用日の次。横に並べる。2026-11 追加）。範囲のエラーはまとまりの下に出す（§2-7 の但し書き） --}}
+                        <div class="col-12">
+                            <div class="d-flex flex-wrap align-items-end column-gap-2 row-gap-2" data-usage-time-range>
+                                <div>
+                                    <label for="usage_start_time" class="form-label">開始時刻 <span class="text-danger">*</span></label>
+                                    <input type="time" class="form-control @if($openModal === 'usage') @error('start_time') is-invalid @enderror @endif"
+                                           id="usage_start_time" name="start_time"
+                                           value="{{ $openModal === 'usage' ? old('start_time') : '' }}"
+                                           required autocomplete="off">
+                                </div>
+                                <div class="pb-2" aria-hidden="true">〜</div>
+                                <div>
+                                    <label for="usage_end_time" class="form-label">終了時刻 <span class="text-danger">*</span></label>
+                                    <input type="time" class="form-control @if($openModal === 'usage') @error('end_time') is-invalid @enderror @endif"
+                                           id="usage_end_time" name="end_time"
+                                           value="{{ $openModal === 'usage' ? old('end_time') : '' }}"
+                                           required autocomplete="off">
+                                </div>
+                            </div>
+                            @if($openModal === 'usage')
+                                <x-form-error field="start_time" block />
+                                <x-form-error field="end_time" block />
+                            @endif
+                        </div>
+                        {{-- トレーニー（開始時刻・終了時刻の次。2026-11 追加）。その会員にトレーニーがいなければ出さない。
+                             エラーで開き直したときは選んでいたトレーニーを選び直す（未選択なら未選択の選択肢）。
+                             未選択の選択肢を隠すかどうかは JS の applyTraineeBlank() で決める --}}
+                        @if(count($traineeOptions) > 0)
+                            <div class="col-12">
+                                <label for="usage_trainee_id" class="form-label">トレーニー <span class="text-danger">*</span></label>
+                                <select class="form-select @if($openModal === 'usage') @error('trainee_id') is-invalid @enderror @endif"
+                                        id="usage_trainee_id" name="trainee_id" required>
+                                    <option value="" @selected($openModal === 'usage' && blank(old('trainee_id')))></option>
+                                    @foreach($traineeOptions as $option)
+                                        <option value="{{ $option['id'] }}"
+                                                @selected($openModal === 'usage' && (string) old('trainee_id') === (string) $option['id'])>{{ $option['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                @if($openModal === 'usage')
+                                    <x-form-error field="trainee_id" />
+                                @endif
+                            </div>
+                        @endif
+                        {{-- 契約（トレーニーの次の項目。トレーニーの欄がないときは開始時刻・終了時刻の次。任意）。エラーで開き直したときは選んでいた値を選び直す。
                              disabled（使い切り）の付け外しはモードに合わせて JS の applyDisabled() で行う。 --}}
                         <div class="col-12">
                             <label for="client_contract_id" class="form-label">契約</label>
@@ -121,6 +183,10 @@
     const DESTROY_URL_TEMPLATE = @json(route('client-usages.destroy', ['usage' => '__ID__']));
     // 登録時の「契約」の初期値（残りがある契約のうち一番古いもの。null は「契約なし」）
     const DEFAULT_CONTRACT_ID = @json($defaultContractId);
+    // 登録時の「トレーニー」の初期値（null は初期選択なし）と、開始時刻・終了時刻の初期値（予定の設定。HH:MM）。2026-11 追加
+    const DEFAULT_TRAINEE_ID = @json($defaultTraineeId);
+    const DEFAULT_START_TIME = @json($defaultStartTime);
+    const DEFAULT_END_TIME = @json($defaultEndTime);
 
     // 登録時の初期値「今日」はモーダルを開いた瞬間のブラウザの日付を使う
     function pad2(n) { return String(n).padStart(2, '0'); }
@@ -141,6 +207,9 @@
     let usedOnInput = null;
     let noteInput = null;
     let contractSelect = null;
+    let traineeSelect = null;   // その会員にトレーニーがいなければ null（欄を出さない）
+    let startTimeInput = null;
+    let endTimeInput = null;
 
     // 使い切った契約を選べなくする。currentContractId（編集中の利用が今割り当てられている契約）
     // だけは使い切りでも選べるようにする。登録モードでは null を渡す。
@@ -150,6 +219,21 @@
                 option.disabled = currentContractId === null || String(option.value) !== String(currentContractId);
             }
         });
+    }
+
+    // 「トレーニー」の未選択の選択肢（value は空）を、何かが選ばれているときだけ隠す（2026-11 追加）。
+    // 初期選択がないとき（登録で初期値がない・編集で「トレーニーなし」の利用・エラーで未選択のまま戻ったとき）は出す
+    function applyTraineeBlank() {
+        if (!traineeSelect) return;
+        const blank = traineeSelect.querySelector('option[value=""]');
+        if (blank) {
+            blank.hidden = traineeSelect.value !== '';
+        }
+    }
+    function setTrainee(traineeId) {
+        if (!traineeSelect) return;
+        traineeSelect.value = traineeId === undefined || traineeId === null ? '' : String(traineeId);
+        applyTraineeBlank();
     }
 
     // 利用済みのマス（data-client-contract-id を持つ）から、その利用の今の契約を読む。
@@ -174,6 +258,12 @@
         usedOnInput = document.getElementById('used_on');
         noteInput = document.getElementById('usage_note');
         contractSelect = document.getElementById('client_contract_id');
+        traineeSelect = document.getElementById('usage_trainee_id');
+        startTimeInput = document.getElementById('usage_start_time');
+        endTimeInput = document.getElementById('usage_end_time');
+        if (traineeSelect) {
+            traineeSelect.addEventListener('change', applyTraineeBlank);
+        }
 
         deleteBtn.addEventListener('click', function () {
             if (confirm('この利用を削除しますか？')) {
@@ -215,12 +305,15 @@
             contractSelect.value = DEFAULT_CONTRACT_ID === null ? '' : String(DEFAULT_CONTRACT_ID);
         }
         usedOnInput.value = todayString();
+        startTimeInput.value = DEFAULT_START_TIME;
+        endTimeInput.value = DEFAULT_END_TIME;
+        setTrainee(DEFAULT_TRAINEE_ID);
         noteInput.value = '';
         modal.show();
     }
 
     function openForEdit(data) {
-        // data: { id, clientContractId, usedOn, note }（data-* 属性はキャメルケースになる）
+        // data: { id, clientContractId, traineeId, usedOn, startTime, endTime, note }（data-* 属性はキャメルケースになる。時刻は HH:MM）
         initRefs();
         if (!modal) return;
         setEditMode(data.id);
@@ -228,6 +321,10 @@
         applyDisabled(currentContractId);
         contractSelect.value = currentContractId === null ? '' : String(currentContractId);
         usedOnInput.value = data.usedOn || '';
+        startTimeInput.value = data.startTime || '';
+        endTimeInput.value = data.endTime || '';
+        // 「トレーニーなし」（data-trainee-id が空）の利用は、未選択の状態で開く
+        setTrainee(data.traineeId || null);
         noteInput.value = data.note || '';
         modal.show();
     }
@@ -248,6 +345,8 @@
                 setCreateMode();
                 applyDisabled(null);
             }
+            // トレーニー・時刻は Blade の old() で戻し済み。未選択の選択肢の表示だけを合わせる
+            applyTraineeBlank();
             modal.show();
         @endif
     });

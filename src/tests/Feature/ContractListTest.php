@@ -35,6 +35,8 @@ class ContractListTest extends TestCase
 
         $this->createClientsTable();
         $this->createClientCountTables();
+        // 会員詳細の利用のモーダルが、時刻の初期値に予定の設定を読む（2026-11 追加）
+        $this->createSystemSettingsTable();
         $this->createAccessLogsTable();
         $this->createClientEmailRegistrationTokensTable();
         Schema::create('trainers', function (Blueprint $table) {
