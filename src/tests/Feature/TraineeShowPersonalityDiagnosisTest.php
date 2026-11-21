@@ -58,6 +58,8 @@ class TraineeShowPersonalityDiagnosisTest extends TestCase
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });
+        // 削除の確認で、そのトレーニーの利用の件数を数える（2026-11 追加）。外部キーが効くよう、トレーニーの表のあとに作る
+        $this->createClientCountTables();
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('trainee_id');

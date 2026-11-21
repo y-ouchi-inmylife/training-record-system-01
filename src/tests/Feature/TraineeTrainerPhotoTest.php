@@ -56,6 +56,8 @@ class TraineeTrainerPhotoTest extends TestCase
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });
+        // 削除の確認で、そのトレーニーの利用の件数を数える（2026-11 追加）。外部キーが効くよう、トレーニーの表のあとに作る
+        $this->createClientCountTables();
         Schema::create('media_records', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('trainer_id')->nullable();

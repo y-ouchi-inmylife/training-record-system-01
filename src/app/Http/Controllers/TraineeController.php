@@ -114,6 +114,9 @@ class TraineeController extends Controller
         // 2026-10-18 追加：公開済みの愛犬性格診断のアドバイスがあるときは、消えるものの文のあとに
         // 「公開済みの愛犬性格診断のアドバイスも、会員様のマイページから消えます。」を足す
         // （2026-10-18 変更：その前は、結果から作ったトレーニング記録が残ることの文だった）
+        // 2026-11 追加（要件定義書 6-16-4、設計書 S-0309「削除」）：そのトレーニーに利用（D-1000）があるときだけ、使えなくなる案内の文の
+        // あとに「このトレーニーの利用 N件は『トレーニーなし』になります。」を足す（利用は消えず、trainee_id が NULL になるため。
+        // 契約の削除の確認〔S-0305-M04〕の「割り当てられている利用 N件は『契約なし』になります。」と同じ形）
         $measurementSentence = $measurementCount > 0
             ? "このトレーニーには {$measurementCount} 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。"
             : '';
@@ -134,6 +137,10 @@ class TraineeController extends Controller
         }
         if ($invalidated !== []) {
             $intakeSurveySentence .= '発行済みの'.implode('と', $invalidated).'も使えなくなります。';
+        }
+        $usageCount = $trainee->usages()->count();
+        if ($usageCount > 0) {
+            $intakeSurveySentence .= "このトレーニーの利用 {$usageCount}件は『トレーニーなし』になります。";
         }
         if ($intakeSurveySentence !== '') {
             $deleteConfirmMessage = $measurementSentence.$intakeSurveySentence.'このトレーニーを削除しますか？';

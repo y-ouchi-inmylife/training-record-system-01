@@ -53,6 +53,8 @@ class TraineeShowIntakeSurveyTest extends TestCase
             $table->timestamps();
             $table->unsignedBigInteger('updated_by')->nullable();
         });
+        // 削除の確認で、そのトレーニーの利用の件数を数える（2026-11 追加）。外部キーが効くよう、トレーニーの表のあとに作る
+        $this->createClientCountTables();
         Schema::create('trainee_measurements', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('trainee_id');
@@ -331,6 +333,51 @@ class TraineeShowIntakeSurveyTest extends TestCase
     }
 
     // ---- 答え直し（2026-10-19 追加：回答したあとも、いつでも案内を発行し直して答え直してもらえる） ----
+
+    // ---- 削除の確認：利用（2026-11 追加。要件定義書 6-16-4。利用は消えず「トレーニーなし」になる） ----
+
+    private function addUsages(int $count, ?int $traineeId = null): void
+    {
+        for ($i = 0; $i < $count; $i++) {
+            DB::table('client_usages')->insert([
+                'client_id' => $this->trainee->client_id, 'trainee_id' => $traineeId ?? $this->trainee->id,
+                'used_on' => '2026-11-0'.($i + 1), 'start_time' => '08:00:00', 'end_time' => '19:00:00',
+            ]);
+        }
+    }
+
+    public function test_削除の確認_利用があれば件数とトレーニーなしになることを足す(): void
+    {
+        $this->addUsages(2);
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('このトレーニーの利用 2件は『トレーニーなし』になります。このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
+
+    public function test_削除の確認_利用の文は計測値と案内の文のあと締めの前(): void
+    {
+        $this->addMeasurements(1);
+        $this->addResponse();
+        $this->issueToken();
+        $this->addUsages(3);
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame(
+            'このトレーニーには 1 件の計測値が登録されています。トレーニーを削除すると計測値も一緒に削除されます。'
+            .'愛犬アンケートの回答も一緒に削除されます。発行済みの愛犬アンケートの案内も使えなくなります。'
+            .'このトレーニーの利用 3件は『トレーニーなし』になります。このトレーニーを削除しますか？',
+            $this->deleteConfirmMessage($html)
+        );
+    }
+
+    public function test_削除の確認_ほかのトレーニーの利用は数えない(): void
+    {
+        $other = Trainee::query()->create(['client_id' => $this->trainee->client_id, 'name' => 'ハナ']);
+        $this->addUsages(2, $other->id);
+        $html = $this->get(route('trainees.show', $this->trainee))->getContent();
+
+        $this->assertSame('このトレーニーを削除しますか？', $this->deleteConfirmMessage($html));
+    }
 
     public function test_削除の確認_回答が2件でも文は今までどおり(): void
     {
