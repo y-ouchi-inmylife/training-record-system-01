@@ -6,6 +6,7 @@ import {
     applyInput,
     capacityState,
     countText,
+    dayCellClasses,
     dayHeading,
     dayLabel,
     initialState,
@@ -147,3 +148,55 @@ describe('状態の移り方', () => {
         expect(selectDate(state, '2026-10-05')).toEqual({ month: '2026-10', selected: '2026-10-05' });
     });
 });
+
+// 選んでいる日は太い青の枠、今日は日付の数字を青の太字（2026-11 変更。設計書 S-0305-M05「予約状況」）
+describe('dayCellClasses', () => {
+    const cell = (state, selected, today) => dayCellClasses({ state, selected, today });
+
+    it('選んでいる日は塗りつぶし（btn-primary）にならず、枠のクラスが付く', () => {
+        const { button, day } = cell(CAPACITY_AVAILABLE, true, false);
+        expect(button).toContain('usage-schedule-selected');
+        expect(button).toContain('btn-light');
+        expect(button).not.toContain('btn-primary');
+        expect(button).not.toContain('bg-primary');
+        expect(day).toEqual(['d-block']);
+    });
+
+    it.each([
+        [CAPACITY_FULL, ['bg-success-subtle', 'text-success-emphasis', 'border-success-subtle']],
+        [CAPACITY_OVER, ['bg-danger-subtle', 'text-danger', 'border-danger-subtle']],
+    ])('選んでいる日が %s でも、その背景と文字の色が残る', (state, colors) => {
+        const { button } = cell(state, true, false);
+        expect(button).toEqual(expect.arrayContaining([...colors, 'usage-schedule-selected']));
+        expect(button).not.toContain('btn-light');
+        expect(button).not.toContain('btn-primary');
+    });
+
+    it('今日は数字が青の太字で、枠は付かない', () => {
+        const { button, day } = cell(CAPACITY_AVAILABLE, false, true);
+        expect(day).toEqual(['d-block', 'text-primary', 'fw-bold']);
+        expect(button).not.toContain('usage-schedule-selected');
+        expect(button.join(' ')).not.toMatch(/\bborder(-2|-primary)?\b/);
+    });
+
+    it('今日を選んでいるときは、枠と青の太字の両方が付く', () => {
+        const { button, day } = cell(CAPACITY_AVAILABLE, true, true);
+        expect(button).toContain('usage-schedule-selected');
+        expect(day).toEqual(['d-block', 'text-primary', 'fw-bold']);
+    });
+
+    it('今日が満・超過の日でも、数字は青の太字で、マスは満・超過の色のまま', () => {
+        expect(cell(CAPACITY_FULL, false, true).button).toContain('bg-success-subtle');
+        expect(cell(CAPACITY_OVER, true, true).button).toEqual(expect.arrayContaining(['bg-danger-subtle', 'text-danger', 'usage-schedule-selected']));
+        expect(cell(CAPACITY_OVER, true, true).day).toEqual(['d-block', 'text-primary', 'fw-bold']);
+    });
+
+    it('選んでいない・今日でない日は、色だけ（上限をまだ読んでいない間は空きありと同じ）', () => {
+        expect(cell(null, false, false)).toEqual({
+            button: ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day', 'btn-light'],
+            day: ['d-block'],
+        });
+        expect(cell(CAPACITY_FULL, false, false).button).not.toContain('usage-schedule-selected');
+    });
+});
+

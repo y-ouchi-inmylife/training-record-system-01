@@ -134,6 +134,43 @@ export function capacityState(count, capacity) {
 }
 
 /**
+ * カレンダーのマス（ボタン）と、その中の日付の数字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
+ *
+ * - 背景と文字の色は、空きあり・満・超過の 3 段階（capacityState）。選んでいる日・今日でも変えない
+ *   （空きあり＝btn-light、満＝緑、超過＝赤。上限をまだ読んでいない間〔state が null〕は空きありと同じ）
+ * - 選んでいる日（＝利用日）は太い青の枠（usage-schedule-selected。app.scss で内側に描くので、マスの大きさは変わらない）。
+ *   2026-11 変更：その前は青の塗りつぶし（btn-primary）で、満・超過の色より優先していた
+ * - 今日は日付の数字を青の太字（text-primary・fw-bold）。枠は付けない。2026-11 変更：その前は青の枠（border-primary）
+ * - 今日を選んでいるときは、枠と青の太字の両方
+ *
+ * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean}} cell
+ * @returns {{button: string[], day: string[]}}
+ */
+export function dayCellClasses({ state, selected, today }) {
+    const button = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
+    if (state === CAPACITY_OVER) {
+        // 超過：赤（§2-5 の bg-danger〔異常〕の系統）
+        button.push('bg-danger-subtle', 'text-danger', 'border-danger-subtle');
+    } else if (state === CAPACITY_FULL) {
+        // 満（上限ちょうど）：緑（§2-5 の bg-success〔正常・完了〕の系統）
+        button.push('bg-success-subtle', 'text-success-emphasis', 'border-success-subtle');
+    } else {
+        button.push('btn-light');
+    }
+    if (selected) {
+        button.push('usage-schedule-selected');
+    }
+
+    const day = ['d-block'];
+    if (today) {
+        button.push('usage-schedule-today');
+        day.push('text-primary', 'fw-bold');
+    }
+
+    return { button, day };
+}
+
+/**
  * 開いたときの状態。日付が正しくなければ fallback（今日）にする
  *
  * @param {string} ymd 利用日の欄の値

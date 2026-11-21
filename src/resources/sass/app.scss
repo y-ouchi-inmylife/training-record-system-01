@@ -345,3 +345,15 @@ h2 {
         padding-top: 0 !important;
     }
 }
+
+// 利用の予約状況のカレンダー（<x-usage-schedule>。2026-11 追加。設計書 S-0305-M05「予約状況」）。
+// 選んでいる日（＝利用日）は太い青の枠。背景（空きあり・満・超過の色）は塗りつぶさない。
+// 枠は box-shadow の inset でマスの内側に描くので、マスの大きさ・並びは変わらない（border の太さは変えない）。
+// キーボードで選んだとき（:focus-visible）も、Bootstrap のフォーカスの輪と枠の両方を出す
+.usage-schedule-selected {
+    box-shadow: inset 0 0 0 3px var(--bs-primary);
+
+    &:focus-visible {
+        box-shadow: inset 0 0 0 3px var(--bs-primary), var(--bs-btn-focus-box-shadow);
+    }
+}

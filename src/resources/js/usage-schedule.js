@@ -16,12 +16,11 @@
  * 計算（月のマス・状態の移り方）は usage-schedule-core.js。
  */
 import {
-    CAPACITY_FULL,
-    CAPACITY_OVER,
     WEEKDAYS,
     applyInput,
     capacityState,
     countText,
+    dayCellClasses,
     dayHeading,
     initialState,
     monthHeading,
@@ -190,27 +189,13 @@ class UsageSchedule {
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.date = ymd;
-        const classes = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
-        if (selected) {
-            // 選んでいる日は、満・超過でも選んでいる日の見た目を優先する
-            classes.push('btn-primary');
-        } else if (state === CAPACITY_OVER) {
-            // 超過：赤（§2-5 の bg-danger〔異常〕の系統）
-            classes.push('bg-danger-subtle', 'text-danger', 'border-danger-subtle');
-        } else if (state === CAPACITY_FULL) {
-            // 満（上限ちょうど）：緑（§2-5 の bg-success〔正常・完了〕の系統。2026-11 追加）
-            classes.push('bg-success-subtle', 'text-success-emphasis', 'border-success-subtle');
-        } else {
-            classes.push('btn-light');
-        }
-        if (ymd === this.today) {
-            classes.push('usage-schedule-today', 'border', 'border-2', 'border-primary');
-        }
-        button.className = classes.join(' ');
+        // 色（空きあり・満・超過）・選んでいる日の枠・今日の数字の色は usage-schedule-core.js の dayCellClasses で決める
+        const classes = dayCellClasses({ state, selected, today: ymd === this.today });
+        button.className = classes.button.join(' ');
         if (selected) button.setAttribute('aria-pressed', 'true');
 
         const day = document.createElement('span');
-        day.className = 'd-block';
+        day.className = classes.day.join(' ');
         day.textContent = String(parseInt(ymd.slice(8), 10));
         button.appendChild(day);
 
