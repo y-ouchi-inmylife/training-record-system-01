@@ -103,11 +103,42 @@ class ScheduleSettingTest extends TestCase
 
         $this->assertMatchesRegularExpression(
             '/<li><a class="dropdown-item" href="'.preg_quote(route('settings.summary-prompts.edit'), '/').'">要約プロンプト<\/a><\/li>\s*'
+            .'<li><hr class="dropdown-divider"><\/li>\s*'
             .'<li><a class="dropdown-item" href="'.preg_quote(route('settings.schedule.edit'), '/').'">事業所情報の設定<\/a><\/li>/s',
             $html
         );
         // 開いているときは【管理者】を強調する
         $this->assertMatchesRegularExpression('/<a class="nav-link dropdown-toggle active"[^>]*>\s*【管理者】/', $html);
+    }
+
+    /** 【管理者】メニュー（ドロップダウン）の中身。メニューが出なければ null */
+    private function adminMenu(string $html): ?string
+    {
+        if (preg_match('/【管理者】\s*<\/a>\s*<ul class="dropdown-menu">(.*?)<\/ul>/su', $html, $m) !== 1) {
+            return null;
+        }
+
+        return $m[1];
+    }
+
+    public function test_管理者メニューの区切り線は管理者に2本_システム管理者には出さない(): void
+    {
+        // 2026-11 追加：事業所情報の設定の上に区切り線。どちらの区切り線も前後の項目と同じく管理者だけに出し、
+        // 区切り線だけが残ったり 2 本続いたりしない
+        $this->actingAsRole('admin');
+        $menu = $this->adminMenu((string) $this->view('layouts.app'));
+        $this->assertNotNull($menu);
+        $this->assertSame(2, substr_count($menu, '<li><hr class="dropdown-divider"></li>'));
+        $this->assertDoesNotMatchRegularExpression('/dropdown-divider"><\/li>\s*<li><hr class="dropdown-divider"/u', $menu);
+        $this->assertDoesNotMatchRegularExpression('/dropdown-divider"><\/li>\s*$/u', $menu);
+
+        // システム管理者の【管理者】メニューはトレーナー管理だけで、区切り線は出さない
+        $this->actingAsRole('system_admin');
+        $menu = $this->adminMenu((string) $this->view('layouts.app'));
+        $this->assertNotNull($menu);
+        $this->assertStringContainsString('トレーナー管理', $menu);
+        $this->assertStringNotContainsString('dropdown-divider', $menu);
+        $this->assertStringNotContainsString('事業所情報の設定', $menu);
     }
 
     public function test_一般トレーナーとシステム管理者は開けず更新もできない(): void
