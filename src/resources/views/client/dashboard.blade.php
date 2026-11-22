@@ -41,6 +41,28 @@
         </div>
     @endif
 
+    {{-- 次回のご予約（2026-11 追加。設計書 S-1402「次回のご予約」）。今日以降の利用（予約）があるとき、ご連絡先の登録のお願いの下・愛犬のカードの上に出す。
+         中身は Client\DashboardController::nextReservation で組み立て済み（次回の日の予約をすべて・ほかの日の件数・リンク先）。
+         見た目はお知らせ（紺の系統。.c-reservation-notice）。今日なら見出しを「本日のご予約」の塗りのラベルにし、面を少し濃くする（--today）。
+         アイコンは Bootstrap Icons の calendar-event の SVG（会員側は Bootstrap Icons の CSS を読み込まない。読み上げない）。
+         利用のメモ・契約の情報は出さない --}}
+    @if($nextReservation)
+        <section @class(['c-reservation-notice', 'c-reservation-notice--today' => $nextReservation['isToday']])
+                 aria-label="{{ $nextReservation['heading'] }}" data-client-next-reservation="{{ $nextReservation['date'] }}">
+            <p class="c-reservation-notice-head mb-0">
+                <svg class="c-reservation-notice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false" data-reservation-notice-icon="calendar-event"><path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></svg>
+                <span class="c-reservation-notice-title">{{ $nextReservation['heading'] }}</span>
+                <span class="c-reservation-notice-date num-tabular">{{ $nextReservation['dateLabel'] }}</span>
+            </p>
+            <ul class="c-reservation-notice-list list-unstyled mb-0">
+                @foreach($nextReservation['items'] as $item)
+                    <li><span class="c-reservation-notice-time num-tabular">{{ $item['timeRange'] }}</span>@if($item['callName'] !== null)<span class="c-reservation-notice-name">{{ $item['callName'] }}</span>@endif</li>
+                @endforeach
+            </ul>
+            <a href="{{ $nextReservation['url'] }}" class="c-reservation-notice-link">@if($nextReservation['laterCount'] > 0)ほかに <span class="num-tabular">{{ $nextReservation['laterCount'] }}</span>件@elseご利用回数を見る@endif<span aria-hidden="true"> ›</span></a>
+        </section>
+    @endif
+
     {{-- 体重推移（設計書 S-1402 セクション「体重推移」・6-15-14、段階③）。
          トレーニーごとに折れ線グラフを 1 枚描く。データはコントローラで
          組み立て、`data-measurement-chart` 属性に JSON で載せる（既存の

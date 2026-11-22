@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MediaRecordController as TrainerMediaRecordController;
+use App\Models\ClientUsage;
 use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Support\RecordTimeline;
@@ -89,7 +90,10 @@ class DashboardController extends Controller
         // 足りないもの（'address'・'phone'）を渡し、文は足りないものに合わせる。入力が済めば出ない
         $contactNotice = $this->contactNotice($client);
 
-        return view('client.dashboard', compact('timeline', 'recordCount', 'weightCharts', 'contactNotice'));
+        // 次回のご予約（2026-11 追加。設計書 S-1402「次回のご予約」）。今日以降の利用がなければ null（帯を出さない）
+        $nextReservation = $this->nextReservation($client);
+
+        return view('client.dashboard', compact('timeline', 'recordCount', 'weightCharts', 'contactNotice', 'nextReservation'));
     }
 
     /**
@@ -159,6 +163,53 @@ class DashboardController extends Controller
             'missing' => $missing,
             'text' => __('messages.client_contact_notice.'.(count($missing) === 2 ? 'both' : $missing[0])),
             'url' => route('client-portal.profile.edit'),
+        ];
+    }
+
+    /**
+     * 次回のご予約（2026-11 追加。要件定義書 6-15-3・6-17-9、設計書 S-1402「次回のご予約」）。
+     *
+     * ログイン中の会員自身の利用のうち、利用日が今日（today()。アプリのタイムゾーン。時刻は使わない）以降のもの（予約）を読み、
+     * いちばん早い利用日（次回の日）の予約をすべて、開始時刻 → 終了時刻 → id の順に並べる。
+     * laterCount は次回の日より後の日の予約の件数（1 以上なら「ほかに n件」、0 なら「ご利用回数を見る」。どちらもご利用回数 S-1412 へ）。
+     * callName は Trainee::client_call_name（「○○ちゃん」。名前が未登録なら「愛犬」）。トレーニーがない利用は null（時刻だけを出す）。
+     * 利用のメモ・契約の情報は渡さない（会員さんに一切見せない）
+     *
+     * @return array{isToday: bool, heading: string, dateLabel: string, date: string,
+     *               items: list<array{timeRange: string, callName: ?string}>, laterCount: int, url: string}|null
+     */
+    private function nextReservation($client): ?array
+    {
+        $today = today()->toDateString();
+        // Client::usages() の既定の並び（利用日 → 開始時刻 → id）を外し、利用日 → 開始時刻 → 終了時刻 → id にする
+        $reservations = $client->usages()
+            ->reorder()
+            ->with('trainee')
+            ->whereDate('used_on', '>=', $today)
+            ->orderBy('used_on')
+            ->orderBy('start_time')
+            ->orderBy('end_time')
+            ->orderBy('id')
+            ->get();
+        if ($reservations->isEmpty()) {
+            return null;
+        }
+
+        $date = $reservations->first()->used_on->toDateString();
+        $sameDay = $reservations->filter(fn (ClientUsage $usage) => $usage->used_on->toDateString() === $date);
+        $isToday = $date === $today;
+
+        return [
+            'isToday' => $isToday,
+            'heading' => $isToday ? '本日のご予約' : '次回のご予約',
+            'dateLabel' => ClientUsage::toShortDateLabel($date),
+            'date' => $date,
+            'items' => $sameDay->map(fn (ClientUsage $usage) => [
+                'timeRange' => $usage->time_range_label,
+                'callName' => $usage->trainee?->client_call_name,
+            ])->values()->all(),
+            'laterCount' => $reservations->count() - $sameDay->count(),
+            'url' => route('client-portal.contracts'),
         ];
     }
 

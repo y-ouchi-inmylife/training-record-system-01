@@ -55,6 +55,8 @@ class ClientDashboardPhotoFormErrorRenderingTest extends TestCase
             'timeline' => new Collection([]),
             'recordCount' => 0,
             'contactNotice' => null,
+            // 次回のご予約（2026-11 追加）。この確認では出さない
+            'nextReservation' => null,
             'weightCharts' => $weightCharts ?? $this->dummyWeightCharts([1]),
         ]);
     }

@@ -46,17 +46,20 @@
                     @if($row['contract']->expires_on)
                         <span class="c-ticket-expires">有効期限 @if($row['expired'])<span class="text-danger num-tabular">{{ $row['contract']->expires_on->format('Y/m/d') }}</span>@else<span class="num-tabular">{{ $row['contract']->expires_on->format('Y/m/d') }}</span>@endif</span>
                     @endif
+                    {{-- 使い切った契約：予約（今日より後の利用）を含めば「すべてご予約済み」、なければ「すべてご利用済み」（2026-11 追加。文はコントローラーで決める） --}}
                     @if($row['usedUp'])
-                        <span class="badge bg-secondary">すべてご利用済み</span>
+                        <span class="badge bg-secondary">{{ $row['statusLabel'] }}</span>
                     @else
                         <span class="c-ticket-status">あと <span class="num-tabular">{{ $row['remaining'] }}</span>回</span>
                     @endif
                 </div>
-                {{-- マス：利用済みは利用日、未利用は「未利用」。利用日の昇順で左から並べ、狭い幅では折り返す --}}
+                {{-- マス：利用済みは利用日、未利用は「未利用」。利用日の昇順で左から並べ、狭い幅では折り返す。
+                     利用日が今日・今日より後のマスは、日付の上に「本日」「ご予約」の印を出し、面と枠を変える（2026-11 追加。設計書 S-1412「マスの予約の印」。
+                     印と状態はコントローラーで組み立て済み。読むだけの画面なので data-* は付けない） --}}
                 <div class="c-ticket-slots">
-                    @foreach($row['slots'] as $usage)
-                        @if($usage)
-                            <span class="c-ticket-slot num-tabular">{{ $usage->used_on->format('Y/m/d') }}</span>
+                    @foreach($row['slots'] as $slot)
+                        @if($slot)
+                            <span @class(['c-ticket-slot', 'num-tabular', 'c-ticket-slot--today' => $slot['state'] === \App\Services\ContractTicketService::STATE_TODAY, 'c-ticket-slot--upcoming' => $slot['state'] === \App\Services\ContractTicketService::STATE_UPCOMING])>@if($slot['mark'] !== null)<span class="c-ticket-slot-mark">{{ $slot['mark'] }}</span>@endif<span>{{ $slot['date'] }}</span></span>
                         @else
                             <span class="c-ticket-slot c-ticket-slot--empty">未利用</span>
                         @endif

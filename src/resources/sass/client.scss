@@ -35,6 +35,13 @@ $driftwood:    #6B6155; // 補助アクション面（$secondary）
 // 2026-10-18 変更：ユーザーレビューで、琥珀色（線 #B45309・面 #FFF4E0）ではまだ優しく見えたため、ピンクにした
 $caution:      #C2185B;
 $caution-bg:   #FAD7E2;
+// 予約（お知らせ）の色（2026-11 追加。設計書 S-1402「次回のご予約」・S-1412「予約の印の見た目」）。マイページの紺の系統。
+// 線・アイコン・見出し・印の文字は明るい紺（$brand-bright）、面はそれを白に混ぜた薄い紺。今日（本日）は面を少し濃くする。
+// 注意（$caution のピンク）とは分ける。名前は色ではなく役目（予約）で付けている。
+// コントラスト比：$reservation と $reservation-bg 7.40:1・$reservation-today-bg 6.46:1、$ink と面 15.36:1・13.41:1
+$reservation:          $brand-bright;
+$reservation-bg:       mix($brand-bright, $mat, 8%);
+$reservation-today-bg: mix($brand-bright, $mat, 16%);
 
 // -----------------------------------------------------------------------------
 // Bootstrap 変数の上書き（Bootstrap import の前）
@@ -1139,7 +1146,11 @@ input[type="tel"] {
     gap: 0.5rem;
 }
 .c-ticket-slot {
-    display: inline-block;
+    // 予約の印（2026-11 追加）のあるマスとないマスが同じ行に並んでも高さがそろい、日付が上下の真ん中に来るよう、縦の flex にする
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     min-width: 6.5rem;
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
@@ -1156,6 +1167,31 @@ input[type="tel"] {
     color: rgba(15, 26, 46, 0.5);
     border-color: rgba(15, 26, 46, 0.15);
     border-style: dashed;
+}
+// 予約の印（2026-11 追加。設計書 S-1412「予約の印の見た目」）。トレーナー側（S-0305）の「今日を強く、予定を薄い色で」に合わせ、会員側の紺で作る。
+// ご予約（今日より後）：薄い紺の面・明るい紺の枠・明るい紺の太字の印。本日（今日）：少し濃い面・濃い紺の 2px の枠・濃い紺の塗りの印（白の文字）。
+// 日付は $ink のまま（読みやすさは client.scss の $reservation の注記）
+.c-ticket-slot--upcoming {
+    background-color: $reservation-bg;
+    border-color: $reservation;
+}
+.c-ticket-slot--today {
+    background-color: $reservation-today-bg;
+    border: 2px solid $brand-deep;
+    // 枠が 1px 太いぶん、内側の余白を 1px 減らして、ほかのマスと大きさをそろえる
+    padding: calc(0.25rem - 1px) calc(0.5rem - 1px);
+}
+.c-ticket-slot-mark {
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: $reservation;
+}
+.c-ticket-slot--today .c-ticket-slot-mark {
+    padding: 0 0.375rem;
+    border-radius: 999px;
+    background-color: $brand-deep;
+    color: $mat;
 }
 
 .c-login {
@@ -1604,3 +1640,78 @@ input[type="tel"] {
     color: var(--c-survey-notice-color);
 }
 
+// -----------------------------------------------------------------------------
+// ダッシュボード（S-1402）の次回のご予約（2026-11 追加。設計書 S-1402「次回のご予約」）
+//
+// お知らせの帯（左の太い線・薄い面・角丸。回答待ちの案内・ご連絡先の登録のお願いと同じ作り）を、予約の色（$reservation。紺の系統）で。
+// sm 以上：左に「アイコン・見出し・日付」、その右に予約の行を縦に並べ、右下にリンク（3 列の grid）。
+// スマホの幅（sm 未満）：見出しの行 → 予約の行 → リンクの順に縦に並べる。
+// 本日のご予約（--today）：見出しを塗りのラベル（$reservation の地に白）にし、面を少し濃く、左の線を濃い紺（$brand-deep）にする
+// -----------------------------------------------------------------------------
+.c-reservation-notice {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem 1rem;
+    margin-bottom: 1rem;
+    padding: 0.625rem 0.875rem;
+    border-left: 4px solid $reservation;
+    border-radius: 0.375rem;
+    background-color: $reservation-bg;
+    color: $ink;
+
+    @include media-breakpoint-up(sm) {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: start;
+    }
+}
+.c-reservation-notice--today {
+    border-left-color: $brand-deep;
+    background-color: $reservation-today-bg;
+}
+.c-reservation-notice-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    font-weight: 700;
+}
+.c-reservation-notice-icon {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    color: $reservation;
+}
+.c-reservation-notice--today .c-reservation-notice-icon {
+    color: $brand-deep;
+}
+.c-reservation-notice-title {
+    color: $reservation;
+}
+.c-reservation-notice--today .c-reservation-notice-title {
+    padding: 0.0625rem 0.625rem;
+    border-radius: 999px;
+    background-color: $reservation;
+    color: $mat;
+}
+.c-reservation-notice-list {
+    // 1 件 1 行。時刻と呼び方のあいだを空け、狭い幅では呼び方が次の行に回ってもよい
+    li {
+        display: flex;
+        flex-wrap: wrap;
+        column-gap: 0.75rem;
+        line-height: 1.6;
+    }
+
+    @include media-breakpoint-up(sm) {
+        // 見出しの行（アイコンの高さ 1.25rem）と 1 行目の文字の高さをそろえる
+        padding-top: 0.0625rem;
+    }
+}
+.c-reservation-notice-link {
+    justify-self: end;
+    white-space: nowrap;
+
+    @include media-breakpoint-up(sm) {
+        align-self: end;
+    }
+}

@@ -257,4 +257,61 @@ class ClientPortalContractRenderingTest extends TestCase
         $this->assertStringNotContainsString('契約に含まれないご利用', $text);
         $this->assertStringContainsString('あと 1回', $text);
     }
+
+    // ---- 予約の印・すべてご予約済み（2026-11 追加。設計書 S-1412「マスの予約の印」。今日は 2026-10-13） ----
+
+    /** マス（.c-ticket-slot）ごとの「クラス」と「中の文字」 */
+    private function slots(string $html): array
+    {
+        preg_match_all('/<span class="(c-ticket-slot[^"]*)">(.*?)<\/span>\s*(?=<span class="c-ticket-slot|<\/div>)/su', $html, $m, PREG_SET_ORDER);
+
+        return array_map(fn ($x) => [$x[1], trim(preg_replace('/\s+/u', ' ', strip_tags(str_replace('</span><span', '</span> <span', $x[2]))))], $m);
+    }
+
+    public function test_今日のマスは本日_今日より後はご予約の印で_過去は印なし(): void
+    {
+        $client = $this->makeClient();
+        $c = $this->contract($client, '2026-10-01', 4);
+        $this->usage($client, '2026-10-12', $c);   // 過去
+        $this->usage($client, '2026-10-13', $c);   // 今日
+        $this->usage($client, '2026-10-20', $c);   // 今日より後
+
+        $this->assertSame([
+            ['c-ticket-slot num-tabular', '2026/10/12'],
+            ['c-ticket-slot num-tabular c-ticket-slot--today', '本日 2026/10/13'],
+            ['c-ticket-slot num-tabular c-ticket-slot--upcoming', 'ご予約 2026/10/20'],
+            ['c-ticket-slot c-ticket-slot--empty', '未利用'],
+        ], $this->slots($this->open($client)));
+    }
+
+    public function test_使い切った契約は_予約を含めばすべてご予約済み_今日以前だけならすべてご利用済み(): void
+    {
+        $client = $this->makeClient();
+        $reserved = $this->contract($client, '2026-10-01', 2);
+        $this->usage($client, '2026-10-12', $reserved);
+        $this->usage($client, '2026-10-14', $reserved);   // 今日より後を含む
+        $usedToday = $this->contract($client, '2026-09-01', 2);
+        $this->usage($client, '2026-09-05', $usedToday);
+        $this->usage($client, '2026-10-13', $usedToday);  // 今日は予約に数えない（トレーナー側と同じ）
+
+        $html = $this->open($client);
+        $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary">すべてご予約済み</span>'));
+        $this->assertSame(1, substr_count($html, '<span class="badge bg-secondary">すべてご利用済み</span>'));
+        // 新しい契約（予約を含む）が上
+        $this->assertLessThan(strpos($html, 'すべてご利用済み'), strpos($html, 'すべてご予約済み'));
+    }
+
+    public function test_予約の印のあるページでもメモは出さない(): void
+    {
+        $client = $this->makeClient();
+        $c = $this->contract($client, '2026-10-01', 2, null, 'CONTRACT_NOTE_SECRET');
+        ClientUsage::query()->create([
+            'client_id' => $client->id, 'client_contract_id' => $c->id,
+            'used_on' => '2026-10-20', 'start_time' => '08:00', 'end_time' => '19:00', 'note' => 'RESERVATION_NOTE_SECRET',
+        ]);
+
+        $html = $this->open($client);
+        $this->assertStringContainsString('ご予約', $html);
+        $this->assertStringNotContainsString('NOTE_SECRET', $html);
+    }
 }
