@@ -53,7 +53,7 @@
                         <span class="c-ticket-status">あと <span class="num-tabular">{{ $row['remaining'] }}</span>回</span>
                     @endif
                 </div>
-                {{-- マス：利用済みは利用日、まだ使っていないマスは「利用なし」（2026-11 変更：その前は「未利用」。トレーナー側の呼び名は「未利用」のまま。用語集 No.44）。利用日の昇順で左から並べ、狭い幅では折り返す。
+                {{-- マス：利用済みは利用日、まだ使っていないマスは「ご利用なし」（2026-11 変更：その前は「未利用」。会員ポータルのほかの表記「ご予約」「すべてご利用済み」とそろえる。「未利用」は設計書・コードの中の呼び名。用語集 No.44）。利用日の昇順で左から並べ、狭い幅では折り返す。
                      利用日が今日・今日より後のマスは、日付の上に「本日」「ご予約」の印を出し、面と枠を変える（2026-11 追加。設計書 S-1412「マスの予約の印」。
                      印と状態はコントローラーで組み立て済み。読むだけの画面なので data-* は付けない） --}}
                 <div class="c-ticket-slots">
@@ -61,7 +61,7 @@
                         @if($slot)
                             @include('client.contracts._slot', ['slot' => $slot])
                         @else
-                            <span class="c-ticket-slot c-ticket-slot--empty">利用なし</span>
+                            <span class="c-ticket-slot c-ticket-slot--empty">ご利用なし</span>
                         @endif
                     @endforeach
                 </div>
