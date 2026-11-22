@@ -11,11 +11,13 @@
  *   syncUrl     ：true なら、選んでいる日が変わったときに URL の date を書き換える（history.replaceState）。初期値 false
  *   timetable   ：true なら、広い画面（lg 以上）でその日の予約を横向きのタイムテーブルにする（狭い画面はリストのまま。
  *                 リストとタイムテーブルを両方作り、CSS の d-lg-none・d-none d-lg-block で出し分ける）。初期値 false。2026-11 追加
+ *   keepDayHeight：true なら、その日の予定の枠の最低の高さを同時に預かれる数の行数分にし、読み込み中は前の高さを保つ
+ *                 （その日の予定の下にカレンダーがある画面で、日を押すたびにカレンダーが動かないようにする）。初期値 false。2026-11 追加
  *   判定と組み立ては usage-schedule-core.js（usageLineParts・scheduleDateUrl・timetableModel など）
  *
  * 使い方：
  *   const schedule = new window.UsageSchedule(rootEl, { onSelect: (ymd) => { ... } });
- *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true });  // カレンダー画面
+ *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true });  // カレンダー画面
  *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
@@ -34,6 +36,7 @@ import {
     cellBottomRow,
     dayCellClasses,
     dayHeadingParts,
+    dayMinRows,
     isPastDay,
     initialState,
     monthHeading,
@@ -52,7 +55,7 @@ const LOADING = '読み込み中…';
 const FAILED = '予約状況を読み込めませんでした。';
 
 class UsageSchedule {
-    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false } = {}) {
+    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false, keepDayHeight = false } = {}) {
         this.root = root;
         this.onSelect = onSelect;
         // 会員名をリンクにするときの会員詳細の URL の型（linkClients が false なら null。2026-11 追加）
@@ -89,6 +92,13 @@ class UsageSchedule {
         this.statusEl = root.querySelector('[data-usage-schedule-status]');
         this.dayHeadingEl = root.querySelector('[data-usage-schedule-day-heading]');
         this.dayListEl = root.querySelector('[data-usage-schedule-day-list]');
+        // その日の予定の中身（リスト・タイムテーブル・知らせ）の入れ物。keepDayHeight のとき最低の高さを付ける（2026-11 追加）
+        this.dayBodyEl = root.querySelector('[data-usage-schedule-day-body]');
+        this.keepDayHeight = keepDayHeight && this.dayBodyEl !== null;
+        if (this.keepDayHeight) {
+            this.dayBodyEl.classList.add('usage-schedule-day-body--keep');
+            this.applyDayMinRows();
+        }
         if (this.timetableEl) {
             this.dayListEl.after(this.timetableEl);
         }
@@ -186,6 +196,7 @@ class UsageSchedule {
             this.usageCounts = data.usage_counts || {};
             this.countsLoaded = true;
             this.capacity = data.capacity;
+            this.applyDayMinRows();
             this.today = data.today;
             this.renderMonth();
             this.setStatus('');
@@ -199,17 +210,33 @@ class UsageSchedule {
     async loadDay() {
         const seq = ++this.daySeq;
         const date = this.state.selected;
-        this.dayHeadingEl.textContent = '';
+        if (this.keepDayHeight) {
+            // 読み込み中は、前の日の表示の高さを保つ（縮んでから伸びて、下のカレンダーが動かないように。2026-11 追加）。
+            // 見出しも 1 行分の高さを保つ（空にすると縮むため、見えない空白を入れる）
+            this.dayBodyEl.style.minHeight = `${this.dayBodyEl.offsetHeight}px`;
+            this.dayHeadingEl.textContent = '\u00a0';
+        } else {
+            this.dayHeadingEl.textContent = '';
+        }
         this.renderDayMessage(LOADING);
         try {
             const data = await this.fetchJson(`${this.dayUrl}?${this.params({ date })}`);
             if (seq !== this.daySeq) return;
             this.capacity = data.capacity;
-            // 「M/D(曜) の予約 n件　同時に預かる数 m」（2026-11 変更）。件数は一覧の行の数（編集中の利用自身は JSON の時点で除いてある）。
+            this.applyDayMinRows();
+            // 「M/D(曜)　n件　同時に預かる数 m」（2026-11 変更：「の予約」を外した）。件数は一覧の行の数（編集中の利用自身は JSON の時点で除いてある）。
+            // 日付と件数のあいだは全角の空白で、読み上げで続けて読まれないよう、見えない読点も入れる（2026-11 追加）。
             // 同時に預かる数は予約が 1 件以上の日だけ出し、数字の部分だけを別の要素にして、満・超過はカレンダーと同じバッジにする
             const usages = data.usages || [];
             const heading = dayHeadingParts(date, usages.length, data.count, data.capacity);
-            const nodes = [document.createTextNode(heading.label)];
+            const separator = document.createElement('span');
+            separator.className = 'visually-hidden';
+            separator.textContent = '、';
+            const nodes = [
+                document.createTextNode(heading.dateLabel),
+                separator,
+                document.createTextNode(heading.gap + heading.usageCountLabel),
+            ];
             if (heading.showCount) {
                 const countEl = document.createElement('span');
                 countEl.className = heading.countClasses.join(' ');
@@ -220,10 +247,12 @@ class UsageSchedule {
             this.dayHeadingEl.replaceChildren(...nodes);
             this.renderDayList(usages);
             this.renderTimetable(usages, data.open_time, data.close_time);
+            this.releaseDayHeight();
         } catch (error) {
             if (seq !== this.daySeq) return;
             console.error('予約状況（日）を読み込めませんでした', error);
             this.renderDayMessage(FAILED, true);
+            this.releaseDayHeight();
         }
     }
 
@@ -314,6 +343,21 @@ class UsageSchedule {
         this.dayListEl.replaceChildren(li);
         // 知らせ（読み込み中・失敗・予約はありません）は、どの幅でもリストの 1 行で出す（タイムテーブルは隠す）
         this.hideTimetable();
+    }
+
+    /**
+     * その日の予定の枠の最低の行数を、同時に預かれる数にする（keepDayHeight のときだけ。2026-11 追加。行数は usage-schedule-core.js の dayMinRows）。
+     * 高さは CSS（app.scss の .usage-schedule-day-body--keep）が行数から決める
+     */
+    applyDayMinRows() {
+        if (!this.keepDayHeight) return;
+        this.dayBodyEl.style.setProperty('--usage-schedule-min-rows', String(dayMinRows(this.capacity)));
+    }
+
+    /** 読み込み中に保っていた高さの指定を外す（keepDayHeight のときだけ） */
+    releaseDayHeight() {
+        if (!this.keepDayHeight) return;
+        this.dayBodyEl.style.minHeight = '';
     }
 
     hideTimetable() {

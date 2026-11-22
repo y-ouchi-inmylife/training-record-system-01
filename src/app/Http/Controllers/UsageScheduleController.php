@@ -115,11 +115,16 @@ class UsageScheduleController extends Controller
     }
 
     /**
-     * 「トレーニー（会員名）」。名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「（会員名）」。
+     * 「トレーニー（会員名）」。名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ
+     * （かっこを付けない。2026-11 変更：その前は「（会員名）」で、かっこだけが残って見えたため）。
      * 会員名は Client::display_name（姓名。名が空のとき末尾に空白を残さない）
      */
     private static function usageLabel(ClientUsage $usage): string
     {
+        if ($usage->trainee === null) {
+            return self::clientName($usage);
+        }
+
         return self::traineeName($usage).'（'.self::clientName($usage).'）';
     }
 

@@ -38,6 +38,7 @@ import {
     timetableLabelPlacement,
     usageNameParts,
     timetableModel,
+    dayMinRows,
 } from '../../resources/js/usage-schedule-core.js';
 
 // 利用の予約状況（カレンダーとその日の予約）の計算（2026-11 追加。設計書 S-0305-M05「予約状況」）。
@@ -128,10 +129,10 @@ describe('預かる数の表示', () => {
     it('その日の予約の見出しと 1 行の文', () => {
         expect(dayLabel('2026-11-26')).toBe('11/26(木)');
         expect(dayLabel('2026-11-01')).toBe('11/1(日)');
-        // 見出しは「M/D(曜) の予約 n件　同時に預かる数 m」（2026-11 変更）
-        expect(dayHeading('2026-11-26', 2, 2, 3)).toBe('11/26(木) の予約 2件　同時に預かる数 2');
-        expect(dayHeading('2026-11-26', 4, 3, 3)).toBe('11/26(木) の予約 4件　同時に預かる数 3');
-        expect(dayHeading('2026-11-26', 4, 3, 3)).not.toMatch(/[頭匹]|\/3/);
+        // 見出しは「M/D(曜)　n件　同時に預かる数 m」（2026-11 変更：「の予約」を外した。あいだは全角の空白）
+        expect(dayHeading('2026-11-26', 2, 2, 3)).toBe('11/26(木)　2件　同時に預かる数 2');
+        expect(dayHeading('2026-11-26', 4, 3, 3)).toBe('11/26(木)　4件　同時に預かる数 3');
+        expect(dayHeading('2026-11-26', 4, 3, 3)).not.toMatch(/[頭匹]|\/3|の予約/);
         expect(usageLine({ time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）' })).toBe('8:00〜19:00　アムロ（佐藤 一郎）');
     });
 });
@@ -320,7 +321,7 @@ describe('「n/上限」の太字と色', () => {
         expect(countBadgeClasses(null)).toEqual([]);
     });
 
-    // 見出し：「M/D(曜) の予約 n件　同時に預かる数 m」。数字の部分だけカレンダーと同じバッジ（2026-11 変更）
+    // 見出し：「M/D(曜)　n件　同時に預かる数 m」。数字の部分だけカレンダーと同じバッジ（2026-11 変更）
     it.each([
         ['満', 4, 3, 3, ['badge', 'bg-success', 'usage-schedule-count-badge']],
         ['超過', 4, 4, 3, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
@@ -328,19 +329,22 @@ describe('「n/上限」の太字と色', () => {
         ['空きあり・件数と違う', 3, 2, 3, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
     ])('見出し（%s）：件数 %i・同時に預かる数 %i・上限 %i', (_, usageCount, count, capacity, classes) => {
         const parts = dayHeadingParts('2026-11-20', usageCount, count, capacity);
-        expect(parts.label).toBe(`11/20(金) の予約 ${usageCount}件`);
+        expect(parts.dateLabel).toBe('11/20(金)');
+        expect(parts.gap).toBe('　');
+        expect(parts.usageCountLabel).toBe(`${usageCount}件`);
         expect(parts.showCount).toBe(true);
         expect(parts.countLabel).toBe('　同時に預かる数 ');
         expect(parts.count).toBe(`${count}`);
         expect(parts.countClasses).toEqual(classes);
-        expect(dayHeading('2026-11-20', usageCount, count, capacity)).toBe(`11/20(金) の予約 ${usageCount}件　同時に預かる数 ${count}`);
+        expect(dayHeading('2026-11-20', usageCount, count, capacity)).toBe(`11/20(金)　${usageCount}件　同時に預かる数 ${count}`);
     });
 
     it('見出し：予約が 0 件の日は「同時に預かる数」を出さない', () => {
         const parts = dayHeadingParts('2026-11-22', 0, 0, 3);
-        expect(parts.label).toBe('11/22(日) の予約 0件');
+        expect(parts.dateLabel).toBe('11/22(日)');
+        expect(parts.usageCountLabel).toBe('0件');
         expect(parts.showCount).toBe(false);
-        expect(dayHeading('2026-11-22', 0, 0, 3)).toBe('11/22(日) の予約 0件');
+        expect(dayHeading('2026-11-22', 0, 0, 3)).toBe('11/22(日)　0件');
     });
 
     it('見出しのバッジのクラスは、カレンダーの同じ日の数字のバッジのクラスと同じ', () => {
@@ -460,7 +464,8 @@ describe('過去の日と「0/上限」', () => {
 describe('カレンダー画面の設定', () => {
     const TEMPLATE = `https://trainer.example.test/clients/${CLIENT_ID_PLACEHOLDER}`;
     const withTrainee = { time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）', client_id: 12, client_name: '佐藤 一郎', trainee_name: 'アムロ' };
-    const withoutTrainee = { time_range: '19:01〜20:00', label: '（中森）', client_id: 7, client_name: '中森', trainee_name: '' };
+    // トレーニーがない利用の label は会員名だけ（2026-11 変更：その前は「（中森）」）
+    const withoutTrainee = { time_range: '19:01〜20:00', label: '中森', client_id: 7, client_name: '中森', trainee_name: '' };
 
     it('会員詳細の URL は、型の印を会員の id に置き換える', () => {
         expect(CLIENT_ID_PLACEHOLDER).toBe('__CLIENT_ID__');
@@ -484,11 +489,10 @@ describe('カレンダー画面の設定', () => {
         ]);
     });
 
-    it('画面用：トレーニーがない利用も、会員名をリンクにする', () => {
+    it('画面用：トレーニーがない利用も、会員名をリンクにする（かっこを付けない。2026-11 変更）', () => {
         expect(usageLineParts(withoutTrainee, TEMPLATE)).toEqual([
-            { text: '19:01〜20:00　（' },
+            { text: '19:01〜20:00　' },
             { text: '中森', href: 'https://trainer.example.test/clients/7' },
-            { text: '）' },
         ]);
     });
 
@@ -501,7 +505,7 @@ describe('カレンダー画面の設定', () => {
     it('モーダル用（型なし）：リンクにせず、今までどおり 1 行の文だけ', () => {
         expect(usageLineParts(withTrainee)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
         expect(usageLineParts(withTrainee, null)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
-        expect(usageLineParts(withoutTrainee, null)).toEqual([{ text: '19:01〜20:00　（中森）' }]);
+        expect(usageLineParts(withoutTrainee, null)).toEqual([{ text: '19:01〜20:00　中森' }]);
         // JSON に会員の id がなければ、型があってもリンクにしない
         expect(usageLineParts({ time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）' }, TEMPLATE)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
     });
@@ -609,7 +613,9 @@ describe('タイムテーブル', () => {
         const usage = u('08:00', '19:00', { client_id: 7, client_name: '柏原 美江', trainee_name: 'まま' });
         expect(usageNameParts(usage, '/clients/__CLIENT_ID__')).toEqual([{ text: 'まま（' }, { text: '柏原 美江', href: '/clients/7' }, { text: '）' }]);
         expect(usageNameParts(usage)).toEqual([{ text: 'まま（柏原 美江）' }]);
-        expect(usageNameParts({ ...usage, trainee_name: '', label: '（柏原 美江）' }, '/clients/__CLIENT_ID__')[0]).toEqual({ text: '（' });
+        // トレーニーがない利用は会員名のリンクだけ（かっこを付けない。2026-11 変更）。型がなければ label（会員名だけ）
+        expect(usageNameParts({ ...usage, trainee_name: '', label: '柏原 美江' }, '/clients/__CLIENT_ID__')).toEqual([{ text: '柏原 美江', href: '/clients/7' }]);
+        expect(usageNameParts({ ...usage, trainee_name: '', label: '柏原 美江' })).toEqual([{ text: '柏原 美江' }]);
     });
 
     it('予約がない日はタイムテーブルを作らない（null）', () => {
@@ -627,7 +633,23 @@ describe('タイムテーブル', () => {
         expect(model.outside).toEqual([{ left: (660 / 720) * 100, width: (60 / 720) * 100 }]);
         expect(model.rows.map((r) => r.timeRange)).toEqual(['8:00〜19:00', '19:00〜20:00']);
         expect(model.rows[1]).toMatchObject({ left: (660 / 720) * 100, width: (60 / 720) * 100 });
-        expect(model.rows[1].nameParts).toEqual([{ text: '（' }, { text: 'B', href: '/clients/2' }, { text: '）' }]);
+        expect(model.rows[1].nameParts).toEqual([{ text: 'B', href: '/clients/2' }]);
+    });
+});
+
+// カレンダー画面（S-1602）のその日の予定の枠の最低の行数（2026-11 追加。日を押してもカレンダーが動かないように）
+describe('その日の予定の枠の最低の行数', () => {
+    it('同時に預かれる数（上限）の行数分', () => {
+        expect(dayMinRows(3)).toBe(3);
+        expect(dayMinRows(1)).toBe(1);
+        expect(dayMinRows(10)).toBe(10);
+        expect(dayMinRows('4')).toBe(4);
+    });
+
+    it('上限をまだ読んでいない・正しくないときは 1', () => {
+        for (const v of [null, undefined, 0, -2, 2.5, 'abc', '']) {
+            expect(dayMinRows(v)).toBe(1);
+        }
     });
 });
 

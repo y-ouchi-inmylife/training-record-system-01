@@ -188,10 +188,11 @@ class UsageScheduleApiTest extends TestCase
                 // 営業時間（2026-11 追加。設定がなければ初期値 8:00〜19:00）
                 'open_time' => '08:00',
                 'close_time' => '19:00',
+                // トレーニーがない利用の label は会員名だけ（かっこを付けない。2026-11 変更：その前は「（佐藤 一郎）」）
                 // client_id・client_name・trainee_name（2026-11 追加）：カレンダー画面（S-1602）で会員名だけをリンクにするため、label を分けたもの
                 'usages' => [
                     ['time_range' => '8:00〜19:00', 'start_time' => '08:00', 'end_time' => '19:00', 'label' => 'アムロ（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => 'アムロ'],
-                    ['time_range' => '13:00〜15:00', 'start_time' => '13:00', 'end_time' => '15:00', 'label' => '（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => ''],
+                    ['time_range' => '13:00〜15:00', 'start_time' => '13:00', 'end_time' => '15:00', 'label' => '佐藤 一郎', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => ''],
                     ['time_range' => '13:00〜19:00', 'start_time' => '13:00', 'end_time' => '19:00', 'label' => '名前未登録（大内）', 'client_id' => $this->ouchi->id, 'client_name' => '大内', 'trainee_name' => '名前未登録'],
                 ],
             ]);
@@ -213,7 +214,7 @@ class UsageScheduleApiTest extends TestCase
         $response = $this->getJson(route('api.usage-schedule.day', ['date' => '2026-11-26', 'exclude_usage_id' => $self->id]))->assertOk();
 
         $this->assertSame(1, $response->json('count'));
-        $this->assertSame(['（佐藤 一郎）'], array_column($response->json('usages'), 'label'));
+        $this->assertSame(['佐藤 一郎'], array_column($response->json('usages'), 'label'));
     }
 
     public function test_日付の形が正しくなければ422(): void

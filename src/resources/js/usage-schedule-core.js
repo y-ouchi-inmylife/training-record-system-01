@@ -347,8 +347,13 @@ export function usageLineParts(usage, clientUrlTemplate = null) {
         return [{ text: usageLine(usage) }];
     }
 
+    // トレーニーがない利用は、会員名だけ（かっこを付けない。2026-11 変更）
+    if (!usage.trainee_name) {
+        return [{ text: `${usage.time_range}　` }, { text: usage.client_name ?? '', href }];
+    }
+
     return [
-        { text: `${usage.time_range}　${usage.trainee_name ?? ''}（` },
+        { text: `${usage.time_range}　${usage.trainee_name}（` },
         { text: usage.client_name ?? '', href },
         { text: '）' },
     ];
@@ -373,7 +378,8 @@ export function scheduleDateUrl({ href, syncUrl, previous, selected }) {
 }
 
 /**
- * その日の予約の見出しの文（「11/20(金) の予約 4件　同時に預かる数 3」。予約が 0 件の日は「11/20(金) の予約 0件」）
+ * その日の予約の見出しの文（「11/20(金)　4件　同時に預かる数 3」。予約が 0 件の日は「11/20(金)　0件」。
+ * 2026-11 変更：その前は「11/20(金) の予約 4件…」。過去の日も選べるので「予約」は合わないため「の予約」を外した）
  *
  * @param {string} ymd
  * @param {number} usageCount その日の予約（利用）の件数
@@ -383,22 +389,26 @@ export function scheduleDateUrl({ href, syncUrl, previous, selected }) {
 export function dayHeading(ymd, usageCount, count, capacity) {
     const parts = dayHeadingParts(ymd, usageCount, count, capacity);
 
-    return parts.label + (parts.showCount ? parts.countLabel + parts.count : '');
+    return parts.dateLabel + parts.gap + parts.usageCountLabel + (parts.showCount ? parts.countLabel + parts.count : '');
 }
 
 /**
- * その日の予約の見出しを、「M/D(曜) の予約 n件」と「同時に預かる数 m」に分けたもの（2026-11 変更。設計書 S-0305-M05「その日の予約」）。
+ * その日の予約の見出しを、日付「M/D(曜)」・件数「n件」と「同時に預かる数 m」に分けたもの（2026-11 変更。設計書 S-0305-M05「その日の予約」）。
  * - 「n件」はその日の予約（利用）の件数（一覧の行の数）。「件」は予約〔記録〕を数えるもので、犬を数えるものではない
  * - 「同時に預かる数 m」は、予約が 1 件以上の日だけ出す（showCount）。数字の部分（count）だけに、カレンダーと同じ
  *   バッジのクラス（countBadgeClasses。判定は capacityState）を付ける。見出しはもともと太字
  * - 件数と同時に預かる数を分けるのは、時間帯が重ならなければ同じ日に上限より多く預かれるため
- * 2026-11 変更：その前は「M/D(曜) の予約　n/上限」
+ * 2026-11 変更：その前は「M/D(曜) の予約 n件」（label）。さらにその前は「M/D(曜) の予約　n/上限」
  *
- * @returns {{label: string, showCount: boolean, countLabel: string, count: string, countClasses: string[]}}
+ * @returns {{dateLabel: string, gap: string, usageCountLabel: string, showCount: boolean, countLabel: string, count: string, countClasses: string[]}}
  */
 export function dayHeadingParts(ymd, usageCount, count, capacity) {
     return {
-        label: `${dayLabel(ymd)} の予約 ${usageCount}件`,
+        // 日付と件数（2026-11 変更：「M/D(曜) の予約 n件」から「の予約」を外した）。あいだは全角の空白 1 つぶん（「同時に預かる数」の前と同じ）。
+        // 画面では、読み上げで続けて読まれないよう、あいだに見えない区切り（読点）も入れる（usage-schedule.js）
+        dateLabel: dayLabel(ymd),
+        gap: '　',
+        usageCountLabel: `${usageCount}件`,
         showCount: usageCount > 0,
         countLabel: '　同時に預かる数 ',
         count: countText(count),
@@ -615,9 +625,13 @@ export function usageNameParts(usage, clientUrlTemplate = null) {
     if (href === null) {
         return [{ text: usage.label }];
     }
+    // トレーニーがない利用は、会員名だけ（かっこを付けない。2026-11 変更）
+    if (!usage.trainee_name) {
+        return [{ text: usage.client_name ?? '', href }];
+    }
 
     return [
-        { text: `${usage.trainee_name ?? ''}（` },
+        { text: `${usage.trainee_name}（` },
         { text: usage.client_name ?? '', href },
         { text: '）' },
     ];
@@ -647,3 +661,17 @@ export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate 
         })),
     };
 }
+
+/**
+ * カレンダー画面（S-1602）のその日の予定の枠の、最低の行数（2026-11 追加。設計書 S-1602「日を切り替えてもカレンダーが動かないようにする」）。
+ * 同時に預かれる数（上限）の行数分にする。上限をまだ読んでいない・正しくないときは 1
+ *
+ * @param {(number|null|undefined)} capacity
+ * @returns {number}
+ */
+export function dayMinRows(capacity) {
+    const n = Number(capacity);
+
+    return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+

@@ -376,6 +376,24 @@ h2 {
     line-height: inherit;
 }
 
+// カレンダー画面（S-1602）の並び（2026-11 変更。設計書 S-1602「並び」）。上にその日の予定を横いっぱい、下にカレンダーを今までの大きさで左寄せ。
+// 34rem（544px）は、前の左右の並びのとき（画面の幅 1280px）のカレンダーの幅（マスがおよそ 70px）。狭い画面では幅いっぱい
+.usage-schedule-calendar {
+    max-width: 34rem;
+}
+// 日を押してもカレンダーが動かないよう、その日の予定の中身の最低の高さを、同時に預かれる数（--usage-schedule-min-rows。JS が入れる）の行数分にする。
+// 狭い画面（リスト）：1 行は list-group-item の small py-1（上下の余白 .25rem×2 ＋ 文字の高さ .875rem×1.5）で、行のあいだに 1px の線。
+// 広い画面（タイムテーブル）：上下の余白 .25rem＋.5rem、目盛りの行 1.25rem、1 行 1.75rem、行のあいだ .25rem。
+// 知らせ（読み込み中・予約はありません）の 1 行だけのときも、この高さを保つ
+.usage-schedule-day-body--keep {
+    --usage-schedule-min-rows: 1;
+    min-height: calc(var(--usage-schedule-min-rows) * (.5rem + .875rem * 1.5) + (var(--usage-schedule-min-rows) - 1) * var(--bs-list-group-border-width, 1px));
+
+    @include media-breakpoint-up(lg) {
+        min-height: calc(.75rem + 1.25rem + var(--usage-schedule-min-rows) * 1.75rem + (var(--usage-schedule-min-rows) - 1) * .25rem);
+    }
+}
+
 // カレンダー画面（S-1602）のその日の予約のタイムテーブル（2026-11 追加。設計書 S-1602「その日の予約のタイムテーブル」）。
 // 広い画面（lg 以上）だけ（JS が d-none d-lg-block を付ける。狭い画面と利用モーダルはリストのまま）。
 // 1 行に 1 利用。左の列に「トレーニー（会員名）」、右の目盛りに帯。位置と幅は JS が割合（%）で入れる。

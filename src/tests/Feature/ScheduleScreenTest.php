@@ -121,22 +121,36 @@ class ScheduleScreenTest extends TestCase
         $this->assertSame('2026-11-21', $this->openedDate($this->page('?date[]=2026-12-03')));
     }
 
-    public function test_利用モーダルと同じ部品を_左右に並べる設定と会員詳細のURLの型で置く(): void
+    public function test_利用モーダルと同じ部品を_予定が上の並びと会員詳細のURLの型で置く(): void
     {
         $html = $this->page();
 
+        // 部品のいちばん上に、その日の予定の枠（2026-11 変更：その前は左右に並べる row gx-4・col-lg-6）
         $this->assertMatchesRegularExpression(
             '/<div id="scheduleCalendar" class="usage-schedule"\s+data-usage-schedule\s+data-month-url="'.preg_quote(route('api.usage-schedule.month'), '/')
             .'"\s+data-day-url="'.preg_quote(route('api.usage-schedule.day'), '/')
-            .'"\s+data-client-url="'.preg_quote(url('/clients/__CLIENT_ID__'), '/').'"\s*>\s*<div class="row gx-4">\s*<div class="col-lg-6">/u',
+            .'"\s+data-client-url="'.preg_quote(url('/clients/__CLIENT_ID__'), '/').'"\s*>\s*<div class="card">\s*<div class="card-header small fw-bold py-1" data-usage-schedule-day-heading><\/div>\s*<div data-usage-schedule-day-body>\s*<ul class="list-group list-group-flush" data-usage-schedule-day-list><\/ul>/u',
             $html
         );
-        // 右の列にその日の予約
-        $this->assertMatchesRegularExpression('/<div class="col-lg-6">\s*(<!--.*?-->\s*)?<div class="card">\s*<div class="card-header small fw-bold py-1" data-usage-schedule-day-heading>/su', $html);
-        // JS の設定：会員名をリンクにし、URL の date を書き換え、広い画面でタイムテーブルにする（2026-11 追加。利用日の欄はない）
-        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true });", $html);
+        $this->assertStringNotContainsString('col-lg-6', $html);
+        // その下にカレンダー（今までの大きさで左寄せ。usage-schedule-calendar）
+        $this->assertMatchesRegularExpression('/<\/ul>\s*<\/div>\s*<\/div>\s*<div class="usage-schedule-calendar mt-3">\s*<div class="d-flex align-items-center justify-content-center gap-2 mb-1">/u', $html);
+        // JS の設定：会員名をリンクにし、URL の date を書き換え、広い画面でタイムテーブルにし、予定の枠の高さを保つ（2026-11 追加。利用日の欄はない）
+        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true });", $html);
         $this->assertStringNotContainsString('onSelect', $html);
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
+    }
+
+    public function test_その日の予定の枠はカレンダーより前にある(): void
+    {
+        // 見た目の順（予定が上・カレンダーが下）と、読み上げ・タブの順をそろえる（2026-11 変更）
+        $html = $this->page();
+        $day = strpos($html, 'data-usage-schedule-day-heading');
+        $calendar = strpos($html, 'data-usage-schedule-days');
+        $this->assertNotFalse($day);
+        $this->assertNotFalse($calendar);
+        $this->assertLessThan($calendar, $day);
+        $this->assertSame(1, substr_count($html, 'data-usage-schedule-day-heading'));
     }
 
     // ---- ナビ ----
