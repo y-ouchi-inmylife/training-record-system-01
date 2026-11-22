@@ -753,7 +753,7 @@ class ClientCountRenderingTest extends TestCase
         ]);
     }
 
-    public function test_利用の行は_ラベル_日付と曜日_時刻_トレーニー_メモの順(): void
+    public function test_利用の行は_ラベル_日付と曜日_時刻_トレーニーの順で_メモは2行目(): void
     {
         $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
         $this->fakeMediaDisk();
@@ -781,7 +781,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('onclick="window.usageModal.openForEdit(this.dataset)"', $row);
     }
 
-    public function test_利用の行のメモはメモがない行では出さず_トレーニーなしの行でも出す(): void
+    public function test_利用の行のメモはメモがない行では出さず_過去の行もトレーニーなしの行も2行目に出す(): void
     {
         // 利用のメモは文字で出す（2026-11 変更：その前はメモの印〔bi-chat-left-text〕だけ）。設計書 S-0305 セクション5「利用の行」
         $this->travelTo(Carbon::parse('2026-11-21 10:00:00'));
@@ -795,17 +795,19 @@ class ClientCountRenderingTest extends TestCase
 
         // メモがない行はメモを出さない（空けたまま）
         $this->assertStringEndsWith('<span class="usage-row-trainee text-truncate">アイ</span>', $this->rowCells($html, $noNote));
-        // トレーニーなしの行も、トレーニーの列（空）のあとにメモを出す（メモの列の位置はそろう）
+        // 過去の行（リンクなし）・トレーニーなしの行も、同じくメモを出す
         $this->assertStringEndsWith(
             '<span class="usage-row-trainee text-truncate"></span><span class="usage-row-note text-body-secondary text-truncate">初回カウンセリング後に様子を見る</span>',
             $this->rowCells($html, $noTrainee)
         );
         $this->assertStringNotContainsString('bi-chat-left-text', $html);
-        // 列の幅：トレーニーは固定幅、メモは残りの幅
+        // 列の幅：トレーニーは固定幅。メモはいつも 2 行目（折り返す行の中で幅 100%。2026-11 変更：その前はトレーニーの右の残りの幅）
         $this->assertMatchesRegularExpression('/\.usage-row-trainee\s*\{\s*width:\s*6em;\s*flex-shrink:\s*0;/u', $html);
-        $this->assertMatchesRegularExpression('/\.usage-row-note\s*\{\s*flex:\s*1 1 8em;/u', $html);
-        // md 以上では、メモを次の行に回さない（flex-basis と最小の幅を 0 にして、トレーニーの右の残りの幅に入れる。2026-11 修正）
-        $this->assertMatchesRegularExpression('/@media \(min-width: 768px\) \{\s*\.usage-row-note\s*\{\s*flex-basis:\s*0;\s*min-width:\s*0;\s*\}\s*\}/u', $html);
+        $this->assertMatchesRegularExpression('/\.usage-row-note\s*\{\s*flex:\s*0 0 100%;\s*min-width:\s*0;\s*\}/u', $html);
+        $this->assertSame(1, preg_match_all('/\.usage-row-note\s*\{/u', $html), 'メモの幅の指定は 1 つだけ（画面の幅で変えない）');
+        foreach ([$noNote, $noTrainee] as $usage) {
+            $this->assertStringContainsString('usage-row d-flex flex-wrap ', $this->rowHtml($html, $usage));
+        }
     }
 
     public function test_利用の行は実施済みはラベルなし_今日と予定はラベルと見た目を変える(): void
@@ -883,47 +885,78 @@ class ClientCountRenderingTest extends TestCase
         return ['_form_type' => 'usage', 'used_on' => $usedOn, 'trainee_id' => $traineeId, 'start_time' => '08:00', 'end_time' => '19:00', 'client_contract_id' => '', 'note' => 'ひみつのメモ'];
     }
 
-    /** 会員詳細を開き、完了メッセージ（緑のお知らせ）の HTML を返す */
-    private function successAlert(Client $client): string
+    /** 登録・更新の完了のメッセージボックス（S-0305-M10）の HTML（ダイアログの中身）。出ていなければ null */
+    private function completedModal(string $html): ?string
     {
-        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
-        $this->assertSame(1, preg_match('/<div class="alert alert-success alert-dismissible fade show" role="alert"[^>]*>.*?<\/div>/su', $html, $m));
-
-        return $m[0];
+        return preg_match('/<div class="modal fade" id="usageCompletedModal".*?<div class="modal-footer">.*?<\/div>/su', $html, $m) === 1 ? $m[0] : null;
     }
 
-    public function test_登録と更新の直後は_今日以降なら完了メッセージにリンクが出て自動で消さない(): void
+    public function test_登録と更新の直後は_今日以降ならメッセージボックスで知らせ_上部の完了メッセージは出さない(): void
     {
         $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
         $ai = $this->trainee($client, 'アイ');
         $momo = $this->trainee($client, 'モモ');
+        $open = fn (): string => $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 登録（今日）
-        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-21', $ai))->assertSessionHas('success', '利用を登録しました。');
+        // 登録（今日。もう終わった時刻でも出す）
+        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-21', $ai))
+            ->assertRedirect(route('clients.show', $client))
+            ->assertSessionMissing('success');
         $usage = ClientUsage::query()->sole();
-        $alert = $this->successAlert($client);
-        $this->assertStringContainsString('利用を登録しました。', $alert);
-        $this->assertStringContainsString('href="'.e(app(GoogleCalendarLinkService::class)->urlFor($usage)).'" target="_blank" rel="noopener noreferrer"', $alert);
-        $this->assertStringContainsString('<i class="bi bi-calendar-plus" aria-hidden="true"></i> Googleカレンダーに追加</a>', $alert);
-        $this->assertStringNotContainsString('data-auto-dismiss', $alert);
-        $this->assertStringContainsString('data-bs-dismiss="alert"', $alert);
-        $this->assertStringNotContainsString('ひみつのメモ', rawurldecode($alert));
-
-        // 更新（過去 → 今日より後、トレーニーも変える）。更新したあとの値の URL になる
-        $past = $this->usageWith($client, '2026-11-10', $ai);
-        $this->put(route('client-usages.update', $past), $this->usageInput('2026-11-30', $momo))->assertSessionHas('success', '利用を更新しました。');
-        $alert = $this->successAlert($client);
-        $this->assertStringContainsString('利用を更新しました。', $alert);
-        $this->assertStringContainsString(rawurlencode('モモ（山田 太郎）').'&amp;dates=20261130T080000%2F20261130T190000&amp;', $alert);
-        $this->assertStringNotContainsString('data-auto-dismiss', $alert);
+        $html = $open();
+        $modal = $this->completedModal($html);
+        $this->assertNotNull($modal);
+        $this->assertStringContainsString('<h5 class="modal-title" id="usageCompletedModalLabel">利用を登録しました</h5>', $modal);
+        $this->assertStringContainsString('<p class="mb-1">2026/11/21(土) 8:00〜19:00</p>', $modal);
+        $this->assertStringContainsString('<p class="mb-0">アイ（山田 太郎）</p>', $modal);
+        $this->assertStringContainsString('<a href="'.e(app(GoogleCalendarLinkService::class)->urlFor($usage)).'" target="_blank" rel="noopener noreferrer"', $modal);
+        $this->assertStringContainsString('id="usageCompletedGoogleCalendar" class="btn btn-primary"><i class="bi bi-calendar-plus" aria-hidden="true"></i> Googleカレンダーに追加</a>', $modal);
+        $this->assertStringContainsString('<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>', $modal);
+        // リンクには data-bs-dismiss を付けない（リンクを開く動きが止まるため）
+        $this->assertSame(1, substr_count($modal, 'data-bs-dismiss'));
+        $this->assertStringNotContainsString('ひみつのメモ', rawurldecode($modal));
+        // 自動で開き、開いたらリンクにフォーカスを置き、リンクを押したら閉じる
+        $this->assertMatchesRegularExpression("/addEventListener\('shown\.bs\.modal', function \(\) \{\s*linkEl\.focus\(\);/u", $html);
+        $this->assertMatchesRegularExpression("/linkEl\.addEventListener\('click', function \(\) \{\s*modal\.hide\(\);/u", $html);
+        $this->assertMatchesRegularExpression('/modal\.show\(\);\s*\}\);\s*<\/script>/u', $html);
+        // 上部の完了メッセージは出さない
+        $this->assertStringNotContainsString('alert-success', $html);
 
         // 開き直したら出ない（1 回だけ）
-        $this->assertStringNotContainsString('alert-success', $this->get(route('clients.show', $client))->getContent());
+        $html = $open();
+        $this->assertNull($this->completedModal($html));
+        $this->assertStringNotContainsString('usageCompletedModal', $html);
+
+        // 更新（過去 → 今日より後、トレーニーも変える）。更新したあとの値になる
+        $past = $this->usageWith($client, '2026-11-10', $ai);
+        $this->put(route('client-usages.update', $past), $this->usageInput('2026-11-30', $momo))->assertSessionMissing('success');
+        $html = $open();
+        $modal = $this->completedModal($html);
+        $this->assertNotNull($modal);
+        $this->assertStringContainsString('>利用を更新しました</h5>', $modal);
+        $this->assertStringContainsString('<p class="mb-1">2026/11/30(月) 8:00〜19:00</p>', $modal);
+        $this->assertStringContainsString('<p class="mb-0">モモ（山田 太郎）</p>', $modal);
+        $this->assertStringContainsString(rawurlencode('モモ（山田 太郎）').'&amp;dates=20261130T080000%2F20261130T190000&amp;', $modal);
+        $this->assertStringNotContainsString('ひみつのメモ', rawurldecode($modal));
+        $this->assertStringNotContainsString('alert-success', $html);
     }
 
-    public function test_登録と更新の直後でも_過去の利用と削除ではリンクが出ず今までどおり自動で消える(): void
+    public function test_メッセージボックスの名前は_トレーニーがない利用は会員名だけ(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $this->post(route('client-usages.store', $client), collect($this->usageInput('2026-11-26', 0))->except('trainee_id')->all())
+            ->assertSessionHas('usage_completed', fn (array $completed): bool => array_keys($completed) === ['title', 'date_time', 'label', 'google_calendar_url']);
+
+        $modal = $this->completedModal($this->get(route('clients.show', $client))->assertOk()->getContent());
+        $this->assertNotNull($modal);
+        $this->assertStringContainsString('<p class="mb-0">山田 太郎</p>', $modal);
+    }
+
+    public function test_過去の利用の登録と更新と削除の直後は_メッセージボックスを出さず今までどおり完了メッセージ(): void
     {
         $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
         $this->fakeMediaDisk();
@@ -931,21 +964,46 @@ class ClientCountRenderingTest extends TestCase
         $ai = $this->trainee($client, 'アイ');
 
         $check = function (string $message) use ($client): void {
-            $alert = $this->successAlert($client);
-            $this->assertMatchesRegularExpression('/role="alert" data-auto-dismiss>\s*'.preg_quote($message, '/').'/u', $alert);
-            $this->assertStringNotContainsString('<a ', $alert);
+            $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+            $this->assertStringNotContainsString('usageCompletedModal', $html);
+            // 自動で消える（data-auto-dismiss）。リンクは出さない
+            $this->assertMatchesRegularExpression(
+                '/<div class="alert alert-success alert-dismissible fade show" role="alert" data-auto-dismiss>\s*'.preg_quote($message, '/').'\s*<button type="button" class="btn-close" data-bs-dismiss="alert"><\/button>/u',
+                $html
+            );
         };
 
-        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-20', $ai))->assertSessionMissing('google_calendar_url');
+        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-20', $ai))->assertSessionMissing('usage_completed');
         $check('利用を登録しました。');
 
         $usage = $this->usageWith($client, '2026-11-30', $ai);
-        $this->put(route('client-usages.update', $usage), $this->usageInput('2026-11-19', $ai))->assertSessionMissing('google_calendar_url');
+        $this->put(route('client-usages.update', $usage), $this->usageInput('2026-11-19', $ai))->assertSessionMissing('usage_completed');
         $check('利用を更新しました。');
 
         $upcoming = $this->usageWith($client, '2026-12-01', $ai);
-        $this->delete(route('client-usages.destroy', $upcoming))->assertSessionMissing('google_calendar_url');
+        $this->delete(route('client-usages.destroy', $upcoming))->assertSessionMissing('usage_completed');
         $check('利用を削除しました。');
+    }
+
+    public function test_今日以降の利用の登録と更新もアクセスログに記録し_メッセージボックスを開いても記録しない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+
+        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-26', $ai));
+        $this->put(route('client-usages.update', ClientUsage::query()->sole()), $this->usageInput('2026-11-27', $ai));
+        $logged = DB::table('access_logs')->pluck('action')->all();
+        $this->assertSame(['create_client_usage', 'edit_client_usage'], $logged);
+
+        // 会員詳細を開く記録は、メッセージボックスのあるときもないときも同じ
+        $before = DB::table('access_logs')->count();
+        $this->get(route('clients.show', $client))->assertOk();
+        $withModal = DB::table('access_logs')->count() - $before;
+        $before = DB::table('access_logs')->count();
+        $this->get(route('clients.show', $client))->assertOk();
+        $this->assertSame(DB::table('access_logs')->count() - $before, $withModal);
     }
 
     public function test_利用の行のトレーニーは名前未登録と出し_トレーニーなしは空欄(): void

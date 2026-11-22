@@ -174,13 +174,8 @@
     <main class="py-4">
         <div class="container">
             @if(session('success'))
-                {{-- 利用の登録・更新の直後で、その利用が今日以降のとき（session('google_calendar_url')。2026-11 追加）は
-                     「Googleカレンダーに追加」のリンクを横に出し、押す前に消えないよう自動では消さない（×で閉じるまで残す） --}}
-                <div class="alert alert-success alert-dismissible fade show" role="alert"{{ session('google_calendar_url') ? '' : ' data-auto-dismiss' }}>
+                <div class="alert alert-success alert-dismissible fade show" role="alert" data-auto-dismiss>
                     {{ session('success') }}
-                    @if(session('google_calendar_url'))
-                        <x-google-calendar-link :url="session('google_calendar_url')" :with-text="true" class="alert-link small fw-normal ms-2 d-inline-block" />
-                    @endif
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             @endif

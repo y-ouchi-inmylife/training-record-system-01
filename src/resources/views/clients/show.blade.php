@@ -154,27 +154,16 @@
 .usage-row-time {
     width: 7em;
 }
-/* トレーニーは固定幅（入らない名前は .text-truncate で「…」。2026-11 変更：その前は残りの幅）。
-   トレーニーなしの行も同じ幅を取るので、メモの列の位置がそろう */
+/* トレーニーは固定幅（入らない名前は .text-truncate で「…」。2026-11 変更：その前は残りの幅） */
 .usage-row-trainee {
     width: 6em;
     flex-shrink: 0;
 }
-/* 利用のメモ（文字。2026-11 変更：その前はメモの印）。残りの幅に 1 行で出し、入らなければ「…」。
-   残りの幅が狭すぎるときは次の行に折り返す（flex-basis 8em・最小 4em） */
+/* 利用のメモ（文字。2026-11 変更：その前はメモの印）。いつも 2 行目（日付・時刻・トレーニーの下）に、幅いっぱいの 1 行で出し、
+   入らなければ .text-truncate で「…」（2026-11 変更：その前はトレーニーの右の残りの幅。リンクのある行でほぼ 1 文字しか見えなかった） */
 .usage-row-note {
-    flex: 1 1 8em;
-    min-width: 4em;
-}
-/* md 以上（ノートPC 以上）では、メモを次の行に回さない（2026-11 修正）。
-   行は flex-wrap のため、上の flex-basis 8em（行の文字 14px で 112px）がトレーニーの右の残り（会員詳細の右カラム〔col-lg-5〕では
-   70px 前後）より大きいと、メモだけが次の行に回っていた。md 以上では flex-basis と最小の幅を 0 にして、トレーニーの右の
-   残りの幅にそのまま入れ、入らない分は .text-truncate で「…」にする（md 未満は上の指定のまま、狭ければ折り返す） */
-@media (min-width: 768px) {
-    .usage-row-note {
-        flex-basis: 0;
-        min-width: 0;
-    }
+    flex: 0 0 100%;
+    min-width: 0;
 }
 /* 行の中のボタン（編集モーダルを開く部分。2026-11 変更：その前は行の全体がボタン）。枠・背景は外側（.usage-row-item）に付ける */
 .usage-row {
@@ -183,7 +172,7 @@
     color: var(--bs-list-group-color);
     background-color: transparent;
 }
-/* 「Googleカレンダーに追加」のリンク（アイコンだけ）。メモの幅をなるべく残すため、押しやすい最小の幅（24px）にする */
+/* 「Googleカレンダーに追加」のリンク（アイコンだけ）。行の幅をなるべく残すため、押しやすい最小の幅（24px）にする */
 .usage-row-calendar {
     min-width: 24px;
 }
@@ -894,6 +883,10 @@
                 // 保存時の確認（上限・重なり）の注意（2026-11 追加。なければ null）
                 'confirmationWarning' => $usageForm['confirmationWarning'],
             ])
+            {{-- 利用の登録・更新の完了のメッセージボックス（S-0305-M10。2026-11 追加）。登録・更新した利用が今日以降のときだけ、自動で開く --}}
+            @if(session('usage_completed'))
+                <x-usage-completed-modal :completed="session('usage_completed')" />
+            @endif
         </div>
     </div>
 

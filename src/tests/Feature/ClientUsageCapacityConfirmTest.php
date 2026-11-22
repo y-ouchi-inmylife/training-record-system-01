@@ -23,6 +23,7 @@ use Tests\TestCase;
  * - 入力エラーがあるときは、入力エラーを先に出す
  * - 編集のときは、編集中の利用自身を数えない
  * - 確認で戻った送信はアクセスログに記録しない
+ * - 保存できたことは、今日以降の利用なら完了のメッセージボックスの中身（usage_completed。S-0305-M10）、過去の利用なら success で見る（2026-11 変更）
  *
  * ミドルウェア（auth・practitioners・LogAccess など）は外さず、実際の HTTP で確かめる。今日は 2026-11-21（土）に固定する。
  */
@@ -113,7 +114,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
 
         $this->post(route('client-usages.store', $this->client), $this->input(['_usage_confirmed' => '1']))
             ->assertRedirect(route('clients.show', $this->client))
-            ->assertSessionHas('success', '利用を登録しました。')
+            ->assertSessionHas('usage_completed.title', '利用を登録しました')
             ->assertSessionMissing('usage_confirmation_warning');
 
         $this->assertSame(1, ClientUsage::query()->where('client_id', $this->client->id)->count());
@@ -133,7 +134,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->usage($this->other, '2026-11-26', '08:00', '19:00'); // 1 ＋ 入れる利用で 2（上限と同じ）
 
         $this->post(route('client-usages.store', $this->client), $this->input())
-            ->assertSessionHas('success', '利用を登録しました。')
+            ->assertSessionHas('usage_completed.title', '利用を登録しました')
             ->assertSessionMissing('usage_confirmation_warning');
     }
 
@@ -144,7 +145,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
 
         // 14:00 からは重ならない
         $this->post(route('client-usages.store', $this->client), $this->input(['start_time' => '14:00', 'end_time' => '18:00']))
-            ->assertSessionHas('success');
+            ->assertSessionHas('usage_completed');
     }
 
     public function test_今日の利用は確認し_今日より前の利用は確認しない(): void
@@ -182,7 +183,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
 
         // メモだけ変える：自身を数えなければ 2のままなので確認しない
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id, 'note' => '直した']))
-            ->assertSessionHas('success', '利用を更新しました。')
+            ->assertSessionHas('usage_completed.title', '利用を更新しました')
             ->assertSessionMissing('usage_confirmation_warning');
         $this->assertSame('直した', $self->fresh()->note);
     }
@@ -200,7 +201,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->assertSame('2026-11-27', $self->fresh()->used_on->toDateString(), '保存していない');
 
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id, '_usage_confirmed' => '1']))
-            ->assertSessionHas('success', '利用を更新しました。');
+            ->assertSessionHas('usage_completed.title', '利用を更新しました');
         $this->assertSame('2026-11-26', $self->fresh()->used_on->toDateString());
     }
 
@@ -213,7 +214,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->post(route('client-usages.store', $this->client), $this->input())->assertSessionHas('usage_confirmation_warning');
         $this->assertSame(0, AccessLog::query()->count());
 
-        $this->post(route('client-usages.store', $this->client), $this->input(['_usage_confirmed' => '1']))->assertSessionHas('success');
+        $this->post(route('client-usages.store', $this->client), $this->input(['_usage_confirmed' => '1']))->assertSessionHas('usage_completed');
         $this->assertSame(['create_client_usage'], AccessLog::query()->pluck('action')->all());
 
         $self = ClientUsage::query()->where('client_id', $this->client->id)->sole();
@@ -253,7 +254,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $traineeId = $this->overlapping();
 
         $this->post(route('client-usages.store', $this->client), $this->input(['trainee_id' => (string) $traineeId, '_usage_confirmed' => '1']))
-            ->assertSessionHas('success', '利用を登録しました。');
+            ->assertSessionHas('usage_completed.title', '利用を登録しました');
         $this->assertSame(2, ClientUsage::query()->where('client_id', $this->client->id)->count());
     }
 
@@ -288,7 +289,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
 
         // 自身だけ（別の日）なら確認しない
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id, 'used_on' => '2026-11-27', 'trainee_id' => (string) $traineeId, 'note' => '直した']))
-            ->assertSessionHas('success', '利用を更新しました。');
+            ->assertSessionHas('usage_completed.title', '利用を更新しました');
         // 11/26 に移すと、13:00〜19:00 の利用と重なる
         $this->put(route('client-usages.update', $self), $this->input(['_usage_id' => (string) $self->id, 'trainee_id' => (string) $traineeId]))
             ->assertSessionHas('usage_confirmation_warning',
@@ -305,7 +306,7 @@ class ClientUsageCapacityConfirmTest extends TestCase
         $this->assertSame(0, AccessLog::query()->count());
 
         $this->post(route('client-usages.store', $this->client), $this->input(['trainee_id' => (string) $traineeId, '_usage_confirmed' => '1']))
-            ->assertSessionHas('success');
+            ->assertSessionHas('usage_completed');
         $this->assertSame(['create_client_usage'], AccessLog::query()->pluck('action')->all());
     }
 }

@@ -15,8 +15,8 @@ use Illuminate\Support\Carbon;
  *
  * ClientContractController と同じ書き方（TraineeMeasurementController に合わせる）：
  * - store / update で `updated_by` はコントローラで明示代入
- * - フラッシュキーは `success`。登録・更新した利用が今日以降なら、「Googleカレンダーに追加」の URL を
- *   GOOGLE_CALENDAR_URL_SESSION_KEY に載せる（2026-11 追加。layouts/app.blade.php がリンクにする）
+ * - フラッシュキーは `success`。登録・更新した利用が今日以降なら、代わりに COMPLETED_SESSION_KEY に
+ *   完了のメッセージボックス（S-0305-M10）の中身を載せる（2026-11 追加。同じことを 2 回知らせない）
  * - destroy は物理削除。**権限は一般トレーナーも可**（設計書 requirements.md 6-17-6）
  * - 処理後は常に会員詳細（S-0305）へ戻す（`return_to` は持たない）
  *
@@ -46,9 +46,10 @@ class ClientUsageController extends Controller
     public const CONFIRMED_INPUT = '_usage_confirmed';
 
     /**
-     * 完了メッセージの横に出す「Googleカレンダーに追加」の URL を載せるセッションのキー（2026-11 追加）
+     * 登録・更新の完了のメッセージボックス（S-0305-M10）の中身を載せるセッションのキー（2026-11 追加。
+     * clients/show.blade.php の <x-usage-completed-modal>）。登録・更新した利用が今日以降のときだけ載せる
      */
-    public const GOOGLE_CALENDAR_URL_SESSION_KEY = 'google_calendar_url';
+    public const COMPLETED_SESSION_KEY = 'usage_completed';
 
     /**
      * 利用の登録
@@ -71,7 +72,7 @@ class ClientUsageController extends Controller
 
         $usage = ClientUsage::create($validated);
 
-        return $this->toClientWithSuccess($usage, '利用を登録しました。', $googleCalendar);
+        return $this->toClientWithCompletion($usage, '利用を登録しました', $googleCalendar);
     }
 
     /**
@@ -94,23 +95,32 @@ class ClientUsageController extends Controller
         $validated['updated_by'] = auth()->id();
         $usage->update($validated);
 
-        return $this->toClientWithSuccess($usage, '利用を更新しました。', $googleCalendar);
+        return $this->toClientWithCompletion($usage, '利用を更新しました', $googleCalendar);
     }
 
     /**
-     * 登録・更新のあと、完了メッセージを付けて会員詳細へ戻す。その利用が今日以降なら「Googleカレンダーに追加」の URL も載せる
-     * （2026-11 追加。HTML はフラッシュに入れない）
+     * 登録・更新のあと、会員詳細へ戻す（2026-11 追加）。その利用が今日以降なら（「Googleカレンダーに追加」の URL があるとき）
+     * 完了のメッセージボックスの中身を、過去の利用なら今までどおり完了メッセージを載せる。
+     * HTML はフラッシュに入れない。メモも入れない
+     *
+     * @param  string  $title  「利用を登録しました」「利用を更新しました」（完了メッセージは最後に「。」を付ける）
      */
-    private function toClientWithSuccess(ClientUsage $usage, string $message, GoogleCalendarLinkService $googleCalendar): RedirectResponse
+    private function toClientWithCompletion(ClientUsage $usage, string $title, GoogleCalendarLinkService $googleCalendar): RedirectResponse
     {
-        $redirect = redirect()
-            ->route('clients.show', $usage->client_id)
-            ->with('success', $message);
+        $redirect = redirect()->route('clients.show', $usage->client_id);
 
         // 保存した値で作る（更新の前に読み込んだトレーニーなどが残っていることがあるため、読み直す）
         $url = $googleCalendar->urlFor($usage->refresh());
+        if ($url === null) {
+            return $redirect->with('success', $title.'。');
+        }
 
-        return $url === null ? $redirect : $redirect->with(self::GOOGLE_CALENDAR_URL_SESSION_KEY, $url);
+        return $redirect->with(self::COMPLETED_SESSION_KEY, [
+            'title' => $title,
+            'date_time' => $usage->used_on_label.' '.$usage->time_range_label,
+            'label' => $usage->schedule_label,
+            'google_calendar_url' => $url,
+        ]);
     }
 
     /**

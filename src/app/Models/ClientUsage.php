@@ -121,6 +121,15 @@ class ClientUsage extends Model
         return $this->schedule_trainee_name.'（'.$this->schedule_client_name.'）';
     }
 
+    /**
+     * 曜日付きの利用日「2026/11/26(木)」（曜日は日本語の 1 文字。会員詳細の利用の行と、登録・更新の完了のメッセージボックスで使う。
+     * 2026-11 追加：ContractTicketService から移した）
+     */
+    public function getUsedOnLabelAttribute(): string
+    {
+        return $this->used_on->format('Y/m/d').'('.self::WEEKDAYS[$this->used_on->dayOfWeek].')';
+    }
+
     /** 曜日（日曜始まり） */
     private const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 

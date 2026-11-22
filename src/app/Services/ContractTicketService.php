@@ -43,9 +43,6 @@ class ContractTicketService
     /** 利用の状態：利用日が今日より後（予定） */
     public const STATE_UPCOMING = 'upcoming';
 
-    /** 曜日の表示（Carbon の dayOfWeek：0＝日曜〜6＝土曜） */
-    private const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-
     /**
      * 回数券型の表示データと、利用モーダルの選択肢を組み立てる。
      *
@@ -140,7 +137,7 @@ class ContractTicketService
         $usageNotes = [];
         foreach ($sortedUsages as $usage) {
             $usageStates[$usage->id] = self::usageState($usage, $today);
-            $usageDates[$usage->id] = self::dateWithWeekday($usage);
+            $usageDates[$usage->id] = $usage->used_on_label;
             $usageNotes[$usage->id] = blank($usage->note) ? null : $usage->note;
         }
 
@@ -212,14 +209,6 @@ class ContractTicketService
             'usageDates' => $usageDates,
             'usageNotes' => $usageNotes,
         ];
-    }
-
-    /**
-     * 曜日付きの利用日「2026/11/26(木)」（曜日は日本語の 1 文字。2026-11 追加）
-     */
-    private static function dateWithWeekday(ClientUsage $usage): string
-    {
-        return $usage->used_on->format('Y/m/d').'('.self::WEEKDAYS[$usage->used_on->dayOfWeek].')';
     }
 
     /**
