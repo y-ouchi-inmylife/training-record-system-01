@@ -22,7 +22,7 @@
  * 使い方：
  *   const schedule = new window.UsageSchedule(rootEl, { onSelect: (ymd) => { ... } });
  *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2, calendarLinks: true });  // カレンダー画面
- *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
+ *   schedule.open('2026-11-26', { editingUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は編集中の利用の id を渡す。その行に「編集中」の印が付く）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
  * 預かる数・予約はサーバーから JSON で読む（rootEl の data-month-url・data-day-url。権限は利用の登録・編集と同じ）。
@@ -31,6 +31,7 @@
  * 計算（月のマス・状態の移り方）は usage-schedule-core.js。
  */
 import {
+    EDITING_BADGE_CLASSES,
     GOOGLE_CALENDAR_LINK_LABEL,
     WEEKDAYS,
     applyInput,
@@ -88,7 +89,8 @@ class UsageSchedule {
         this.monthUrl = root.dataset.monthUrl;
         this.dayUrl = root.dataset.dayUrl;
         this.state = null;
-        this.excludeUsageId = null;
+        // 編集中の利用の id（編集のモーダルだけ。件数・一覧からは除かず、行に「編集中」の印を付ける。2026-11 変更：その前は除く利用の id）
+        this.editingUsageId = null;
         this.today = null;          // サーバーの今日（月の JSON の today）
         this.capacity = null;       // 同時に預かれる数（JSON の capacity）
         this.counts = {};           // 出している月の日ごとの預かる数
@@ -132,8 +134,8 @@ class UsageSchedule {
     }
 
     /** 開いたとき。日付が正しくなければ fallbackDate（今日）の月・日にする */
-    open(ymd, { excludeUsageId = null, fallbackDate } = {}) {
-        this.excludeUsageId = excludeUsageId === null || excludeUsageId === '' ? null : String(excludeUsageId);
+    open(ymd, { editingUsageId = null, fallbackDate } = {}) {
+        this.editingUsageId = editingUsageId === null || editingUsageId === '' ? null : String(editingUsageId);
         this.state = initialState(ymd, fallbackDate);
         this.clearCounts();
         this.renderMonth();
@@ -179,13 +181,8 @@ class UsageSchedule {
         if (dayChanged) this.loadDay();
     }
 
-    params(extra) {
-        const params = new URLSearchParams(extra);
-        if (this.excludeUsageId !== null) {
-            params.set('exclude_usage_id', this.excludeUsageId);
-        }
-
-        return params.toString();
+    params(query) {
+        return new URLSearchParams(query).toString();
     }
 
     async fetchJson(url) {
@@ -249,7 +246,7 @@ class UsageSchedule {
             if (seq !== this.daySeq) return;
             this.capacity = data.capacity;
             this.applyDayMinRows();
-            // 「M/D(曜)　n件　同時に預かる数 m」（2026-11 変更：「の予約」を外した）。件数は一覧の行の数（編集中の利用自身は JSON の時点で除いてある）。
+            // 「M/D(曜)　n件　同時に預かる数 m」（2026-11 変更：「の予約」を外した）。件数は一覧の行の数（編集中の利用も数える。2026-11 変更）。
             // 日付と件数のあいだは全角の空白で、読み上げで続けて読まれないよう、見えない読点も入れる（2026-11 追加）。
             // 同時に預かる数は予約が 1 件以上の日だけ出し、数字の部分だけを別の要素にして、満・超過はカレンダーと同じバッジにする
             const usages = data.usages || [];
@@ -404,6 +401,14 @@ class UsageSchedule {
      */
     appendParts(el, parts) {
         parts.forEach((part) => {
+            if (part.editing) {
+                // 編集中の利用の行の印（2026-11 追加）
+                const badge = document.createElement('span');
+                badge.className = EDITING_BADGE_CLASSES.join(' ');
+                badge.textContent = part.text;
+                el.appendChild(badge);
+                return;
+            }
             if (part.href === undefined) {
                 el.appendChild(document.createTextNode(part.text));
                 return;
@@ -573,7 +578,7 @@ class UsageSchedule {
             const li = document.createElement('li');
             li.className = 'list-group-item small py-1';
             // 会員名をリンクにするか（linkClients）は usage-schedule-core.js の usageLineParts で決める（2026-11 追加）
-            this.appendParts(li, usageLineParts(usage, this.clientUrlTemplate, this.calendarLinks));
+            this.appendParts(li, usageLineParts(usage, this.clientUrlTemplate, this.calendarLinks, this.editingUsageId));
 
             return li;
         }));

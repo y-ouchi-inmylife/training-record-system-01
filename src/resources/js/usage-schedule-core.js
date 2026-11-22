@@ -367,36 +367,58 @@ export function googleCalendarParts(usage, calendarLinks = false) {
     return [{ text: '', href: usage.google_calendar_url, calendar: true }];
 }
 
+/** 編集中の利用の行に付ける印の文字とクラス（2026-11 追加。設計書 S-0305-M05「その日の予約」。配色は §2-5 の分類ラベル） */
+export const EDITING_BADGE_TEXT = '編集中';
+export const EDITING_BADGE_CLASSES = ['badge', 'bg-light', 'text-dark', 'border', 'ms-2'];
+
+/**
+ * 編集中の利用の行に付ける「編集中」の印の部分（2026-11 追加。設計書 S-0305-M05「その日の予約」）。
+ * JSON の利用の id（id）が、編集のモーダルで編集している利用の id と同じ行だけ 1 つ。ほかは空（登録のモーダル・カレンダー画面は id が null）
+ *
+ * @param {{id?: (number|string)}} usage
+ * @param {(number|string|null)} editingUsageId
+ * @returns {Array<{text: string, editing: true}>}
+ */
+export function editingParts(usage, editingUsageId = null) {
+    if (editingUsageId === null || editingUsageId === '' || usage.id === undefined || String(usage.id) !== String(editingUsageId)) {
+        return [];
+    }
+
+    return [{ text: EDITING_BADGE_TEXT, editing: true }];
+}
+
 /**
  * 予約の 1 行を、文字とリンクの部分に分けたもの（2026-11 追加。設計書 S-1602「会員名のリンク」）。
  * - 会員詳細の URL の型（clientUrlTemplate）があるとき（カレンダー画面の linkClients: true）：
  *   「開始〜終了　トレーニー（」・会員名（href 付き）・「）」の 3 つ。会員名の部分だけがリンク。トレーニーがない利用は「開始〜終了　（」から始まる
  * - 型がないとき（利用モーダル）・JSON に会員の id がないとき：usageLine と同じ文 1 つ（リンクにしない）
  *
- * 最後に「Googleカレンダーに追加」のリンク（googleCalendarParts。calendarLinks が true で、今日以降の利用のとき。2026-11 追加）
+ * 最後に「Googleカレンダーに追加」のリンク（googleCalendarParts。calendarLinks が true で、今日以降の利用のとき。2026-11 追加）と、
+ * 「編集中」の印（editingParts。編集中の利用の行だけ。2026-11 追加）
  *
- * @param {{time_range: string, label: string, client_id?: number, client_name?: string, trainee_name?: string, google_calendar_url?: (string|null)}} usage
+ * @param {{id?: number, time_range: string, label: string, client_id?: number, client_name?: string, trainee_name?: string, google_calendar_url?: (string|null)}} usage
  * @param {(string|null)} clientUrlTemplate
  * @param {boolean} calendarLinks
- * @returns {Array<{text: string, href?: string, calendar?: true}>}
+ * @param {(number|string|null)} editingUsageId 編集中の利用の id（なければ null）
+ * @returns {Array<{text: string, href?: string, calendar?: true, editing?: true}>}
  */
-export function usageLineParts(usage, clientUrlTemplate = null, calendarLinks = false) {
-    const calendar = googleCalendarParts(usage, calendarLinks);
+export function usageLineParts(usage, clientUrlTemplate = null, calendarLinks = false, editingUsageId = null) {
+    const tail = [...googleCalendarParts(usage, calendarLinks), ...editingParts(usage, editingUsageId)];
     const href = clientDetailUrl(clientUrlTemplate, usage.client_id);
     if (href === null) {
-        return [{ text: usageLine(usage) }, ...calendar];
+        return [{ text: usageLine(usage) }, ...tail];
     }
 
     // トレーニーがない利用は、会員名だけ（かっこを付けない。2026-11 変更）
     if (!usage.trainee_name) {
-        return [{ text: `${usage.time_range}　` }, { text: usage.client_name ?? '', href }, ...calendar];
+        return [{ text: `${usage.time_range}　` }, { text: usage.client_name ?? '', href }, ...tail];
     }
 
     return [
         { text: `${usage.time_range}　${usage.trainee_name}（` },
         { text: usage.client_name ?? '', href },
         { text: '）' },
-        ...calendar,
+        ...tail,
     ];
 }
 

@@ -16,7 +16,7 @@ use Tests\TestCase;
  * - 利用 1 件を 1 と数える（トレーニーがない利用も 1 と数える）・事業所全体（すべての会員の利用）で数える
  * - 同じ日の中で時間帯が重なる利用を数える。時間帯は終わりを含まない
  * - 「ある時間帯の預かる数」「ある日の預かる数」は、最も多く重なる瞬間の預かる数
- * - 編集中の利用自身は数えない（除く利用）
+ * - 保存時の確認では、編集中の利用自身は数えない（除く利用）。予約状況の表示（dayCount・monthCounts）では除かない（2026-11 変更）
  */
 class UsageCapacityServiceTest extends TestCase
 {
@@ -109,15 +109,6 @@ class UsageCapacityServiceTest extends TestCase
         $this->assertSame(0, $this->service->dayCount('2026-11-26'));
     }
 
-    public function test_除く利用は数えない(): void
-    {
-        $this->usage('2026-11-26', '08:00', '19:00');
-        $self = $this->usage('2026-11-26', '08:00', '19:00');
-
-        $this->assertSame(2, $this->service->dayCount('2026-11-26'));
-        $this->assertSame(1, $this->service->dayCount('2026-11-26', $self->id));
-    }
-
     // ---- 月の日ごとの預かる数 ----
 
     public function test_月の日ごとの預かる数は1以上の日だけを日付の順に返す(): void
@@ -125,15 +116,13 @@ class UsageCapacityServiceTest extends TestCase
         $this->usage('2026-11-30', '08:00', '19:00');
         $this->usage('2026-11-01', '08:00', '12:00');
         $this->usage('2026-11-01', '12:00', '19:00'); // 終わりを含まないので 1のまま
-        $a = $this->usage('2026-11-26', '08:00', '19:00');
+        $this->usage('2026-11-26', '08:00', '19:00');
         $this->usage('2026-11-26', '13:00', '19:00', $this->makeClient('0002', '佐藤'));
         // 前後の月は入れない
         $this->usage('2026-10-31', '08:00', '19:00');
         $this->usage('2026-12-01', '08:00', '19:00');
 
         $this->assertSame(['2026-11-01' => 1, '2026-11-26' => 2, '2026-11-30' => 1], $this->service->monthCounts('2026-11'));
-        // 除く利用
-        $this->assertSame(['2026-11-01' => 1, '2026-11-26' => 1, '2026-11-30' => 1], $this->service->monthCounts('2026-11', $a->id));
     }
 
     // ---- その時間帯に 1 件入れたときの預かる数 ----

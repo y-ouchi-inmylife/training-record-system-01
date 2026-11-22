@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
  * 利用モーダルの予約状況（カレンダーとその日の予約。<x-usage-schedule>・resources/js/usage-schedule.js）・
  * カレンダー画面（S-1602。2026-11 追加。同じ部品）と、利用の保存の前の確認（check。2026-11 追加）が読む。
  * 預かる数は事業所全体で数える（UsageCapacityService。保存時の上限の確認と同じ計算）。上限は ScheduleSetting::capacity()。
+ * 表示（month・day）は、編集のモーダルでも編集中の利用を除かず、保存されている内容のまま数える（2026-11 変更）。
+ * 保存の前の確認（check）だけが、編集中の利用自身（exclude_usage_id）を除く。
  * 権限は利用の登録・編集と同じ（routes/api.php の auth・practitioners）。参照なので、アクセスログには記録しない。
  */
 class UsageScheduleController extends Controller
@@ -26,18 +28,16 @@ class UsageScheduleController extends Controller
     {
         $validated = $request->validate([
             'month' => 'required|date_format:Y-m',
-            'exclude_usage_id' => 'nullable|integer',
         ]);
-        $exclude = isset($validated['exclude_usage_id']) ? (int) $validated['exclude_usage_id'] : null;
 
         return response()->json([
             'month' => $validated['month'],
             'today' => today()->toDateString(),
             'capacity' => ScheduleSetting::capacity(),
             // 預かる数が 1 以上の日だけ。日がなくても JSON のオブジェクト（{}）にする
-            'days' => (object) $service->monthCounts($validated['month'], $exclude),
+            'days' => (object) $service->monthCounts($validated['month']),
             // 日ごとの予約の件数（2026-11 追加。カレンダーのマスの右上に出す）。件数が 1 以上の日だけ。days と同じ形
-            'usage_counts' => (object) $service->monthUsageCounts($validated['month'], $exclude),
+            'usage_counts' => (object) $service->monthUsageCounts($validated['month']),
         ]);
     }
 
@@ -48,23 +48,23 @@ class UsageScheduleController extends Controller
     {
         $validated = $request->validate([
             'date' => 'required|date_format:Y-m-d',
-            'exclude_usage_id' => 'nullable|integer',
         ]);
-        $exclude = isset($validated['exclude_usage_id']) ? (int) $validated['exclude_usage_id'] : null;
 
-        $usages = $service->usagesOn($validated['date'], $exclude)->load(['client', 'trainee']);
+        $usages = $service->usagesOn($validated['date'])->load(['client', 'trainee']);
 
         return response()->json([
             'date' => $validated['date'],
             'date_label' => ClientUsage::toShortDateLabel($validated['date']),
             'capacity' => ScheduleSetting::capacity(),
-            'count' => $service->dayCount($validated['date'], $exclude),
+            'count' => $service->dayCount($validated['date']),
             // 営業時間（HH:MM。2026-11 追加）。カレンダー画面（S-1602）のタイムテーブルの時間の幅の基本に使う
             'open_time' => ScheduleSetting::openTime(),
             'close_time' => ScheduleSetting::closeTime(),
             // label は「トレーニー（会員名）」の 1 つの文（利用モーダルが使う）。client_id・client_name・trainee_name（2026-11 追加）は、
             // カレンダー画面（S-1602）で会員名の部分だけを会員詳細へのリンクにするために、label を分けたもの
             'usages' => $usages->map(fn (ClientUsage $usage) => [
+                // 利用の id（2026-11 追加）。編集のモーダルで、編集中の利用の行に「編集中」の印を付けるのに使う
+                'id' => (int) $usage->id,
                 'time_range' => $usage->time_range_label,
                 // 開始・終了の時刻（HH:MM。2026-11 追加）。タイムテーブルの帯の位置に使う（time_range は表示用の文字）
                 'start_time' => $usage->start_time_input,

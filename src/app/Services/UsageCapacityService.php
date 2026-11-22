@@ -15,7 +15,8 @@ use Illuminate\Support\Collection;
  * - 事業所全体（すべての会員の利用）で数える
  * - 同じ日の中で、時間帯が重なる利用を数える。時間帯は終わりを含まない（「12:00 まで」と「12:00 から」は重ならない）
  * - 「ある時間帯の預かる数」は、その時間帯の中で最も多く重なる瞬間の預かる数。「ある日の預かる数」は、その日の中で最も多く重なる瞬間の預かる数
- * - 編集のときは、編集中の利用自身を数えない（$excludeUsageId）
+ * - 編集のとき、保存時の確認（confirmation）では編集中の利用自身を数えない（$excludeUsageId）。
+ *   予約状況の表示（dayCount・monthCounts・monthUsageCounts）では、保存されている内容のまま数える（2026-11 変更：その前は表示でも除いていた）
  *
  * 予約状況の表示（UsageScheduleController）と、利用の保存時の上限の確認（ClientUsageController）で、この計算を使う。
  * 上限（同時に預かれる数）は App\Support\ScheduleSetting::capacity()。
@@ -43,9 +44,9 @@ class UsageCapacityService
     /**
      * その日の預かる数（その日の中で最も多く重なる瞬間の預かる数）
      */
-    public function dayCount(string $date, ?int $excludeUsageId = null): int
+    public function dayCount(string $date): int
     {
-        return self::maxOverlap(self::intervalsOf($this->usagesOn($date, $excludeUsageId)));
+        return self::maxOverlap(self::intervalsOf($this->usagesOn($date)));
     }
 
     /**
@@ -54,10 +55,10 @@ class UsageCapacityService
      * @param  string  $month  「Y-m」
      * @return array<string, int>
      */
-    public function monthCounts(string $month, ?int $excludeUsageId = null): array
+    public function monthCounts(string $month): array
     {
         $counts = [];
-        foreach ($this->monthUsagesByDate($month, $excludeUsageId) as $date => $dayUsages) {
+        foreach ($this->monthUsagesByDate($month) as $date => $dayUsages) {
             $count = self::maxOverlap(self::intervalsOf($dayUsages));
             if ($count > 0) {
                 $counts[$date] = $count;
@@ -69,32 +70,31 @@ class UsageCapacityService
 
     /**
      * 月の日ごとの予約（利用）の件数（2026-11 追加。カレンダーのマスの右上に出す）。
-     * トレーニーの有無に関係なく 1 件ずつ数える。$excludeUsageId（編集中の利用自身）は数えない。
+     * トレーニーの有無に関係なく 1 件ずつ数える。
      * 件数が 1 以上の日だけを、日付（Y-m-d）の昇順で返す（monthCounts と同じ形）
      *
      * @param  string  $month  「Y-m」
      * @return array<string, int>
      */
-    public function monthUsageCounts(string $month, ?int $excludeUsageId = null): array
+    public function monthUsageCounts(string $month): array
     {
-        return $this->monthUsagesByDate($month, $excludeUsageId)
+        return $this->monthUsagesByDate($month)
             ->map(fn (Collection $dayUsages) => $dayUsages->count())
             ->all();
     }
 
     /**
-     * 月の利用を、利用日（Y-m-d）ごとにまとめたもの（日付の昇順）。$excludeUsageId の利用は入れない
+     * 月の利用を、利用日（Y-m-d）ごとにまとめたもの（日付の昇順）
      *
      * @return Collection<string, Collection<int, ClientUsage>>
      */
-    private function monthUsagesByDate(string $month, ?int $excludeUsageId): Collection
+    private function monthUsagesByDate(string $month): Collection
     {
         $first = Carbon::createFromFormat('Y-m-d', $month.'-01')->startOfDay();
 
         return ClientUsage::query()
             ->whereDate('used_on', '>=', $first->toDateString())
             ->whereDate('used_on', '<=', $first->copy()->endOfMonth()->toDateString())
-            ->when($excludeUsageId !== null, fn ($query) => $query->where('id', '!=', $excludeUsageId))
             ->orderBy('used_on')
             ->get(['id', 'used_on', 'start_time', 'end_time'])
             ->groupBy(fn (ClientUsage $usage) => $usage->used_on->toDateString());

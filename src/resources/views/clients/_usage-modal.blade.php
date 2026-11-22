@@ -63,7 +63,8 @@
      lg 未満では予約状況を入力欄の下に回す。利用日の欄には flatpickr を付けない（右のカレンダーと役割が重なるため。直接入力はできる）。
      カレンダーの日付を押すと利用日の欄に入れ、利用日の欄に正しい日付を入れるとカレンダーが動く。
      開いたときの月：登録は今日、編集はその利用の利用日、エラーで開き直したときは入力していた利用日（正しくなければ今日）。
-     編集のときは、編集中の利用自身を予約状況に入れない（除く利用の id を渡す）。
+     編集のときは、編集中の利用も保存されている内容のまま予約状況に入れ、その日の予約の行に「編集中」の印を付ける
+     （編集中の利用の id を渡す。2026-11 変更：その前は除いていた）。保存の前の確認（check）では、今までどおり編集中の利用を除いて数える。
 
      エラーのあとの開き直しは契約モーダルと同じ（hidden `_form_type` = 'usage'、
      編集で失敗したときは old('_usage_id') で編集モードに戻す）。選んでいた契約は
@@ -441,7 +442,7 @@
         endTimeInput.value = DEFAULT_END_TIME;
         setTrainee(DEFAULT_TRAINEE_ID);
         noteInput.value = '';
-        schedule.open(usedOnInput.value, { excludeUsageId: null, fallbackDate: todayString() });
+        schedule.open(usedOnInput.value, { editingUsageId: null, fallbackDate: todayString() });
         modal.show();
     }
 
@@ -460,8 +461,8 @@
         // 「トレーニーなし」（data-trainee-id が空）の利用は、未選択の状態で開く
         setTrainee(data.traineeId || null);
         noteInput.value = data.note || '';
-        // 編集中の利用自身は、予約状況の預かる数にも一覧にも入れない
-        schedule.open(usedOnInput.value, { excludeUsageId: data.id, fallbackDate: todayString() });
+        // 編集中の利用も予約状況に入れ（保存されている内容のまま）、その行に「編集中」の印を付ける（2026-11 変更：その前は除いていた）
+        schedule.open(usedOnInput.value, { editingUsageId: data.id, fallbackDate: todayString() });
         modal.show();
     }
 
@@ -488,7 +489,7 @@
                 confirmedValues = confirmationValues();
             }
             // 予約状況は入力していた利用日の月で開く（正しくない日付なら今日）
-            schedule.open(usedOnInput.value, { excludeUsageId: oldUsageId || null, fallbackDate: todayString() });
+            schedule.open(usedOnInput.value, { editingUsageId: oldUsageId || null, fallbackDate: todayString() });
             modal.show();
         @endif
     });

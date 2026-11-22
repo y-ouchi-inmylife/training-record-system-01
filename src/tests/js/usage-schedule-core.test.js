@@ -38,6 +38,8 @@ import {
     timetableLabelPlacement,
     usageNameGroups,
     googleCalendarParts,
+    editingParts,
+    EDITING_BADGE_CLASSES,
     GOOGLE_CALENDAR_LINK_LABEL,
     usageNameText,
     timetableModel,
@@ -763,5 +765,36 @@ describe('Googleカレンダーに追加', () => {
     it('利用モーダル（設定なし）：URL があってもリンクを出さない', () => {
         expect(usageLineParts(upcoming)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
         expect(model(upcoming).rows[0].name.keep.some((part) => part.calendar)).toBe(false);
+    });
+});
+
+// 編集のモーダル（S-0305-M05）のその日の予約の「編集中」の印（2026-11 追加。設計書 S-0305-M05「その日の予約」）
+describe('編集中の印', () => {
+    const T = '/clients/__CLIENT_ID__';
+    const usage = { id: 12, time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）', client_id: 3, client_name: '佐藤 一郎', trainee_name: 'アムロ' };
+    const other = { ...usage, id: 13 };
+    const badge = { text: '編集中', editing: true };
+
+    it('編集中の利用の行だけ、行の最後に印が付く（id は数でも文字でも同じ）', () => {
+        for (const id of [12, '12']) {
+            expect(usageLineParts(usage, null, false, id)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }, badge]);
+            expect(usageLineParts(other, null, false, id)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
+        }
+        // id の一部が同じだけの行には付かない
+        expect(editingParts({ ...usage, id: 120 }, '12')).toEqual([]);
+    });
+
+    it('登録のモーダル・カレンダー画面（編集中の id がない）では付かない', () => {
+        for (const id of [null, undefined, '']) {
+            expect(editingParts(usage, id)).toEqual([]);
+        }
+        expect(usageLineParts(usage)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
+        expect(usageLineParts(usage, T, true).some((part) => part.editing)).toBe(false);
+        // JSON に id がなければ付かない
+        expect(editingParts({ ...usage, id: undefined }, 12)).toEqual([]);
+    });
+
+    it('印は目立ちすぎない分類ラベルの配色', () => {
+        expect(EDITING_BADGE_CLASSES).toEqual(['badge', 'bg-light', 'text-dark', 'border', 'ms-2']);
     });
 });

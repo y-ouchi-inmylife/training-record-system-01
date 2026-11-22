@@ -1129,14 +1129,18 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/class="form-control datepicker[^"]*"\s+id="contracted_on"/u', $html);
     }
 
-    public function test_編集で開くときは編集中の利用を予約状況から除く(): void
+    public function test_編集で開くときは編集中の利用のidを予約状況に渡し_保存の前の確認では今までどおり除く(): void
     {
         $client = $this->makeClient('0001', '山田');
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $this->assertStringContainsString('schedule.open(usedOnInput.value, { excludeUsageId: data.id, fallbackDate: todayString() });', $html);
-        $this->assertStringContainsString('schedule.open(usedOnInput.value, { excludeUsageId: null, fallbackDate: todayString() });', $html);
+        // 編集：編集中の利用の id（その行に「編集中」の印。表示からは除かない。2026-11 変更）。登録：なし
+        $this->assertStringContainsString('schedule.open(usedOnInput.value, { editingUsageId: data.id, fallbackDate: todayString() });', $html);
+        $this->assertStringContainsString('schedule.open(usedOnInput.value, { editingUsageId: null, fallbackDate: todayString() });', $html);
+        $this->assertDoesNotMatchRegularExpression('/schedule\.open\([^;]*excludeUsageId/u', $html);
+        // 保存の前の確認（check）は、今までどおり編集中の利用を除く
+        $this->assertStringContainsString('excludeUsageId: idInput.value || null,', $html);
     }
 
     // ---- 保存時の上限の確認で開き直したモーダル（2026-11 追加。設計書 S-0305-M05「保存時の上限の確認」） ----
