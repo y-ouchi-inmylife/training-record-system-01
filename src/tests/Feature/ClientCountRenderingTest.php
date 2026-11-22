@@ -921,6 +921,8 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<table class="table table-borderless table-sm text-center mb-3" style="table-layout: fixed;">', $modal);
         preg_match_all('/<th scope="col" class="fw-normal p-1">(.)<\/th>/u', $modal, $m);
         $this->assertSame(['日', '月', '火', '水', '木', '金', '土'], $m[1]);
+        // 利用モーダルは、その日の予約をリストのまま出す（タイムテーブルはカレンダー画面 S-1602 だけ。2026-11 追加）
+        $this->assertStringNotContainsString('timetable', $html);
         // 部品の JS（Vite の入口）を読み込み、利用のモーダルの JS がつなぐ
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
         $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('usageSchedule')", $html);

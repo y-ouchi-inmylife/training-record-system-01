@@ -29,6 +29,15 @@ import {
     clientDetailUrl,
     scheduleDateUrl,
     CLIENT_ID_PLACEHOLDER,
+    toMinutes,
+    timetableRange,
+    timetablePosition,
+    timetableOutside,
+    timetableLabelStep,
+    timetableHours,
+    timetableLabelPlacement,
+    usageNameParts,
+    timetableModel,
 } from '../../resources/js/usage-schedule-core.js';
 
 // 利用の予約状況（カレンダーとその日の予約）の計算（2026-11 追加。設計書 S-0305-M05「予約状況」）。
@@ -523,3 +532,102 @@ describe('カレンダー画面の設定', () => {
         expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule?date=2026-11-26', syncUrl: true, previous: state.selected, selected: next.selected })).toBeNull();
     });
 });
+
+// カレンダー画面（S-1602）のその日の予約のタイムテーブル（2026-11 追加）
+describe('タイムテーブル', () => {
+    const u = (start, end, extra = {}) => ({ time_range: `${start.replace(/^0/, '')}〜${end.replace(/^0/, '')}`, start_time: start, end_time: end, label: 'まま（柏原 美江）', ...extra });
+
+    it('時刻を 0 時からの分にする（正しくなければ null）', () => {
+        expect(toMinutes('08:00')).toBe(480);
+        expect(toMinutes('8:30')).toBe(510);
+        expect(toMinutes('19:05')).toBe(1145);
+        expect(toMinutes('24:00')).toBe(1440);
+        for (const v of ['', null, undefined, '8', '08:60', '25:00', 'ab:cd', '08:00:00']) {
+            expect(toMinutes(v)).toBeNull();
+        }
+    });
+
+    it('時間の幅：営業時間だけの日は営業時間', () => {
+        expect(timetableRange({ openTime: '08:00', closeTime: '19:00', usages: [u('08:00', '19:00'), u('13:00', '15:00')] })).toEqual({ start: 480, end: 1140 });
+    });
+
+    it('時間の幅：営業時間より前に始まる利用があれば、前に広げる', () => {
+        expect(timetableRange({ openTime: '08:00', closeTime: '19:00', usages: [u('07:00', '09:00')] })).toEqual({ start: 420, end: 1140 });
+    });
+
+    it('時間の幅：営業時間より後に終わる利用があれば、後ろに広げる', () => {
+        expect(timetableRange({ openTime: '08:00', closeTime: '19:00', usages: [u('19:00', '20:00')] })).toEqual({ start: 480, end: 1200 });
+    });
+
+    it('時間の幅：分単位の時刻は、左端を切り下げ、右端を切り上げる', () => {
+        expect(timetableRange({ openTime: '08:00', closeTime: '19:00', usages: [u('07:30', '19:01')] })).toEqual({ start: 420, end: 1200 });
+        // 営業時間そのものが 1 時間単位でないときも同じ
+        expect(timetableRange({ openTime: '08:30', closeTime: '18:15', usages: [u('09:00', '10:00')] })).toEqual({ start: 480, end: 1140 });
+    });
+
+    it('時間の幅：営業時間が読めないときは、利用の時刻だけで決める', () => {
+        expect(timetableRange({ openTime: '', closeTime: undefined, usages: [u('09:15', '10:45')] })).toEqual({ start: 540, end: 660 });
+    });
+
+    it('帯の位置と幅：開始・終了から、左端と幅の割合を出す', () => {
+        const range = { start: 480, end: 1200 };   // 8:00〜20:00（12 時間）
+        expect(timetablePosition(range, 480, 1140)).toEqual({ left: 0, width: (660 / 720) * 100 });
+        expect(timetablePosition(range, 1140, 1200)).toEqual({ left: (660 / 720) * 100, width: (60 / 720) * 100 });
+        expect(timetablePosition(range, 780, 810)).toEqual({ left: 300 / 720 * 100, width: 30 / 720 * 100 });   // 13:00〜13:30
+        // 幅の外にはみ出す分は切る
+        expect(timetablePosition(range, 400, 500)).toEqual({ left: 0, width: (20 / 720) * 100 });
+    });
+
+    it('営業時間の外：広げた部分と、1 時間単位でない端を灰色にする', () => {
+        expect(timetableOutside({ start: 480, end: 1140 }, '08:00', '19:00')).toEqual([]);
+        expect(timetableOutside({ start: 480, end: 1200 }, '08:00', '19:00')).toEqual([{ left: (660 / 720) * 100, width: (60 / 720) * 100 }]);
+        expect(timetableOutside({ start: 420, end: 1140 }, '08:30', '19:00')).toEqual([{ left: 0, width: (90 / 720) * 100 }]);
+        expect(timetableOutside({ start: 480, end: 1140 }, '', '19:00')).toEqual([]);
+    });
+
+    it('時の数字：1 時間あたり 28px 以上なら 1 時間ごと、狭ければ 2 時間ごと（線は 1 時間ごと）', () => {
+        expect(timetableLabelStep(12 * 28, 12)).toBe(1);
+        expect(timetableLabelStep(12 * 28 - 1, 12)).toBe(2);
+        expect(timetableLabelStep(0, 12)).toBe(1);
+        const hours = timetableHours({ start: 480, end: 720 }, 2);   // 8〜12
+        expect(hours.map((h) => h.hour)).toEqual([8, 9, 10, 11, 12]);
+        expect(hours.map((h) => h.left)).toEqual([0, 25, 50, 75, 100]);
+        expect(hours.map((h) => h.labeled)).toEqual([true, false, true, false, true]);
+        expect(timetableHours({ start: 480, end: 600 }).map((h) => h.labeled)).toEqual([true, true, true]);
+    });
+
+    it('帯の時刻：収まれば帯の中、収まらなければ右、右に余白がなければ左', () => {
+        const base = { labelWidthPx: 60, trackWidthPx: 300 };
+        expect(timetableLabelPlacement({ ...base, bandLeftPx: 0, bandWidthPx: 68 })).toBe('inside');
+        expect(timetableLabelPlacement({ ...base, bandLeftPx: 0, bandWidthPx: 67 })).toBe('right');
+        expect(timetableLabelPlacement({ ...base, bandLeftPx: 270, bandWidthPx: 30 })).toBe('left');
+        // どちらにも収まらなければ右（文字は帯の中で切らない）
+        expect(timetableLabelPlacement({ labelWidthPx: 60, trackWidthPx: 80, bandLeftPx: 30, bandWidthPx: 20 })).toBe('right');
+    });
+
+    it('左の列の名前：型があれば会員名だけリンク、なければ label のまま（時刻は付けない）', () => {
+        const usage = u('08:00', '19:00', { client_id: 7, client_name: '柏原 美江', trainee_name: 'まま' });
+        expect(usageNameParts(usage, '/clients/__CLIENT_ID__')).toEqual([{ text: 'まま（' }, { text: '柏原 美江', href: '/clients/7' }, { text: '）' }]);
+        expect(usageNameParts(usage)).toEqual([{ text: 'まま（柏原 美江）' }]);
+        expect(usageNameParts({ ...usage, trainee_name: '', label: '（柏原 美江）' }, '/clients/__CLIENT_ID__')[0]).toEqual({ text: '（' });
+    });
+
+    it('予約がない日はタイムテーブルを作らない（null）', () => {
+        expect(timetableModel({ usages: [], openTime: '08:00', closeTime: '19:00' })).toBeNull();
+        expect(timetableModel({ usages: undefined, openTime: '08:00', closeTime: '19:00' })).toBeNull();
+    });
+
+    it('1 日分：行は渡した順のまま、時間の幅・時間数・灰色・帯を組み立てる', () => {
+        const model = timetableModel({
+            usages: [u('08:00', '19:00', { client_id: 1, client_name: 'A', trainee_name: 'a' }), u('19:00', '20:00', { client_id: 2, client_name: 'B', trainee_name: '' })],
+            openTime: '08:00', closeTime: '19:00', clientUrlTemplate: '/clients/__CLIENT_ID__',
+        });
+        expect(model.range).toEqual({ start: 480, end: 1200 });
+        expect(model.hourCount).toBe(12);
+        expect(model.outside).toEqual([{ left: (660 / 720) * 100, width: (60 / 720) * 100 }]);
+        expect(model.rows.map((r) => r.timeRange)).toEqual(['8:00〜19:00', '19:00〜20:00']);
+        expect(model.rows[1]).toMatchObject({ left: (660 / 720) * 100, width: (60 / 720) * 100 });
+        expect(model.rows[1].nameParts).toEqual([{ text: '（' }, { text: 'B', href: '/clients/2' }, { text: '）' }]);
+    });
+});
+

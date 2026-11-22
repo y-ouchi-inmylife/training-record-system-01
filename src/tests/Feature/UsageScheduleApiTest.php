@@ -185,11 +185,14 @@ class UsageScheduleApiTest extends TestCase
                 'date_label' => '11/26(木)',
                 'capacity' => 3,
                 'count' => 3,
+                // 営業時間（2026-11 追加。設定がなければ初期値 8:00〜19:00）
+                'open_time' => '08:00',
+                'close_time' => '19:00',
                 // client_id・client_name・trainee_name（2026-11 追加）：カレンダー画面（S-1602）で会員名だけをリンクにするため、label を分けたもの
                 'usages' => [
-                    ['time_range' => '8:00〜19:00', 'label' => 'アムロ（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => 'アムロ'],
-                    ['time_range' => '13:00〜15:00', 'label' => '（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => ''],
-                    ['time_range' => '13:00〜19:00', 'label' => '名前未登録（大内）', 'client_id' => $this->ouchi->id, 'client_name' => '大内', 'trainee_name' => '名前未登録'],
+                    ['time_range' => '8:00〜19:00', 'start_time' => '08:00', 'end_time' => '19:00', 'label' => 'アムロ（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => 'アムロ'],
+                    ['time_range' => '13:00〜15:00', 'start_time' => '13:00', 'end_time' => '15:00', 'label' => '（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => ''],
+                    ['time_range' => '13:00〜19:00', 'start_time' => '13:00', 'end_time' => '19:00', 'label' => '名前未登録（大内）', 'client_id' => $this->ouchi->id, 'client_name' => '大内', 'trainee_name' => '名前未登録'],
                 ],
             ]);
     }
@@ -462,5 +465,21 @@ class UsageScheduleApiTest extends TestCase
         $this->getJson(route('api.usage-schedule.check', $this->checkQuery(['used_on' => '2026-11-20', 'trainee_id' => 10, 'exclude_usage_id' => $self->id])))
             ->assertOk()->assertJson(['needs_confirmation' => false, 'needs_overlap_confirmation' => false]);
     }
-}
 
+    public function test_その日の営業時間は事業所情報の設定の値を返す(): void
+    {
+        // カレンダー画面（S-1602）のタイムテーブルの時間の幅の基本（2026-11 追加）
+        DB::table('system_settings')->insert([
+            ['key' => 'schedule_open_time', 'value' => '09:30'],
+            ['key' => 'schedule_close_time', 'value' => '18:00'],
+        ]);
+        $this->usage($this->sato, '2026-11-26', '19:00', '20:05');
+
+        $this->getJson(route('api.usage-schedule.day', ['date' => '2026-11-26']))
+            ->assertOk()
+            ->assertJsonPath('open_time', '09:30')
+            ->assertJsonPath('close_time', '18:00')
+            ->assertJsonPath('usages.0.start_time', '19:00')
+            ->assertJsonPath('usages.0.end_time', '20:05');
+    }
+}

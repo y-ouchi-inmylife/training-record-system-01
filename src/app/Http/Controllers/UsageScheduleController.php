@@ -58,10 +58,16 @@ class UsageScheduleController extends Controller
             'date_label' => ClientUsage::toShortDateLabel($validated['date']),
             'capacity' => ScheduleSetting::capacity(),
             'count' => $service->dayCount($validated['date'], $exclude),
+            // 営業時間（HH:MM。2026-11 追加）。カレンダー画面（S-1602）のタイムテーブルの時間の幅の基本に使う
+            'open_time' => ScheduleSetting::openTime(),
+            'close_time' => ScheduleSetting::closeTime(),
             // label は「トレーニー（会員名）」の 1 つの文（利用モーダルが使う）。client_id・client_name・trainee_name（2026-11 追加）は、
             // カレンダー画面（S-1602）で会員名の部分だけを会員詳細へのリンクにするために、label を分けたもの
             'usages' => $usages->map(fn (ClientUsage $usage) => [
                 'time_range' => $usage->time_range_label,
+                // 開始・終了の時刻（HH:MM。2026-11 追加）。タイムテーブルの帯の位置に使う（time_range は表示用の文字）
+                'start_time' => $usage->start_time_input,
+                'end_time' => $usage->end_time_input,
                 'label' => self::usageLabel($usage),
                 'client_id' => (int) $usage->client_id,
                 'client_name' => self::clientName($usage),

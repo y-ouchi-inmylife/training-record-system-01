@@ -133,8 +133,8 @@ class ScheduleScreenTest extends TestCase
         );
         // 右の列にその日の予約
         $this->assertMatchesRegularExpression('/<div class="col-lg-6">\s*(<!--.*?-->\s*)?<div class="card">\s*<div class="card-header small fw-bold py-1" data-usage-schedule-day-heading>/su', $html);
-        // JS の設定：会員名をリンクにし、URL の date を書き換える（利用日の欄はない）
-        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true });", $html);
+        // JS の設定：会員名をリンクにし、URL の date を書き換え、広い画面でタイムテーブルにする（2026-11 追加。利用日の欄はない）
+        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true });", $html);
         $this->assertStringNotContainsString('onSelect', $html);
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
     }

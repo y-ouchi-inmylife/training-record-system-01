@@ -452,3 +452,198 @@ export function usageConfirmMessage(check, button) {
 
     return `${lines.join('\n')}\n\n${button}しますか？`;
 }
+
+// -----------------------------------------------------------------------------
+// カレンダー画面（S-1602）のその日の予約のタイムテーブル（2026-11 追加。設計書 S-1602「その日の予約のタイムテーブル」）。
+// 広い画面だけで出す（狭い画面と利用モーダルはリストのまま）。ここは DOM に触れない計算だけ。時刻は 0 時からの分で扱う
+// -----------------------------------------------------------------------------
+
+/** 時の数字を 1 時間ごとに出すのに要る、1 時間あたりの幅（px）。これより狭いときは 2 時間ごと */
+export const TIMETABLE_MIN_HOUR_LABEL_PX = 28;
+
+/**
+ * 「HH:MM」（「H:MM」も可）を 0 時からの分にする。正しくなければ null
+ *
+ * @param {string} value
+ * @returns {(number|null)}
+ */
+export function toMinutes(value) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? '').trim());
+    if (!m) {
+        return null;
+    }
+    const hour = parseInt(m[1], 10);
+    const minute = parseInt(m[2], 10);
+    if (hour > 24 || minute > 59 || (hour === 24 && minute !== 0)) {
+        return null;
+    }
+
+    return hour * 60 + minute;
+}
+
+/**
+ * タイムテーブルの時間の幅（分）。基本は営業時間で、その日の利用が営業時間より前に始まる・後に終わるときは、その時刻まで広げる。
+ * 左端は 1 時間単位に切り下げ、右端は 1 時間単位に切り上げる（例：8:00〜19:00 に 19:00〜20:00 の利用 → 8:00〜20:00）。
+ * 営業時間が読めないときは、利用の時刻だけで決める。日をまたぐ利用はない（終了は開始より後。S-0305-M05）
+ *
+ * @param {{openTime: string, closeTime: string, usages: Array<{start_time: string, end_time: string}>}} args
+ * @returns {{start: number, end: number}}
+ */
+export function timetableRange({ openTime, closeTime, usages }) {
+    const points = [toMinutes(openTime), toMinutes(closeTime)];
+    for (const usage of usages) {
+        points.push(toMinutes(usage.start_time), toMinutes(usage.end_time));
+    }
+    const valid = points.filter((v) => v !== null);
+    if (valid.length === 0) {
+        return { start: 0, end: 24 * 60 };
+    }
+    const start = Math.floor(Math.min(...valid) / 60) * 60;
+    let end = Math.ceil(Math.max(...valid) / 60) * 60;
+    if (end <= start) {
+        end = start + 60;
+    }
+
+    return { start, end };
+}
+
+/**
+ * 時間の幅の中で、開始〜終了の位置（左端と幅。時間の幅に対する割合〔%〕）。幅の外にはみ出す分は切る
+ *
+ * @param {{start: number, end: number}} range
+ * @param {number} startMinutes
+ * @param {number} endMinutes
+ * @returns {{left: number, width: number}}
+ */
+export function timetablePosition(range, startMinutes, endMinutes) {
+    const span = range.end - range.start;
+    const from = Math.min(Math.max(startMinutes, range.start), range.end);
+    const to = Math.min(Math.max(endMinutes, range.start), range.end);
+
+    return {
+        left: ((from - range.start) / span) * 100,
+        width: (Math.max(to - from, 0) / span) * 100,
+    };
+}
+
+/**
+ * 営業時間の外の部分（灰色にする。左端と幅の割合）。営業時間が読めないときはなし
+ *
+ * @param {{start: number, end: number}} range
+ * @param {string} openTime
+ * @param {string} closeTime
+ * @returns {Array<{left: number, width: number}>}
+ */
+export function timetableOutside(range, openTime, closeTime) {
+    const open = toMinutes(openTime);
+    const close = toMinutes(closeTime);
+    if (open === null || close === null || close <= open) {
+        return [];
+    }
+    const segments = [];
+    if (open > range.start) {
+        segments.push(timetablePosition(range, range.start, open));
+    }
+    if (close < range.end) {
+        segments.push(timetablePosition(range, close, range.end));
+    }
+
+    return segments;
+}
+
+/**
+ * 時の数字を何時間ごとに出すか（1 か 2）。1 時間あたりの幅が TIMETABLE_MIN_HOUR_LABEL_PX 未満なら 2。幅が分からない（0）ときは 1
+ *
+ * @param {number} trackWidthPx 目盛りの幅（px）
+ * @param {number} hourCount 時間の幅の時間数
+ */
+export function timetableLabelStep(trackWidthPx, hourCount) {
+    if (!trackWidthPx || hourCount <= 0) {
+        return 1;
+    }
+
+    return trackWidthPx / hourCount < TIMETABLE_MIN_HOUR_LABEL_PX ? 2 : 1;
+}
+
+/**
+ * 目盛りの時（左端から右端まで 1 時間ごと）。labeled は数字を出すか（左端から step 時間ごと）
+ *
+ * @param {{start: number, end: number}} range
+ * @param {number} step 1 か 2
+ * @returns {Array<{hour: number, left: number, labeled: boolean}>}
+ */
+export function timetableHours(range, step = 1) {
+    const first = range.start / 60;
+    const last = range.end / 60;
+    const hours = [];
+    for (let hour = first; hour <= last; hour++) {
+        hours.push({ hour, left: ((hour - first) / (last - first)) * 100, labeled: (hour - first) % step === 0 });
+    }
+
+    return hours;
+}
+
+/**
+ * 帯の時刻をどこに書くか：帯の中（inside）、帯の外の右（right）、帯の外の左（left）。
+ * 帯の中に収まらなければ右、右に余白がなければ左。どちらにも収まらなければ右（はみ出した分は隠れる）。帯の中で文字を切らない
+ *
+ * @param {{bandLeftPx: number, bandWidthPx: number, labelWidthPx: number, trackWidthPx: number, paddingPx?: number, gapPx?: number}} args
+ * @returns {('inside'|'right'|'left')}
+ */
+export function timetableLabelPlacement({ bandLeftPx, bandWidthPx, labelWidthPx, trackWidthPx, paddingPx = 4, gapPx = 4 }) {
+    if (labelWidthPx + paddingPx * 2 <= bandWidthPx) {
+        return 'inside';
+    }
+    if (bandLeftPx + bandWidthPx + gapPx + labelWidthPx <= trackWidthPx) {
+        return 'right';
+    }
+    if (bandLeftPx - gapPx - labelWidthPx >= 0) {
+        return 'left';
+    }
+
+    return 'right';
+}
+
+/**
+ * 左の列の「トレーニー（会員名）」を、文字とリンクの部分に分けたもの（usageLineParts から時刻を除いたもの）。
+ * 会員詳細の URL の型があれば会員名だけをリンクにし、なければ label の 1 つの文
+ *
+ * @returns {Array<{text: string, href?: string}>}
+ */
+export function usageNameParts(usage, clientUrlTemplate = null) {
+    const href = clientDetailUrl(clientUrlTemplate, usage.client_id);
+    if (href === null) {
+        return [{ text: usage.label }];
+    }
+
+    return [
+        { text: `${usage.trainee_name ?? ''}（` },
+        { text: usage.client_name ?? '', href },
+        { text: '）' },
+    ];
+}
+
+/**
+ * タイムテーブル 1 つ分の表示データ。予約がない日は null（タイムテーブルを出さず、「予約はありません」の知らせだけ）
+ *
+ * @param {{usages: Array, openTime: string, closeTime: string, clientUrlTemplate?: (string|null)}} args
+ * @returns {(null|{range: {start: number, end: number}, hourCount: number, outside: Array<{left: number, width: number}>,
+ *            rows: Array<{timeRange: string, nameParts: Array<{text: string, href?: string}>, left: number, width: number}>})}
+ */
+export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate = null }) {
+    if (!usages || usages.length === 0) {
+        return null;
+    }
+    const range = timetableRange({ openTime, closeTime, usages });
+
+    return {
+        range,
+        hourCount: (range.end - range.start) / 60,
+        outside: timetableOutside(range, openTime, closeTime),
+        rows: usages.map((usage) => ({
+            timeRange: usage.time_range,
+            nameParts: usageNameParts(usage, clientUrlTemplate),
+            ...timetablePosition(range, toMinutes(usage.start_time) ?? range.start, toMinutes(usage.end_time) ?? range.start),
+        })),
+    };
+}

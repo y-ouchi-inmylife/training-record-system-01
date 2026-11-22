@@ -376,3 +376,82 @@ h2 {
     line-height: inherit;
 }
 
+// カレンダー画面（S-1602）のその日の予約のタイムテーブル（2026-11 追加。設計書 S-1602「その日の予約のタイムテーブル」）。
+// 広い画面（lg 以上）だけ（JS が d-none d-lg-block を付ける。狭い画面と利用モーダルはリストのまま）。
+// 1 行に 1 利用。左の列に「トレーニー（会員名）」、右の目盛りに帯。位置と幅は JS が割合（%）で入れる。
+// 縦の線は 1 時間ごと（--usage-timetable-hours＝時間数。JS が入れる）。営業時間の外は灰色（.usage-timetable-outside）。
+// 帯の色は Bootstrap の primary の subtle（今日のマスの薄い青と同じ系統）
+.usage-timetable {
+    --usage-timetable-hours: 11;
+    --usage-timetable-line: var(--bs-border-color);
+    padding: .25rem .5rem .5rem;
+}
+.usage-timetable-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 32%) minmax(0, 1fr);
+    column-gap: .5rem;
+    align-items: center;
+}
+.usage-timetable-rows .usage-timetable-row + .usage-timetable-row {
+    margin-top: .25rem;
+}
+.usage-timetable-name {
+    font-size: .875rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+// 目盛り（時の数字）。数字は線の位置に中央をそろえる
+.usage-timetable-scale {
+    position: relative;
+    height: 1.25rem;
+    font-size: .75rem;
+    color: var(--bs-secondary-color);
+}
+.usage-timetable-hour {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    line-height: 1.25rem;
+}
+.usage-timetable-hour--hidden {
+    visibility: hidden;
+}
+// 1 行の目盛り：1 時間ごとの縦の線（左端から 1 時間ごと。右端は枠線）
+.usage-timetable-track {
+    position: relative;
+    height: 1.75rem;
+    overflow: hidden;
+    border-right: 1px solid var(--usage-timetable-line);
+    background-image: linear-gradient(to right, var(--usage-timetable-line) 1px, transparent 1px);
+    background-size: calc(100% / var(--usage-timetable-hours)) 100%;
+}
+// 営業時間の外：灰色の背景（線が透けるよう半透明）
+.usage-timetable-outside {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(var(--bs-secondary-rgb), .15);
+}
+// 帯：開始〜終了。青系の薄い面と青の枠
+.usage-timetable-band {
+    position: absolute;
+    top: .25rem;
+    bottom: .25rem;
+    background-color: var(--bs-primary-bg-subtle);
+    border: 1px solid var(--bs-primary-border-subtle);
+    border-radius: var(--bs-border-radius-sm);
+}
+// 帯の時刻（帯の中なら帯の幅で中央、外なら帯の右または左。文字は切らずに 1 行）
+.usage-timetable-time {
+    position: absolute;
+    top: 0;
+    line-height: 1.75rem;
+    font-size: .75rem;
+    white-space: nowrap;
+    color: var(--bs-body-color);
+}
+.usage-timetable-time--inside {
+    text-align: center;
+    color: var(--bs-primary-text-emphasis);
+}
+

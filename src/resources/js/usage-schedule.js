@@ -9,11 +9,13 @@
  *   onSelect    ：日付を押したときに呼ぶ（利用モーダルが利用日の欄に入れる）
  *   linkClients ：true なら、その日の予約の会員名を会員詳細へのリンクにする（URL の型は rootEl の data-client-url）。初期値 false
  *   syncUrl     ：true なら、選んでいる日が変わったときに URL の date を書き換える（history.replaceState）。初期値 false
- *   判定と組み立ては usage-schedule-core.js（usageLineParts・scheduleDateUrl）
+ *   timetable   ：true なら、広い画面（lg 以上）でその日の予約を横向きのタイムテーブルにする（狭い画面はリストのまま。
+ *                 リストとタイムテーブルを両方作り、CSS の d-lg-none・d-none d-lg-block で出し分ける）。初期値 false。2026-11 追加
+ *   判定と組み立ては usage-schedule-core.js（usageLineParts・scheduleDateUrl・timetableModel など）
  *
  * 使い方：
  *   const schedule = new window.UsageSchedule(rootEl, { onSelect: (ymd) => { ... } });
- *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true });  // カレンダー画面
+ *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true });  // カレンダー画面
  *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
@@ -40,18 +42,36 @@ import {
     scheduleDateUrl,
     selectDate,
     usageLineParts,
+    timetableModel,
+    timetableHours,
+    timetableLabelStep,
+    timetableLabelPlacement,
 } from './usage-schedule-core.js';
 
 const LOADING = '読み込み中…';
 const FAILED = '予約状況を読み込めませんでした。';
 
 class UsageSchedule {
-    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false } = {}) {
+    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false } = {}) {
         this.root = root;
         this.onSelect = onSelect;
         // 会員名をリンクにするときの会員詳細の URL の型（linkClients が false なら null。2026-11 追加）
         this.clientUrlTemplate = linkClients ? (root.dataset.clientUrl || null) : null;
         this.syncUrl = syncUrl;
+        // 広い画面のタイムテーブル（2026-11 追加。カレンダー画面だけ）。入れ物はリストの後ろに作る
+        this.timetableEl = null;
+        this.timetableRows = [];
+        this.hourEls = [];
+        if (timetable) {
+            this.timetableEl = document.createElement('div');
+            // 出すときだけ d-lg-block を付ける（hidden 属性は Bootstrap の d-lg-block〔!important〕に負けるので使わない）
+            this.timetableEl.className = 'usage-timetable d-none';
+            this.timetableEl.dataset.usageScheduleTimetable = '';
+            // 幅が変わったら、時の数字の間引きと帯の時刻の置き場所を決め直す（狭い画面では出していないので何もしない）
+            window.addEventListener('resize', () => {
+                window.requestAnimationFrame(() => this.layoutTimetable());
+            });
+        }
         this.monthUrl = root.dataset.monthUrl;
         this.dayUrl = root.dataset.dayUrl;
         this.state = null;
@@ -69,6 +89,9 @@ class UsageSchedule {
         this.statusEl = root.querySelector('[data-usage-schedule-status]');
         this.dayHeadingEl = root.querySelector('[data-usage-schedule-day-heading]');
         this.dayListEl = root.querySelector('[data-usage-schedule-day-list]');
+        if (this.timetableEl) {
+            this.dayListEl.after(this.timetableEl);
+        }
 
         root.querySelector('[data-usage-schedule-prev]').addEventListener('click', () => this.move(-1));
         root.querySelector('[data-usage-schedule-next]').addEventListener('click', () => this.move(1));
@@ -196,6 +219,7 @@ class UsageSchedule {
             }
             this.dayHeadingEl.replaceChildren(...nodes);
             this.renderDayList(usages);
+            this.renderTimetable(usages, data.open_time, data.close_time);
         } catch (error) {
             if (seq !== this.daySeq) return;
             console.error('予約状況（日）を読み込めませんでした', error);
@@ -288,6 +312,148 @@ class UsageSchedule {
         li.className = `list-group-item small ${isError ? 'text-danger' : 'text-body-secondary'}`;
         li.textContent = text;
         this.dayListEl.replaceChildren(li);
+        // 知らせ（読み込み中・失敗・予約はありません）は、どの幅でもリストの 1 行で出す（タイムテーブルは隠す）
+        this.hideTimetable();
+    }
+
+    hideTimetable() {
+        if (!this.timetableEl) return;
+        this.timetableEl.classList.remove('d-lg-block');
+        this.timetableEl.replaceChildren();
+        this.timetableRows = [];
+        this.dayListEl.classList.remove('d-lg-none');
+    }
+
+    /**
+     * 名前の部分（文字とリンク）を要素に入れる。リンクにするか（linkClients）は usage-schedule-core.js で決める
+     */
+    appendParts(el, parts) {
+        parts.forEach((part) => {
+            if (part.href === undefined) {
+                el.appendChild(document.createTextNode(part.text));
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = part.href;
+            a.textContent = part.text;
+            el.appendChild(a);
+        });
+    }
+
+    /**
+     * その日の予約のタイムテーブル（2026-11 追加。設計書 S-1602「その日の予約のタイムテーブル」）。timetable の設定のときだけ。
+     * 位置・幅・時間の幅・灰色の部分は usage-schedule-core.js の timetableModel で決める。帯と目盛りは見た目だけ（aria-hidden）で、
+     * 各行の左の列に、見えない文字で時刻と区切り（「8:00〜19:00、」）を入れて、リストと同じ内容を読み上げる
+     */
+    renderTimetable(usages, openTime, closeTime) {
+        if (!this.timetableEl) return;
+        const model = timetableModel({ usages, openTime, closeTime, clientUrlTemplate: this.clientUrlTemplate });
+        if (model === null) {
+            this.hideTimetable();
+            return;
+        }
+        this.timetableEl.style.setProperty('--usage-timetable-hours', String(model.hourCount));
+
+        const outsideEls = () => model.outside.map((segment) => {
+            const span = document.createElement('span');
+            span.className = 'usage-timetable-outside';
+            span.style.left = `${segment.left}%`;
+            span.style.width = `${segment.width}%`;
+            return span;
+        });
+
+        // いちばん上の目盛りの行（時の数字。読み上げない）
+        const head = document.createElement('div');
+        head.className = 'usage-timetable-row usage-timetable-head';
+        head.setAttribute('aria-hidden', 'true');
+        const headName = document.createElement('div');
+        headName.className = 'usage-timetable-name';
+        const scale = document.createElement('div');
+        scale.className = 'usage-timetable-scale';
+        this.hourEls = timetableHours(model.range).map((hour) => {
+            const span = document.createElement('span');
+            span.className = 'usage-timetable-hour';
+            span.style.left = `${hour.left}%`;
+            span.textContent = String(hour.hour);
+            scale.appendChild(span);
+            return span;
+        });
+        head.append(headName, scale);
+
+        const list = document.createElement('ul');
+        list.className = 'usage-timetable-rows list-unstyled mb-0';
+        this.timetableRows = model.rows.map((row) => {
+            const li = document.createElement('li');
+            li.className = 'usage-timetable-row';
+
+            const name = document.createElement('div');
+            name.className = 'usage-timetable-name';
+            const hiddenTime = document.createElement('span');
+            hiddenTime.className = 'visually-hidden';
+            hiddenTime.textContent = `${row.timeRange}、`;
+            name.appendChild(hiddenTime);
+            this.appendParts(name, row.nameParts);
+
+            const track = document.createElement('div');
+            track.className = 'usage-timetable-track';
+            track.setAttribute('aria-hidden', 'true');
+            const band = document.createElement('span');
+            band.className = 'usage-timetable-band';
+            band.style.left = `${row.left}%`;
+            band.style.width = `${row.width}%`;
+            const time = document.createElement('span');
+            time.className = 'usage-timetable-time';
+            time.textContent = row.timeRange;
+            track.append(...outsideEls(), band, time);
+
+            li.append(name, track);
+            list.appendChild(li);
+
+            return { row, track, time };
+        });
+
+        this.timetableEl.replaceChildren(head, list);
+        this.timetableEl.classList.add('d-lg-block');
+        this.dayListEl.classList.add('d-lg-none');
+        this.layoutTimetable();
+    }
+
+    /**
+     * 幅に合わせて、時の数字の間引き（1 時間ごと・2 時間ごと）と、帯の時刻の置き場所（帯の中・右・左）を決める。
+     * 判定は usage-schedule-core.js の timetableLabelStep・timetableLabelPlacement。出していない（狭い画面）ときは幅が 0 なので何もしない
+     */
+    layoutTimetable() {
+        if (!this.timetableEl || this.timetableRows.length === 0) return;
+        const trackWidth = this.timetableRows[0].track.clientWidth;
+        if (trackWidth === 0) return;
+
+        const step = timetableLabelStep(trackWidth, this.hourEls.length - 1);
+        this.hourEls.forEach((el, index) => {
+            el.classList.toggle('usage-timetable-hour--hidden', index % step !== 0);
+        });
+
+        this.timetableRows.forEach(({ row, time }) => {
+            // 前の置き場所の幅の指定を外してから、文字の幅を測る（帯の中のときは帯の幅にしているため）
+            time.classList.remove('usage-timetable-time--inside', 'usage-timetable-time--right', 'usage-timetable-time--left');
+            time.style.left = '';
+            time.style.right = '';
+            time.style.width = '';
+            const placement = timetableLabelPlacement({
+                bandLeftPx: (row.left / 100) * trackWidth,
+                bandWidthPx: (row.width / 100) * trackWidth,
+                labelWidthPx: time.getBoundingClientRect().width,
+                trackWidthPx: trackWidth,
+            });
+            time.classList.add(`usage-timetable-time--${placement}`);
+            if (placement === 'inside') {
+                time.style.left = `${row.left}%`;
+                time.style.width = `${row.width}%`;
+            } else if (placement === 'right') {
+                time.style.left = `calc(${row.left + row.width}% + 4px)`;
+            } else {
+                time.style.right = `calc(${100 - row.left}% + 4px)`;
+            }
+        });
     }
 
     renderDayList(usages) {
@@ -299,16 +465,7 @@ class UsageSchedule {
             const li = document.createElement('li');
             li.className = 'list-group-item small py-1';
             // 会員名をリンクにするか（linkClients）は usage-schedule-core.js の usageLineParts で決める（2026-11 追加）
-            usageLineParts(usage, this.clientUrlTemplate).forEach((part) => {
-                if (part.href === undefined) {
-                    li.appendChild(document.createTextNode(part.text));
-                    return;
-                }
-                const a = document.createElement('a');
-                a.href = part.href;
-                a.textContent = part.text;
-                li.appendChild(a);
-            });
+            this.appendParts(li, usageLineParts(usage, this.clientUrlTemplate));
 
             return li;
         }));
