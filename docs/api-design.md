@@ -3280,13 +3280,13 @@ POST /training-records に以下を追加する。
   "usages": [
     { "time_range": "8:00〜19:00", "start_time": "08:00", "end_time": "19:00", "label": "アムロ（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "アムロ" },
     { "time_range": "13:00〜19:00", "start_time": "13:00", "end_time": "19:00", "label": "検証Dog（大内 太郎）", "client_id": 7, "client_name": "大内 太郎", "trainee_name": "検証Dog" },
-    { "time_range": "19:00〜20:00", "start_time": "19:00", "end_time": "20:00", "label": "（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "" }
+    { "time_range": "19:00〜20:00", "start_time": "19:00", "end_time": "20:00", "label": "佐藤 一郎", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "" }
   ]
 }
 ```
 - `count`：その日の預かる数（月の `days` と同じ数え方）
 - `open_time`・`close_time`：営業時間（事業所情報の設定 S-1601 の `schedule_open_time`・`schedule_close_time`。`HH:MM`。**2026-11 追加**）。カレンダー画面（S-1602）のタイムテーブルの時間の幅の基本に使う
-- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`start_time`・`end_time` は開始・終了の時刻（`HH:MM`。**2026-11 追加**。タイムテーブルの帯の位置に使う。`time_range` は表示用の文字）。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「（会員名）」）。`client_id`・`client_name`・`trainee_name`（**2026-11 追加**）は、カレンダー画面（S-1602）で会員名だけを会員詳細へのリンクにするために使う：`client_id` は会員の id、`client_name` は `label` のかっこの中の会員名、`trainee_name` は `label` のかっこの前（トレーニーの名前。未登録なら「名前未登録」、トレーニーがない利用は空文字）。`label` は今までどおり返す（利用モーダルは `label` を使う）。利用の id は返さない（画面で使わないため。**2026-11 変更**：その前は会員の id も返さなかった）
+- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`start_time`・`end_time` は開始・終了の時刻（`HH:MM`。**2026-11 追加**。タイムテーブルの帯の位置に使う。`time_range` は表示用の文字）。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ〔かっこを付けない。**2026-11 変更**：その前は「（会員名）」〕）。`client_id`・`client_name`・`trainee_name`（**2026-11 追加**）は、カレンダー画面（S-1602）で会員名だけを会員詳細へのリンクにするために使う：`client_id` は会員の id、`client_name` は `label` のかっこの中の会員名、`trainee_name` は `label` のかっこの前（トレーニーの名前。未登録なら「名前未登録」、トレーニーがない利用は空文字）。`label` は今までどおり返す（利用モーダルは `label` を使う）。利用の id は返さない（画面で使わないため。**2026-11 変更**：その前は会員の id も返さなかった）
 
 ##### GET /api/usage-schedule/check
 
