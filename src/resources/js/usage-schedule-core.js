@@ -128,18 +128,6 @@ export function cellCountText({ count, capacity, loaded }) {
 }
 
 /**
- * カレンダーのマスの下の行で、同時に預かる数の左に出す予約の件数（2026-11 追加。設計書 S-0305-M05「予約状況」）。
- * 数字だけ（「件」は付けない）。0 件の日も「0」を出す。月の預かる数を読み込む前（読み込み中・失敗）は出さない（空）。
- * 2026-11 変更：その前はマスの右上に出し、0 件の日は出さなかった（右上の小さな数字は見落としやすく、並べたほうが比べやすいため）
- *
- * @param {{usageCount: number, loaded: boolean}} cell
- * @returns {string}
- */
-export function cellUsageCountText({ usageCount, loaded }) {
-    return loaded ? `${usageCount}` : '';
-}
-
-/**
  * カレンダーのマスの読み上げの文に入れる、予約の件数と同時に預かる数（「予約 4件 同時に預かる数 3」）。
  * 数字だけだと何の数か分からないため、言葉を添える。0 件の日も「予約 0件」を入れる。読み込む前は空。
  * 2026-11 変更：件数を足した（その前は「同時に預かる数 n」。さらにその前は「n/上限」）
@@ -235,8 +223,10 @@ export function dayCellClasses({ state, selected, today, past = false }) {
 
 /**
  * 同時に預かる数の数字のバッジのクラス（2026-11 変更。カレンダーのマスと、その日の予約の見出しで同じものを使う。設計書 S-0305-M05「予約状況」）。
- * 満＝緑のバッジ（badge bg-success）、超過＝赤のバッジ（badge bg-danger）。どちらも白い文字（§2-5 のバッジの配色）。
- * 空きあり・上限をまだ読んでいない間（null）＝なし（バッジにしない）。
+ * 空きあり＝灰色のバッジ（badge bg-secondary。2026-11 追加）、満＝緑のバッジ（badge bg-success）、超過＝赤のバッジ（badge bg-danger）。
+ * どれも白い文字（§2-5 のバッジの配色）。上限をまだ読んでいない間（null）＝なし（バッジにしない）。
+ * 予約が 0 件の日は、カレンダーでも見出しでもバッジを使わない（cellBottomRow・dayHeadingParts が決める）。
+ * 2026-11 変更：その前は空きありをバッジにしなかった。
  * usage-schedule-count-badge は、マスの大きさが変わらないようにバッジの文字の大きさと余白を合わせるクラス（app.scss）。
  * 2026-11 変更：その前は文字の色のクラス（usage-schedule-count-full・usage-schedule-count-over）を返していた
  *
@@ -250,8 +240,37 @@ export function countBadgeClasses(state) {
     if (state === CAPACITY_FULL) {
         return ['badge', 'bg-success', 'usage-schedule-count-badge'];
     }
+    if (state === CAPACITY_AVAILABLE) {
+        return ['badge', 'bg-secondary', 'usage-schedule-count-badge'];
+    }
 
     return [];
+}
+
+/**
+ * カレンダーのマスの下の行に出すもの（2026-11 変更。設計書 S-0305-M05「予約状況」）。3 通り：
+ * - 予約の件数と同時に預かる数が違う日：左に灰色の件数（usageCount）、右に同時に預かる数のバッジ（badge が true）
+ * - 件数と同時に預かる数が同じ日（1 以上）：同時に預かる数のバッジだけ（usageCount は空）
+ * - 予約が 0 件の日：「0」だけ。バッジにしない（badge が false）
+ * 月の預かる数を読み込む前（読み込み中・失敗）は、何も出さない（count も空）。
+ * 2026-11 変更：その前は、同じ日も 0 件の日も件数と同時に預かる数の 2 つを出し、空きありはバッジにしなかった
+ *
+ * @param {{count: number, usageCount: number, capacity: (number|null), loaded: boolean}} cell
+ * @returns {{usageCount: string, count: string, badge: boolean}}
+ */
+export function cellBottomRow({ count, usageCount, capacity, loaded }) {
+    if (!loaded || capacity === null) {
+        return { usageCount: '', count: '', badge: false };
+    }
+    if (usageCount === 0) {
+        return { usageCount: '', count: countText(count), badge: false };
+    }
+
+    return {
+        usageCount: usageCount === count ? '' : countText(usageCount),
+        count: countText(count),
+        badge: true,
+    };
 }
 
 /**

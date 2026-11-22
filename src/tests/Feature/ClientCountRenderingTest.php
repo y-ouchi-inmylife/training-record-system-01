@@ -911,7 +911,7 @@ class ClientCountRenderingTest extends TestCase
         }
         // カレンダーの下の説明（2026-11 追加）：日付のマスのすぐ下、読み込みの知らせ・その日の予約の上
         $this->assertMatchesRegularExpression(
-            '/<tbody data-usage-schedule-days><\/tbody>\s*<\/table>\s*<div class="small text-body-secondary mb-2" data-usage-schedule-legend>左：予約の件数　右：同時に預かる数<\/div>/u',
+            '/<tbody data-usage-schedule-days><\/tbody>\s*<\/table>\s*<div class="small text-body-secondary mb-2" data-usage-schedule-legend>バッジ：同時に預かる数　左の灰色の数字：予約の件数（違う日だけ）<\/div>/u',
             $modal
         );
         preg_match_all('/<th scope="col" class="fw-normal p-1">(.)<\/th>/u', $modal, $m);

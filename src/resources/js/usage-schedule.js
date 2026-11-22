@@ -22,8 +22,7 @@ import {
     usageConfirmMessage,
     capacityState,
     cellCountAriaText,
-    cellCountText,
-    cellUsageCountText,
+    cellBottomRow,
     dayCellClasses,
     dayHeadingParts,
     isPastDay,
@@ -229,29 +228,29 @@ class UsageSchedule {
 
         const countEl = document.createElement('span');
         countEl.className = classes.count.join(' ');
-        // 下の行：左に予約の件数、右に同時に預かる数（2026-11 変更：件数は右上から、ここに移した）。
-        // 読み込む前はどちらも出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
-        const text = cellCountText({ count, capacity: this.capacity, loaded: this.countsLoaded });
-        const usageCountText = cellUsageCountText({ usageCount, loaded: this.countsLoaded });
-        if (text === '') {
+        // 下の行（2026-11 変更。出すものは usage-schedule-core.js の cellBottomRow で決める）：
+        // 件数と違う日は「灰色の件数＋バッジ」、同じ日は「バッジだけ」、0 件の日は「0」だけ（バッジにしない）。
+        // 読み込む前は何も出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
+        const row = cellBottomRow({ count, usageCount, capacity: this.capacity, loaded: this.countsLoaded });
+        if (row.count === '') {
             countEl.textContent = '\u00a0';
         } else {
-            if (usageCountText !== '') {
-                // 予約の件数（0 件も「0」）。読み上げはボタンの aria-label で伝える
+            if (row.usageCount !== '') {
+                // 予約の件数（同時に預かる数と違う日だけ）。読み上げはボタンの aria-label で伝える
                 const usageCountEl = document.createElement('span');
                 usageCountEl.className = classes.usageCount.join(' ');
-                usageCountEl.textContent = usageCountText;
+                usageCountEl.textContent = row.usageCount;
                 usageCountEl.setAttribute('aria-hidden', 'true');
                 countEl.appendChild(usageCountEl);
             }
-            if (classes.countBadge.length > 0) {
-                // 満・超過は同時に預かる数の数字を小さなバッジにする（2026-11 変更）
+            if (row.badge) {
+                // 同時に預かる数のバッジ（空きあり＝灰色・満＝緑・超過＝赤）
                 const badge = document.createElement('span');
                 badge.className = classes.countBadge.join(' ');
-                badge.textContent = text;
+                badge.textContent = row.count;
                 countEl.appendChild(badge);
             } else {
-                countEl.appendChild(document.createTextNode(text));
+                countEl.appendChild(document.createTextNode(row.count));
             }
         }
         button.appendChild(countEl);

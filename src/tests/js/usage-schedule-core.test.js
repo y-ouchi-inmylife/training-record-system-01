@@ -10,7 +10,7 @@ import {
     countBadgeClasses,
     cellCountAriaText,
     cellCountText,
-    cellUsageCountText,
+    cellBottomRow,
     countText,
     dayCellClasses,
     dayHeading,
@@ -178,9 +178,10 @@ describe('dayCellClasses', () => {
         expect(day).toEqual(['d-block']);
     });
 
-    it('空きありの「n/上限」は通常の色の太字で、バッジにしない', () => {
+    // 2026-11 変更：空きありも灰色のバッジ（その前はバッジにしなかった）
+    it('空きありの同時に預かる数は灰色のバッジ', () => {
         expect(cell(CAPACITY_AVAILABLE, false, false).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
-        expect(cell(CAPACITY_AVAILABLE, false, false).countBadge).toEqual([]);
+        expect(cell(CAPACITY_AVAILABLE, false, false).countBadge).toEqual(['badge', 'bg-secondary', 'usage-schedule-count-badge']);
     });
 
     it('今日のマスは薄い青の背景で、日付の数字に青の太字は付かない', () => {
@@ -299,10 +300,10 @@ describe('「n/上限」の太字と色', () => {
         },
     );
 
-    it('バッジのクラスは満（badge bg-success）・超過（badge bg-danger）だけ（カレンダーと見出しで同じ判定）', () => {
+    it('バッジのクラスは空きあり（灰色）・満（緑）・超過（赤）。読み込む前はなし（カレンダーと見出しで同じ判定）', () => {
+        expect(countBadgeClasses(CAPACITY_AVAILABLE)).toEqual(['badge', 'bg-secondary', 'usage-schedule-count-badge']);
         expect(countBadgeClasses(CAPACITY_FULL)).toEqual(['badge', 'bg-success', 'usage-schedule-count-badge']);
         expect(countBadgeClasses(CAPACITY_OVER)).toEqual(['badge', 'bg-danger', 'usage-schedule-count-badge']);
-        expect(countBadgeClasses(CAPACITY_AVAILABLE)).toEqual([]);
         expect(countBadgeClasses(null)).toEqual([]);
     });
 
@@ -310,7 +311,8 @@ describe('「n/上限」の太字と色', () => {
     it.each([
         ['満', 4, 3, 3, ['badge', 'bg-success', 'usage-schedule-count-badge']],
         ['超過', 4, 4, 3, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
-        ['空きあり', 1, 1, 3, []],
+        ['空きあり', 1, 1, 3, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
+        ['空きあり・件数と違う', 3, 2, 3, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
     ])('見出し（%s）：件数 %i・同時に預かる数 %i・上限 %i', (_, usageCount, count, capacity, classes) => {
         const parts = dayHeadingParts('2026-11-20', usageCount, count, capacity);
         expect(parts.label).toBe(`11/20(金) の予約 ${usageCount}件`);
@@ -380,17 +382,15 @@ describe('過去の日と「0/上限」', () => {
         expect(button).toEqual(expect.arrayContaining(['bg-secondary-subtle', 'usage-schedule-selected']));
     });
 
-    it('予約がない日にも「0」が出て、空きあり（色なし・太字）になる', () => {
-        expect(cellCountText({ count: 0, capacity: 3, loaded: true })).toBe('0');
-        expect(capacityState(0, 3)).toBe(CAPACITY_AVAILABLE);
+    it('予約がない日は「0」だけで、バッジにしない（通常の色の太字）', () => {
+        expect(cellBottomRow({ count: 0, usageCount: 0, capacity: 3, loaded: true })).toEqual({ usageCount: '', count: '0', badge: false });
         expect(cell({ state: capacityState(0, 3) }).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
-        expect(cell({ state: capacityState(0, 3) }).countBadge).toEqual([]);
     });
 
     // マスの文字は数字だけで、満・超過のバッジのクラスは今のまま（2026-11 変更：その前は「n/上限」）
     it.each([
-        [0, '0', []],
-        [1, '1', []],
+        [0, '0', ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
+        [1, '1', ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
         [3, '3', ['badge', 'bg-success', 'usage-schedule-count-badge']],
         [4, '4', ['badge', 'bg-danger', 'usage-schedule-count-badge']],
     ])('マス：同時に預かる数 %i は「%s」', (count, text, badge) => {
@@ -405,27 +405,33 @@ describe('過去の日と「0/上限」', () => {
         expect(cellCountAriaText({ count: 2, usageCount: 2, capacity: 3, loaded: false })).toBe('');
     });
 
-    // 予約の件数は、下の行の同時に預かる数の左に並べる（2026-11 変更：その前は右上に小さく、0 件の日は出さなかった）
+    // 下の行の 3 通り（2026-11 変更：同時に預かる数をいつもバッジにし、件数と同じ日は数字を 1 つにした）
     it.each([
-        [4, true, '4'],
-        [1, true, '1'],
-        [0, true, '0'],
-        [4, false, ''],
-        [0, false, ''],
-    ])('件数：件数 %i・読み込み済み %s は「%s」（0 件も「0」、読み込む前は出さない）', (usageCount, loaded, text) => {
-        expect(cellUsageCountText({ usageCount, loaded })).toBe(text);
+        ['違う・空きあり', 3, 2, { usageCount: '3', count: '2', badge: true }, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
+        ['違う・満', 4, 3, { usageCount: '4', count: '3', badge: true }, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        ['違う・超過', 5, 4, { usageCount: '5', count: '4', badge: true }, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+        ['同じ・空きあり', 1, 1, { usageCount: '', count: '1', badge: true }, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
+        ['同じ・満', 3, 3, { usageCount: '', count: '3', badge: true }, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        ['同じ・超過', 4, 4, { usageCount: '', count: '4', badge: true }, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+    ])('下の行（%s）：件数 %i・同時に預かる数 %i', (_, usageCount, count, row, badge) => {
+        expect(cellBottomRow({ count, usageCount, capacity: 3, loaded: true })).toEqual(row);
+        expect(cell({ state: capacityState(count, 3) }).countBadge).toEqual(badge);
+    });
+
+    it('下の行：読み込む前は何も出さない（上限を知っていても）', () => {
+        for (const [usageCount, count] of [[4, 3], [2, 2], [0, 0]]) {
+            expect(cellBottomRow({ count, usageCount, capacity: 3, loaded: false })).toEqual({ usageCount: '', count: '', badge: false });
+        }
+        expect(cellBottomRow({ count: 2, usageCount: 2, capacity: null, loaded: true })).toEqual({ usageCount: '', count: '', badge: false });
+    });
+
+    it('件数と同じ日も、読み上げの文には件数と同時に預かる数の両方を入れる', () => {
+        expect(cellCountAriaText({ count: 2, usageCount: 2, capacity: 3, loaded: true })).toBe('予約 2件 同時に預かる数 2');
     });
 
     it('件数の要素は控えめな灰色で太字にせず、同時に預かる数とのあいだを空ける（どの日でも同じ）', () => {
         for (const opts of [{}, { today: true }, { past: true }, { selected: true }, { state: CAPACITY_OVER }, { state: CAPACITY_FULL }]) {
             expect(cell(opts).usageCount).toEqual(['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2']);
-        }
-    });
-
-    it('件数と同時に預かる数は、同じ日も 0 件の日も両方出す', () => {
-        for (const [usageCount, count] of [[4, 3], [2, 2], [0, 0]]) {
-            expect(cellUsageCountText({ usageCount, loaded: true })).toBe(`${usageCount}`);
-            expect(cellCountText({ count, capacity: 3, loaded: true })).toBe(`${count}`);
         }
     });
 
