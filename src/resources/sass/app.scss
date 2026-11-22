@@ -381,14 +381,15 @@ h2 {
 .usage-schedule-calendar {
     max-width: 34rem;
 }
-// 2 か月の並び（2026-11 追加。設計書 S-1602「2 か月の並び」）。xl 以上で、1 つ 34rem のカレンダーを 1.5rem あけて 2 つ並べる
-// （34rem×2＋1.5rem＝1112px。xl のコンテナの中の幅 1116px に収まる。lg の 936px には収まらないので、xl 未満は 1 か月）。
+// 2 か月の並び（2026-11 追加。設計書 S-1602「2 か月の並び」）。xl 以上で、2 つのカレンダーを 1.5rem あけて半分ずつ横いっぱいに並べる
+// （右端を上の予定の枠とそろえる。マスの高さは変わらない。2026-11 変更：その前は 1 つ 34rem で止めて左寄せで、右に空きが残った）。
+// xl 未満は 1 か月で、34rem で止める（xl のコンテナの中の幅 1116px なら、半分ずつで 1 つ 546px。lg の 936px だと 456px に縮む）。
 // ［＜］は左の見出しの左端、［＞］は右の見出しの右端に置く。ボタンは 1 組だけなので、送りの行（.usage-schedule-nav）を
 // display: contents にして、中の要素を 2 列の枠に置く（d-flex が !important のため、こちらも !important）
 .usage-schedule-calendar--two {
     @include media-breakpoint-up(xl) {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 34rem));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: .25rem 1.5rem;
         align-items: start;
         max-width: none;
