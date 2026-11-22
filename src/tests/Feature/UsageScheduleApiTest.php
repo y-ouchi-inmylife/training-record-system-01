@@ -17,6 +17,7 @@ use Tests\TestCase;
  *
  * - GET /api/usage-schedule/month：月の日ごとの預かる数（1 以上の日だけ）・上限・今日
  * - GET /api/usage-schedule/day：その日の預かる数・上限・予約の一覧（開始時刻の順。「トレーニー（会員名）」）
+ *   一覧の行には、会員の id・会員名・トレーニーの名前も返す（2026-11 追加。カレンダー画面 S-1602 の会員名のリンク）
  * - どちらも除く利用（編集中の利用自身）を受け取る
  * - 権限は利用の登録・編集と同じ（practitioners。システム管理者は 403）。参照なのでアクセスログに記録しない
  *
@@ -184,10 +185,11 @@ class UsageScheduleApiTest extends TestCase
                 'date_label' => '11/26(木)',
                 'capacity' => 3,
                 'count' => 3,
+                // client_id・client_name・trainee_name（2026-11 追加）：カレンダー画面（S-1602）で会員名だけをリンクにするため、label を分けたもの
                 'usages' => [
-                    ['time_range' => '8:00〜19:00', 'label' => 'アムロ（佐藤 一郎）'],
-                    ['time_range' => '13:00〜15:00', 'label' => '（佐藤 一郎）'],
-                    ['time_range' => '13:00〜19:00', 'label' => '名前未登録（大内）'],
+                    ['time_range' => '8:00〜19:00', 'label' => 'アムロ（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => 'アムロ'],
+                    ['time_range' => '13:00〜15:00', 'label' => '（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => ''],
+                    ['time_range' => '13:00〜19:00', 'label' => '名前未登録（大内）', 'client_id' => $this->ouchi->id, 'client_name' => '大内', 'trainee_name' => '名前未登録'],
                 ],
             ]);
     }

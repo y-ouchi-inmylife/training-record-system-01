@@ -2,7 +2,7 @@
  * 利用の予約状況（カレンダーとその日の予約）の、DOM に触れない計算（2026-11 追加。設計書 screen-design.md S-0305-M05「予約状況」）。
  *
  * 画面の部品（usage-schedule.js の UsageSchedule）はここの関数で表示する月・選んだ日を決め、マスを組み立てる。
- * 利用モーダル（S-0305-M05）のほか、後でカレンダー画面（S-1602。まだ作らない）でも使い回す。
+ * 利用モーダル（S-0305-M05）のほか、カレンダー画面（S-1602。2026-11 追加）でも使う。
  * ここは DOM に触れない純粋な関数だけを置く（vitest で確かめる。copy-message-core.js と同じ分け方）。
  *
  * 状態（state）は { month: 'YYYY-MM', selected: 'YYYY-MM-DD' }。
@@ -308,6 +308,68 @@ export function moveMonth(state, delta) {
  */
 export function usageLine(usage) {
     return `${usage.time_range}　${usage.label}`;
+}
+
+/**
+ * 会員詳細の URL の型（<x-usage-schedule> の client-url）の中で、会員の id のところに置く印（2026-11 追加。設計書 S-1602）
+ */
+export const CLIENT_ID_PLACEHOLDER = '__CLIENT_ID__';
+
+/**
+ * 会員詳細の URL（2026-11 追加。設計書 S-1602「会員名のリンク」）。型の CLIENT_ID_PLACEHOLDER を会員の id に置き換える。
+ * 型がない・id がないときは null（リンクにしない）
+ *
+ * @param {(string|null|undefined)} template
+ * @param {(number|string|null|undefined)} clientId
+ * @returns {(string|null)}
+ */
+export function clientDetailUrl(template, clientId) {
+    if (!template || clientId === null || clientId === undefined || clientId === '') {
+        return null;
+    }
+
+    return template.replace(CLIENT_ID_PLACEHOLDER, encodeURIComponent(String(clientId)));
+}
+
+/**
+ * 予約の 1 行を、文字とリンクの部分に分けたもの（2026-11 追加。設計書 S-1602「会員名のリンク」）。
+ * - 会員詳細の URL の型（clientUrlTemplate）があるとき（カレンダー画面の linkClients: true）：
+ *   「開始〜終了　トレーニー（」・会員名（href 付き）・「）」の 3 つ。会員名の部分だけがリンク。トレーニーがない利用は「開始〜終了　（」から始まる
+ * - 型がないとき（利用モーダル）・JSON に会員の id がないとき：usageLine と同じ文 1 つ（リンクにしない）
+ *
+ * @param {{time_range: string, label: string, client_id?: number, client_name?: string, trainee_name?: string}} usage
+ * @param {(string|null)} clientUrlTemplate
+ * @returns {Array<{text: string, href?: string}>}
+ */
+export function usageLineParts(usage, clientUrlTemplate = null) {
+    const href = clientDetailUrl(clientUrlTemplate, usage.client_id);
+    if (href === null) {
+        return [{ text: usageLine(usage) }];
+    }
+
+    return [
+        { text: `${usage.time_range}　${usage.trainee_name ?? ''}（` },
+        { text: usage.client_name ?? '', href },
+        { text: '）' },
+    ];
+}
+
+/**
+ * 選んでいる日を変えたときの URL（2026-11 追加。設計書 S-1602「選んでいる日を URL で持つ」）。
+ * 今の URL（href）のクエリの date を ymd にしたもの（ほかのクエリ・# はそのまま。同じオリジンの中の、パスから後ろ）。
+ * URL を書き換えない設定（syncUrl が false。利用モーダル）のとき・選んでいる日が変わらないときは null（書き換えない）
+ *
+ * @param {{href: string, syncUrl: boolean, previous: (string|null), selected: string}} args
+ * @returns {(string|null)}
+ */
+export function scheduleDateUrl({ href, syncUrl, previous, selected }) {
+    if (!syncUrl || previous === selected || !parseYmd(selected)) {
+        return null;
+    }
+    const url = new URL(href);
+    url.searchParams.set('date', selected);
+
+    return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /**

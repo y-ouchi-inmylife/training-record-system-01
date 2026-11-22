@@ -25,6 +25,10 @@ import {
     selectDate,
     shiftMonth,
     usageLine,
+    usageLineParts,
+    clientDetailUrl,
+    scheduleDateUrl,
+    CLIENT_ID_PLACEHOLDER,
 } from '../../resources/js/usage-schedule-core.js';
 
 // 利用の予約状況（カレンダーとその日の予約）の計算（2026-11 追加。設計書 S-0305-M05「予約状況」）。
@@ -443,3 +447,79 @@ describe('過去の日と「0/上限」', () => {
     });
 });
 
+// カレンダー画面（S-1602。2026-11 追加）の設定：会員名のリンク（linkClients）と URL の date（syncUrl）
+describe('カレンダー画面の設定', () => {
+    const TEMPLATE = `https://trainer.example.test/clients/${CLIENT_ID_PLACEHOLDER}`;
+    const withTrainee = { time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）', client_id: 12, client_name: '佐藤 一郎', trainee_name: 'アムロ' };
+    const withoutTrainee = { time_range: '19:01〜20:00', label: '（中森）', client_id: 7, client_name: '中森', trainee_name: '' };
+
+    it('会員詳細の URL は、型の印を会員の id に置き換える', () => {
+        expect(CLIENT_ID_PLACEHOLDER).toBe('__CLIENT_ID__');
+        expect(clientDetailUrl(TEMPLATE, 12)).toBe('https://trainer.example.test/clients/12');
+        expect(clientDetailUrl(TEMPLATE, '7')).toBe('https://trainer.example.test/clients/7');
+    });
+
+    it('型がない・id がないときは URL を作らない（リンクにしない）', () => {
+        expect(clientDetailUrl(null, 12)).toBeNull();
+        expect(clientDetailUrl('', 12)).toBeNull();
+        expect(clientDetailUrl(undefined, 12)).toBeNull();
+        expect(clientDetailUrl(TEMPLATE, null)).toBeNull();
+        expect(clientDetailUrl(TEMPLATE, undefined)).toBeNull();
+    });
+
+    it('画面用（型あり）：会員名の部分だけがリンクで、時刻・トレーニー・かっこはリンクにしない', () => {
+        expect(usageLineParts(withTrainee, TEMPLATE)).toEqual([
+            { text: '8:00〜19:00　アムロ（' },
+            { text: '佐藤 一郎', href: 'https://trainer.example.test/clients/12' },
+            { text: '）' },
+        ]);
+    });
+
+    it('画面用：トレーニーがない利用も、会員名をリンクにする', () => {
+        expect(usageLineParts(withoutTrainee, TEMPLATE)).toEqual([
+            { text: '19:01〜20:00　（' },
+            { text: '中森', href: 'https://trainer.example.test/clients/7' },
+            { text: '）' },
+        ]);
+    });
+
+    it('画面用：つなげた文字は、モーダルの 1 行の文と同じ', () => {
+        for (const usage of [withTrainee, withoutTrainee]) {
+            expect(usageLineParts(usage, TEMPLATE).map((part) => part.text).join('')).toBe(usageLine(usage));
+        }
+    });
+
+    it('モーダル用（型なし）：リンクにせず、今までどおり 1 行の文だけ', () => {
+        expect(usageLineParts(withTrainee)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
+        expect(usageLineParts(withTrainee, null)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
+        expect(usageLineParts(withoutTrainee, null)).toEqual([{ text: '19:01〜20:00　（中森）' }]);
+        // JSON に会員の id がなければ、型があってもリンクにしない
+        expect(usageLineParts({ time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）' }, TEMPLATE)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
+    });
+
+    it('URL の date：選んでいる日を書き換えた URL（パスから後ろ）を返す', () => {
+        expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule', syncUrl: true, previous: '2026-11-26', selected: '2026-11-28' }))
+            .toBe('/schedule?date=2026-11-28');
+        expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule?date=2026-11-26', syncUrl: true, previous: '2026-11-26', selected: '2026-12-03' }))
+            .toBe('/schedule?date=2026-12-03');
+    });
+
+    it('URL の date：ほかのクエリと # はそのまま残す', () => {
+        expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule?x=1&date=2026-11-26#top', syncUrl: true, previous: '2026-11-26', selected: '2026-11-28' }))
+            .toBe('/schedule?x=1&date=2026-11-28#top');
+    });
+
+    it('URL の date：モーダル用（syncUrl が false）・選んでいる日が変わらない（前月・翌月）・正しくない日付は書き換えない', () => {
+        const href = 'https://trainer.example.test/schedule?date=2026-11-26';
+        expect(scheduleDateUrl({ href, syncUrl: false, previous: '2026-11-26', selected: '2026-11-28' })).toBeNull();
+        expect(scheduleDateUrl({ href, syncUrl: true, previous: '2026-11-26', selected: '2026-11-26' })).toBeNull();
+        expect(scheduleDateUrl({ href, syncUrl: true, previous: '2026-11-26', selected: '2026-02-30' })).toBeNull();
+    });
+
+    it('前月・翌月に移っても選んでいる日は変わらないので、URL の date も変えない', () => {
+        const state = initialState('2026-11-26', '2026-11-21');
+        const next = moveMonth(state, 1);
+        expect(next).toEqual({ month: '2026-12', selected: '2026-11-26' });
+        expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule?date=2026-11-26', syncUrl: true, previous: state.selected, selected: next.selected })).toBeNull();
+    });
+});

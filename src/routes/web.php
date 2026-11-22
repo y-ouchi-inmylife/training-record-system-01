@@ -22,6 +22,7 @@ use App\Http\Controllers\MediaRecordController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AudioRecordController;
 use App\Http\Controllers\RecordingV2Controller;
+use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ScheduleSettingController;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\EvaluationPromptController;
@@ -218,6 +219,9 @@ Route::domain(config('subdomain.trainer_host'))->middleware('check-ip')->group(f
             // 契約一覧（S-0315。2026-10-28 追加）。会員をまたいで契約を出す、見るだけの画面（登録・編集・削除は上の会員詳細のモーダルのまま）。
             // 参照なのでアクセスログは記録しない（LogAccess の対象にしない）
             Route::get('contracts', [ContractController::class, 'index'])->name('contracts.index');
+            // カレンダー（S-1602。2026-11 追加）。会員を選ばずに事業所全体の予約を見る、見るだけの画面（利用の登録・編集は会員詳細のモーダルのまま）。
+            // 選んでいる日は ?date=YYYY-MM-DD。参照なのでアクセスログは記録しない（LogAccess の対象にしない）
+            Route::get('schedule', [ScheduleController::class, 'index'])->name('schedule.index');
 
             Route::resource('training-records', TrainingRecordController::class);
 

@@ -11,8 +11,8 @@ use Illuminate\Http\Request;
 /**
  * 利用の予約状況の内部 API（2026-11 追加。api-design.md 4-2-6、screen-design.md S-0305-M05「予約状況」）。
  *
- * 利用モーダルの予約状況（カレンダーとその日の予約。<x-usage-schedule>・resources/js/usage-schedule.js）と、
- * 利用の保存の前の確認（check。2026-11 追加）が読む。
+ * 利用モーダルの予約状況（カレンダーとその日の予約。<x-usage-schedule>・resources/js/usage-schedule.js）・
+ * カレンダー画面（S-1602。2026-11 追加。同じ部品）と、利用の保存の前の確認（check。2026-11 追加）が読む。
  * 預かる数は事業所全体で数える（UsageCapacityService。保存時の上限の確認と同じ計算）。上限は ScheduleSetting::capacity()。
  * 権限は利用の登録・編集と同じ（routes/api.php の auth・practitioners）。参照なので、アクセスログには記録しない。
  */
@@ -58,9 +58,14 @@ class UsageScheduleController extends Controller
             'date_label' => ClientUsage::toShortDateLabel($validated['date']),
             'capacity' => ScheduleSetting::capacity(),
             'count' => $service->dayCount($validated['date'], $exclude),
+            // label は「トレーニー（会員名）」の 1 つの文（利用モーダルが使う）。client_id・client_name・trainee_name（2026-11 追加）は、
+            // カレンダー画面（S-1602）で会員名の部分だけを会員詳細へのリンクにするために、label を分けたもの
             'usages' => $usages->map(fn (ClientUsage $usage) => [
                 'time_range' => $usage->time_range_label,
                 'label' => self::usageLabel($usage),
+                'client_id' => (int) $usage->client_id,
+                'client_name' => self::clientName($usage),
+                'trainee_name' => self::traineeName($usage),
             ])->values()->all(),
         ]);
     }
@@ -109,8 +114,22 @@ class UsageScheduleController extends Controller
      */
     private static function usageLabel(ClientUsage $usage): string
     {
-        $clientName = trim((string) $usage->client?->display_name);
+        return self::traineeName($usage).'（'.self::clientName($usage).'）';
+    }
 
-        return ($usage->trainee?->display_name ?? '').'（'.$clientName.'）';
+    /**
+     * 会員名（Client::display_name。名が空のとき末尾に空白を残さない）
+     */
+    private static function clientName(ClientUsage $usage): string
+    {
+        return trim((string) $usage->client?->display_name);
+    }
+
+    /**
+     * トレーニーの名前（名前が未登録なら「名前未登録」。トレーニーがない利用は空文字）
+     */
+    private static function traineeName(ClientUsage $usage): string
+    {
+        return (string) ($usage->trainee?->display_name ?? '');
     }
 }

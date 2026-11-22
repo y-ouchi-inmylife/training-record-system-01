@@ -66,6 +66,13 @@
                                 契約
                             </a>
                         </li>
+                        {{-- カレンダー：カレンダー画面（S-1602）への直接リンク（2026-11 追加）。置き場所は「契約」の右。強調は /schedule… のときだけ
+                             （事業所情報の設定の /settings/schedule は、request()->is が URL の先頭から比べるので対象にならない。設計書 §2-1-1「カレンダー」） --}}
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->is('schedule*') ? 'active' : '' }}" href="{{ route('schedule.index') }}">
+                                カレンダー
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link {{ request()->is('training-records*') ? 'active' : '' }}" href="{{ route('training-records.index') }}">
                                 トレーニング記録

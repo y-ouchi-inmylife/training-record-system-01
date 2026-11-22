@@ -2,11 +2,18 @@
  * 利用の予約状況の部品（カレンダーとその日の予約。2026-11 追加。設計書 screen-design.md S-0305-M05「予約状況」、api-design.md 4-2-6）。
  *
  * マークアップは匿名コンポーネント <x-usage-schedule>（resources/views/components/usage-schedule.blade.php）。
- * 利用モーダル（S-0305-M05）から切り離して作り、後でカレンダー画面（S-1602。まだ作らない）でも使い回す。
+ * 利用モーダル（S-0305-M05）から切り離して作り、カレンダー画面（S-1602。2026-11 追加）でも使う。
  * 部品は利用日の欄を直接は触らない。日付を押したことを onSelect で知らせ、使う側（利用モーダルのスクリプト）が欄に入れる。
+ *
+ * 設定（2026-11 追加。設計書 S-1602「利用モーダルとの違い」。初期値は利用モーダルの動き）：
+ *   onSelect    ：日付を押したときに呼ぶ（利用モーダルが利用日の欄に入れる）
+ *   linkClients ：true なら、その日の予約の会員名を会員詳細へのリンクにする（URL の型は rootEl の data-client-url）。初期値 false
+ *   syncUrl     ：true なら、選んでいる日が変わったときに URL の date を書き換える（history.replaceState）。初期値 false
+ *   判定と組み立ては usage-schedule-core.js（usageLineParts・scheduleDateUrl）
  *
  * 使い方：
  *   const schedule = new window.UsageSchedule(rootEl, { onSelect: (ymd) => { ... } });
+ *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true });  // カレンダー画面
  *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
@@ -30,17 +37,21 @@ import {
     monthHeading,
     monthWeeks,
     moveMonth,
+    scheduleDateUrl,
     selectDate,
-    usageLine,
+    usageLineParts,
 } from './usage-schedule-core.js';
 
 const LOADING = '読み込み中…';
 const FAILED = '予約状況を読み込めませんでした。';
 
 class UsageSchedule {
-    constructor(root, { onSelect = () => {} } = {}) {
+    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false } = {}) {
         this.root = root;
         this.onSelect = onSelect;
+        // 会員名をリンクにするときの会員詳細の URL の型（linkClients が false なら null。2026-11 追加）
+        this.clientUrlTemplate = linkClients ? (root.dataset.clientUrl || null) : null;
+        this.syncUrl = syncUrl;
         this.monthUrl = root.dataset.monthUrl;
         this.dayUrl = root.dataset.dayUrl;
         this.state = null;
@@ -100,11 +111,16 @@ class UsageSchedule {
         const monthChanged = next.month !== this.state.month;
         const dayChanged = next.selected !== this.state.selected;
         if (!monthChanged && !dayChanged) return;
+        // 選んでいる日が変わったら URL の date を書き換える（syncUrl のときだけ。前月・翌月では選んでいる日は変わらない。2026-11 追加）
+        const url = scheduleDateUrl({ href: window.location.href, syncUrl: this.syncUrl, previous: this.state.selected, selected: next.selected });
+        if (url !== null) {
+            window.history.replaceState(window.history.state, '', url);
+        }
         this.state = next;
         if (monthChanged) {
             this.counts = {};
-        this.usageCounts = {};
-        this.countsLoaded = false;
+            this.usageCounts = {};
+            this.countsLoaded = false;
         }
         this.renderMonth();
         if (monthChanged) this.loadMonth();
@@ -282,7 +298,17 @@ class UsageSchedule {
         this.dayListEl.replaceChildren(...usages.map((usage) => {
             const li = document.createElement('li');
             li.className = 'list-group-item small py-1';
-            li.textContent = usageLine(usage);
+            // 会員名をリンクにするか（linkClients）は usage-schedule-core.js の usageLineParts で決める（2026-11 追加）
+            usageLineParts(usage, this.clientUrlTemplate).forEach((part) => {
+                if (part.href === undefined) {
+                    li.appendChild(document.createTextNode(part.text));
+                    return;
+                }
+                const a = document.createElement('a');
+                a.href = part.href;
+                a.textContent = part.text;
+                li.appendChild(a);
+            });
 
             return li;
         }));
