@@ -1633,6 +1633,7 @@ POST /training-records に以下を追加する。
 - **公開済みの愛犬性格診断のアドバイスを混ぜる**（**2026-10-18 追加**。requirements.md 6-15-6）：自分のトレーニーの結果のうち `evaluation_published_at` が NULL でないものを読み込み、記録と 1 本の並び（S-0305 と同じ並び。アドバイスは公開した日時。`App\Support\RecordTimeline::merge`）に組み立てて `timeline` として渡す。最新の記録のカード（hero）は、混ぜた並びの先頭。「全 N 回」は記録だけを数える（`recordCount`。0 のときは出さない）。ページ送りはない（今の記録と同じく全件）。下書き・公開を取り消したもの・ほかの会員のものは入れない
 - トレーニーごとの体重推移データ（6-15-14）と、**トレーニー写真の表示用 URL**（6-15-15）も view に渡す。写真 URL は `Storage::disk('media')->temporaryUrl($trainee->photo_path, ...)` で発行する（`photo_path` が NULL のトレーニーは URL を渡さず、Blade で「写真を登録」の案内に切り替える）
 - **トレーナー用写真（`trainer_photo_path`）は view に渡さない**（URL も設定の有無も。**2026-11 追加**、requirements.md 6-16-20）。トレーナー側 S-0309 と共用している体重推移のデータ（`Trainee::getWeightChartDataAttribute()`）にも入れない
+- **次回のご予約**（**2026-11 追加**。requirements.md 6-15-3、screen-design.md S-1402「次回のご予約」）：自分の利用のうち利用日が今日（`today()`）以降のものを読み、`nextReservation` として渡す。予約がなければ `null`。形は `{isToday, heading（「次回のご予約」／「本日のご予約」）, dateLabel（「M/D(曜)」）, items: [{timeRange（「8:00〜19:00」）, callName（「○○ちゃん」／「愛犬」。トレーニーがない利用は null）}], laterCount（次回の日より後の予約の件数）, url（ご利用回数 S-1412）}`。`items` は次回の日の予約を開始時刻 → 終了時刻 → id の順。**メモ・契約の情報は渡さない**
 
 **レスポンス**:
 - view `client.dashboard`
