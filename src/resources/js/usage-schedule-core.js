@@ -631,26 +631,33 @@ export function timetableLabelPlacement({ bandLeftPx, bandWidthPx, labelWidthPx,
 }
 
 /**
- * 左の列の「トレーニー（会員名）」を、文字とリンクの部分に分けたもの（usageLineParts から時刻を除いたもの）。
- * 会員詳細の URL の型があれば会員名だけをリンクにし、なければ label の 1 つの文
+ * 左の列の「トレーニー（会員名）」を、列の上限を超えたときに「…」で省いてよい部分（shrink）と、必ず全体を出す部分（keep）に分けたもの
+ * （設計書 S-1602「列の幅」。2026-11 変更：その前は分けずに末尾を省いていて、会員名のリンクが隠れることがあった）。
+ * - トレーニーがある利用：省いてよいのはトレーニーの名前だけ。「（会員名）」はかっこごと必ず全体を出す（会員名のリンクをいつも押せるように）
+ * - トレーニーがない利用：会員名だけ（かっこを付けない）。上限を超えるときだけ会員名を省く
+ * - 会員詳細の URL の型がない・JSON に会員の id がないとき：label の 1 つの文（リンクにしない）
+ * shrink・keep の順につなげると、行の全体の文になる
  *
- * @returns {Array<{text: string, href?: string}>}
+ * @returns {{shrink: Array<{text: string, href?: string}>, keep: Array<{text: string, href?: string}>}}
  */
-export function usageNameParts(usage, clientUrlTemplate = null) {
+export function usageNameGroups(usage, clientUrlTemplate = null) {
     const href = clientDetailUrl(clientUrlTemplate, usage.client_id);
     if (href === null) {
-        return [{ text: usage.label }];
+        return { shrink: [{ text: usage.label }], keep: [] };
     }
-    // トレーニーがない利用は、会員名だけ（かっこを付けない。2026-11 変更）
     if (!usage.trainee_name) {
-        return [{ text: usage.client_name ?? '', href }];
+        return { shrink: [{ text: usage.client_name ?? '', href }], keep: [] };
     }
 
-    return [
-        { text: `${usage.trainee_name}（` },
-        { text: usage.client_name ?? '', href },
-        { text: '）' },
-    ];
+    return {
+        shrink: [{ text: usage.trainee_name }],
+        keep: [{ text: '（' }, { text: usage.client_name ?? '', href }, { text: '）' }],
+    };
+}
+
+/** 左の列の行の全体の文（「…」で省いたときの title に入れる。2026-11 追加） */
+export function usageNameText({ shrink, keep }) {
+    return [...shrink, ...keep].map((part) => part.text).join('');
 }
 
 /**
@@ -658,7 +665,7 @@ export function usageNameParts(usage, clientUrlTemplate = null) {
  *
  * @param {{usages: Array, openTime: string, closeTime: string, clientUrlTemplate?: (string|null)}} args
  * @returns {(null|{range: {start: number, end: number}, hourCount: number, outside: Array<{left: number, width: number}>,
- *            rows: Array<{timeRange: string, nameParts: Array<{text: string, href?: string}>, left: number, width: number}>})}
+ *            rows: Array<{timeRange: string, name: {shrink: Array<{text: string, href?: string}>, keep: Array<{text: string, href?: string}>}, left: number, width: number}>})}
  */
 export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate = null }) {
     if (!usages || usages.length === 0) {
@@ -672,7 +679,7 @@ export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate 
         outside: timetableOutside(range, openTime, closeTime),
         rows: usages.map((usage) => ({
             timeRange: usage.time_range,
-            nameParts: usageNameParts(usage, clientUrlTemplate),
+            name: usageNameGroups(usage, clientUrlTemplate),
             ...timetablePosition(range, toMinutes(usage.start_time) ?? range.start, toMinutes(usage.end_time) ?? range.start),
         })),
     };

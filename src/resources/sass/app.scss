@@ -476,14 +476,24 @@ h2 {
 .usage-timetable-rows .usage-timetable-row + .usage-timetable-row {
     margin-top: .25rem;
 }
-// 名前は 1 行に収める（行の高さを変えない）。列の上限を超える分は末尾を「…」で省く（全体は JS が title に入れる）
+// 名前は 1 行に収める（行の高さを変えない）。列の上限を超えるときは、省いてよい部分（-shrink。トレーニーの名前。トレーニーがない利用は会員名）だけ
+// 末尾を「…」で省き、「（会員名）」は必ず全体を出す（会員名のリンクをいつも押せるように。2026-11 変更）。全体は JS が title に入れる。
+// 中も grid にするのは、列の幅の決め方のため：名前の最小の幅が「（会員名）」＋1 文字分になり、それが 16rem を超えるときは列のほうが広がる
 .usage-timetable-name {
+    display: grid;
+    grid-template-columns: minmax(0, max-content);
     padding-inline: .125rem;
-    overflow: hidden;
     font-size: .875rem;
     line-height: 1.75rem;
-    text-overflow: ellipsis;
     white-space: nowrap;
+}
+.usage-timetable-name--with-keep {
+    grid-template-columns: minmax(1em, max-content) max-content;
+}
+.usage-timetable-name-shrink {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 // 目盛り（時の数字）。数字は線の位置に中央をそろえる
 .usage-timetable-scale {

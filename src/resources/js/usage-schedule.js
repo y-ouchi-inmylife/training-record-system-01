@@ -47,6 +47,7 @@ import {
     scheduleDateUrl,
     selectDate,
     usageLineParts,
+    usageNameText,
     visibleMonths,
     ymOf,
     timetableModel,
@@ -461,7 +462,17 @@ class UsageSchedule {
             hiddenTime.className = 'visually-hidden';
             hiddenTime.textContent = `${row.timeRange}、`;
             name.appendChild(hiddenTime);
-            this.appendParts(name, row.nameParts);
+            // 省いてよい部分（トレーニーの名前。トレーニーがない利用は会員名）と、必ず全体を出す部分（「（会員名）」）を分けて置く（2026-11 変更）
+            const shrink = document.createElement('span');
+            shrink.className = 'usage-timetable-name-shrink';
+            this.appendParts(shrink, row.name.shrink);
+            name.appendChild(shrink);
+            if (row.name.keep.length > 0) {
+                const keep = document.createElement('span');
+                this.appendParts(keep, row.name.keep);
+                name.appendChild(keep);
+                name.classList.add('usage-timetable-name--with-keep');
+            }
 
             const track = document.createElement('div');
             track.className = 'usage-timetable-track';
@@ -478,7 +489,7 @@ class UsageSchedule {
             li.append(name, track);
             list.appendChild(li);
 
-            return { row, track, time, name };
+            return { row, track, time, name, shrink };
         });
 
         // 目盛りの行とすべての行で名前の列の幅をそろえる入れ物（幅は CSS の subgrid でいちばん長い名前に合わせる。2026-11 追加）
@@ -505,10 +516,10 @@ class UsageSchedule {
             el.classList.toggle('usage-timetable-hour--hidden', index % step !== 0);
         });
 
-        this.timetableRows.forEach(({ row, time, name }) => {
-            // 名前が列の上限を超えて「…」で省かれたときだけ、全体を title に入れる（マウスを乗せると見える。2026-11 追加）
-            if (name.scrollWidth > name.clientWidth) {
-                name.title = row.nameParts.map((part) => part.text).join('');
+        this.timetableRows.forEach(({ row, time, name, shrink }) => {
+            // 名前が列の上限を超えて「…」で省かれたときだけ、行の全体を title に入れる（マウスを乗せると見える。2026-11 追加）
+            if (shrink.scrollWidth > shrink.clientWidth) {
+                name.title = usageNameText(row.name);
             } else {
                 name.removeAttribute('title');
             }

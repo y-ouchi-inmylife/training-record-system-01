@@ -36,7 +36,8 @@ import {
     timetableLabelStep,
     timetableHours,
     timetableLabelPlacement,
-    usageNameParts,
+    usageNameGroups,
+    usageNameText,
     timetableModel,
     dayMinRows,
     visibleMonths,
@@ -612,11 +613,25 @@ describe('タイムテーブル', () => {
 
     it('左の列の名前：型があれば会員名だけリンク、なければ label のまま（時刻は付けない）', () => {
         const usage = u('08:00', '19:00', { client_id: 7, client_name: '柏原 美江', trainee_name: 'まま' });
-        expect(usageNameParts(usage, '/clients/__CLIENT_ID__')).toEqual([{ text: 'まま（' }, { text: '柏原 美江', href: '/clients/7' }, { text: '）' }]);
-        expect(usageNameParts(usage)).toEqual([{ text: 'まま（柏原 美江）' }]);
-        // トレーニーがない利用は会員名のリンクだけ（かっこを付けない。2026-11 変更）。型がなければ label（会員名だけ）
-        expect(usageNameParts({ ...usage, trainee_name: '', label: '柏原 美江' }, '/clients/__CLIENT_ID__')).toEqual([{ text: '柏原 美江', href: '/clients/7' }]);
-        expect(usageNameParts({ ...usage, trainee_name: '', label: '柏原 美江' })).toEqual([{ text: '柏原 美江' }]);
+        const T = '/clients/__CLIENT_ID__';
+        // 省いてよいのはトレーニーの名前だけ。「（会員名）」はかっこごと必ず出す部分（リンクを残す。2026-11 変更）
+        expect(usageNameGroups(usage, T)).toEqual({
+            shrink: [{ text: 'まま' }],
+            keep: [{ text: '（' }, { text: '柏原 美江', href: '/clients/7' }, { text: '）' }],
+        });
+        expect(usageNameGroups(usage)).toEqual({ shrink: [{ text: 'まま（柏原 美江）' }], keep: [] });
+        // トレーニーがない利用は会員名のリンクだけ（かっこを付けない）。上限を超えるときだけ会員名を省く。型がなければ label（会員名だけ）
+        expect(usageNameGroups({ ...usage, trainee_name: '', label: '柏原 美江' }, T)).toEqual({ shrink: [{ text: '柏原 美江', href: '/clients/7' }], keep: [] });
+        expect(usageNameGroups({ ...usage, trainee_name: '', label: '柏原 美江' })).toEqual({ shrink: [{ text: '柏原 美江' }], keep: [] });
+    });
+
+    it('長いトレーニー名でも、会員名のリンクは省く部分に入らない。title に入れる全体の文は、読み上げと同じ文字', () => {
+        const long = 'とてもとても長い名前のトレーニーさん二号';
+        const groups = usageNameGroups(u('08:00', '12:00', { client_id: 4, client_name: '大内 佳和', trainee_name: long }), '/clients/__CLIENT_ID__');
+        expect(groups.shrink.some((part) => part.href !== undefined)).toBe(false);
+        expect(groups.keep).toContainEqual({ text: '大内 佳和', href: '/clients/4' });
+        expect(usageNameText(groups)).toBe(`${long}（大内 佳和）`);
+        expect(usageNameText(usageNameGroups({ client_id: 4, client_name: '中森', trainee_name: '', label: '中森' }, '/clients/__CLIENT_ID__'))).toBe('中森');
     });
 
     it('予約がない日はタイムテーブルを作らない（null）', () => {
@@ -634,7 +649,8 @@ describe('タイムテーブル', () => {
         expect(model.outside).toEqual([{ left: (660 / 720) * 100, width: (60 / 720) * 100 }]);
         expect(model.rows.map((r) => r.timeRange)).toEqual(['8:00〜19:00', '19:00〜20:00']);
         expect(model.rows[1]).toMatchObject({ left: (660 / 720) * 100, width: (60 / 720) * 100 });
-        expect(model.rows[1].nameParts).toEqual([{ text: 'B', href: '/clients/2' }]);
+        expect(model.rows[0].name.keep).toEqual([{ text: '（' }, { text: 'A', href: '/clients/1' }, { text: '）' }]);
+        expect(model.rows[1].name).toEqual({ shrink: [{ text: 'B', href: '/clients/2' }], keep: [] });
     });
 });
 
