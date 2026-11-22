@@ -13,13 +13,15 @@
  *                 リストとタイムテーブルを両方作り、CSS の d-lg-none・d-none d-lg-block で出し分ける）。初期値 false。2026-11 追加
  *   keepDayHeight：true なら、その日の予定の枠の最低の高さを同時に預かれる数の行数分にし、読み込み中は前の高さを保つ
  *                 （その日の予定の下にカレンダーがある画面で、日を押すたびにカレンダーが動かないようにする）。初期値 false。2026-11 追加
+ *   calendarLinks：true なら、その日の予約の行に「Googleカレンダーに追加」のリンク（アイコンだけ）を出す（JSON に URL がある今日以降の利用だけ）。
+ *                 初期値 false。2026-11 追加
  *   months      ：2 なら、2 か月（左の月と翌月）を並べる（2 つ目の入れ物は <x-usage-schedule :months="2">。狭い画面では CSS で隠す）。
  *                 初期値 1。2026-11 追加
  *   判定と組み立ては usage-schedule-core.js（usageLineParts・scheduleDateUrl・timetableModel など）
  *
  * 使い方：
  *   const schedule = new window.UsageSchedule(rootEl, { onSelect: (ymd) => { ... } });
- *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2 });  // カレンダー画面
+ *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2, calendarLinks: true });  // カレンダー画面
  *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
@@ -29,6 +31,7 @@
  * 計算（月のマス・状態の移り方）は usage-schedule-core.js。
  */
 import {
+    GOOGLE_CALENDAR_LINK_LABEL,
     WEEKDAYS,
     applyInput,
     usageCheckQuery,
@@ -60,12 +63,14 @@ const LOADING = '読み込み中…';
 const FAILED = '予約状況を読み込めませんでした。';
 
 class UsageSchedule {
-    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false, keepDayHeight = false, months = 1 } = {}) {
+    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false, keepDayHeight = false, months = 1, calendarLinks = false } = {}) {
         this.root = root;
         this.onSelect = onSelect;
         // 会員名をリンクにするときの会員詳細の URL の型（linkClients が false なら null。2026-11 追加）
         this.clientUrlTemplate = linkClients ? (root.dataset.clientUrl || null) : null;
         this.syncUrl = syncUrl;
+        // 「Googleカレンダーに追加」のリンクを出すか（2026-11 追加）
+        this.calendarLinks = calendarLinks;
         // 広い画面のタイムテーブル（2026-11 追加。カレンダー画面だけ）。入れ物はリストの後ろに作る
         this.timetableEl = null;
         this.timetableRows = [];
@@ -405,7 +410,20 @@ class UsageSchedule {
             }
             const a = document.createElement('a');
             a.href = part.href;
-            a.textContent = part.text;
+            if (part.calendar) {
+                // 「Googleカレンダーに追加」（アイコンだけ。別タブ。<x-google-calendar-link> と同じ形。2026-11 追加）
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.className = 'usage-schedule-calendar-link';
+                a.title = GOOGLE_CALENDAR_LINK_LABEL;
+                a.setAttribute('aria-label', GOOGLE_CALENDAR_LINK_LABEL);
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-calendar-plus';
+                icon.setAttribute('aria-hidden', 'true');
+                a.appendChild(icon);
+            } else {
+                a.textContent = part.text;
+            }
             el.appendChild(a);
         });
     }
@@ -417,7 +435,7 @@ class UsageSchedule {
      */
     renderTimetable(usages, openTime, closeTime) {
         if (!this.timetableEl) return;
-        const model = timetableModel({ usages, openTime, closeTime, clientUrlTemplate: this.clientUrlTemplate });
+        const model = timetableModel({ usages, openTime, closeTime, clientUrlTemplate: this.clientUrlTemplate, calendarLinks: this.calendarLinks });
         if (model === null) {
             this.hideTimetable();
             return;
@@ -462,7 +480,7 @@ class UsageSchedule {
             hiddenTime.className = 'visually-hidden';
             hiddenTime.textContent = `${row.timeRange}、`;
             name.appendChild(hiddenTime);
-            // 省いてよい部分（トレーニーの名前。トレーニーがない利用は会員名）と、必ず全体を出す部分（「（会員名）」）を分けて置く（2026-11 変更）
+            // 省いてよい部分（トレーニーの名前。トレーニーがない利用は会員名）と、必ず全体を出す部分（「（会員名）」と「Googleカレンダーに追加」のリンク）を分けて置く（2026-11 変更）
             const shrink = document.createElement('span');
             shrink.className = 'usage-timetable-name-shrink';
             this.appendParts(shrink, row.name.shrink);
@@ -555,7 +573,7 @@ class UsageSchedule {
             const li = document.createElement('li');
             li.className = 'list-group-item small py-1';
             // 会員名をリンクにするか（linkClients）は usage-schedule-core.js の usageLineParts で決める（2026-11 追加）
-            this.appendParts(li, usageLineParts(usage, this.clientUrlTemplate));
+            this.appendParts(li, usageLineParts(usage, this.clientUrlTemplate, this.calendarLinks));
 
             return li;
         }));

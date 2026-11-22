@@ -136,7 +136,7 @@ class ScheduleScreenTest extends TestCase
         // その下にカレンダー（今までの大きさで左寄せ。usage-schedule-calendar）
         $this->assertMatchesRegularExpression('/<\/ul>\s*<\/div>\s*<\/div>\s*<div class="usage-schedule-calendar mt-3 usage-schedule-calendar--two">\s*<div class="d-flex align-items-center justify-content-center gap-2 mb-1 usage-schedule-nav">/u', $html);
         // JS の設定：会員名をリンクにし、URL の date を書き換え、広い画面でタイムテーブルにし、予定の枠の高さを保つ（2026-11 追加。利用日の欄はない）
-        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2 });", $html);
+        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2, calendarLinks: true });", $html);
         $this->assertStringNotContainsString('onSelect', $html);
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
     }

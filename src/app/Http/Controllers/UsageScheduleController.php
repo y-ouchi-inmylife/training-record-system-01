@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ClientUsage;
+use App\Services\GoogleCalendarLinkService;
 use App\Services\UsageCapacityService;
 use App\Support\ScheduleSetting;
 use Illuminate\Http\JsonResponse;
@@ -43,7 +44,7 @@ class UsageScheduleController extends Controller
     /**
      * その日の預かる数・上限・予約の一覧（GET /api/usage-schedule/day）
      */
-    public function day(Request $request, UsageCapacityService $service): JsonResponse
+    public function day(Request $request, UsageCapacityService $service, GoogleCalendarLinkService $googleCalendar): JsonResponse
     {
         $validated = $request->validate([
             'date' => 'required|date_format:Y-m-d',
@@ -68,10 +69,12 @@ class UsageScheduleController extends Controller
                 // 開始・終了の時刻（HH:MM。2026-11 追加）。タイムテーブルの帯の位置に使う（time_range は表示用の文字）
                 'start_time' => $usage->start_time_input,
                 'end_time' => $usage->end_time_input,
-                'label' => self::usageLabel($usage),
+                'label' => $usage->schedule_label,
                 'client_id' => (int) $usage->client_id,
-                'client_name' => self::clientName($usage),
-                'trainee_name' => self::traineeName($usage),
+                'client_name' => $usage->schedule_client_name,
+                'trainee_name' => $usage->schedule_trainee_name,
+                // 「Googleカレンダーに追加」の URL（今日以降の利用だけ。過去は null。2026-11 追加）。カレンダー画面だけが使う
+                'google_calendar_url' => $googleCalendar->urlFor($usage),
             ])->values()->all(),
         ]);
     }
@@ -112,35 +115,5 @@ class UsageScheduleController extends Controller
             'trainee_label' => $confirmation['trainee_label'],
             'date_label' => ClientUsage::toShortDateLabel($validated['used_on']),
         ]);
-    }
-
-    /**
-     * 「トレーニー（会員名）」。名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ
-     * （かっこを付けない。2026-11 変更：その前は「（会員名）」で、かっこだけが残って見えたため）。
-     * 会員名は Client::display_name（姓名。名が空のとき末尾に空白を残さない）
-     */
-    private static function usageLabel(ClientUsage $usage): string
-    {
-        if ($usage->trainee === null) {
-            return self::clientName($usage);
-        }
-
-        return self::traineeName($usage).'（'.self::clientName($usage).'）';
-    }
-
-    /**
-     * 会員名（Client::display_name。名が空のとき末尾に空白を残さない）
-     */
-    private static function clientName(ClientUsage $usage): string
-    {
-        return trim((string) $usage->client?->display_name);
-    }
-
-    /**
-     * トレーニーの名前（名前が未登録なら「名前未登録」。トレーニーがない利用は空文字）
-     */
-    private static function traineeName(ClientUsage $usage): string
-    {
-        return (string) ($usage->trainee?->display_name ?? '');
     }
 }

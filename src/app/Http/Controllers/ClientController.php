@@ -13,6 +13,7 @@ use App\Models\Trainer;
 use App\Models\TrainingRecord;
 use App\Services\ClientInternalIdService;
 use App\Services\ContractTicketService;
+use App\Services\GoogleCalendarLinkService;
 use App\Support\ScheduleSetting;
 use App\Support\RecordTimeline;
 use Illuminate\Database\QueryException;
@@ -180,7 +181,7 @@ class ClientController extends Controller
     /**
      * クライアント詳細画面（S-0305）
      */
-    public function show(Client $client, ContractTicketService $contractTicketService): View
+    public function show(Client $client, ContractTicketService $contractTicketService, GoogleCalendarLinkService $googleCalendar): View
     {
         // trainees は id 昇順（Client::trainees() の既定）で並び、
         // 各 trainee の measurements を eager load することで、
@@ -213,6 +214,12 @@ class ClientController extends Controller
         // 選択肢と初期値は Blade に書かず、ContractTicketService で組み立てて渡す
         // （設計書 S-0305 セクション5「マスの並べ方」・S-0305-M05 参照）。
         $ticket = $contractTicketService->build($client->contracts, $client->usages);
+
+        // 利用の id ごとの「Googleカレンダーに追加」の URL（今日以降の利用だけ。過去は null。2026-11 追加）。
+        // 会員側（S-1412）と共用の ContractTicketService には入れない（会員ポータルには出さないため）
+        $googleCalendarUrls = $client->usages
+            ->mapWithKeys(fn ($usage) => [$usage->id => $googleCalendar->urlFor($usage->setRelation('client', $client))])
+            ->all();
 
         // 契約・利用のモーダル（S-0305-M04 / M05）で入力エラーになって戻ったとき、
         // 送信元のモーダルだけを開き直すための種別（'contract' / 'usage'）。
@@ -268,7 +275,7 @@ class ClientController extends Controller
             ? $client->traineeContractUsageDeletionBlockedMessage()
             : null;
 
-        return view('clients.show', compact('client', 'trainers', 'ticket', 'openModal', 'timeline', 'contractDefaultExpiresOn', 'usageForm', 'traineeContractUsageDeletionBlockedMessage'));
+        return view('clients.show', compact('client', 'trainers', 'ticket', 'googleCalendarUrls', 'openModal', 'timeline', 'contractDefaultExpiresOn', 'usageForm', 'traineeContractUsageDeletionBlockedMessage'));
     }
 
     /**

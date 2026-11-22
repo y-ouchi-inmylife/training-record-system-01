@@ -37,6 +37,8 @@ import {
     timetableHours,
     timetableLabelPlacement,
     usageNameGroups,
+    googleCalendarParts,
+    GOOGLE_CALENDAR_LINK_LABEL,
     usageNameText,
     timetableModel,
     dayMinRows,
@@ -709,5 +711,57 @@ describe('2 か月の並び', () => {
         const next = selectDate(state, '2026-12-03', 2);
         expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule?date=2026-11-20', syncUrl: true, previous: state.selected, selected: next.selected }))
             .toBe('/schedule?date=2026-12-03');
+    });
+});
+
+// カレンダー画面（S-1602）の「Googleカレンダーに追加」のリンク（2026-11 追加。設計書 S-1602「Googleカレンダーに追加」）
+describe('Googleカレンダーに追加', () => {
+    const T = '/clients/__CLIENT_ID__';
+    const URL_ = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=a';
+    const base = { time_range: '8:00〜19:00', start_time: '08:00', end_time: '19:00', label: 'アムロ（佐藤 一郎）', client_id: 12, client_name: '佐藤 一郎', trainee_name: 'アムロ' };
+    const upcoming = { ...base, google_calendar_url: URL_ };
+    const past = { ...base, google_calendar_url: null };
+    const noTrainee = { ...upcoming, label: '佐藤 一郎', trainee_name: '' };
+    const link = { text: '', href: URL_, calendar: true };
+    const model = (usage, calendarLinks) => timetableModel({ usages: [usage], openTime: '08:00', closeTime: '19:00', clientUrlTemplate: T, calendarLinks });
+
+    it('リンクの title・aria-label の文（別タブで開くことが分かる）', () => {
+        expect(GOOGLE_CALENDAR_LINK_LABEL).toBe('Googleカレンダーに追加（別タブで開きます）');
+    });
+
+    it('設定が true で URL があるときだけリンクを作る（URL はサーバーの値のまま）', () => {
+        expect(googleCalendarParts(upcoming, true)).toEqual([link]);
+        expect(googleCalendarParts(past, true)).toEqual([]);
+        expect(googleCalendarParts(base, true)).toEqual([]);
+        expect(googleCalendarParts(upcoming)).toEqual([]);
+    });
+
+    it('リストの行：URL があれば行の最後にリンク。URL がなければ出ない', () => {
+        expect(usageLineParts(upcoming, T, true)).toEqual([...usageLineParts(past, T, true), link]);
+        expect(usageLineParts(noTrainee, T, true).at(-1)).toEqual(link);
+        expect(usageLineParts(past, T, true).some((part) => part.calendar)).toBe(false);
+        // 行の文は変わらない
+        expect(usageLineParts(upcoming, T, true).map((part) => part.text).join('')).toBe(usageLine(upcoming));
+    });
+
+    it('タイムテーブルの行：リンクは必ず全体を出す部分（keep）の最後。省く部分（shrink）には入らない', () => {
+        for (const usage of [upcoming, noTrainee, { ...upcoming, client_id: null }]) {
+            const { shrink, keep } = model(usage, true).rows[0].name;
+            expect(keep.at(-1)).toEqual(link);
+            expect(shrink.some((part) => part.calendar)).toBe(false);
+        }
+        expect(model(noTrainee, true).rows[0].name).toEqual({ shrink: [{ text: '佐藤 一郎', href: '/clients/12' }], keep: [link] });
+        // 省いたときの title の文には入らない
+        expect(usageNameText(model(upcoming, true).rows[0].name)).toBe('アムロ（佐藤 一郎）');
+    });
+
+    it('タイムテーブルの行：URL がなければ出ない', () => {
+        const { shrink, keep } = model(past, true).rows[0].name;
+        expect([...shrink, ...keep].some((part) => part.calendar)).toBe(false);
+    });
+
+    it('利用モーダル（設定なし）：URL があってもリンクを出さない', () => {
+        expect(usageLineParts(upcoming)).toEqual([{ text: '8:00〜19:00　アムロ（佐藤 一郎）' }]);
+        expect(model(upcoming).rows[0].name.keep.some((part) => part.calendar)).toBe(false);
     });
 });

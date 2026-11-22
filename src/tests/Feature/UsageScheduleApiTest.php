@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientUsage;
 use App\Models\SystemSetting;
 use App\Models\Trainer;
+use App\Services\GoogleCalendarLinkService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesClientCountTables;
@@ -173,10 +174,12 @@ class UsageScheduleApiTest extends TestCase
     {
         DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => 'アムロ']);
         DB::table('trainees')->insert(['id' => 11, 'client_id' => $this->ouchi->id, 'name' => null]);
-        $this->usage($this->ouchi, '2026-11-26', '13:00', '19:00', 11);   // 名前未登録
-        $this->usage($this->sato, '2026-11-26', '08:00', '19:00', 10);
-        $this->usage($this->sato, '2026-11-26', '13:00', '15:00');        // トレーニーなし
-        $this->usage($this->sato, '2026-11-27', '08:00', '19:00', 10);    // ほかの日
+        $unnamed = $this->usage($this->ouchi, '2026-11-26', '13:00', '19:00', 11);   // 名前未登録
+        $amuro = $this->usage($this->sato, '2026-11-26', '08:00', '19:00', 10);
+        $none = $this->usage($this->sato, '2026-11-26', '13:00', '15:00');           // トレーニーなし
+        $this->usage($this->sato, '2026-11-27', '08:00', '19:00', 10);               // ほかの日
+        // 「Googleカレンダーに追加」の URL（今日以降の利用だけ。2026-11 追加。中身は GoogleCalendarLinkServiceTest で確かめる）
+        $google = fn (ClientUsage $usage): string => (string) app(GoogleCalendarLinkService::class)->urlFor($usage);
 
         $this->getJson(route('api.usage-schedule.day', ['date' => '2026-11-26']))
             ->assertOk()
@@ -191,9 +194,9 @@ class UsageScheduleApiTest extends TestCase
                 // トレーニーがない利用の label は会員名だけ（かっこを付けない。2026-11 変更：その前は「（佐藤 一郎）」）
                 // client_id・client_name・trainee_name（2026-11 追加）：カレンダー画面（S-1602）で会員名だけをリンクにするため、label を分けたもの
                 'usages' => [
-                    ['time_range' => '8:00〜19:00', 'start_time' => '08:00', 'end_time' => '19:00', 'label' => 'アムロ（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => 'アムロ'],
-                    ['time_range' => '13:00〜15:00', 'start_time' => '13:00', 'end_time' => '15:00', 'label' => '佐藤 一郎', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => ''],
-                    ['time_range' => '13:00〜19:00', 'start_time' => '13:00', 'end_time' => '19:00', 'label' => '名前未登録（大内）', 'client_id' => $this->ouchi->id, 'client_name' => '大内', 'trainee_name' => '名前未登録'],
+                    ['time_range' => '8:00〜19:00', 'start_time' => '08:00', 'end_time' => '19:00', 'label' => 'アムロ（佐藤 一郎）', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => 'アムロ', 'google_calendar_url' => $google($amuro)],
+                    ['time_range' => '13:00〜15:00', 'start_time' => '13:00', 'end_time' => '15:00', 'label' => '佐藤 一郎', 'client_id' => $this->sato->id, 'client_name' => '佐藤 一郎', 'trainee_name' => '', 'google_calendar_url' => $google($none)],
+                    ['time_range' => '13:00〜19:00', 'start_time' => '13:00', 'end_time' => '19:00', 'label' => '名前未登録（大内）', 'client_id' => $this->ouchi->id, 'client_name' => '大内', 'trainee_name' => '名前未登録', 'google_calendar_url' => $google($unnamed)],
                 ],
             ]);
     }
@@ -482,5 +485,32 @@ class UsageScheduleApiTest extends TestCase
             ->assertJsonPath('close_time', '18:00')
             ->assertJsonPath('usages.0.start_time', '19:00')
             ->assertJsonPath('usages.0.end_time', '20:05');
+    }
+
+    // ---- 「Googleカレンダーに追加」の URL（2026-11 追加。requirements.md「Google カレンダーに追加」） ----
+
+    public function test_その日の今日以降の利用にはGoogleカレンダーのURLがあり_メモは入らない(): void
+    {
+        // 今日（2026-11-21 10:00）の、もう終わった時刻の利用も含む（時刻は判定に使わない）
+        foreach (['2026-11-21', '2026-11-22'] as $date) {
+            $usage = $this->usage($this->sato, $date, '08:00', '09:00');
+            $usage->update(['note' => 'ひみつのメモ']);
+
+            $response = $this->getJson(route('api.usage-schedule.day', ['date' => $date]))->assertOk();
+
+            $url = $response->json('usages.0.google_calendar_url');
+            $this->assertStringStartsWith('https://calendar.google.com/calendar/render?action=TEMPLATE&', $url);
+            $this->assertStringNotContainsString('ひみつのメモ', rawurldecode($response->getContent()));
+        }
+    }
+
+    public function test_その日の過去の利用のGoogleカレンダーのURLはnull(): void
+    {
+        $this->usage($this->sato, '2026-11-20', '08:00', '19:00');
+
+        $this->getJson(route('api.usage-schedule.day', ['date' => '2026-11-20']))
+            ->assertOk()
+            ->assertJsonPath('usages.0.label', '佐藤 一郎')
+            ->assertJsonPath('usages.0.google_calendar_url', null);
     }
 }

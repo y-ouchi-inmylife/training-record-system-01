@@ -90,6 +90,37 @@ class ClientUsage extends Model
         return self::toDisplayTime($this->start_time).'〜'.self::toDisplayTime($this->end_time);
     }
 
+    /**
+     * 会員名（Client::display_name。名が空のとき末尾に空白を残さない。2026-11 追加：UsageScheduleController から移した）
+     */
+    public function getScheduleClientNameAttribute(): string
+    {
+        return trim((string) $this->client?->display_name);
+    }
+
+    /**
+     * トレーニーの名前（名前が未登録なら「名前未登録」。トレーニーがない利用は空文字。2026-11 追加：UsageScheduleController から移した）
+     */
+    public function getScheduleTraineeNameAttribute(): string
+    {
+        return (string) ($this->trainee?->display_name ?? '');
+    }
+
+    /**
+     * 「トレーニー（会員名）」。名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ
+     * （かっこを付けない。2026-11 変更：その前は「（会員名）」で、かっこだけが残って見えたため）。
+     * 予約状況（UsageScheduleController）と「Googleカレンダーに追加」の予定の名前（GoogleCalendarLinkService）で使う
+     * （2026-11 追加：UsageScheduleController から移した）
+     */
+    public function getScheduleLabelAttribute(): string
+    {
+        if ($this->trainee === null) {
+            return $this->schedule_client_name;
+        }
+
+        return $this->schedule_trainee_name.'（'.$this->schedule_client_name.'）';
+    }
+
     /** 曜日（日曜始まり） */
     private const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 

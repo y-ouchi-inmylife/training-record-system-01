@@ -7,6 +7,7 @@ use App\Models\ClientContract;
 use App\Models\ClientUsage;
 use App\Models\Trainee;
 use App\Models\Trainer;
+use App\Services\GoogleCalendarLinkService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -338,7 +339,7 @@ class ClientCountRenderingTest extends TestCase
 
         // 利用の行（2026-11 変更：その前はマス）：利用 1 件に 1 行。残りは見出しの「あと n回」だけで、
         // 「未利用 n回」の行は出さない（2026-11 変更）。メモのある利用はメモを文字で出す（2026-11 変更：その前は印）
-        $this->assertSame(4, substr_count($html, 'class="list-group-item list-group-item-action usage-row'));
+        $this->assertSame(4, substr_count($html, 'class="list-group-item-action usage-row '));
         $this->assertStringNotContainsString('>未利用', $html);
         $this->assertStringNotContainsString('data-usage-unused', $html);
         $this->assertStringContainsString('data-used-on="2026-09-04"', $html);
@@ -715,7 +716,15 @@ class ClientCountRenderingTest extends TestCase
     /** その利用の行（button）の HTML */
     private function rowHtml(string $html, ClientUsage $usage): string
     {
-        $this->assertSame(1, preg_match('/<button type="button" class="list-group-item list-group-item-action usage-row[^"]*"\s+data-id="'.$usage->id.'".*?<\/button>/su', $html, $m), 'row '.$usage->id);
+        $this->assertSame(1, preg_match('/<button type="button" class="list-group-item-action usage-row [^"]*"\s+data-id="'.$usage->id.'".*?<\/button>/su', $html, $m), 'row '.$usage->id);
+
+        return $m[0];
+    }
+
+    /** その利用の行の枠（div。ボタンと「Googleカレンダーに追加」のリンク）の HTML。2026-11 追加 */
+    private function rowItemHtml(string $html, ClientUsage $usage): string
+    {
+        $this->assertSame(1, preg_match('/<div class="list-group-item usage-row-item [^"]*">\s*<button type="button" class="list-group-item-action usage-row [^"]*"\s+data-id="'.$usage->id.'"(?:(?!<\/div>).)*<\/div>/su', $html, $m), 'row item '.$usage->id);
 
         return $m[0];
     }
@@ -723,7 +732,7 @@ class ClientCountRenderingTest extends TestCase
     /** その利用の行の HTML の中での位置（契約の見出しの data-id と取り違えないよう、利用の行の button で探す） */
     private function rowPos(string $html, ClientUsage $usage): int
     {
-        $this->assertSame(1, preg_match('/<button type="button" class="list-group-item list-group-item-action usage-row[^"]*"\s+data-id="'.$usage->id.'"/u', $html, $m, PREG_OFFSET_CAPTURE), 'row '.$usage->id);
+        $this->assertSame(1, preg_match('/<button type="button" class="list-group-item-action usage-row [^"]*"\s+data-id="'.$usage->id.'"/u', $html, $m, PREG_OFFSET_CAPTURE), 'row '.$usage->id);
 
         return $m[0][1];
     }
@@ -812,18 +821,131 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        $base = 'class="list-group-item list-group-item-action usage-row d-flex flex-wrap align-items-center column-gap-2 py-1 px-2 small';
+        // 今日の線・予定の背景は行の枠（div）に付ける（2026-11 変更：その前は行の全体がボタンで、ボタンに付けていた）
+        $base = '<div class="list-group-item usage-row-item d-flex align-items-stretch p-0 small';
+        $button = 'class="list-group-item-action usage-row d-flex flex-wrap align-items-center column-gap-2 py-1 px-2';
         // 実施済み：ラベルなし（空欄で列の位置はそろえる）。飾らない
-        $this->assertStringContainsString($base.'"', $this->rowHtml($html, $past));
+        $this->assertStringStartsWith($base.'"', $this->rowItemHtml($html, $past));
+        $this->assertStringContainsString($button.'"', $this->rowHtml($html, $past));
         $this->assertStringStartsWith('<span class="usage-row-label"></span><span class="usage-row-date">2026/11/20(金)</span>', $this->rowCells($html, $past));
         // 今日：左端に太い線と「今日」
-        $this->assertStringContainsString($base.' usage-row-today"', $this->rowHtml($html, $today));
+        $this->assertStringStartsWith($base.' usage-row-today"', $this->rowItemHtml($html, $today));
+        $this->assertStringContainsString($button.'"', $this->rowHtml($html, $today));
         $this->assertStringStartsWith('<span class="usage-row-label"><span class="badge text-bg-dark">今日</span></span>', $this->rowCells($html, $today));
         // 予定：薄い青の背景と「予定」
-        $this->assertStringContainsString($base.' bg-info-subtle"', $this->rowHtml($html, $upcoming));
+        $this->assertStringStartsWith($base.' bg-info-subtle"', $this->rowItemHtml($html, $upcoming));
+        $this->assertStringContainsString($button.' bg-transparent"', $this->rowHtml($html, $upcoming));
         $this->assertStringStartsWith('<span class="usage-row-label"><span class="badge text-bg-info">予定</span></span><span class="usage-row-date">2026/11/26(木)</span><span class="usage-row-time">13:00〜19:00</span>', $this->rowCells($html, $upcoming));
         // 左端の太い線の指定
-        $this->assertMatchesRegularExpression('/\.usage-row-today\s*\{\s*box-shadow:\s*inset 4px 0 0 var\(--bs-dark\);/u', $html);
+        $this->assertMatchesRegularExpression('/\.usage-row-today::before\s*\{[^}]*box-shadow:\s*inset 4px 0 0 var\(--bs-dark\);/u', $html);
+    }
+
+    // ---- 「Googleカレンダーに追加」のリンク（2026-11 追加。設計書 S-0305 セクション5「Googleカレンダーに追加」） ----
+
+    private const GOOGLE_CALENDAR = 'https://calendar.google.com/';
+
+    public function test_利用の行のGoogleカレンダーのリンクは今日以降だけで_ボタンの外に置く(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+        $contract = $this->contract($client, '2026-11-01', 4);
+        $past = $this->usageWith($client, '2026-11-20', $ai, contract: $contract);
+        $today = $this->usageWith($client, '2026-11-21', $ai, contract: $contract, note: 'ひみつのメモ');
+        $upcoming = $this->usageWith($client, '2026-11-26', $ai);   // 契約なし
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('<a ', $this->rowItemHtml($html, $past));
+        foreach ([$today, $upcoming] as $usage) {
+            $url = app(GoogleCalendarLinkService::class)->urlFor($usage->fresh());
+            $item = $this->rowItemHtml($html, $usage);
+            // アイコンだけ。別タブで開く
+            $this->assertStringContainsString(
+                '<a href="'.e($url).'" target="_blank" rel="noopener noreferrer" title="Googleカレンダーに追加（別タブで開きます）" aria-label="Googleカレンダーに追加（別タブで開きます）"'
+                .' class="usage-row-calendar d-flex align-items-center flex-shrink-0 px-1"><i class="bi bi-calendar-plus" aria-hidden="true"></i></a>',
+                $item
+            );
+            // リンクはボタンの外。ボタンを押すと今までどおり編集モーダル
+            $this->assertStringNotContainsString('<a ', $this->rowHtml($html, $usage));
+            $this->assertStringContainsString('onclick="window.usageModal.openForEdit(this.dataset)"', $this->rowHtml($html, $usage));
+            $this->assertStringNotContainsString('ひみつのメモ', rawurldecode($url));
+        }
+        // リンクはこの 2 つだけ（利用モーダルには出さない）。モーダルの予約状況にもリンクの設定を渡さない
+        $this->assertSame(2, substr_count($html, self::GOOGLE_CALENDAR));
+        $this->assertStringNotContainsString('calendarLinks', $html);
+    }
+
+    /** 登録・更新の入力 */
+    private function usageInput(string $usedOn, int $traineeId): array
+    {
+        return ['_form_type' => 'usage', 'used_on' => $usedOn, 'trainee_id' => $traineeId, 'start_time' => '08:00', 'end_time' => '19:00', 'client_contract_id' => '', 'note' => 'ひみつのメモ'];
+    }
+
+    /** 会員詳細を開き、完了メッセージ（緑のお知らせ）の HTML を返す */
+    private function successAlert(Client $client): string
+    {
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+        $this->assertSame(1, preg_match('/<div class="alert alert-success alert-dismissible fade show" role="alert"[^>]*>.*?<\/div>/su', $html, $m));
+
+        return $m[0];
+    }
+
+    public function test_登録と更新の直後は_今日以降なら完了メッセージにリンクが出て自動で消さない(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+        $momo = $this->trainee($client, 'モモ');
+
+        // 登録（今日）
+        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-21', $ai))->assertSessionHas('success', '利用を登録しました。');
+        $usage = ClientUsage::query()->sole();
+        $alert = $this->successAlert($client);
+        $this->assertStringContainsString('利用を登録しました。', $alert);
+        $this->assertStringContainsString('href="'.e(app(GoogleCalendarLinkService::class)->urlFor($usage)).'" target="_blank" rel="noopener noreferrer"', $alert);
+        $this->assertStringContainsString('<i class="bi bi-calendar-plus" aria-hidden="true"></i> Googleカレンダーに追加</a>', $alert);
+        $this->assertStringNotContainsString('data-auto-dismiss', $alert);
+        $this->assertStringContainsString('data-bs-dismiss="alert"', $alert);
+        $this->assertStringNotContainsString('ひみつのメモ', rawurldecode($alert));
+
+        // 更新（過去 → 今日より後、トレーニーも変える）。更新したあとの値の URL になる
+        $past = $this->usageWith($client, '2026-11-10', $ai);
+        $this->put(route('client-usages.update', $past), $this->usageInput('2026-11-30', $momo))->assertSessionHas('success', '利用を更新しました。');
+        $alert = $this->successAlert($client);
+        $this->assertStringContainsString('利用を更新しました。', $alert);
+        $this->assertStringContainsString(rawurlencode('モモ（山田 太郎）').'&amp;dates=20261130T080000%2F20261130T190000&amp;', $alert);
+        $this->assertStringNotContainsString('data-auto-dismiss', $alert);
+
+        // 開き直したら出ない（1 回だけ）
+        $this->assertStringNotContainsString('alert-success', $this->get(route('clients.show', $client))->getContent());
+    }
+
+    public function test_登録と更新の直後でも_過去の利用と削除ではリンクが出ず今までどおり自動で消える(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-21 21:00:00'));
+        $this->fakeMediaDisk();
+        $client = $this->makeClient('0001', '山田');
+        $ai = $this->trainee($client, 'アイ');
+
+        $check = function (string $message) use ($client): void {
+            $alert = $this->successAlert($client);
+            $this->assertMatchesRegularExpression('/role="alert" data-auto-dismiss>\s*'.preg_quote($message, '/').'/u', $alert);
+            $this->assertStringNotContainsString('<a ', $alert);
+        };
+
+        $this->post(route('client-usages.store', $client), $this->usageInput('2026-11-20', $ai))->assertSessionMissing('google_calendar_url');
+        $check('利用を登録しました。');
+
+        $usage = $this->usageWith($client, '2026-11-30', $ai);
+        $this->put(route('client-usages.update', $usage), $this->usageInput('2026-11-19', $ai))->assertSessionMissing('google_calendar_url');
+        $check('利用を更新しました。');
+
+        $upcoming = $this->usageWith($client, '2026-12-01', $ai);
+        $this->delete(route('client-usages.destroy', $upcoming))->assertSessionMissing('google_calendar_url');
+        $check('利用を削除しました。');
     }
 
     public function test_利用の行のトレーニーは名前未登録と出し_トレーニーなしは空欄(): void

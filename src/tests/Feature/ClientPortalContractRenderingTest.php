@@ -347,5 +347,18 @@ class ClientPortalContractRenderingTest extends TestCase
         // 「ご」の付かない「利用なし」だけの表記も出さない（2026-11 変更：「ご予約」「すべてご利用済み」とそろえる）
         $this->assertDoesNotMatchRegularExpression('/(?<!ご)利用なし/u', $html);
     }
-}
 
+    public function test_予約があってもGoogleカレンダーに追加のリンクは出さない(): void
+    {
+        // トレーナー側（会員詳細・カレンダー画面）だけのリンク（2026-11 追加）
+        $client = $this->makeClient();
+        $c = $this->contract($client, '2026-10-01', 3);
+        $this->usage($client, '2026-10-13', $c);
+        $this->usage($client, '2026-10-20');
+
+        $html = $this->open($client);
+        $this->assertStringContainsString('2026/10/20', $html);
+        $this->assertStringNotContainsString('calendar.google.com', $html);
+        $this->assertStringNotContainsString('Googleカレンダー', $html);
+    }
+}

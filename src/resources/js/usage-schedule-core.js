@@ -347,31 +347,56 @@ export function clientDetailUrl(template, clientId) {
     return template.replace(CLIENT_ID_PLACEHOLDER, encodeURIComponent(String(clientId)));
 }
 
+/** 「Googleカレンダーに追加」のリンク（アイコンだけ）の title・aria-label（2026-11 追加。Blade の <x-google-calendar-link> と同じ文） */
+export const GOOGLE_CALENDAR_LINK_LABEL = 'Googleカレンダーに追加（別タブで開きます）';
+
+/**
+ * 「Googleカレンダーに追加」のリンクの部分（2026-11 追加。設計書 S-1602「Googleカレンダーに追加」）。
+ * calendarLinks が true（カレンダー画面）で、JSON に URL がある（今日以降の利用）ときだけ 1 つ。ほかは空。
+ * 文字は持たない（アイコンだけ。行の全体の文には入らない）。画面の部品は calendar が true の部分をアイコンのリンクにする
+ *
+ * @param {{google_calendar_url?: (string|null)}} usage
+ * @param {boolean} calendarLinks
+ * @returns {Array<{text: string, href: string, calendar: true}>}
+ */
+export function googleCalendarParts(usage, calendarLinks = false) {
+    if (!calendarLinks || !usage.google_calendar_url) {
+        return [];
+    }
+
+    return [{ text: '', href: usage.google_calendar_url, calendar: true }];
+}
+
 /**
  * 予約の 1 行を、文字とリンクの部分に分けたもの（2026-11 追加。設計書 S-1602「会員名のリンク」）。
  * - 会員詳細の URL の型（clientUrlTemplate）があるとき（カレンダー画面の linkClients: true）：
  *   「開始〜終了　トレーニー（」・会員名（href 付き）・「）」の 3 つ。会員名の部分だけがリンク。トレーニーがない利用は「開始〜終了　（」から始まる
  * - 型がないとき（利用モーダル）・JSON に会員の id がないとき：usageLine と同じ文 1 つ（リンクにしない）
  *
- * @param {{time_range: string, label: string, client_id?: number, client_name?: string, trainee_name?: string}} usage
+ * 最後に「Googleカレンダーに追加」のリンク（googleCalendarParts。calendarLinks が true で、今日以降の利用のとき。2026-11 追加）
+ *
+ * @param {{time_range: string, label: string, client_id?: number, client_name?: string, trainee_name?: string, google_calendar_url?: (string|null)}} usage
  * @param {(string|null)} clientUrlTemplate
- * @returns {Array<{text: string, href?: string}>}
+ * @param {boolean} calendarLinks
+ * @returns {Array<{text: string, href?: string, calendar?: true}>}
  */
-export function usageLineParts(usage, clientUrlTemplate = null) {
+export function usageLineParts(usage, clientUrlTemplate = null, calendarLinks = false) {
+    const calendar = googleCalendarParts(usage, calendarLinks);
     const href = clientDetailUrl(clientUrlTemplate, usage.client_id);
     if (href === null) {
-        return [{ text: usageLine(usage) }];
+        return [{ text: usageLine(usage) }, ...calendar];
     }
 
     // トレーニーがない利用は、会員名だけ（かっこを付けない。2026-11 変更）
     if (!usage.trainee_name) {
-        return [{ text: `${usage.time_range}　` }, { text: usage.client_name ?? '', href }];
+        return [{ text: `${usage.time_range}　` }, { text: usage.client_name ?? '', href }, ...calendar];
     }
 
     return [
         { text: `${usage.time_range}　${usage.trainee_name}（` },
         { text: usage.client_name ?? '', href },
         { text: '）' },
+        ...calendar,
     ];
 }
 
@@ -636,22 +661,25 @@ export function timetableLabelPlacement({ bandLeftPx, bandWidthPx, labelWidthPx,
  * - トレーニーがある利用：省いてよいのはトレーニーの名前だけ。「（会員名）」はかっこごと必ず全体を出す（会員名のリンクをいつも押せるように）
  * - トレーニーがない利用：会員名だけ（かっこを付けない）。上限を超えるときだけ会員名を省く
  * - 会員詳細の URL の型がない・JSON に会員の id がないとき：label の 1 つの文（リンクにしない）
+ * - 「Googleカレンダーに追加」のリンク（googleCalendarParts。calendarLinks が true で、今日以降の利用のとき）は、どの利用でも
+ *   必ず全体を出す部分の最後に置く（「…」で省かれないように。2026-11 追加）
  * shrink・keep の順につなげると、行の全体の文になる
  *
- * @returns {{shrink: Array<{text: string, href?: string}>, keep: Array<{text: string, href?: string}>}}
+ * @returns {{shrink: Array<{text: string, href?: string}>, keep: Array<{text: string, href?: string, calendar?: true}>}}
  */
-export function usageNameGroups(usage, clientUrlTemplate = null) {
+export function usageNameGroups(usage, clientUrlTemplate = null, calendarLinks = false) {
+    const calendar = googleCalendarParts(usage, calendarLinks);
     const href = clientDetailUrl(clientUrlTemplate, usage.client_id);
     if (href === null) {
-        return { shrink: [{ text: usage.label }], keep: [] };
+        return { shrink: [{ text: usage.label }], keep: calendar };
     }
     if (!usage.trainee_name) {
-        return { shrink: [{ text: usage.client_name ?? '', href }], keep: [] };
+        return { shrink: [{ text: usage.client_name ?? '', href }], keep: calendar };
     }
 
     return {
         shrink: [{ text: usage.trainee_name }],
-        keep: [{ text: '（' }, { text: usage.client_name ?? '', href }, { text: '）' }],
+        keep: [{ text: '（' }, { text: usage.client_name ?? '', href }, { text: '）' }, ...calendar],
     };
 }
 
@@ -663,11 +691,11 @@ export function usageNameText({ shrink, keep }) {
 /**
  * タイムテーブル 1 つ分の表示データ。予約がない日は null（タイムテーブルを出さず、「予約はありません」の知らせだけ）
  *
- * @param {{usages: Array, openTime: string, closeTime: string, clientUrlTemplate?: (string|null)}} args
+ * @param {{usages: Array, openTime: string, closeTime: string, clientUrlTemplate?: (string|null), calendarLinks?: boolean}} args
  * @returns {(null|{range: {start: number, end: number}, hourCount: number, outside: Array<{left: number, width: number}>,
  *            rows: Array<{timeRange: string, name: {shrink: Array<{text: string, href?: string}>, keep: Array<{text: string, href?: string}>}, left: number, width: number}>})}
  */
-export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate = null }) {
+export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate = null, calendarLinks = false }) {
     if (!usages || usages.length === 0) {
         return null;
     }
@@ -679,7 +707,7 @@ export function timetableModel({ usages, openTime, closeTime, clientUrlTemplate 
         outside: timetableOutside(range, openTime, closeTime),
         rows: usages.map((usage) => ({
             timeRange: usage.time_range,
-            name: usageNameGroups(usage, clientUrlTemplate),
+            name: usageNameGroups(usage, clientUrlTemplate, calendarLinks),
             ...timetablePosition(range, toMinutes(usage.start_time) ?? range.start, toMinutes(usage.end_time) ?? range.start),
         })),
     };

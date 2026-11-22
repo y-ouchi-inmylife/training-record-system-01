@@ -237,6 +237,17 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertStringNotContainsString('NOTE_SECRET', $html);
     }
 
+    public function test_Googleカレンダーに追加のリンクは出さない(): void
+    {
+        // トレーナー側（会員詳細・カレンダー画面）だけのリンク（2026-11 追加）
+        $this->usage('2026-11-26', '08:00', '19:00', $this->trainee('アイ'));
+
+        $html = $this->dashboard();
+        $this->assertNotNull($this->notice($html));
+        $this->assertStringNotContainsString('calendar.google.com', $html);
+        $this->assertStringNotContainsString('Googleカレンダー', $html);
+    }
+
     public function test_帯はあいさつとご連絡先の登録のお願いの下で_愛犬のカードより上(): void
     {
         // 電話番号を空にして、ご連絡先の登録のお願いも出す（利用があるので対象）

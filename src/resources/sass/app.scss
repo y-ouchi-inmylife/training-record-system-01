@@ -496,6 +496,11 @@ h2 {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+// 名前の後ろの「Googleカレンダーに追加」のリンク（アイコンだけ。タイムテーブルとリストの行。2026-11 追加。設計書 S-1602「Googleカレンダーに追加」）。
+// アイコンの高さは文字と同じ（1em）なので、行の高さは変わらない。左右の余白は押しやすくするため
+.usage-schedule-calendar-link {
+    padding-inline: .375rem;
+}
 // 目盛り（時の数字）。数字は線の位置に中央をそろえる
 .usage-timetable-scale {
     position: relative;

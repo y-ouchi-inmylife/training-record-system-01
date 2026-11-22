@@ -176,8 +176,25 @@
         min-width: 0;
     }
 }
-/* 今日の行は左端に太い線（list-group-flush の左右の枠を使わず、内側の影で引く。太さは 4px） */
-.usage-row-today {
+/* 行の中のボタン（編集モーダルを開く部分。2026-11 変更：その前は行の全体がボタン）。枠・背景は外側（.usage-row-item）に付ける */
+.usage-row {
+    min-width: 0;
+    border: 0;
+    color: var(--bs-list-group-color);
+    background-color: transparent;
+}
+/* 「Googleカレンダーに追加」のリンク（アイコンだけ）。メモの幅をなるべく残すため、押しやすい最小の幅（24px）にする */
+.usage-row-calendar {
+    min-width: 24px;
+}
+/* 今日の行は左端に太い線（list-group-flush の左右の枠を使わず、内側の影で引く。太さは 4px）。
+   中のボタンの背景（マウスを乗せたとき）に隠れないよう、行の上に重ねた面に引く（2026-11 変更） */
+.usage-row-today::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
     box-shadow: inset 4px 0 0 var(--bs-dark);
 }
 </style>
@@ -528,7 +545,7 @@
                                 </div>
                                 <div class="list-group list-group-flush usage-rows">
                                     @foreach($ticket['unassigned']['usages'] as $usage)
-                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id], 'note' => $ticket['usageNotes'][$usage->id]])
+                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id], 'note' => $ticket['usageNotes'][$usage->id], 'googleCalendarUrl' => $googleCalendarUrls[$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
@@ -576,7 +593,7 @@
                                 </div>
                                 <div class="list-group list-group-flush usage-rows">
                                     @foreach($row['usages'] as $usage)
-                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id], 'note' => $ticket['usageNotes'][$usage->id]])
+                                        @include('clients._usage-row', ['usage' => $usage, 'state' => $ticket['usageStates'][$usage->id], 'date' => $ticket['usageDates'][$usage->id], 'note' => $ticket['usageNotes'][$usage->id], 'googleCalendarUrl' => $googleCalendarUrls[$usage->id]])
                                     @endforeach
                                 </div>
                             </div>
