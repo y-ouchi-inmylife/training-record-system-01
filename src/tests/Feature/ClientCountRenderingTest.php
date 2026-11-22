@@ -1129,6 +1129,18 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/class="form-control datepicker[^"]*"\s+id="contracted_on"/u', $html);
     }
 
+    public function test_利用のメモの欄にプレースホルダーを出さない(): void
+    {
+        // キャンセルは利用の削除で行うため、「例: 当日キャンセル」をなくした（2026-11 変更）
+        $client = $this->makeClient('0001', '山田');
+
+        $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('/<input[^>]*\bid="usage_note"[^>]*>/u', $html, $m));
+        $this->assertStringNotContainsString('placeholder', $m[0]);
+        $this->assertStringNotContainsString('当日キャンセル', $html);
+    }
+
     public function test_編集で開くときは編集中の利用のidを予約状況に渡し_保存の前の確認では今までどおり除く(): void
     {
         $client = $this->makeClient('0001', '山田');

@@ -181,7 +181,6 @@
                                    class="form-control @if($openModal === 'usage') @error('note') is-invalid @enderror @endif"
                                    id="usage_note" name="note"
                                    value="{{ $openModal === 'usage' ? old('note') : '' }}"
-                                   placeholder="例: 当日キャンセル"
                                    autocomplete="off">
                             @if($openModal === 'usage')
                                 <x-form-error field="note" />
