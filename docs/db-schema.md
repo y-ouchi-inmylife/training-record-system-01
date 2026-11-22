@@ -786,7 +786,7 @@ erDiagram
 | used_on | DATE | NO | — | 利用日。今日より後の利用は予定として表示する（requirements.md 6-17-9） |
 | start_time | TIME | NO | — | 開始時刻（**2026-11 追加**）。DB のデフォルト値は持たない |
 | end_time | TIME | NO | — | 終了時刻（**2026-11 追加**）。開始時刻より後（アプリ側でチェック。日付をまたぐ利用は扱わない）。DB のデフォルト値は持たない |
-| note | VARCHAR(255) | YES | NULL | メモ（「当日キャンセル」など） |
+| note | VARCHAR(255) | YES | NULL | メモ（利用についての補足） |
 | created_at | TIMESTAMP | YES | NULL | 作成日時 |
 | updated_at | TIMESTAMP | YES | NULL | 更新日時 |
 | updated_by | BIGINT UNSIGNED | YES | NULL | 最終更新者のトレーナーのid（外部キー） |
