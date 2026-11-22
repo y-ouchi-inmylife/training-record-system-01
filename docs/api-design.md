@@ -3242,7 +3242,8 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | month | string | ● | required, date_format:Y-m | 表示する月（例 `2026-11`） |
-| exclude_usage_id | integer | | nullable, integer | 数えない利用の id（編集中の利用自身） |
+
+除く利用の指定（`exclude_usage_id`）は受け取らない（**2026-11 変更**：編集のモーダルでも、編集中の利用を含めて数えるため。その前は、編集中の利用を除くのに使っていた）。
 
 **レスポンス**（200）:
 ```json
@@ -3255,7 +3256,7 @@ POST /training-records に以下を追加する。
 }
 ```
 - `days`：その日の預かる数（その日の中で最も多く重なる瞬間の預かる数）。**預かる数が 1 以上の日だけ**を入れる（画面は、入っていない日を 0 として「0」を出す。**2026-11 追加**：screen-design.md S-0305-M05）
-- `usage_counts`：その日の予約（利用）の件数（**2026-11 追加**。カレンダーのマスの下の行に、同時に預かる数の左に並べて出す。同時に預かる数と同じ日も出す〔**2026-11 変更**：一度、同じ日は出さない形にした〕。screen-design.md S-0305-M05）。トレーニーの有無に関係なく 1 件ずつ数える。`exclude_usage_id` の利用は数えない。**件数が 1 以上の日だけ**を入れる（`days` と同じ形。日付の文字列から件数への対応。画面は、入っていない日を 0 として「0」を出す）。時間帯が重ならない予約があると、`days`（同時に預かる数）より大きくなる
+- `usage_counts`：その日の予約（利用）の件数（**2026-11 追加**。カレンダーのマスの下の行に、同時に預かる数の左に並べて出す。同時に預かる数と同じ日も出す〔**2026-11 変更**：一度、同じ日は出さない形にした〕。screen-design.md S-0305-M05）。トレーニーの有無に関係なく 1 件ずつ数える。**件数が 1 以上の日だけ**を入れる（`days` と同じ形。日付の文字列から件数への対応。画面は、入っていない日を 0 として「0」を出す）。時間帯が重ならない予約があると、`days`（同時に預かる数）より大きくなる
 - `today`：アプリのタイムゾーンでの今日（カレンダーの「今日」の印に使う）
 
 ##### GET /api/usage-schedule/day
@@ -3266,7 +3267,8 @@ POST /training-records に以下を追加する。
 | パラメータ | 型 | 必須 | バリデーション | 説明 |
 |-----------|-----|------|---------------|------|
 | date | string | ● | required, date_format:Y-m-d | 日付 |
-| exclude_usage_id | integer | | nullable, integer | 数えない・出さない利用の id（編集中の利用自身） |
+
+除く利用の指定（`exclude_usage_id`）は受け取らない（**2026-11 変更**。月と同じ）。
 
 **レスポンス**（200）:
 ```json
@@ -3278,15 +3280,15 @@ POST /training-records に以下を追加する。
   "open_time": "08:00",
   "close_time": "19:00",
   "usages": [
-    { "time_range": "8:00〜19:00", "start_time": "08:00", "end_time": "19:00", "label": "アムロ（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "アムロ", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" },
-    { "time_range": "13:00〜19:00", "start_time": "13:00", "end_time": "19:00", "label": "検証Dog（大内 太郎）", "client_id": 7, "client_name": "大内 太郎", "trainee_name": "検証Dog", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" },
-    { "time_range": "19:00〜20:00", "start_time": "19:00", "end_time": "20:00", "label": "佐藤 一郎", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" }
+    { "id": 31, "time_range": "8:00〜19:00", "start_time": "08:00", "end_time": "19:00", "label": "アムロ（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "アムロ", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" },
+    { "id": 34, "time_range": "13:00〜19:00", "start_time": "13:00", "end_time": "19:00", "label": "検証Dog（大内 太郎）", "client_id": 7, "client_name": "大内 太郎", "trainee_name": "検証Dog", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" },
+    { "id": 35, "time_range": "19:00〜20:00", "start_time": "19:00", "end_time": "20:00", "label": "佐藤 一郎", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" }
   ]
 }
 ```
 - `count`：その日の預かる数（月の `days` と同じ数え方）
 - `open_time`・`close_time`：営業時間（事業所情報の設定 S-1601 の `schedule_open_time`・`schedule_close_time`。`HH:MM`。**2026-11 追加**）。カレンダー画面（S-1602）のタイムテーブルの時間の幅の基本に使う
-- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`start_time`・`end_time` は開始・終了の時刻（`HH:MM`。**2026-11 追加**。タイムテーブルの帯の位置に使う。`time_range` は表示用の文字）。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ〔かっこを付けない。**2026-11 変更**：その前は「（会員名）」〕）。`client_id`・`client_name`・`trainee_name`（**2026-11 追加**）は、カレンダー画面（S-1602）で会員名だけを会員詳細へのリンクにするために使う：`client_id` は会員の id、`client_name` は `label` のかっこの中の会員名、`trainee_name` は `label` のかっこの前（トレーニーの名前。未登録なら「名前未登録」、トレーニーがない利用は空文字）。`label` は今までどおり返す（利用モーダルは `label` を使う）。利用の id は返さない（画面で使わないため。**2026-11 変更**：その前は会員の id も返さなかった）
+- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`start_time`・`end_time` は開始・終了の時刻（`HH:MM`。**2026-11 追加**。タイムテーブルの帯の位置に使う。`time_range` は表示用の文字）。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ〔かっこを付けない。**2026-11 変更**：その前は「（会員名）」〕）。`client_id`・`client_name`・`trainee_name`（**2026-11 追加**）は、カレンダー画面（S-1602）で会員名だけを会員詳細へのリンクにするために使う：`client_id` は会員の id、`client_name` は `label` のかっこの中の会員名、`trainee_name` は `label` のかっこの前（トレーニーの名前。未登録なら「名前未登録」、トレーニーがない利用は空文字）。`label` は今までどおり返す（利用モーダルは `label` を使う）。`id` は利用の id（**2026-11 追加**。編集のモーダルで、編集中の利用の行に「編集中」の印を付けるのに使う。その前は、画面で使わないため返さなかった）
 - `google_calendar_url`（**2026-11 追加**）：「Googleカレンダーに追加」のリンクの URL（requirements.md 6-17-13、screen-design.md S-1602。組み立ては `App\Services\GoogleCalendarLinkService`）。**利用日が今日以降の利用だけ**で、過去の利用は `null`。利用のメモは入らない。カレンダー画面（S-1602）だけが使い、利用モーダルは使わない
 
 ##### GET /api/usage-schedule/check
@@ -3300,7 +3302,7 @@ POST /training-records に以下を追加する。
 | start_time | string | ● | required, date_format:H:i | 開始時刻 |
 | end_time | string | ● | required, date_format:H:i, start_time より後 | 終了時刻 |
 | trainee_id | integer | | nullable, integer | トレーニー（**2026-11 追加**）。渡さない・空のときは、重なりの確認をしない |
-| exclude_usage_id | integer | | nullable, integer | 数えない利用の id（編集中の利用自身） |
+| exclude_usage_id | integer | | nullable, integer | 数えない利用の id（編集中の利用自身。自分自身と重なって数えないため。予約状況の表示〔month・day〕と違い、こちらは除く） |
 
 **処理**:
 - 判定は、利用の保存時の確認（`POST /clients/{client}/usages`・`PUT /client-usages/{usage}`）と**同じ処理**を使う（`UsageCapacityService::confirmation`）
