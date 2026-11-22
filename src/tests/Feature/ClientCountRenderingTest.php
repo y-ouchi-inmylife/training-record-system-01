@@ -927,6 +927,10 @@ class ClientCountRenderingTest extends TestCase
         $this->assertLessThan(strpos($modal, 'data-usage-schedule-day-heading'), strpos($modal, 'data-usage-schedule-days'));
         $this->assertStringNotContainsString('usage-schedule-calendar', $modal);
         $this->assertStringNotContainsString('keepDayHeight', $html);
+        // 利用モーダルのカレンダーは 1 か月のまま（2 か月の並びはカレンダー画面だけ。2026-11 追加）
+        $this->assertStringNotContainsString('data-usage-schedule-days-2', $html);
+        $this->assertStringNotContainsString('data-usage-schedule-heading-2', $html);
+        $this->assertDoesNotMatchRegularExpression('/UsageSchedule\([^;]*months:/s', $html);
         // 部品の JS（Vite の入口）を読み込み、利用のモーダルの JS がつなぐ
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
         $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('usageSchedule')", $html);

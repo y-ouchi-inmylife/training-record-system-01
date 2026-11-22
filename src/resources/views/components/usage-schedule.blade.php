@@ -12,8 +12,9 @@
                     下にカレンダーを今までの大きさで左寄せ。どの幅でも同じ。カレンダー画面。2026-11 変更：その前は 'side'〔広い画面で左右に並べる〕）。
                     'day-first' は、その日の予定をカレンダーより前に置く（見た目の順と読み上げ・タブの順をそろえる）
        client-url ：会員詳細の URL の型（会員の id のところを __CLIENT_ID__ にしたもの）。JS の linkClients: true のときに、
-                    一覧の会員名をリンクにするのに使う。リンクにしない利用モーダルでは渡さない --}}
-@props(['id', 'layout' => 'stacked', 'clientUrl' => null])
+                    一覧の会員名をリンクにするのに使う。リンクにしない利用モーダルでは渡さない
+       months     ：1（初期値。利用モーダル）／2（広い画面〔xl 以上〕で、翌月も横に並べる。カレンダー画面。JS にも months: 2 を渡す。2026-11 追加） --}}
+@props(['id', 'layout' => 'stacked', 'clientUrl' => null, 'months' => 1])
 
 <div id="{{ $id }}" class="usage-schedule"
      data-usage-schedule
@@ -26,27 +27,19 @@
     @endif
 
     {{-- カレンダー。'day-first' では下に、今までの大きさで左寄せ（.usage-schedule-calendar。最大の幅 34rem）にし、上の予定とのあいだを空ける --}}
-    <div @class(['usage-schedule-calendar mt-3' => $layout === 'day-first'])>
+    <div @class(['usage-schedule-calendar mt-3' => $layout === 'day-first', 'usage-schedule-calendar--two' => $months === 2])>
         {{-- カレンダー（月の表示。［＜］［＞］で前月・翌月へ） --}}
-        <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+        <div @class(['d-flex align-items-center justify-content-center gap-2 mb-1', 'usage-schedule-nav' => $months === 2])>
             <button type="button" class="btn btn-sm btn-link text-decoration-none" data-usage-schedule-prev aria-label="前の月">＜</button>
             <div class="fw-bold text-center" style="min-width: 8em;" data-usage-schedule-heading aria-live="polite"></div>
             <button type="button" class="btn btn-sm btn-link text-decoration-none" data-usage-schedule-next aria-label="次の月">＞</button>
         </div>
-        <table class="table table-borderless table-sm text-center mb-3" style="table-layout: fixed;">
-            <thead>
-                <tr class="small text-body-secondary">
-                    <th scope="col" class="fw-normal p-1">日</th>
-                    <th scope="col" class="fw-normal p-1">月</th>
-                    <th scope="col" class="fw-normal p-1">火</th>
-                    <th scope="col" class="fw-normal p-1">水</th>
-                    <th scope="col" class="fw-normal p-1">木</th>
-                    <th scope="col" class="fw-normal p-1">金</th>
-                    <th scope="col" class="fw-normal p-1">土</th>
-                </tr>
-            </thead>
-            <tbody data-usage-schedule-days></tbody>
-        </table>
+        <x-usage-schedule-table />
+        {{-- 2 つ目のカレンダー（翌月。months が 2 のとき。広い画面〔xl 以上〕だけ出す。2026-11 追加） --}}
+        @if($months === 2)
+            <div class="fw-bold text-center d-none d-xl-block" data-usage-schedule-heading-2 aria-live="polite"></div>
+            <x-usage-schedule-table :second="true" />
+        @endif
         {{-- マスの数字の説明の行は置かない（2026-11 変更。マスの 2 つの数字の意味は、その日の予約の見出し
              「M/D(曜)　n件　同時に預かる数 m」で分かるため。画面を見られない人にはマスの読み上げの文で伝える）。
              カレンダーとその日の予約のあいだは、表の下の mb-3 で空ける（mb-1 のままだと、マスの行のあいだと同じ 8px になり、

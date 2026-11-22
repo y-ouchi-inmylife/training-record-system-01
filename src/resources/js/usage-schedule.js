@@ -13,11 +13,13 @@
  *                 リストとタイムテーブルを両方作り、CSS の d-lg-none・d-none d-lg-block で出し分ける）。初期値 false。2026-11 追加
  *   keepDayHeight：true なら、その日の予定の枠の最低の高さを同時に預かれる数の行数分にし、読み込み中は前の高さを保つ
  *                 （その日の予定の下にカレンダーがある画面で、日を押すたびにカレンダーが動かないようにする）。初期値 false。2026-11 追加
+ *   months      ：2 なら、2 か月（左の月と翌月）を並べる（2 つ目の入れ物は <x-usage-schedule :months="2">。狭い画面では CSS で隠す）。
+ *                 初期値 1。2026-11 追加
  *   判定と組み立ては usage-schedule-core.js（usageLineParts・scheduleDateUrl・timetableModel など）
  *
  * 使い方：
  *   const schedule = new window.UsageSchedule(rootEl, { onSelect: (ymd) => { ... } });
- *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true });  // カレンダー画面
+ *   new window.UsageSchedule(rootEl, { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2 });  // カレンダー画面
  *   schedule.open('2026-11-26', { excludeUsageId: 12, fallbackDate: '2026-11-21' }); // 開いたとき（編集は除く利用の id を渡す）
  *   schedule.setDate(inputValue);                     // 利用日の欄に入力したとき（正しい日付のときだけ動く）
  *
@@ -45,6 +47,8 @@ import {
     scheduleDateUrl,
     selectDate,
     usageLineParts,
+    visibleMonths,
+    ymOf,
     timetableModel,
     timetableHours,
     timetableLabelStep,
@@ -55,7 +59,7 @@ const LOADING = '読み込み中…';
 const FAILED = '予約状況を読み込めませんでした。';
 
 class UsageSchedule {
-    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false, keepDayHeight = false } = {}) {
+    constructor(root, { onSelect = () => {}, linkClients = false, syncUrl = false, timetable = false, keepDayHeight = false, months = 1 } = {}) {
         this.root = root;
         this.onSelect = onSelect;
         // 会員名をリンクにするときの会員詳細の URL の型（linkClients が false なら null。2026-11 追加）
@@ -83,12 +87,20 @@ class UsageSchedule {
         this.capacity = null;       // 同時に預かれる数（JSON の capacity）
         this.counts = {};           // 出している月の日ごとの預かる数
         this.usageCounts = {};      // 出している月の日ごとの予約の件数（2026-11 追加。月の JSON の usage_counts）
-        this.countsLoaded = false;  // 出している月の預かる数を読み込んだか（読み込む前・失敗は同時に預かる数の数字を出さない。2026-11 追加）
+        // 預かる数を読み込んだ月（「YYYY-MM」。読み込む前・失敗した月は同時に預かる数の数字を出さない。2026-11 変更：その前は 1 か月だけの真偽）
+        this.loadedMonths = new Set();
         this.monthSeq = 0;
         this.daySeq = 0;
 
         this.headingEl = root.querySelector('[data-usage-schedule-heading]');
         this.daysEl = root.querySelector('[data-usage-schedule-days]');
+        // 並べるカレンダー（月の見出しと日のマスの入れ物。左から）。2 か月のときは 2 つ目の入れ物もある（2026-11 追加）
+        this.calendars = [{ headingEl: this.headingEl, daysEl: this.daysEl }];
+        const nextDaysEl = root.querySelector('[data-usage-schedule-days-2]');
+        if (months === 2 && nextDaysEl !== null) {
+            this.calendars.push({ headingEl: root.querySelector('[data-usage-schedule-heading-2]'), daysEl: nextDaysEl });
+        }
+        this.monthCount = this.calendars.length;
         this.statusEl = root.querySelector('[data-usage-schedule-status]');
         this.dayHeadingEl = root.querySelector('[data-usage-schedule-day-heading]');
         this.dayListEl = root.querySelector('[data-usage-schedule-day-list]');
@@ -105,24 +117,29 @@ class UsageSchedule {
 
         root.querySelector('[data-usage-schedule-prev]').addEventListener('click', () => this.move(-1));
         root.querySelector('[data-usage-schedule-next]').addEventListener('click', () => this.move(1));
-        this.daysEl.addEventListener('click', (event) => {
+        this.calendars.forEach(({ daysEl }) => daysEl.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-date]');
             if (!button) return;
             this.select(button.dataset.date);
             this.onSelect(button.dataset.date);
-        });
+        }));
     }
 
     /** 開いたとき。日付が正しくなければ fallbackDate（今日）の月・日にする */
     open(ymd, { excludeUsageId = null, fallbackDate } = {}) {
         this.excludeUsageId = excludeUsageId === null || excludeUsageId === '' ? null : String(excludeUsageId);
         this.state = initialState(ymd, fallbackDate);
-        this.counts = {};
-        this.usageCounts = {};
-        this.countsLoaded = false;
+        this.clearCounts();
         this.renderMonth();
         this.loadMonth();
         this.loadDay();
+    }
+
+    /** 読み込んだ預かる数・件数を空にする（開いたとき・月を移したとき） */
+    clearCounts() {
+        this.counts = {};
+        this.usageCounts = {};
+        this.loadedMonths = new Set();
     }
 
     /** 利用日の欄に入力したとき。正しい日付ならその月に移ってその日を選ぶ */
@@ -133,7 +150,7 @@ class UsageSchedule {
     }
 
     select(ymd) {
-        this.update(selectDate(this.state, ymd));
+        this.update(selectDate(this.state, ymd, this.monthCount));
     }
 
     move(delta) {
@@ -150,11 +167,7 @@ class UsageSchedule {
             window.history.replaceState(window.history.state, '', url);
         }
         this.state = next;
-        if (monthChanged) {
-            this.counts = {};
-            this.usageCounts = {};
-            this.countsLoaded = false;
-        }
+        if (monthChanged) this.clearCounts();
         this.renderMonth();
         if (monthChanged) this.loadMonth();
         if (dayChanged) this.loadDay();
@@ -187,24 +200,30 @@ class UsageSchedule {
 
     async loadMonth() {
         const seq = ++this.monthSeq;
-        const month = this.state.month;
+        // 並べる月ごとに 1 回ずつ読む（2026-11 変更：その前は 1 か月だけ）。片方だけ失敗したときは、読み込めた月の数字は出し、失敗も知らせる
+        const months = visibleMonths(this.state.month, this.monthCount);
         this.setStatus(LOADING);
-        try {
-            const data = await this.fetchJson(`${this.monthUrl}?${this.params({ month })}`);
-            if (seq !== this.monthSeq) return;
-            this.counts = data.days || {};
-            this.usageCounts = data.usage_counts || {};
-            this.countsLoaded = true;
+        const results = await Promise.allSettled(months.map((month) => this.fetchJson(`${this.monthUrl}?${this.params({ month })}`)));
+        if (seq !== this.monthSeq) return;
+        let failed = false;
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                failed = true;
+                console.error('予約状況（月）を読み込めませんでした', result.reason);
+                return;
+            }
+            const data = result.value;
+            Object.assign(this.counts, data.days || {});
+            Object.assign(this.usageCounts, data.usage_counts || {});
+            this.loadedMonths.add(months[index]);
             this.capacity = data.capacity;
-            this.applyDayMinRows();
             this.today = data.today;
+        });
+        if (this.loadedMonths.size > 0) {
+            this.applyDayMinRows();
             this.renderMonth();
-            this.setStatus('');
-        } catch (error) {
-            if (seq !== this.monthSeq) return;
-            console.error('予約状況（月）を読み込めませんでした', error);
-            this.setStatus(FAILED, true);
         }
+        this.setStatus(failed ? FAILED : '', failed);
     }
 
     async loadDay() {
@@ -257,8 +276,13 @@ class UsageSchedule {
     }
 
     renderMonth() {
-        this.headingEl.textContent = monthHeading(this.state.month);
-        const rows = monthWeeks(this.state.month).map((week) => {
+        visibleMonths(this.state.month, this.monthCount).forEach((month, index) => this.renderCalendar(month, this.calendars[index]));
+    }
+
+    /** カレンダー 1 つ（1 か月分の見出しと日のマス） */
+    renderCalendar(month, { headingEl, daysEl }) {
+        headingEl.textContent = monthHeading(month);
+        const rows = monthWeeks(month).map((week) => {
             const tr = document.createElement('tr');
             week.forEach((ymd) => {
                 const td = document.createElement('td');
@@ -271,14 +295,15 @@ class UsageSchedule {
 
             return tr;
         });
-        this.daysEl.replaceChildren(...rows);
+        daysEl.replaceChildren(...rows);
     }
 
     dayButton(ymd) {
         const count = this.counts[ymd] || 0;
         const usageCount = this.usageCounts[ymd] || 0;
         // 空きあり・満・超過（判定は usage-schedule-core.js）。月の預かる数をまだ読んでいない間は色を付けない
-        const loaded = this.countsLoaded && this.capacity !== null;
+        const monthLoaded = this.loadedMonths.has(ymOf(ymd));
+        const loaded = monthLoaded && this.capacity !== null;
         const state = loaded ? capacityState(count, this.capacity) : null;
         const past = isPastDay(ymd, this.today);
         const selected = ymd === this.state.selected;
@@ -300,7 +325,7 @@ class UsageSchedule {
         // 下の行（2026-11 変更。出すものは usage-schedule-core.js の cellBottomRow で決める）：
         // 1 件以上の日は「灰色の太字の件数＋バッジ」（件数と同じ日も両方）、0 件の日は「0」だけ（バッジにしない）。
         // 読み込む前は何も出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
-        const row = cellBottomRow({ count, usageCount, capacity: this.capacity, loaded: this.countsLoaded });
+        const row = cellBottomRow({ count, usageCount, capacity: this.capacity, loaded: monthLoaded });
         if (row.count === '') {
             countEl.textContent = '\u00a0';
         } else {
@@ -327,7 +352,7 @@ class UsageSchedule {
         const weekday = WEEKDAYS[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
         const label = [`${parseInt(ymd.slice(5, 7), 10)}月${parseInt(ymd.slice(8), 10)}日(${weekday})`];
         // 読み上げは「予約 n件 同時に預かる数 m」（数字だけだと何の数か分からないため。2026-11 変更：件数を足した）
-        const ariaCount = cellCountAriaText({ count, usageCount, capacity: this.capacity, loaded: this.countsLoaded });
+        const ariaCount = cellCountAriaText({ count, usageCount, capacity: this.capacity, loaded: monthLoaded });
         if (ariaCount !== '') label.push(ariaCount);
         if (ymd === this.today) label.push('今日');
         if (past) label.push('過去の日');
@@ -453,10 +478,14 @@ class UsageSchedule {
             li.append(name, track);
             list.appendChild(li);
 
-            return { row, track, time };
+            return { row, track, time, name };
         });
 
-        this.timetableEl.replaceChildren(head, list);
+        // 目盛りの行とすべての行で名前の列の幅をそろえる入れ物（幅は CSS の subgrid でいちばん長い名前に合わせる。2026-11 追加）
+        const grid = document.createElement('div');
+        grid.className = 'usage-timetable-grid';
+        grid.append(head, list);
+        this.timetableEl.replaceChildren(grid);
         this.timetableEl.classList.add('d-lg-block');
         this.dayListEl.classList.add('d-lg-none');
         this.layoutTimetable();
@@ -476,7 +505,13 @@ class UsageSchedule {
             el.classList.toggle('usage-timetable-hour--hidden', index % step !== 0);
         });
 
-        this.timetableRows.forEach(({ row, time }) => {
+        this.timetableRows.forEach(({ row, time, name }) => {
+            // 名前が列の上限を超えて「…」で省かれたときだけ、全体を title に入れる（マウスを乗せると見える。2026-11 追加）
+            if (name.scrollWidth > name.clientWidth) {
+                name.title = row.nameParts.map((part) => part.text).join('');
+            } else {
+                name.removeAttribute('title');
+            }
             // 前の置き場所の幅の指定を外してから、文字の幅を測る（帯の中のときは帯の幅にしているため）
             time.classList.remove('usage-timetable-time--inside', 'usage-timetable-time--right', 'usage-timetable-time--left');
             time.style.left = '';

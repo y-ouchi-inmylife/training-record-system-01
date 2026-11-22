@@ -39,6 +39,7 @@ import {
     usageNameParts,
     timetableModel,
     dayMinRows,
+    visibleMonths,
 } from '../../resources/js/usage-schedule-core.js';
 
 // 利用の予約状況（カレンダーとその日の予約）の計算（2026-11 追加。設計書 S-0305-M05「予約状況」）。
@@ -653,3 +654,44 @@ describe('その日の予定の枠の最低の行数', () => {
     });
 });
 
+// カレンダー画面（S-1602）の 2 か月の並び（2026-11 追加）
+describe('2 か月の並び', () => {
+    it('並べる月は、選んだ日の月とその翌月（12 月なら翌年 1 月）', () => {
+        expect(visibleMonths(initialState('2026-11-20', '2026-11-01').month, 2)).toEqual(['2026-11', '2026-12']);
+        expect(visibleMonths(initialState('2026-12-31', '2026-11-01').month, 2)).toEqual(['2026-12', '2027-01']);
+    });
+
+    it('利用モーダル（1 か月）は、その月だけ', () => {
+        expect(visibleMonths('2026-11')).toEqual(['2026-11']);
+        expect(visibleMonths('2026-12', 1)).toEqual(['2026-12']);
+    });
+
+    it('月の送りは 2 か月とも 1 か月ずつ（年をまたぐときも）。選んだ日は変えない', () => {
+        const state = initialState('2026-11-20', '2026-11-01');
+        const next = moveMonth(state, 1);
+        expect(visibleMonths(next.month, 2)).toEqual(['2026-12', '2027-01']);
+        expect(next.selected).toBe('2026-11-20');
+        expect(visibleMonths(moveMonth(next, 1).month, 2)).toEqual(['2027-01', '2027-02']);
+        expect(visibleMonths(moveMonth(moveMonth(next, 1), -1).month, 2)).toEqual(['2026-12', '2027-01']);
+        expect(visibleMonths(moveMonth(state, -1).month, 2)).toEqual(['2026-10', '2026-11']);
+    });
+
+    it('右の月の日を押しても、選んだ日だけが変わり、出している月は変わらない（年をまたぐときも）', () => {
+        expect(selectDate({ month: '2026-11', selected: '2026-11-20' }, '2026-12-03', 2)).toEqual({ month: '2026-11', selected: '2026-12-03' });
+        expect(selectDate({ month: '2026-12', selected: '2026-12-31' }, '2027-01-04', 2)).toEqual({ month: '2026-12', selected: '2027-01-04' });
+        // 左の月の日も同じ
+        expect(selectDate({ month: '2026-11', selected: '2026-12-03' }, '2026-11-05', 2)).toEqual({ month: '2026-11', selected: '2026-11-05' });
+    });
+
+    it('出していない月の日なら、その日の月に移る。1 か月（利用モーダル）は今までどおり、その日の月に移る', () => {
+        expect(selectDate({ month: '2026-11', selected: '2026-11-20' }, '2027-03-01', 2)).toEqual({ month: '2027-03', selected: '2027-03-01' });
+        expect(selectDate({ month: '2026-11', selected: '2026-11-20' }, '2026-12-03')).toEqual({ month: '2026-12', selected: '2026-12-03' });
+    });
+
+    it('右の月の日を押したときも、URL の date はその日に書き換わる', () => {
+        const state = { month: '2026-11', selected: '2026-11-20' };
+        const next = selectDate(state, '2026-12-03', 2);
+        expect(scheduleDateUrl({ href: 'https://trainer.example.test/schedule?date=2026-11-20', syncUrl: true, previous: state.selected, selected: next.selected }))
+            .toBe('/schedule?date=2026-12-03');
+    });
+});

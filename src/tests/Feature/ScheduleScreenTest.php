@@ -134,11 +134,24 @@ class ScheduleScreenTest extends TestCase
         );
         $this->assertStringNotContainsString('col-lg-6', $html);
         // その下にカレンダー（今までの大きさで左寄せ。usage-schedule-calendar）
-        $this->assertMatchesRegularExpression('/<\/ul>\s*<\/div>\s*<\/div>\s*<div class="usage-schedule-calendar mt-3">\s*<div class="d-flex align-items-center justify-content-center gap-2 mb-1">/u', $html);
+        $this->assertMatchesRegularExpression('/<\/ul>\s*<\/div>\s*<\/div>\s*<div class="usage-schedule-calendar mt-3 usage-schedule-calendar--two">\s*<div class="d-flex align-items-center justify-content-center gap-2 mb-1 usage-schedule-nav">/u', $html);
         // JS の設定：会員名をリンクにし、URL の date を書き換え、広い画面でタイムテーブルにし、予定の枠の高さを保つ（2026-11 追加。利用日の欄はない）
-        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true });", $html);
+        $this->assertStringContainsString("new window.UsageSchedule(document.getElementById('scheduleCalendar'), { linkClients: true, syncUrl: true, timetable: true, keepDayHeight: true, months: 2 });", $html);
         $this->assertStringNotContainsString('onSelect', $html);
         $this->assertMatchesRegularExpression('/<script type="module" src="[^"]*usage-schedule[^"]*\.js"/u', $html);
+    }
+
+    public function test_2か月分のカレンダーの入れ物があり_月を送るボタンは1組だけ(): void
+    {
+        // 2 つ目（翌月）は広い画面（xl 以上）だけ出す（2026-11 追加）
+        $html = $this->page();
+        foreach (['data-usage-schedule-heading aria-live', 'data-usage-schedule-days>', 'data-usage-schedule-prev', 'data-usage-schedule-next'] as $attribute) {
+            $this->assertSame(1, substr_count($html, $attribute), $attribute);
+        }
+        $this->assertStringContainsString('<div class="fw-bold text-center d-none d-xl-block" data-usage-schedule-heading-2 aria-live="polite"></div>', $html);
+        $this->assertMatchesRegularExpression('/<table class="table table-borderless table-sm text-center mb-3 d-none d-xl-table" style="table-layout: fixed;">.*?<tbody data-usage-schedule-days-2><\/tbody>/su', $html);
+        // 左（今月）→ 右（翌月）の順
+        $this->assertLessThan(strpos($html, 'data-usage-schedule-days-2'), strpos($html, 'data-usage-schedule-days>'));
     }
 
     public function test_その日の予定の枠はカレンダーより前にある(): void

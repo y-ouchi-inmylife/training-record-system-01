@@ -282,13 +282,29 @@ export function initialState(ymd, fallback) {
     return { month: ymOf(date), selected: date };
 }
 
-/** 日付を選ぶ（その日の月に移る） */
-export function selectDate(state, ymd) {
+/**
+ * 並べて出す月（左から。2026-11 追加。設計書 S-1602「2 か月の並び」）。monthCount が 1 なら month だけ（利用モーダル）、
+ * 2 なら month とその翌月（12 月なら翌年 1 月）
+ *
+ * @param {string} month 左の月（「YYYY-MM」）
+ * @param {number} monthCount 並べる月の数
+ * @returns {string[]}
+ */
+export function visibleMonths(month, monthCount = 1) {
+    return Array.from({ length: monthCount }, (_, i) => shiftMonth(month, i));
+}
+
+/**
+ * 日付を選ぶ。出している月の日なら、選んだ日だけを変えて月は動かさない（2 か月並べているときに右の月の日を押しても、並びを動かさない。
+ * 2026-11 追加）。出していない月の日なら、その日の月に移る（1 か月のときは、今までどおりその日の月に移るのと同じ）
+ */
+export function selectDate(state, ymd, monthCount = 1) {
     if (!parseYmd(ymd)) {
         return state;
     }
+    const month = visibleMonths(state.month, monthCount).includes(ymOf(ymd)) ? state.month : ymOf(ymd);
 
-    return { month: ymOf(ymd), selected: ymd };
+    return { month, selected: ymd };
 }
 
 /**
