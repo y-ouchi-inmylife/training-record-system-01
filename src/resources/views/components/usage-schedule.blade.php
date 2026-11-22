@@ -18,7 +18,7 @@
         <div class="fw-bold text-center" style="min-width: 8em;" data-usage-schedule-heading aria-live="polite"></div>
         <button type="button" class="btn btn-sm btn-link text-decoration-none" data-usage-schedule-next aria-label="次の月">＞</button>
     </div>
-    <table class="table table-borderless table-sm text-center mb-1" style="table-layout: fixed;">
+    <table class="table table-borderless table-sm text-center mb-3" style="table-layout: fixed;">
         <thead>
             <tr class="small text-body-secondary">
                 <th scope="col" class="fw-normal p-1">日</th>
@@ -32,11 +32,10 @@
         </thead>
         <tbody data-usage-schedule-days></tbody>
     </table>
-    {{-- マスの数字の説明（2026-11 追加。左の灰色の数字＝予約の件数、バッジ＝同時に預かる数。
-         2026-11 変更：その前は「バッジ：同時に預かる数　左の灰色の数字：予約の件数（違う日だけ）」、その前は「左：予約の件数　右：同時に預かる数」、
-         さらにその前は「右上：予約の件数　下：同時に預かる数」）。
-         書き方の説明なので、月の預かる数を読み込めなかったときも出したままにする --}}
-    <div class="small text-body-secondary mb-2" data-usage-schedule-legend>左の灰色の数字：予約の件数　バッジ：同時に預かる数</div>
+    {{-- マスの数字の説明の行は置かない（2026-11 変更。マスの 2 つの数字の意味は、その日の予約の見出し
+         「M/D(曜) の予約 n件　同時に預かる数 m」で分かるため。画面を見られない人にはマスの読み上げの文で伝える）。
+         カレンダーとその日の予約のあいだは、表の下の mb-3 で空ける（mb-1 のままだと、マスの行のあいだと同じ 8px になり、
+         一覧がカレンダーの続きに見えるため） --}}
     {{-- 読み込み中・失敗の知らせ（失敗しても、使う側の入力と保存は止めない） --}}
     <div class="small text-body-secondary mb-2 d-none" data-usage-schedule-status role="status"></div>
 

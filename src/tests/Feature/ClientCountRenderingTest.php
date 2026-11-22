@@ -909,11 +909,16 @@ class ClientCountRenderingTest extends TestCase
             'data-usage-schedule-status', 'data-usage-schedule-day-heading', 'data-usage-schedule-day-list'] as $attribute) {
             $this->assertStringContainsString($attribute, $modal, $attribute);
         }
-        // カレンダーの下の説明（2026-11 追加）：日付のマスのすぐ下、読み込みの知らせ・その日の予約の上
+        // カレンダーの下の説明の行は置かない（2026-11 変更。数字の意味はその日の予約の見出しで分かる）。
+        // カレンダーの表のすぐ後ろに、読み込みの知らせが続く
+        $this->assertStringNotContainsString('data-usage-schedule-legend', $modal);
+        $this->assertStringNotContainsString('予約の件数　バッジ', $modal);
         $this->assertMatchesRegularExpression(
-            '/<tbody data-usage-schedule-days><\/tbody>\s*<\/table>\s*<div class="small text-body-secondary mb-2" data-usage-schedule-legend>左の灰色の数字：予約の件数　バッジ：同時に預かる数<\/div>/u',
+            '/<tbody data-usage-schedule-days><\/tbody>\s*<\/table>\s*<div class="small text-body-secondary mb-2 d-none" data-usage-schedule-status role="status"><\/div>/u',
             $modal
         );
+        // カレンダーとその日の予約のあいだは、表の下の mb-3 で空ける（2026-11 変更：その前は mb-1 の後ろに説明の行があった）
+        $this->assertStringContainsString('<table class="table table-borderless table-sm text-center mb-3" style="table-layout: fixed;">', $modal);
         preg_match_all('/<th scope="col" class="fw-normal p-1">(.)<\/th>/u', $modal, $m);
         $this->assertSame(['日', '月', '火', '水', '木', '金', '土'], $m[1]);
         // 部品の JS（Vite の入口）を読み込み、利用のモーダルの JS がつなぐ
