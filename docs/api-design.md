@@ -134,6 +134,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 愛犬性格診断 | S-0602 愛犬性格診断のプロンプト画面 | PUT | `/settings/evaluation-prompts` | 愛犬性格診断のプロンプトを更新する（**2026-10-19 追加**） | auth | 管理者 |
 | 予定 | S-1601 事業所情報の設定画面 | GET | `/settings/schedule` | 事業所情報の設定画面を表示する（ルート名 `settings.schedule.edit`。**2026-11 追加**） | auth | 管理者 |
 | 予定 | S-1601 事業所情報の設定画面 | PUT | `/settings/schedule` | 営業開始時刻・営業終了時刻・同時に預かれる数を更新する（ルート名 `settings.schedule.update`。**2026-11 追加**。預かる数は **2026-11 追加**） | auth | 管理者 |
+| 予定 | S-1602 カレンダー画面 | GET | `/schedule` | カレンダー画面を表示する（ルート名 `schedule.index`。見るだけ。**2026-11 追加**） | auth | 管理者、一般 |
 | 音声ファイル容量管理 | S-0701 音声ファイル一覧画面 | GET | `/usage-stats` | 音声ファイル一覧画面を表示する（サーバー容量管理用） | auth | システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | GET | `/trainers/create` | トレーナー登録画面を表示する | auth | 管理者、システム管理者 |
 | トレーナー管理 | S-0801 トレーナー登録画面 | POST | `/trainers` | トレーナーを登録する | auth | 管理者、システム管理者 |
@@ -205,8 +206,8 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 内部API | - | GET | `/api/audio-records/{id}/summary` | 音声記録の要約テキストを取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/audio-records/summaries` | 要約取り込み候補の音声記録一覧を取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/trainers` | 担当トレーナーの選択候補を取得する | auth | 管理者、一般 |
-| 内部API | - | GET | `/api/usage-schedule/month` | 利用の予約状況：月の日ごとの預かる数・予約の件数と上限を返す（S-0305-M05。**2026-11 追加**。件数は **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
-| 内部API | - | GET | `/api/usage-schedule/day` | 利用の予約状況：その日の預かる数・上限・予約の一覧を返す（S-0305-M05。**2026-11 追加**。4-2-6） | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/usage-schedule/month` | 利用の予約状況：月の日ごとの預かる数・予約の件数と上限を返す（S-0305-M05・S-1602。**2026-11 追加**。件数は **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/usage-schedule/day` | 利用の予約状況：その日の預かる数・上限・予約の一覧を返す（S-0305-M05・S-1602。**2026-11 追加**。会員の id・会員名・トレーニーの名前は **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/usage-schedule/check` | 利用の保存の前の確認：この利用を入れたときの預かる数と、同じトレーニーの重なりと、確認が要るかを返す（S-0305-M05。**2026-11 追加**。重なりは **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records/upload-url` | アップロード用の署名付きURLを発行する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records` | アップロード完了後、メディアレコードを作成する | auth | 管理者、一般 |
@@ -2813,6 +2814,20 @@ POST /training-records に以下を追加する。
 
 **レスポンス**: `redirect('/settings/schedule')`。フラッシュ `success` に「事業所情報の設定を更新しました。」
 
+##### S-1602 カレンダー画面
+
+###### GET /schedule
+
+**概要**: カレンダー画面を表示する（ルート名 `schedule.index`。見るだけ。**2026-11 追加**。screen-design.md S-1602）。認証・権限は `auth` ＋ `practitioners`（一般・管理者。システム管理者は 403）。アクセスログは記録しない。
+
+**クエリパラメータ**（任意）:
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| date | string | 選んでいる日（`YYYY-MM-DD`）。ないとき・正しくない日付（形が違う、ない日付）のときは、入力エラーにせず、今日（`today()`）にする |
+
+**レスポンス**: view（選んでいる日 `date` と今日 `today`。カレンダーの数字とその日の予約は、画面が内部 API〔4-2-6 の month・day〕から読む）
+
 ---
 
 ### 4-2. 内部API（routes/api.php）
@@ -3211,7 +3226,7 @@ POST /training-records に以下を追加する。
 
 （**2026-11 追加**。requirements.md 6-17-11、screen-design.md S-0305-M05「予約状況」）
 
-利用のモーダルの予約状況（カレンダーとその日の予約）が読み込む。預かる数は**事業所全体**（すべての会員の利用）で、数え方は requirements.md 6-17-11（利用 1 件を 1 と数える、時間帯は終わりを含まない、最も多く重なる瞬間の預かる数）。計算は `App\Services\UsageCapacityService`（保存時の上限の確認と同じ）。上限は `system_settings` の `schedule_capacity`（行がなければ 3）。
+利用のモーダルの予約状況（カレンダーとその日の予約）と、カレンダー画面（screen-design.md S-1602。**2026-11 追加**）が読み込む。預かる数は**事業所全体**（すべての会員の利用）で、数え方は requirements.md 6-17-11（利用 1 件を 1 と数える、時間帯は終わりを含まない、最も多く重なる瞬間の預かる数）。計算は `App\Services\UsageCapacityService`（保存時の上限の確認と同じ）。上限は `system_settings` の `schedule_capacity`（行がなければ 3）。
 
 - 権限：利用の登録・編集と同じ（`auth` ＋ `practitioners`。トレーナー用ドメイン。システム管理者は 403）
 - 参照なので、アクセスログには記録しない（`LogAccess` の `ACTION_MAP` に足さない）
@@ -3260,13 +3275,14 @@ POST /training-records に以下を追加する。
   "capacity": 3,
   "count": 2,
   "usages": [
-    { "time_range": "8:00〜19:00", "label": "アムロ（佐藤 一郎）" },
-    { "time_range": "13:00〜19:00", "label": "検証Dog（大内 太郎）" }
+    { "time_range": "8:00〜19:00", "label": "アムロ（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "アムロ" },
+    { "time_range": "13:00〜19:00", "label": "検証Dog（大内 太郎）", "client_id": 7, "client_name": "大内 太郎", "trainee_name": "検証Dog" },
+    { "time_range": "19:00〜20:00", "label": "（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "" }
   ]
 }
 ```
 - `count`：その日の預かる数（月の `days` と同じ数え方）
-- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「（会員名）」）。利用の id・会員の id は返さない（画面で使わないため）
+- `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「（会員名）」）。`client_id`・`client_name`・`trainee_name`（**2026-11 追加**）は、カレンダー画面（S-1602）で会員名だけを会員詳細へのリンクにするために使う：`client_id` は会員の id、`client_name` は `label` のかっこの中の会員名、`trainee_name` は `label` のかっこの前（トレーニーの名前。未登録なら「名前未登録」、トレーニーがない利用は空文字）。`label` は今までどおり返す（利用モーダルは `label` を使う）。利用の id は返さない（画面で使わないため。**2026-11 変更**：その前は会員の id も返さなかった）
 
 ##### GET /api/usage-schedule/check
 
