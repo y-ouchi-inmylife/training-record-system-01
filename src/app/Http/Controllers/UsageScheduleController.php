@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
 class UsageScheduleController extends Controller
 {
     /**
-     * 月の日ごとの預かる数と上限（GET /api/usage-schedule/month）
+     * 月の日ごとの預かる数・予約の件数（2026-11 追加）と上限（GET /api/usage-schedule/month）
      */
     public function month(Request $request, UsageCapacityService $service): JsonResponse
     {
@@ -35,6 +35,8 @@ class UsageScheduleController extends Controller
             'capacity' => ScheduleSetting::capacity(),
             // 預かる数が 1 以上の日だけ。日がなくても JSON のオブジェクト（{}）にする
             'days' => (object) $service->monthCounts($validated['month'], $exclude),
+            // 日ごとの予約の件数（2026-11 追加。カレンダーのマスの右上に出す）。件数が 1 以上の日だけ。days と同じ形
+            'usage_counts' => (object) $service->monthUsageCounts($validated['month'], $exclude),
         ]);
     }
 

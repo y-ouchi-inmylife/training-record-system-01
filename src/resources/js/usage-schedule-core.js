@@ -128,16 +128,28 @@ export function cellCountText({ count, capacity, loaded }) {
 }
 
 /**
- * カレンダーのマスの読み上げの文に入れる、同時に預かる数（「同時に預かる数 2」。2026-11 変更：その前は「2/3」）。
- * 数字だけだと何の数か分からないため、言葉を添える。読み込む前は空
+ * カレンダーのマスの右上に出す予約の件数（2026-11 追加。設計書 S-0305-M05「予約状況」）。
+ * 数字だけ（「件」は付けない）。予約が 0 件の日と、月の預かる数を読み込む前（読み込み中・失敗）は出さない（空）
  *
- * @param {{count: number, capacity: (number|null), loaded: boolean}} cell
+ * @param {{usageCount: number, loaded: boolean}} cell
+ * @returns {string}
+ */
+export function cellUsageCountText({ usageCount, loaded }) {
+    return loaded && usageCount > 0 ? `${usageCount}` : '';
+}
+
+/**
+ * カレンダーのマスの読み上げの文に入れる、予約の件数と同時に預かる数（「予約 4件 同時に預かる数 3」）。
+ * 数字だけだと何の数か分からないため、言葉を添える。0 件の日も「予約 0件」を入れる。読み込む前は空。
+ * 2026-11 変更：件数を足した（その前は「同時に預かる数 n」。さらにその前は「n/上限」）
+ *
+ * @param {{count: number, usageCount?: number, capacity: (number|null), loaded: boolean}} cell
  * @returns {string}
  */
 export function cellCountAriaText(cell) {
     const text = cellCountText(cell);
 
-    return text === '' ? '' : `同時に預かる数 ${text}`;
+    return text === '' ? '' : `予約 ${cell.usageCount ?? 0}件 同時に預かる数 ${text}`;
 }
 
 /**
@@ -190,7 +202,8 @@ export function capacityState(count, capacity) {
  *   同時に預かる数の数字の見た目（バッジ・太字）は変えない。過去の日を選んでいるときは、灰色の背景と枠の両方（2026-11 追加）
  *
  * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean, past?: boolean}} cell
- * @returns {{button: string[], day: string[], count: string[], countBadge: string[]}}
+ * @returns {{button: string[], day: string[], count: string[], countBadge: string[], usageCount: string[]}}
+ *   usageCount はマスの右上の予約の件数の要素（2026-11 追加）
  *   count は同時に預かる数の数字の入れ物、countBadge はその中のバッジ（空きありは空。バッジを作らない）
  */
 export function dayCellClasses({ state, selected, today, past = false }) {
@@ -211,7 +224,10 @@ export function dayCellClasses({ state, selected, today, past = false }) {
     // 同時に預かる数の数字はどれも太字（usage-schedule-count。app.scss）。満・超過は中をバッジにする（countBadgeClasses）
     const count = ['d-block', 'small', 'usage-schedule-count'];
 
-    return { button, day, count, countBadge: countBadgeClasses(state) };
+    // 右上の予約の件数（2026-11 追加）：控えめな灰色の小さな文字。位置は app.scss の usage-schedule-usage-count
+    const usageCount = ['usage-schedule-usage-count', 'text-body-secondary'];
+
+    return { button, day, count, countBadge: countBadgeClasses(state), usageCount };
 }
 
 /**

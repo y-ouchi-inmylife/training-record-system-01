@@ -85,7 +85,52 @@ class UsageScheduleApiTest extends TestCase
                 'today' => '2026-11-21',
                 'capacity' => 3,
                 'days' => ['2026-11-24' => 1, '2026-11-26' => 2],
+                // 日ごとの予約の件数（2026-11 追加）
+                'usage_counts' => ['2026-11-24' => 1, '2026-11-26' => 2],
             ]);
+    }
+
+    // ---- 月の日ごとの予約の件数（2026-11 追加。カレンダーのマスの右上） ----
+
+    public function test_月の件数は_時間帯が重ならない予約があると同時に預かる数と違う(): void
+    {
+        // 11/20：予約 4 件。19:00〜20:00 はほかと重ならないので、同時に預かる数は 3
+        $this->usage($this->sato, '2026-11-20', '08:00', '19:00');
+        $this->usage($this->sato, '2026-11-20', '08:00', '19:00');
+        $this->usage($this->ouchi, '2026-11-20', '10:00', '12:00');
+        $this->usage($this->ouchi, '2026-11-20', '19:00', '20:00');
+        // 11/26：予約 2 件、同時に預かる数 2（同じ）
+        $this->usage($this->sato, '2026-11-26', '08:00', '19:00');
+        $this->usage($this->ouchi, '2026-11-26', '13:00', '19:00');
+
+        $response = $this->getJson(route('api.usage-schedule.month', ['month' => '2026-11']))->assertOk();
+
+        $this->assertSame(['2026-11-20' => 3, '2026-11-26' => 2], $response->json('days'));
+        $this->assertSame(['2026-11-20' => 4, '2026-11-26' => 2], $response->json('usage_counts'));
+    }
+
+    public function test_月の件数はトレーニーなしも1件と数え_除く利用は数えない(): void
+    {
+        DB::table('trainees')->insert(['id' => 10, 'client_id' => $this->sato->id, 'name' => 'アムロ']);
+        $this->usage($this->sato, '2026-11-20', '08:00', '12:00', 10);
+        $this->usage($this->sato, '2026-11-20', '13:00', '15:00'); // トレーニーなし
+        $self = $this->usage($this->ouchi, '2026-11-20', '16:00', '18:00');
+        $only = $this->usage($this->ouchi, '2026-11-21', '08:00', '19:00');
+
+        $this->getJson(route('api.usage-schedule.month', ['month' => '2026-11']))
+            ->assertOk()->assertJsonPath('usage_counts', ['2026-11-20' => 3, '2026-11-21' => 1]);
+        $this->getJson(route('api.usage-schedule.month', ['month' => '2026-11', 'exclude_usage_id' => $self->id]))
+            ->assertOk()->assertJsonPath('usage_counts', ['2026-11-20' => 2, '2026-11-21' => 1]);
+        // 件数が 0 になる日は入れない
+        $this->getJson(route('api.usage-schedule.month', ['month' => '2026-11', 'exclude_usage_id' => $only->id]))
+            ->assertOk()->assertJsonPath('usage_counts', ['2026-11-20' => 3]);
+    }
+
+    public function test_月に予約がなければ件数も空のオブジェクト(): void
+    {
+        $response = $this->getJson(route('api.usage-schedule.month', ['month' => '2026-10']))->assertOk();
+
+        $this->assertStringContainsString('"usage_counts":{}', $response->getContent());
     }
 
     public function test_月に利用がなければ日は空のオブジェクトで_上限は設定の値(): void

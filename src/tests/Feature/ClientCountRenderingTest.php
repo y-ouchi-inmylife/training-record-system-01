@@ -909,6 +909,11 @@ class ClientCountRenderingTest extends TestCase
             'data-usage-schedule-status', 'data-usage-schedule-day-heading', 'data-usage-schedule-day-list'] as $attribute) {
             $this->assertStringContainsString($attribute, $modal, $attribute);
         }
+        // カレンダーの下の説明（2026-11 追加）：日付のマスのすぐ下、読み込みの知らせ・その日の予約の上
+        $this->assertMatchesRegularExpression(
+            '/<tbody data-usage-schedule-days><\/tbody>\s*<\/table>\s*<div class="small text-body-secondary mb-2" data-usage-schedule-legend>右上：予約の件数　下：同時に預かる数<\/div>/u',
+            $modal
+        );
         preg_match_all('/<th scope="col" class="fw-normal p-1">(.)<\/th>/u', $modal, $m);
         $this->assertSame(['日', '月', '火', '水', '木', '金', '土'], $m[1]);
         // 部品の JS（Vite の入口）を読み込み、利用のモーダルの JS がつなぐ

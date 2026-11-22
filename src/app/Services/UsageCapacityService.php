@@ -56,17 +56,8 @@ class UsageCapacityService
      */
     public function monthCounts(string $month, ?int $excludeUsageId = null): array
     {
-        $first = Carbon::createFromFormat('Y-m-d', $month.'-01')->startOfDay();
-
-        $usages = ClientUsage::query()
-            ->whereDate('used_on', '>=', $first->toDateString())
-            ->whereDate('used_on', '<=', $first->copy()->endOfMonth()->toDateString())
-            ->when($excludeUsageId !== null, fn ($query) => $query->where('id', '!=', $excludeUsageId))
-            ->orderBy('used_on')
-            ->get(['id', 'used_on', 'start_time', 'end_time']);
-
         $counts = [];
-        foreach ($usages->groupBy(fn (ClientUsage $usage) => $usage->used_on->toDateString()) as $date => $dayUsages) {
+        foreach ($this->monthUsagesByDate($month, $excludeUsageId) as $date => $dayUsages) {
             $count = self::maxOverlap(self::intervalsOf($dayUsages));
             if ($count > 0) {
                 $counts[$date] = $count;
@@ -74,6 +65,39 @@ class UsageCapacityService
         }
 
         return $counts;
+    }
+
+    /**
+     * 月の日ごとの予約（利用）の件数（2026-11 追加。カレンダーのマスの右上に出す）。
+     * トレーニーの有無に関係なく 1 件ずつ数える。$excludeUsageId（編集中の利用自身）は数えない。
+     * 件数が 1 以上の日だけを、日付（Y-m-d）の昇順で返す（monthCounts と同じ形）
+     *
+     * @param  string  $month  「Y-m」
+     * @return array<string, int>
+     */
+    public function monthUsageCounts(string $month, ?int $excludeUsageId = null): array
+    {
+        return $this->monthUsagesByDate($month, $excludeUsageId)
+            ->map(fn (Collection $dayUsages) => $dayUsages->count())
+            ->all();
+    }
+
+    /**
+     * 月の利用を、利用日（Y-m-d）ごとにまとめたもの（日付の昇順）。$excludeUsageId の利用は入れない
+     *
+     * @return Collection<string, Collection<int, ClientUsage>>
+     */
+    private function monthUsagesByDate(string $month, ?int $excludeUsageId): Collection
+    {
+        $first = Carbon::createFromFormat('Y-m-d', $month.'-01')->startOfDay();
+
+        return ClientUsage::query()
+            ->whereDate('used_on', '>=', $first->toDateString())
+            ->whereDate('used_on', '<=', $first->copy()->endOfMonth()->toDateString())
+            ->when($excludeUsageId !== null, fn ($query) => $query->where('id', '!=', $excludeUsageId))
+            ->orderBy('used_on')
+            ->get(['id', 'used_on', 'start_time', 'end_time'])
+            ->groupBy(fn (ClientUsage $usage) => $usage->used_on->toDateString());
     }
 
     /**

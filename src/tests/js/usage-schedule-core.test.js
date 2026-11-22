@@ -10,6 +10,7 @@ import {
     countBadgeClasses,
     cellCountAriaText,
     cellCountText,
+    cellUsageCountText,
     countText,
     dayCellClasses,
     dayHeading,
@@ -221,6 +222,7 @@ describe('dayCellClasses', () => {
             day: ['d-block'],
             count: ['d-block', 'small', 'usage-schedule-count'],
             countBadge: [],
+            usageCount: ['usage-schedule-usage-count', 'text-body-secondary'],
         });
     });
 });
@@ -396,10 +398,28 @@ describe('過去の日と「0/上限」', () => {
         expect(cell({ state: capacityState(count, 3) }).countBadge).toEqual(badge);
     });
 
-    it('マスの読み上げの文は「同時に預かる数 n」（読み込む前は空）', () => {
-        expect(cellCountAriaText({ count: 3, capacity: 3, loaded: true })).toBe('同時に預かる数 3');
-        expect(cellCountAriaText({ count: 0, capacity: 3, loaded: true })).toBe('同時に預かる数 0');
-        expect(cellCountAriaText({ count: 2, capacity: 3, loaded: false })).toBe('');
+    // 読み上げの文は「予約 n件 同時に預かる数 m」（2026-11 変更：件数を足した）
+    it('マスの読み上げの文は「予約 n件 同時に預かる数 m」（0 件も入れる。読み込む前は空）', () => {
+        expect(cellCountAriaText({ count: 3, usageCount: 4, capacity: 3, loaded: true })).toBe('予約 4件 同時に預かる数 3');
+        expect(cellCountAriaText({ count: 0, usageCount: 0, capacity: 3, loaded: true })).toBe('予約 0件 同時に預かる数 0');
+        expect(cellCountAriaText({ count: 2, usageCount: 2, capacity: 3, loaded: false })).toBe('');
+    });
+
+    // マスの右上の予約の件数（2026-11 追加）
+    it.each([
+        [4, true, '4'],
+        [1, true, '1'],
+        [0, true, ''],
+        [4, false, ''],
+        [0, false, ''],
+    ])('右上の件数：件数 %i・読み込み済み %s は「%s」（0 件と読み込む前は出さない）', (usageCount, loaded, text) => {
+        expect(cellUsageCountText({ usageCount, loaded })).toBe(text);
+    });
+
+    it('右上の件数の要素は控えめな灰色の小さな文字（位置は app.scss）', () => {
+        for (const opts of [{}, { today: true }, { past: true }, { selected: true }, { state: CAPACITY_OVER }]) {
+            expect(cell(opts).usageCount).toEqual(['usage-schedule-usage-count', 'text-body-secondary']);
+        }
     });
 
     it('月の預かる数を読み込む前は「n/上限」を出さない（上限を知っていても）', () => {

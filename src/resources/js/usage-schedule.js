@@ -23,6 +23,7 @@ import {
     capacityState,
     cellCountAriaText,
     cellCountText,
+    cellUsageCountText,
     dayCellClasses,
     dayHeadingParts,
     isPastDay,
@@ -48,6 +49,7 @@ class UsageSchedule {
         this.today = null;          // サーバーの今日（月の JSON の today）
         this.capacity = null;       // 同時に預かれる数（JSON の capacity）
         this.counts = {};           // 出している月の日ごとの預かる数
+        this.usageCounts = {};      // 出している月の日ごとの予約の件数（2026-11 追加。月の JSON の usage_counts）
         this.countsLoaded = false;  // 出している月の預かる数を読み込んだか（読み込む前・失敗は同時に預かる数の数字を出さない。2026-11 追加）
         this.monthSeq = 0;
         this.daySeq = 0;
@@ -73,6 +75,7 @@ class UsageSchedule {
         this.excludeUsageId = excludeUsageId === null || excludeUsageId === '' ? null : String(excludeUsageId);
         this.state = initialState(ymd, fallbackDate);
         this.counts = {};
+        this.usageCounts = {};
         this.countsLoaded = false;
         this.renderMonth();
         this.loadMonth();
@@ -101,6 +104,7 @@ class UsageSchedule {
         this.state = next;
         if (monthChanged) {
             this.counts = {};
+        this.usageCounts = {};
         this.countsLoaded = false;
         }
         this.renderMonth();
@@ -141,6 +145,7 @@ class UsageSchedule {
             const data = await this.fetchJson(`${this.monthUrl}?${this.params({ month })}`);
             if (seq !== this.monthSeq) return;
             this.counts = data.days || {};
+            this.usageCounts = data.usage_counts || {};
             this.countsLoaded = true;
             this.capacity = data.capacity;
             this.today = data.today;
@@ -203,6 +208,7 @@ class UsageSchedule {
 
     dayButton(ymd) {
         const count = this.counts[ymd] || 0;
+        const usageCount = this.usageCounts[ymd] || 0;
         // 空きあり・満・超過（判定は usage-schedule-core.js）。月の預かる数をまだ読んでいない間は色を付けない
         const loaded = this.countsLoaded && this.capacity !== null;
         const state = loaded ? capacityState(count, this.capacity) : null;
@@ -215,6 +221,16 @@ class UsageSchedule {
         const classes = dayCellClasses({ state, selected, today: ymd === this.today, past });
         button.className = classes.button.join(' ');
         if (selected) button.setAttribute('aria-pressed', 'true');
+
+        // 右上の予約の件数（2026-11 追加）。0 件の日と、読み込む前は出さない
+        const usageCountText = cellUsageCountText({ usageCount, loaded: this.countsLoaded });
+        if (usageCountText !== '') {
+            const usageCountEl = document.createElement('span');
+            usageCountEl.className = classes.usageCount.join(' ');
+            usageCountEl.textContent = usageCountText;
+            usageCountEl.setAttribute('aria-hidden', 'true'); // 読み上げはボタンの aria-label で伝える
+            button.appendChild(usageCountEl);
+        }
 
         const day = document.createElement('span');
         day.className = classes.day.join(' ');
@@ -238,8 +254,8 @@ class UsageSchedule {
 
         const weekday = WEEKDAYS[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
         const label = [`${parseInt(ymd.slice(5, 7), 10)}月${parseInt(ymd.slice(8), 10)}日(${weekday})`];
-        // 読み上げは「同時に預かる数 n」（数字だけだと何の数か分からないため。2026-11 変更：その前は「n/上限」）
-        const ariaCount = cellCountAriaText({ count, capacity: this.capacity, loaded: this.countsLoaded });
+        // 読み上げは「予約 n件 同時に預かる数 m」（数字だけだと何の数か分からないため。2026-11 変更：件数を足した）
+        const ariaCount = cellCountAriaText({ count, usageCount, capacity: this.capacity, loaded: this.countsLoaded });
         if (ariaCount !== '') label.push(ariaCount);
         if (ymd === this.today) label.push('今日');
         if (past) label.push('過去の日');
