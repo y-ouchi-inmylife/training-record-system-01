@@ -89,7 +89,7 @@ class LogAccess
     {
         $response = $next($request);
 
-        if (auth()->check() && $request->route() && ! $this->wasReturned($request, $response)) {
+        if (auth()->check() && $request->route() && ! $this->wasNotPerformed($request, $response)) {
             $this->logAccess($request);
         }
 
@@ -97,16 +97,22 @@ class LogAccess
     }
 
     /**
-     * 入力エラー・確認・断り・失敗で戻された送信か（2026-11 追加。要件定義書 6-8-9）。戻された送信は記録しない（実際に行った操作だけを記録する）。
+     * 実際には行わなかった操作か（2026-11 追加。要件定義書 6-8-9「記録しない送信」）。行わなかった操作は記録しない（実際に行った操作だけを記録する）。
      *
-     * その前は、レスポンスを見ずに記録していたため、入力エラーで戻った送信も「登録」「編集」などとして記録されていた。
-     * 判定は、この要求の中で新しくセッションに載せられたキー（`_flash.new`。次の要求で読むために、この要求で flash したもの）に
-     * RETURNED_FLASH_KEYS があるかで見る。前の要求から引き継いだもの（`_flash.old`）は見ない。
-     * JSON の要求の入力エラー（HTTP 422。セッションには載せない）も戻された送信とみなす
+     * 次のどちらかなら、行わなかったとみなす：
+     * 1. 返事のステータスが 400 以上（2026-11 変更：その前は 422 だけ）。権限・IP 制限で断った 403（PractitionersMiddleware・
+     *    CheckIpRestriction はこのミドルウェアより内側で動く）、コントローラーの abort() で断った 403・404・409、JSON の入力エラーの 422、
+     *    処理の途中の例外の 500 など。500 の中身は Laravel のエラーログ（laravel.log）に残る。
+     *    なお、対象がない 404（ルートモデルバインディング）・CSRF の 419・ログインしていないときは、このミドルウェアより外側で返るので、ここまで来ない
+     * 2. 入力エラー・確認・断り・失敗で、フラッシュを載せて 302 で戻った送信。この要求の中で新しくセッションに載せられたキー
+     *    （`_flash.new`。次の要求で読むために、この要求で flash したもの）に RETURNED_FLASH_KEYS があるかで見る。
+     *    前の要求から引き継いだもの（`_flash.old`）は見ない。302 はステータスでは見分けられないため、こちらで見る
+     *
+     * その前は、レスポンスを見ずに記録していたため、入力エラーで戻った送信も「登録」「編集」などとして記録されていた
      */
-    private function wasReturned(Request $request, Response $response): bool
+    private function wasNotPerformed(Request $request, Response $response): bool
     {
-        if ($response->getStatusCode() === 422) {
+        if ($response->getStatusCode() >= 400) {
             return true;
         }
 
