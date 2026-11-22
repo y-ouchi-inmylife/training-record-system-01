@@ -223,7 +223,7 @@ describe('dayCellClasses', () => {
             day: ['d-block'],
             count: ['d-block', 'small', 'usage-schedule-count'],
             countBadge: [],
-            usageCount: ['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2'],
+            usageCount: ['usage-schedule-usage-count', 'text-body-secondary', 'fw-bold', 'me-2'],
         });
     });
 });
@@ -382,7 +382,7 @@ describe('過去の日と「0/上限」', () => {
         expect(button).toEqual(expect.arrayContaining(['bg-secondary-subtle', 'usage-schedule-selected']));
     });
 
-    it('予約がない日は「0」だけで、バッジにしない（通常の色の太字）', () => {
+    it('予約がない日は「0」だけで、件数もバッジも出さない（通常の色の太字）', () => {
         expect(cellBottomRow({ count: 0, usageCount: 0, capacity: 3, loaded: true })).toEqual({ usageCount: '', count: '0', badge: false });
         expect(cell({ state: capacityState(0, 3) }).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
     });
@@ -405,14 +405,14 @@ describe('過去の日と「0/上限」', () => {
         expect(cellCountAriaText({ count: 2, usageCount: 2, capacity: 3, loaded: false })).toBe('');
     });
 
-    // 下の行の 3 通り（2026-11 変更：同時に預かる数をいつもバッジにし、件数と同じ日は数字を 1 つにした）
+    // 下の行：1 件以上の日は、件数と同じ日も違う日も、灰色の太字の件数＋バッジ（2026-11 変更：その前は同じ日はバッジだけ）
     it.each([
         ['違う・空きあり', 3, 2, { usageCount: '3', count: '2', badge: true }, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
         ['違う・満', 4, 3, { usageCount: '4', count: '3', badge: true }, ['badge', 'bg-success', 'usage-schedule-count-badge']],
         ['違う・超過', 5, 4, { usageCount: '5', count: '4', badge: true }, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
-        ['同じ・空きあり', 1, 1, { usageCount: '', count: '1', badge: true }, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
-        ['同じ・満', 3, 3, { usageCount: '', count: '3', badge: true }, ['badge', 'bg-success', 'usage-schedule-count-badge']],
-        ['同じ・超過', 4, 4, { usageCount: '', count: '4', badge: true }, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+        ['同じ・空きあり', 1, 1, { usageCount: '1', count: '1', badge: true }, ['badge', 'bg-secondary', 'usage-schedule-count-badge']],
+        ['同じ・満', 3, 3, { usageCount: '3', count: '3', badge: true }, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        ['同じ・超過', 4, 4, { usageCount: '4', count: '4', badge: true }, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
     ])('下の行（%s）：件数 %i・同時に預かる数 %i', (_, usageCount, count, row, badge) => {
         expect(cellBottomRow({ count, usageCount, capacity: 3, loaded: true })).toEqual(row);
         expect(cell({ state: capacityState(count, 3) }).countBadge).toEqual(badge);
@@ -429,9 +429,10 @@ describe('過去の日と「0/上限」', () => {
         expect(cellCountAriaText({ count: 2, usageCount: 2, capacity: 3, loaded: true })).toBe('予約 2件 同時に預かる数 2');
     });
 
-    it('件数の要素は控えめな灰色で太字にせず、同時に預かる数とのあいだを空ける（どの日でも同じ）', () => {
+    it('件数の要素は控えめな灰色の太字で、同時に預かる数とのあいだを空ける（どの日でも同じ）', () => {
         for (const opts of [{}, { today: true }, { past: true }, { selected: true }, { state: CAPACITY_OVER }, { state: CAPACITY_FULL }]) {
-            expect(cell(opts).usageCount).toEqual(['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2']);
+            expect(cell(opts).usageCount).toEqual(['usage-schedule-usage-count', 'text-body-secondary', 'fw-bold', 'me-2']);
+            expect(cell(opts).usageCount).not.toContain('fw-normal');
         }
     });
 

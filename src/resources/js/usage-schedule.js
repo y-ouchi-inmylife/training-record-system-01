@@ -229,14 +229,14 @@ class UsageSchedule {
         const countEl = document.createElement('span');
         countEl.className = classes.count.join(' ');
         // 下の行（2026-11 変更。出すものは usage-schedule-core.js の cellBottomRow で決める）：
-        // 件数と違う日は「灰色の件数＋バッジ」、同じ日は「バッジだけ」、0 件の日は「0」だけ（バッジにしない）。
+        // 1 件以上の日は「灰色の太字の件数＋バッジ」（件数と同じ日も両方）、0 件の日は「0」だけ（バッジにしない）。
         // 読み込む前は何も出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
         const row = cellBottomRow({ count, usageCount, capacity: this.capacity, loaded: this.countsLoaded });
         if (row.count === '') {
             countEl.textContent = '\u00a0';
         } else {
             if (row.usageCount !== '') {
-                // 予約の件数（同時に預かる数と違う日だけ）。読み上げはボタンの aria-label で伝える
+                // 予約の件数（1 件以上の日）。読み上げはボタンの aria-label で伝える
                 const usageCountEl = document.createElement('span');
                 usageCountEl.className = classes.usageCount.join(' ');
                 usageCountEl.textContent = row.usageCount;

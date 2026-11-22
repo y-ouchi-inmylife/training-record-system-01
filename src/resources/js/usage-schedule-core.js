@@ -213,10 +213,10 @@ export function dayCellClasses({ state, selected, today, past = false }) {
     // 同時に預かる数の数字はどれも太字（usage-schedule-count。app.scss）。満・超過は中をバッジにする（countBadgeClasses）
     const count = ['d-block', 'small', 'usage-schedule-count'];
 
-    // 予約の件数（2026-11 追加）：下の行で同時に預かる数の左に並べる。控えめな灰色で太字にしない（入れ物の usage-schedule-count は太字のため
-    // fw-normal で戻す）。大きさは同時に預かる数と同じ。あいだは me-2 で少し空ける。
+    // 予約の件数（2026-11 追加）：下の行で同時に預かる数の左に並べる。控えめな灰色の太字（2026-11 変更：その前は fw-normal で
+    // 太字にしなかった）。大きさは同時に預かる数と同じ。あいだは me-2 で少し空ける。
     // 2026-11 変更：その前は右上に小さく重ねていた（app.scss の位置の指定は消した）
-    const usageCount = ['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2'];
+    const usageCount = ['usage-schedule-usage-count', 'text-body-secondary', 'fw-bold', 'me-2'];
 
     return { button, day, count, countBadge: countBadgeClasses(state), usageCount };
 }
@@ -248,12 +248,13 @@ export function countBadgeClasses(state) {
 }
 
 /**
- * カレンダーのマスの下の行に出すもの（2026-11 変更。設計書 S-0305-M05「予約状況」）。3 通り：
- * - 予約の件数と同時に預かる数が違う日：左に灰色の件数（usageCount）、右に同時に預かる数のバッジ（badge が true）
- * - 件数と同時に預かる数が同じ日（1 以上）：同時に預かる数のバッジだけ（usageCount は空）
- * - 予約が 0 件の日：「0」だけ。バッジにしない（badge が false）
+ * カレンダーのマスの下の行に出すもの（2026-11 変更。設計書 S-0305-M05「予約状況」）。2 通り：
+ * - 予約が 1 件以上の日（件数と同時に預かる数が同じでも違っても）：左に灰色の太字の件数（usageCount）、
+ *   右に同時に預かる数のバッジ（badge が true）
+ * - 予約が 0 件の日：「0」だけ。バッジにしない（usageCount は空、badge が false）
  * 月の預かる数を読み込む前（読み込み中・失敗）は、何も出さない（count も空）。
- * 2026-11 変更：その前は、同じ日も 0 件の日も件数と同時に預かる数の 2 つを出し、空きありはバッジにしなかった
+ * 2026-11 変更：両方がいつも同じ位置にあるほうが読み取りやすいため、同じ日も両方出すようにした。その前は、件数と同じ日は
+ * バッジだけにしていた。さらにその前は、0 件の日も件数と同時に預かる数の 2 つを出し、空きありはバッジにしなかった
  *
  * @param {{count: number, usageCount: number, capacity: (number|null), loaded: boolean}} cell
  * @returns {{usageCount: string, count: string, badge: boolean}}
@@ -266,11 +267,7 @@ export function cellBottomRow({ count, usageCount, capacity, loaded }) {
         return { usageCount: '', count: countText(count), badge: false };
     }
 
-    return {
-        usageCount: usageCount === count ? '' : countText(usageCount),
-        count: countText(count),
-        badge: true,
-    };
+    return { usageCount: countText(usageCount), count: countText(count), badge: true };
 }
 
 /**
