@@ -21,6 +21,7 @@ import {
     usageCheckQuery,
     usageConfirmMessage,
     capacityState,
+    cellCountAriaText,
     cellCountText,
     dayCellClasses,
     dayHeadingParts,
@@ -47,7 +48,7 @@ class UsageSchedule {
         this.today = null;          // サーバーの今日（月の JSON の today）
         this.capacity = null;       // 同時に預かれる数（JSON の capacity）
         this.counts = {};           // 出している月の日ごとの預かる数
-        this.countsLoaded = false;  // 出している月の預かる数を読み込んだか（読み込む前・失敗は「n/上限」を出さない。2026-11 追加）
+        this.countsLoaded = false;  // 出している月の預かる数を読み込んだか（読み込む前・失敗は同時に預かる数の数字を出さない。2026-11 追加）
         this.monthSeq = 0;
         this.daySeq = 0;
 
@@ -161,14 +162,20 @@ class UsageSchedule {
             const data = await this.fetchJson(`${this.dayUrl}?${this.params({ date })}`);
             if (seq !== this.daySeq) return;
             this.capacity = data.capacity;
-            // 「n/上限」の部分だけを別の要素にし、満・超過はカレンダーと同じバッジにする（2026-11 変更）
-            const heading = dayHeadingParts(date, data.count, data.capacity);
-            const countEl = document.createElement('span');
-            countEl.className = heading.countClasses.join(' ');
-            countEl.dataset.usageScheduleDayCount = '';
-            countEl.textContent = heading.count;
-            this.dayHeadingEl.replaceChildren(document.createTextNode(heading.label), countEl);
-            this.renderDayList(data.usages || []);
+            // 「M/D(曜) の予約 n件　同時に預かる数 m」（2026-11 変更）。件数は一覧の行の数（編集中の利用自身は JSON の時点で除いてある）。
+            // 同時に預かる数は予約が 1 件以上の日だけ出し、数字の部分だけを別の要素にして、満・超過はカレンダーと同じバッジにする
+            const usages = data.usages || [];
+            const heading = dayHeadingParts(date, usages.length, data.count, data.capacity);
+            const nodes = [document.createTextNode(heading.label)];
+            if (heading.showCount) {
+                const countEl = document.createElement('span');
+                countEl.className = heading.countClasses.join(' ');
+                countEl.dataset.usageScheduleDayCount = '';
+                countEl.textContent = heading.count;
+                nodes.push(document.createTextNode(heading.countLabel), countEl);
+            }
+            this.dayHeadingEl.replaceChildren(...nodes);
+            this.renderDayList(usages);
         } catch (error) {
             if (seq !== this.daySeq) return;
             console.error('予約状況（日）を読み込めませんでした', error);
@@ -204,7 +211,7 @@ class UsageSchedule {
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.date = ymd;
-        // 「n/上限」の文字の色（空きあり・満・超過）・今日の背景・選んでいる日の枠は usage-schedule-core.js の dayCellClasses で決める
+        // 同時に預かる数の数字の文字の色（空きあり・満・超過）・今日の背景・選んでいる日の枠は usage-schedule-core.js の dayCellClasses で決める
         const classes = dayCellClasses({ state, selected, today: ymd === this.today, past });
         button.className = classes.button.join(' ');
         if (selected) button.setAttribute('aria-pressed', 'true');
@@ -216,10 +223,10 @@ class UsageSchedule {
 
         const countEl = document.createElement('span');
         countEl.className = classes.count.join(' ');
-        // 読み込む前は「n/上限」を出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
+        // 読み込む前は同時に預かる数の数字を出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
         const text = cellCountText({ count, capacity: this.capacity, loaded: this.countsLoaded });
         if (text !== '' && classes.countBadge.length > 0) {
-            // 満・超過は「n/上限」を小さなバッジにする（2026-11 変更）
+            // 満・超過は同時に預かる数の数字を小さなバッジにする（2026-11 変更）
             const badge = document.createElement('span');
             badge.className = classes.countBadge.join(' ');
             badge.textContent = text;
@@ -231,7 +238,9 @@ class UsageSchedule {
 
         const weekday = WEEKDAYS[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
         const label = [`${parseInt(ymd.slice(5, 7), 10)}月${parseInt(ymd.slice(8), 10)}日(${weekday})`];
-        if (text !== '') label.push(text);
+        // 読み上げは「同時に預かる数 n」（数字だけだと何の数か分からないため。2026-11 変更：その前は「n/上限」）
+        const ariaCount = cellCountAriaText({ count, capacity: this.capacity, loaded: this.countsLoaded });
+        if (ariaCount !== '') label.push(ariaCount);
         if (ymd === this.today) label.push('今日');
         if (past) label.push('過去の日');
         button.setAttribute('aria-label', label.join(' '));

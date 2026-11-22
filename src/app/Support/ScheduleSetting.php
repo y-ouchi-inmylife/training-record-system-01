@@ -8,7 +8,7 @@ use App\Models\SystemSetting;
  * 予定の設定（S-1601。2026-11 追加。設計書 requirements.md 6-17-10・db-schema.md DS-0100）の値を読む。
  *
  * 営業開始時刻・営業終了時刻は、利用を登録するときの開始時刻・終了時刻の初期値になる（用語集 No.42）。
- * 同時に預かれる数（用語集 No.43。requirements.md 6-17-11。2026-11 追加）は、利用の予約状況の「n/上限」と、
+ * 同時に預かれる数（用語集 No.43。requirements.md 6-17-11。2026-11 追加）は、利用の予約状況の満・超過の判定と、
  * 利用の保存時の上限の確認に使う（数え方は App\Services\UsageCapacityService）。
  * 値は system_settings の schedule_open_time・schedule_close_time（「HH:MM」の文字列）・schedule_capacity（数字の文字列）。
  * **行がないときは、ここに持つ初期値（08:00・19:00・3）で動く**（本番ではシーダーを流さず、migrate だけで反映するため）。

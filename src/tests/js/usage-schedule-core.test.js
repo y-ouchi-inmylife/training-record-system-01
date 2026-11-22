@@ -8,6 +8,7 @@ import {
     usageConfirmMessage,
     capacityState,
     countBadgeClasses,
+    cellCountAriaText,
     cellCountText,
     countText,
     dayCellClasses,
@@ -84,10 +85,11 @@ describe('monthWeeks', () => {
 });
 
 describe('預かる数の表示', () => {
-    it('預かる数と上限の文は「n/上限」（0 も「0/上限」）', () => {
-        expect(countText(2, 3)).toBe('2/3');
-        // 2026-11 変更：0 も「0/3」（その前は空）
-        expect(countText(0, 3)).toBe('0/3');
+    // 2026-11 変更：同時に預かる数は数字だけ（その前は「n/上限」。「1 日に上限まで」と読めてしまうため）
+    it('同時に預かる数の文は数字だけ（0 も「0」）', () => {
+        expect(countText(2)).toBe('2');
+        expect(countText(0)).toBe('0');
+        expect(countText(4)).toBe('4');
     });
 
     // 2026-11 変更：満（上限ちょうど）は緑、超過（上限を超える）は赤に分けた。その前は上限以上をひとまとめに赤にしていた
@@ -112,9 +114,10 @@ describe('預かる数の表示', () => {
     it('その日の予約の見出しと 1 行の文', () => {
         expect(dayLabel('2026-11-26')).toBe('11/26(木)');
         expect(dayLabel('2026-11-01')).toBe('11/1(日)');
-        expect(dayHeading('2026-11-26', 2, 3)).toBe('11/26(木) の予約　2/3');
-        expect(dayHeading('2026-11-26', 4, 3)).toBe('11/26(木) の予約　4/3');
-        expect(dayHeading('2026-11-26', 4, 3)).not.toContain('頭');
+        // 見出しは「M/D(曜) の予約 n件　同時に預かる数 m」（2026-11 変更）
+        expect(dayHeading('2026-11-26', 2, 2, 3)).toBe('11/26(木) の予約 2件　同時に預かる数 2');
+        expect(dayHeading('2026-11-26', 4, 3, 3)).toBe('11/26(木) の予約 4件　同時に預かる数 3');
+        expect(dayHeading('2026-11-26', 4, 3, 3)).not.toMatch(/[頭匹]|\/3/);
         expect(usageLine({ time_range: '8:00〜19:00', label: 'アムロ（佐藤 一郎）' })).toBe('8:00〜19:00　アムロ（佐藤 一郎）');
     });
 });
@@ -301,24 +304,32 @@ describe('「n/上限」の太字と色', () => {
         expect(countBadgeClasses(null)).toEqual([]);
     });
 
+    // 見出し：「M/D(曜) の予約 n件　同時に預かる数 m」。数字の部分だけカレンダーと同じバッジ（2026-11 変更）
     it.each([
-        [3, 3, ['badge', 'bg-success', 'usage-schedule-count-badge']],
-        [4, 3, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
-        [1, 3, []],
-        [0, 3, []],
-    ])('見出し：預かる数 %i・上限 %i の「n/上限」のバッジのクラスは %j', (count, capacity, classes) => {
-        const parts = dayHeadingParts('2026-11-20', count, capacity);
-        expect(parts.label).toBe('11/20(金) の予約　');
-        expect(parts.count).toBe(`${count}/${capacity}`);
+        ['満', 4, 3, 3, ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        ['超過', 4, 4, 3, ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+        ['空きあり', 1, 1, 3, []],
+    ])('見出し（%s）：件数 %i・同時に預かる数 %i・上限 %i', (_, usageCount, count, capacity, classes) => {
+        const parts = dayHeadingParts('2026-11-20', usageCount, count, capacity);
+        expect(parts.label).toBe(`11/20(金) の予約 ${usageCount}件`);
+        expect(parts.showCount).toBe(true);
+        expect(parts.countLabel).toBe('　同時に預かる数 ');
+        expect(parts.count).toBe(`${count}`);
         expect(parts.countClasses).toEqual(classes);
-        // 見出し全体の文はそのまま
-        expect(dayHeading('2026-11-20', count, capacity)).toBe(`11/20(金) の予約　${count}/${capacity}`);
+        expect(dayHeading('2026-11-20', usageCount, count, capacity)).toBe(`11/20(金) の予約 ${usageCount}件　同時に預かる数 ${count}`);
     });
 
-    it('見出しのバッジのクラスは、カレンダーの同じ日の「n/上限」のバッジのクラスと同じ', () => {
+    it('見出し：予約が 0 件の日は「同時に預かる数」を出さない', () => {
+        const parts = dayHeadingParts('2026-11-22', 0, 0, 3);
+        expect(parts.label).toBe('11/22(日) の予約 0件');
+        expect(parts.showCount).toBe(false);
+        expect(dayHeading('2026-11-22', 0, 0, 3)).toBe('11/22(日) の予約 0件');
+    });
+
+    it('見出しのバッジのクラスは、カレンダーの同じ日の数字のバッジのクラスと同じ', () => {
         for (const [count, capacity] of [[0, 3], [1, 3], [3, 3], [4, 3]]) {
             const cell = dayCellClasses({ state: capacityState(count, capacity), selected: false, today: false });
-            const heading = dayHeadingParts('2026-11-20', count, capacity);
+            const heading = dayHeadingParts('2026-11-20', Math.max(count, 1), count, capacity);
             expect(cell.countBadge).toEqual(heading.countClasses);
         }
     });
@@ -367,11 +378,28 @@ describe('過去の日と「0/上限」', () => {
         expect(button).toEqual(expect.arrayContaining(['bg-secondary-subtle', 'usage-schedule-selected']));
     });
 
-    it('予約がない日にも「0/上限」が出て、空きあり（色なし・太字）になる', () => {
-        expect(cellCountText({ count: 0, capacity: 3, loaded: true })).toBe('0/3');
+    it('予約がない日にも「0」が出て、空きあり（色なし・太字）になる', () => {
+        expect(cellCountText({ count: 0, capacity: 3, loaded: true })).toBe('0');
         expect(capacityState(0, 3)).toBe(CAPACITY_AVAILABLE);
         expect(cell({ state: capacityState(0, 3) }).count).toEqual(['d-block', 'small', 'usage-schedule-count']);
-        expect(cellCountText({ count: 2, capacity: 3, loaded: true })).toBe('2/3');
+        expect(cell({ state: capacityState(0, 3) }).countBadge).toEqual([]);
+    });
+
+    // マスの文字は数字だけで、満・超過のバッジのクラスは今のまま（2026-11 変更：その前は「n/上限」）
+    it.each([
+        [0, '0', []],
+        [1, '1', []],
+        [3, '3', ['badge', 'bg-success', 'usage-schedule-count-badge']],
+        [4, '4', ['badge', 'bg-danger', 'usage-schedule-count-badge']],
+    ])('マス：同時に預かる数 %i は「%s」', (count, text, badge) => {
+        expect(cellCountText({ count, capacity: 3, loaded: true })).toBe(text);
+        expect(cell({ state: capacityState(count, 3) }).countBadge).toEqual(badge);
+    });
+
+    it('マスの読み上げの文は「同時に預かる数 n」（読み込む前は空）', () => {
+        expect(cellCountAriaText({ count: 3, capacity: 3, loaded: true })).toBe('同時に預かる数 3');
+        expect(cellCountAriaText({ count: 0, capacity: 3, loaded: true })).toBe('同時に預かる数 0');
+        expect(cellCountAriaText({ count: 2, capacity: 3, loaded: false })).toBe('');
     });
 
     it('月の預かる数を読み込む前は「n/上限」を出さない（上限を知っていても）', () => {

@@ -35,7 +35,7 @@
     {{-- 読み込み中・失敗の知らせ（失敗しても、使う側の入力と保存は止めない） --}}
     <div class="small text-body-secondary mb-2 d-none" data-usage-schedule-status role="status"></div>
 
-    {{-- その日の予約（見出し「M/D(曜) の予約　n/上限」と、開始時刻の順の一覧） --}}
+    {{-- その日の予約（見出し「M/D(曜) の予約 n件　同時に預かる数 m」と、開始時刻の順の一覧） --}}
     <div class="card">
         <div class="card-header small fw-bold py-1" data-usage-schedule-day-heading></div>
         <ul class="list-group list-group-flush" data-usage-schedule-day-list></ul>

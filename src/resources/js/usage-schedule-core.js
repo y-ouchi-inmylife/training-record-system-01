@@ -103,14 +103,17 @@ export function dayLabel(ymd) {
     return `${d.month}/${d.day}(${WEEKDAYS[weekday]})`;
 }
 
-/** 預かる数と上限の文（「2/3」。0 も「0/3」。2026-11 変更：その前は 0 なら空にしていた） */
-export function countText(count, capacity) {
-    return `${count}/${capacity}`;
+/**
+ * 同時に預かる数の文（数字だけ。「2」。0 も「0」）。
+ * 2026-11 変更：その前は「n/上限」（「2/3」）だったが、「1 日に上限まで」と読めてしまうため、数字だけにした
+ */
+export function countText(count) {
+    return `${count}`;
 }
 
 /**
- * カレンダーのマスに出す「n/上限」（2026-11 変更。設計書 S-0305-M05「予約状況」）。
- * 月の預かる数を読み込んだあとは、予約がない日も「0/上限」を出す（月のすべての日）。
+ * カレンダーのマスに出す同時に預かる数（数字だけ。2026-11 変更。設計書 S-0305-M05「予約状況」）。
+ * 月の預かる数を読み込んだあとは、予約がない日も「0」を出す（月のすべての日）。
  * 読み込む前（読み込み中・失敗）は出さない（空）
  *
  * @param {{count: number, capacity: (number|null), loaded: boolean}} cell
@@ -121,7 +124,20 @@ export function cellCountText({ count, capacity, loaded }) {
         return '';
     }
 
-    return countText(count, capacity);
+    return countText(count);
+}
+
+/**
+ * カレンダーのマスの読み上げの文に入れる、同時に預かる数（「同時に預かる数 2」。2026-11 変更：その前は「2/3」）。
+ * 数字だけだと何の数か分からないため、言葉を添える。読み込む前は空
+ *
+ * @param {{count: number, capacity: (number|null), loaded: boolean}} cell
+ * @returns {string}
+ */
+export function cellCountAriaText(cell) {
+    const text = cellCountText(cell);
+
+    return text === '' ? '' : `同時に預かる数 ${text}`;
 }
 
 /**
@@ -161,21 +177,21 @@ export function capacityState(count, capacity) {
 }
 
 /**
- * カレンダーのマス（ボタン）・日付の数字・「n/上限」の文字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
+ * カレンダーのマス（ボタン）・日付の数字・同時に預かる数の数字の文字に付けるクラス（2026-11 追加。設計書 S-0305-M05「予約状況」）。
  *
- * - 空きあり・満・超過（capacityState）は「n/上限」の見た目だけで示し、マスの背景の色は変えない。
- *   満・超過は「n/上限」を小さなバッジ（countBadge。countBadgeClasses）にし、空きありは通常の色の太字のまま
+ * - 空きあり・満・超過（capacityState）は同時に預かる数の数字の見た目だけで示し、マスの背景の色は変えない。
+ *   満・超過は同時に預かる数の数字を小さなバッジ（countBadge。countBadgeClasses）にし、空きありは通常の色の太字のまま
  *   （2026-11 変更：その前は満・超過を文字の色〔$green-600・$red-600〕だけで示していた。さらにその前はマスの背景を緑・赤にしていた）
  * - 今日はマスの背景を薄い青（bg-primary-subtle）。日付の数字は通常のまま
  *   （2026-11 変更：その前は日付の数字を青の太字〔text-primary・fw-bold〕にしていた）
  * - 選んでいる日（＝利用日）は太い青の枠（usage-schedule-selected。app.scss で内側に描くので、マスの大きさは変わらない）
  * - 今日を選んでいるときは、薄い青の背景と枠の両方。上限をまだ読んでいない間（state が null）は空きありと同じ
  * - 今日より前の日（past。isPastDay）は、マスの背景を灰色（bg-secondary-subtle）、日付の数字を少し薄い色（text-body-secondary）。
- *   「n/上限」の見た目（バッジ・太字）は変えない。過去の日を選んでいるときは、灰色の背景と枠の両方（2026-11 追加）
+ *   同時に預かる数の数字の見た目（バッジ・太字）は変えない。過去の日を選んでいるときは、灰色の背景と枠の両方（2026-11 追加）
  *
  * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean, past?: boolean}} cell
  * @returns {{button: string[], day: string[], count: string[], countBadge: string[]}}
- *   count は「n/上限」の入れ物、countBadge はその中のバッジ（空きありは空。バッジを作らない）
+ *   count は同時に預かる数の数字の入れ物、countBadge はその中のバッジ（空きありは空。バッジを作らない）
  */
 export function dayCellClasses({ state, selected, today, past = false }) {
     const button = ['btn', 'btn-sm', 'w-100', 'px-0', 'py-1', 'lh-sm', 'usage-schedule-day'];
@@ -192,14 +208,14 @@ export function dayCellClasses({ state, selected, today, past = false }) {
         button.push('usage-schedule-selected');
     }
 
-    // 「n/上限」はどれも太字（usage-schedule-count。app.scss）。満・超過は中をバッジにする（countBadgeClasses）
+    // 同時に預かる数の数字はどれも太字（usage-schedule-count。app.scss）。満・超過は中をバッジにする（countBadgeClasses）
     const count = ['d-block', 'small', 'usage-schedule-count'];
 
     return { button, day, count, countBadge: countBadgeClasses(state) };
 }
 
 /**
- * 「n/上限」のバッジのクラス（2026-11 変更。カレンダーのマスと、その日の予約の見出しで同じものを使う。設計書 S-0305-M05「予約状況」）。
+ * 同時に預かる数の数字のバッジのクラス（2026-11 変更。カレンダーのマスと、その日の予約の見出しで同じものを使う。設計書 S-0305-M05「予約状況」）。
  * 満＝緑のバッジ（badge bg-success）、超過＝赤のバッジ（badge bg-danger）。どちらも白い文字（§2-5 のバッジの配色）。
  * 空きあり・上限をまだ読んでいない間（null）＝なし（バッジにしない）。
  * usage-schedule-count-badge は、マスの大きさが変わらないようにバッジの文字の大きさと余白を合わせるクラス（app.scss）。
@@ -259,23 +275,36 @@ export function usageLine(usage) {
     return `${usage.time_range}　${usage.label}`;
 }
 
-/** その日の予約の見出し（「11/26(木) の予約　2/3」。2026-11 変更：単位を付けない） */
-export function dayHeading(ymd, count, capacity) {
-    const parts = dayHeadingParts(ymd, count, capacity);
+/**
+ * その日の予約の見出しの文（「11/20(金) の予約 4件　同時に預かる数 3」。予約が 0 件の日は「11/20(金) の予約 0件」）
+ *
+ * @param {string} ymd
+ * @param {number} usageCount その日の予約（利用）の件数
+ * @param {number} count その日の同時に預かる数
+ * @param {number} capacity 同時に預かれる数（上限）
+ */
+export function dayHeading(ymd, usageCount, count, capacity) {
+    const parts = dayHeadingParts(ymd, usageCount, count, capacity);
 
-    return parts.label + parts.count;
+    return parts.label + (parts.showCount ? parts.countLabel + parts.count : '');
 }
 
 /**
- * その日の予約の見出しを、「M/D(曜) の予約　」と「n/上限」に分けたもの（2026-11 追加）。
- * 「n/上限」の部分だけに、カレンダーと同じバッジのクラス（countBadgeClasses。判定は capacityState）を付ける。見出しはもともと太字
+ * その日の予約の見出しを、「M/D(曜) の予約 n件」と「同時に預かる数 m」に分けたもの（2026-11 変更。設計書 S-0305-M05「その日の予約」）。
+ * - 「n件」はその日の予約（利用）の件数（一覧の行の数）。「件」は予約〔記録〕を数えるもので、犬を数えるものではない
+ * - 「同時に預かる数 m」は、予約が 1 件以上の日だけ出す（showCount）。数字の部分（count）だけに、カレンダーと同じ
+ *   バッジのクラス（countBadgeClasses。判定は capacityState）を付ける。見出しはもともと太字
+ * - 件数と同時に預かる数を分けるのは、時間帯が重ならなければ同じ日に上限より多く預かれるため
+ * 2026-11 変更：その前は「M/D(曜) の予約　n/上限」
  *
- * @returns {{label: string, count: string, countClasses: string[]}}
+ * @returns {{label: string, showCount: boolean, countLabel: string, count: string, countClasses: string[]}}
  */
-export function dayHeadingParts(ymd, count, capacity) {
+export function dayHeadingParts(ymd, usageCount, count, capacity) {
     return {
-        label: `${dayLabel(ymd)} の予約　`,
-        count: `${count}/${capacity}`,
+        label: `${dayLabel(ymd)} の予約 ${usageCount}件`,
+        showCount: usageCount > 0,
+        countLabel: '　同時に預かる数 ',
+        count: countText(count),
         countClasses: countBadgeClasses(capacityState(count, capacity)),
     };
 }
@@ -306,7 +335,7 @@ export function usageCheckQuery({ usedOn, startTime, endTime, traineeId = null, 
  * 要る確認の文を、重なり → 上限の順に 1 行ずつ並べ、空行のあとに 1 回だけ「登録しますか？」（編集は「更新しますか？」）を付ける。
  * - 重なり：「アムロ は、11/26(木) 13:00〜19:00 にすでに予約があります。」（trainee_label・overlap_start・overlap_end）
  * - 上限：「この利用を入れると、11/26(木) 15:00〜17:00 に同時に預かる数が 4 になり、上限（3）を超えます。」
- *   文の頭の「この利用を入れると」は、カレンダーの「n/上限」（入れる前の数）と count が食い違って見えないように付ける
+ *   文の頭の「この利用を入れると」は、カレンダーの同時に預かる数の数字（入れる前の数）と count が食い違って見えないように付ける
  * サーバー側の黄色の注意は、同じ文を UsageCapacityService::confirmationMessage で組み立てる
  *
  * @param {{date_label: string, needs_overlap_confirmation?: boolean, trainee_label?: string, overlap_start?: string, overlap_end?: string,
