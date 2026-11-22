@@ -207,7 +207,7 @@ IP アドレス制限は、**トレーナー用サブドメイン（内部）の
 | 内部API | - | GET | `/api/audio-records/summaries` | 要約取り込み候補の音声記録一覧を取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/trainers` | 担当トレーナーの選択候補を取得する | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/usage-schedule/month` | 利用の予約状況：月の日ごとの預かる数・予約の件数と上限を返す（S-0305-M05・S-1602。**2026-11 追加**。件数は **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
-| 内部API | - | GET | `/api/usage-schedule/day` | 利用の予約状況：その日の預かる数・上限・予約の一覧を返す（S-0305-M05・S-1602。**2026-11 追加**。会員の id・会員名・トレーニーの名前は **2026-11 追加**。営業時間と各利用の開始・終了の時刻〔`HH:MM`〕は **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
+| 内部API | - | GET | `/api/usage-schedule/day` | 利用の予約状況：その日の預かる数・上限・予約の一覧を返す（S-0305-M05・S-1602。**2026-11 追加**。会員の id・会員名・トレーニーの名前は **2026-11 追加**。営業時間と各利用の開始・終了の時刻〔`HH:MM`〕は **2026-11 追加**。「Googleカレンダーに追加」の URL は **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | GET | `/api/usage-schedule/check` | 利用の保存の前の確認：この利用を入れたときの預かる数と、同じトレーニーの重なりと、確認が要るかを返す（S-0305-M05。**2026-11 追加**。重なりは **2026-11 追加**。4-2-6） | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records/upload-url` | アップロード用の署名付きURLを発行する | auth | 管理者、一般 |
 | 内部API | - | POST | `/api/media-records` | アップロード完了後、メディアレコードを作成する | auth | 管理者、一般 |
@@ -678,7 +678,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
   - 重なりの確認（**2026-11 追加**）：同じトレーニー（`trainee_id`）・同じ利用日で、時間帯が重なる利用がすでにあるとき（終わりを含まない。編集では自身を除く。トレーニーなしは確かめない。過去の日も確かめる）
 
 **レスポンス**:
-- 成功：`redirect()->route('clients.show', $client)` ＋「利用を登録しました。」
+- 成功：`redirect()->route('clients.show', $client)` ＋「利用を登録しました。」。登録した利用が今日以降なら、フラッシュ `google_calendar_url` に「Googleカレンダーに追加」の URL も入れる（**2026-11 追加**。screen-design.md S-0305 セクション5「Googleカレンダーに追加」。過去の利用なら入れない）
 - バリデーションエラー：S-0305 に戻り、利用のモーダルを開き直す（「契約・利用エンドポイントのリダイレクト先」）
 - 確認で戻る（**2026-11 追加**）：`redirect()->route('clients.show', $client)->withInput()` ＋ フラッシュ `usage_confirmation_warning`（**2026-11 変更**：その前の名前は `usage_capacity_warning`）に注意の文（重なりの文「{トレーニーの表示名} は、{M/D(曜)} {開始}〜{終了} にすでに予約があります。」・上限の文「この利用を入れると、{M/D(曜)} {開始}〜{終了} に同時に預かる数が {n} になり、上限（{上限}）を超えます。」の要るもの〔両方なら重なり → 上限の順〕のあとに「このまま登録する場合は、もう一度［登録］を押してください。」。screen-design.md S-0305-M05「保存時の確認」の 2）。S-0305 は利用のモーダルを開き直し、上部に注意を出し、`_usage_confirmed` に `1` を入れる。アクセスログには記録しない
 
@@ -689,7 +689,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 **リクエスト**: `POST /clients/{client}/usages` と同じ（会員は `$usage->client_id`）。契約の残りは、その利用自身を除いて数える。保存時の確認（上限・重なり）も登録と同じで、**その利用自身は数えない**（**2026-11 追加**）
 
 **レスポンス**:
-- 成功：`redirect()->route('clients.show', $usage->client_id)` ＋「利用を更新しました。」
+- 成功：`redirect()->route('clients.show', $usage->client_id)` ＋「利用を更新しました。」。フラッシュ `google_calendar_url` は登録と同じ（更新したあとの値で決める。**2026-11 追加**）
 - バリデーションエラー：登録と同じ
 - 確認で戻る：登録と同じ（戻り先は `clients.show` の `$usage->client_id`。注意の文の最後は「このまま更新する場合は、もう一度［更新］を押してください。」）
 
@@ -3278,15 +3278,16 @@ POST /training-records に以下を追加する。
   "open_time": "08:00",
   "close_time": "19:00",
   "usages": [
-    { "time_range": "8:00〜19:00", "start_time": "08:00", "end_time": "19:00", "label": "アムロ（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "アムロ" },
-    { "time_range": "13:00〜19:00", "start_time": "13:00", "end_time": "19:00", "label": "検証Dog（大内 太郎）", "client_id": 7, "client_name": "大内 太郎", "trainee_name": "検証Dog" },
-    { "time_range": "19:00〜20:00", "start_time": "19:00", "end_time": "20:00", "label": "佐藤 一郎", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "" }
+    { "time_range": "8:00〜19:00", "start_time": "08:00", "end_time": "19:00", "label": "アムロ（佐藤 一郎）", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "アムロ", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" },
+    { "time_range": "13:00〜19:00", "start_time": "13:00", "end_time": "19:00", "label": "検証Dog（大内 太郎）", "client_id": 7, "client_name": "大内 太郎", "trainee_name": "検証Dog", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" },
+    { "time_range": "19:00〜20:00", "start_time": "19:00", "end_time": "20:00", "label": "佐藤 一郎", "client_id": 12, "client_name": "佐藤 一郎", "trainee_name": "", "google_calendar_url": "https://calendar.google.com/calendar/render?action=TEMPLATE&text=…" }
   ]
 }
 ```
 - `count`：その日の預かる数（月の `days` と同じ数え方）
 - `open_time`・`close_time`：営業時間（事業所情報の設定 S-1601 の `schedule_open_time`・`schedule_close_time`。`HH:MM`。**2026-11 追加**）。カレンダー画面（S-1602）のタイムテーブルの時間の幅の基本に使う
 - `usages`：その日の利用を開始時刻 → 終了時刻 → id の順に並べる。`start_time`・`end_time` は開始・終了の時刻（`HH:MM`。**2026-11 追加**。タイムテーブルの帯の位置に使う。`time_range` は表示用の文字）。`label` は「トレーニー（会員名）」（会員名は `Client::display_name`。トレーニーの名前が未登録なら「名前未登録（会員名）」、トレーニーがない利用は「会員名」だけ〔かっこを付けない。**2026-11 変更**：その前は「（会員名）」〕）。`client_id`・`client_name`・`trainee_name`（**2026-11 追加**）は、カレンダー画面（S-1602）で会員名だけを会員詳細へのリンクにするために使う：`client_id` は会員の id、`client_name` は `label` のかっこの中の会員名、`trainee_name` は `label` のかっこの前（トレーニーの名前。未登録なら「名前未登録」、トレーニーがない利用は空文字）。`label` は今までどおり返す（利用モーダルは `label` を使う）。利用の id は返さない（画面で使わないため。**2026-11 変更**：その前は会員の id も返さなかった）
+- `google_calendar_url`（**2026-11 追加**）：「Googleカレンダーに追加」のリンクの URL（requirements.md 6-17-13、screen-design.md S-1602。組み立ては `App\Services\GoogleCalendarLinkService`）。**利用日が今日以降の利用だけ**で、過去の利用は `null`。利用のメモは入らない。カレンダー画面（S-1602）だけが使い、利用モーダルは使わない
 
 ##### GET /api/usage-schedule/check
 
