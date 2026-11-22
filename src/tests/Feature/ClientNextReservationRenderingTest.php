@@ -17,7 +17,7 @@ use Tests\TestCase;
  * - 自分の利用のうち、利用日が今日以降のもの（予約）があるときだけ出す。過去の利用・ほかの会員の利用は数えない
  * - いちばん早い利用日の予約をすべて「開始〜終了　愛犬の呼び方」で並べる（開始時刻の順。名前が未登録なら「愛犬」、トレーニーなしは時刻だけ）
  * - 次回の日が今日なら「本日のご予約」
- * - 次回の日より後の予約があれば「ほかに n件」、なければ「ご利用回数を見る」（どちらもご利用回数 S-1412 へのリンク）
+ * - 次回の日より後の予約があれば「ほかに n件」、なければ「ご利用回数を確認」（どちらもご利用回数 S-1412 へのリンク）
  * - 利用のメモは出さない
  *
  * 実際の HTTP でダッシュボードを開くため、画面が読むテーブルを列を絞って作る。今日は 2026-11-22。
@@ -145,7 +145,7 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertStringNotContainsString('次回のご予約', $this->dashboard());
     }
 
-    public function test_予約が1件なら_次回のご予約と日付と時刻と呼び方_ご利用回数を見るのリンク(): void
+    public function test_予約が1件なら_次回のご予約と日付と時刻と呼び方_ご利用回数を確認のリンク(): void
     {
         $this->usage('2026-11-26', '08:00', '19:00', $this->trainee('アイ'));
 
@@ -155,7 +155,7 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertStringContainsString('<span class="c-reservation-notice-title">次回のご予約</span>', $notice);
         $this->assertStringContainsString('<span class="c-reservation-notice-date num-tabular">11/26(木)</span>', $notice);
         $this->assertSame(['8:00〜19:00 アイちゃん'], $this->rows($notice));
-        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('client-portal.contracts'), '/').'" class="c-reservation-notice-link">ご利用回数を見る<span aria-hidden="true"> ›<\/span><\/a>/u', $notice);
+        $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('client-portal.contracts'), '/').'" class="c-reservation-notice-link">ご利用回数を確認<span aria-hidden="true"> ›<\/span><\/a>/u', $notice);
         $this->assertStringNotContainsString('ほかに', $notice);
         // カレンダーのアイコン（読み上げない）
         $this->assertMatchesRegularExpression('/<svg class="c-reservation-notice-icon"[^>]*aria-hidden="true"[^>]*data-reservation-notice-icon="calendar-event">/u', $notice);
@@ -187,7 +187,7 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertStringContainsString('11/26(木)', $notice);
         $this->assertSame(['8:00〜19:00 アイちゃん'], $this->rows($notice));
         $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('client-portal.contracts'), '/').'" class="c-reservation-notice-link">ほかに <span class="num-tabular">2<\/span>件<span aria-hidden="true"> ›<\/span><\/a>/u', $notice);
-        $this->assertStringNotContainsString('ご利用回数を見る', $notice);
+        $this->assertStringNotContainsString('ご利用回数を確認', $notice);
     }
 
     public function test_今日の予約は本日のご予約(): void
@@ -252,7 +252,7 @@ class ClientNextReservationRenderingTest extends TestCase
         // 愛犬のカード（名前の見出し「アイちゃん」）は帯より下
         $this->assertGreaterThan($reservation, strpos($html, 'アイちゃん', $reservation + strlen($this->notice($html))));
         // 帯の文字（回数ではなく予約の日付・時刻だけ）
-        $this->assertSame('次回のご予約 11/26(木) 8:00〜19:00、アイちゃん ご利用回数を見る ›', $this->text($this->notice($html)));
+        $this->assertSame('次回のご予約 11/26(木) 8:00〜19:00、アイちゃん ご利用回数を確認 ›', $this->text($this->notice($html)));
     }
 
     public function test_時刻と呼び方のあいだに読み上げ用の区切りを入れ_トレーニーなしの行には入れない(): void

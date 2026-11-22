@@ -13,7 +13,7 @@ use Tests\TestCase;
  * 会員側のご利用回数画面（設計書 screen-design.md S-1412、要件定義書 6-15-16）の描画確認。
  *
  * - 全体の「あと n回」（マイナスは「ご契約の回数を n回超えてご利用中です」の文。赤字にしない）
- * - 契約ごとのカード（新しい契約が上）・マス（利用日の昇順、未利用は「未利用」）
+ * - 契約ごとのカード（新しい契約が上）・マス（利用日の昇順、まだ使っていないマスは「利用なし」。2026-11 変更：その前は「未利用」）
  * - 使い切りは「すべてご利用済み」、期限切れで残りがあるときは有効期限の日付が赤字
  * - 契約に含まれないご利用は一番下（黄色のバッジは使わない）
  * - 読むだけ（button・onclick・data-* を出さない）、メモは一切出さない
@@ -104,8 +104,8 @@ class ClientPortalContractRenderingTest extends TestCase
         $this->assertStringContainsString('あと 2回', $text);
         $this->assertStringContainsString('2026/09/01 ご契約（4回）', $text);
         $this->assertStringContainsString('有効期限 2027/03/31', $text);
-        // マスは利用日の昇順、残りは「未利用」
-        $this->assertMatchesRegularExpression('#2026/09/10.*2026/09/20.*未利用.*未利用#su', $text);
+        // マスは利用日の昇順、残りは「利用なし」（2026-11 変更：その前は「未利用」）
+        $this->assertMatchesRegularExpression('#2026/09/10.*2026/09/20.*利用なし.*利用なし#su', $text);
         $this->assertSame(2, substr_count($html, 'c-ticket-slot c-ticket-slot--empty'));
         // 期限内なので赤字にしない
         $this->assertStringNotContainsString('text-danger', $html);
@@ -280,7 +280,7 @@ class ClientPortalContractRenderingTest extends TestCase
             ['c-ticket-slot num-tabular', '2026/10/12'],
             ['c-ticket-slot num-tabular c-ticket-slot--today', '本日 2026/10/13'],
             ['c-ticket-slot num-tabular c-ticket-slot--upcoming', 'ご予約 2026/10/20'],
-            ['c-ticket-slot c-ticket-slot--empty', '未利用'],
+            ['c-ticket-slot c-ticket-slot--empty', '利用なし'],
         ], $this->slots($this->open($client)));
     }
 
@@ -331,4 +331,19 @@ class ClientPortalContractRenderingTest extends TestCase
             ['c-ticket-slot num-tabular c-ticket-slot--upcoming', 'ご予約 2026/10/20'],
         ], $this->slots($section));
     }
+
+    // ---- 言葉（2026-11 変更。用語集 No.44） ----
+
+    public function test_まだ使っていないマスは利用なしと出し_未利用の言葉は出さない(): void
+    {
+        $client = $this->makeClient();
+        $c = $this->contract($client, '2026-10-01', 3);
+        $this->usage($client, '2026-10-05', $c);
+        $this->usage($client, '2026-10-20');   // 契約に含まれないご利用（予約）
+
+        $html = $this->open($client);
+        $this->assertSame(2, substr_count($html, '<span class="c-ticket-slot c-ticket-slot--empty">利用なし</span>'));
+        $this->assertStringNotContainsString('未利用', $html);
+    }
 }
+
