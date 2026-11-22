@@ -59,7 +59,7 @@
                 <div class="c-ticket-slots">
                     @foreach($row['slots'] as $slot)
                         @if($slot)
-                            <span @class(['c-ticket-slot', 'num-tabular', 'c-ticket-slot--today' => $slot['state'] === \App\Services\ContractTicketService::STATE_TODAY, 'c-ticket-slot--upcoming' => $slot['state'] === \App\Services\ContractTicketService::STATE_UPCOMING])>@if($slot['mark'] !== null)<span class="c-ticket-slot-mark">{{ $slot['mark'] }}</span>@endif<span>{{ $slot['date'] }}</span></span>
+                            @include('client.contracts._slot', ['slot' => $slot])
                         @else
                             <span class="c-ticket-slot c-ticket-slot--empty">未利用</span>
                         @endif
@@ -75,8 +75,9 @@
                     <span class="c-ticket-title">契約に含まれないご利用 <span class="num-tabular">{{ $unassigned['count'] }}</span>回</span>
                 </div>
                 <div class="c-ticket-slots">
-                    @foreach($unassigned['slots'] as $usage)
-                        <span class="c-ticket-slot num-tabular">{{ $usage->used_on->format('Y/m/d') }}</span>
+                    {{-- 契約のカードのマスと同じく、今日・今日より後は「本日」「ご予約」の印（2026-11 追加） --}}
+                    @foreach($unassigned['slots'] as $slot)
+                        @include('client.contracts._slot', ['slot' => $slot])
                     @endforeach
                 </div>
             </section>

@@ -56,7 +56,8 @@
             </p>
             <ul class="c-reservation-notice-list list-unstyled mb-0">
                 @foreach($nextReservation['items'] as $item)
-                    <li><span class="c-reservation-notice-time num-tabular">{{ $item['timeRange'] }}</span>@if($item['callName'] !== null)<span class="c-reservation-notice-name">{{ $item['callName'] }}</span>@endif</li>
+                    {{-- 時刻と呼び方のあいだのすきまは CSS で空けているので、読み上げ用の区切り（読点）を見えない形で入れる（2026-11 追加） --}}
+                    <li><span class="c-reservation-notice-time num-tabular">{{ $item['timeRange'] }}</span>@if($item['callName'] !== null)<span class="visually-hidden">、</span><span class="c-reservation-notice-name">{{ $item['callName'] }}</span>@endif</li>
                 @endforeach
             </ul>
             <a href="{{ $nextReservation['url'] }}" class="c-reservation-notice-link">@if($nextReservation['laterCount'] > 0)ほかに <span class="num-tabular">{{ $nextReservation['laterCount'] }}</span>件@elseご利用回数を見る@endif<span aria-hidden="true"> ›</span></a>

@@ -314,4 +314,21 @@ class ClientPortalContractRenderingTest extends TestCase
         $this->assertStringContainsString('ご予約', $html);
         $this->assertStringNotContainsString('NOTE_SECRET', $html);
     }
+
+    public function test_契約に含まれないご利用のマスにも_本日とご予約の印を付け_過去は印なし(): void
+    {
+        $client = $this->makeClient();
+        $this->usage($client, '2026-10-12');   // 過去
+        $this->usage($client, '2026-10-13');   // 今日
+        $this->usage($client, '2026-10-20');   // 今日より後
+
+        $html = $this->open($client);
+        $section = substr($html, strpos($html, 'aria-label="契約に含まれないご利用"'));
+        $this->assertStringContainsString('契約に含まれないご利用 <span class="num-tabular">3</span>回', $section);
+        $this->assertSame([
+            ['c-ticket-slot num-tabular', '2026/10/12'],
+            ['c-ticket-slot num-tabular c-ticket-slot--today', '本日 2026/10/13'],
+            ['c-ticket-slot num-tabular c-ticket-slot--upcoming', 'ご予約 2026/10/20'],
+        ], $this->slots($section));
+    }
 }

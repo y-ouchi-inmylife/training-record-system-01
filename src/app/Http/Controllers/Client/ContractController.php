@@ -18,7 +18,7 @@ use Illuminate\View\View;
  * - 読むだけの表示に使う値だけをビューに渡す。トレーナーの操作のための値
  *   （contractOptions / defaultContractId / usageCount）は渡さない
  * - メモ（契約・利用）はビューで出さない（設計書 S-1412 設計方針）
- * - 予約の印（2026-11 追加。設計書 S-1412「マスの予約の印」）：割り当てた利用のマスごとに、利用日が今日なら「本日」、
+ * - 予約の印（2026-11 追加。設計書 S-1412「マスの予約の印」）：利用のマスごと（契約に含まれないご利用も。2026-11 変更）に、利用日が今日なら「本日」、
  *   今日より後なら「ご予約」の印と見た目の状態を組み立てて渡す（判定は ContractTicketService の usageStates。Blade では判定しない）。
  *   使い切っていて予約を含む契約は「すべてご予約済み」（ContractTicketService の reserved）
  */
@@ -46,16 +46,26 @@ class ContractController extends Controller
             $ticket['contracts']
         );
 
+        // 「契約に含まれないご利用」のマスも、同じ「日付・状態・印」の配列にする（2026-11 追加：予約の印を付けるため）。
+        // count は見出しの件数。usages（トレーナー側の利用の行）は渡さない
+        $unassigned = [
+            'count' => $ticket['unassigned']['count'],
+            'slots' => array_map(
+                fn (ClientUsage $usage) => self::slot($usage, $ticket['usageStates'][$usage->id]),
+                $ticket['unassigned']['slots']
+            ),
+        ];
+
         return view('client.contracts.index', [
             'remaining' => $ticket['remaining'],
             'isEmpty' => $ticket['isEmpty'],
-            'unassigned' => $ticket['unassigned'],
+            'unassigned' => $unassigned,
             'contracts' => $contracts,
         ]);
     }
 
     /**
-     * 割り当てた利用のマス 1 つ（2026-11 追加。設計書 S-1412「マスの予約の印」）。
+     * 利用のマス 1 つ（契約に割り当てた利用・契約に含まれないご利用のどちらも。2026-11 追加。設計書 S-1412「マスの予約の印」）。
      * date は利用日（Y/m/d）、state は ContractTicketService の状態（past / today / upcoming。見た目のクラスに使う）、
      * mark は日付の上に出す印（今日「本日」・今日より後「ご予約」・今日より前は null）。利用のメモは入れない
      *

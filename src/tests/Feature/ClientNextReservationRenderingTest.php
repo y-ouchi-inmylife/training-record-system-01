@@ -119,12 +119,16 @@ class ClientNextReservationRenderingTest extends TestCase
         return preg_match('/<section class="c-reservation-notice[^"]*".*?<\/section>/su', $html, $m) === 1 ? $m[0] : null;
     }
 
-    /** 帯の予約の行（タグを除き、空白をまとめたもの） */
+    /** 帯の予約の行の見える文字（読み上げ用の区切りを除き、タグを除き、空白をまとめたもの） */
     private function rows(string $notice): array
     {
         preg_match_all('/<li>(.*?)<\/li>/su', $notice, $m);
 
-        return array_map(fn ($li) => trim(preg_replace('/\s+/u', ' ', strip_tags(str_replace('</span><span', '</span> <span', $li)))), $m[1]);
+        return array_map(fn ($li) => trim(preg_replace('/\s+/u', ' ', strip_tags(str_replace(
+            ['<span class="visually-hidden">、</span>', '</span><span'],
+            ['', '</span> <span'],
+            $li
+        )))), $m[1]);
     }
 
     private function text(string $html): string
@@ -248,6 +252,23 @@ class ClientNextReservationRenderingTest extends TestCase
         // 愛犬のカード（名前の見出し「アイちゃん」）は帯より下
         $this->assertGreaterThan($reservation, strpos($html, 'アイちゃん', $reservation + strlen($this->notice($html))));
         // 帯の文字（回数ではなく予約の日付・時刻だけ）
-        $this->assertSame('次回のご予約 11/26(木) 8:00〜19:00アイちゃん ご利用回数を見る ›', $this->text($this->notice($html)));
+        $this->assertSame('次回のご予約 11/26(木) 8:00〜19:00、アイちゃん ご利用回数を見る ›', $this->text($this->notice($html)));
+    }
+
+    public function test_時刻と呼び方のあいだに読み上げ用の区切りを入れ_トレーニーなしの行には入れない(): void
+    {
+        $this->usage('2026-11-26', '08:00', '12:00', $this->trainee('アイ'));
+        $this->usage('2026-11-26', '13:00', '19:00');
+
+        $notice = $this->notice($this->dashboard());
+        // 見た目には出さない読点（visually-hidden）を、時刻と呼び方のあいだに置く
+        $this->assertStringContainsString(
+            '<li><span class="c-reservation-notice-time num-tabular">8:00〜12:00</span><span class="visually-hidden">、</span><span class="c-reservation-notice-name">アイちゃん</span></li>',
+            $notice
+        );
+        $this->assertStringContainsString('<li><span class="c-reservation-notice-time num-tabular">13:00〜19:00</span></li>', $notice);
+        $this->assertSame(1, substr_count($notice, 'visually-hidden'));
+        // 読み上げで続けて読まれない（タグを除いた文字に区切りがある）
+        $this->assertStringContainsString('8:00〜12:00、アイちゃん', strip_tags($notice));
     }
 }
