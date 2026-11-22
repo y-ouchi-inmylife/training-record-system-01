@@ -128,14 +128,15 @@ export function cellCountText({ count, capacity, loaded }) {
 }
 
 /**
- * カレンダーのマスの右上に出す予約の件数（2026-11 追加。設計書 S-0305-M05「予約状況」）。
- * 数字だけ（「件」は付けない）。予約が 0 件の日と、月の預かる数を読み込む前（読み込み中・失敗）は出さない（空）
+ * カレンダーのマスの下の行で、同時に預かる数の左に出す予約の件数（2026-11 追加。設計書 S-0305-M05「予約状況」）。
+ * 数字だけ（「件」は付けない）。0 件の日も「0」を出す。月の預かる数を読み込む前（読み込み中・失敗）は出さない（空）。
+ * 2026-11 変更：その前はマスの右上に出し、0 件の日は出さなかった（右上の小さな数字は見落としやすく、並べたほうが比べやすいため）
  *
  * @param {{usageCount: number, loaded: boolean}} cell
  * @returns {string}
  */
 export function cellUsageCountText({ usageCount, loaded }) {
-    return loaded && usageCount > 0 ? `${usageCount}` : '';
+    return loaded ? `${usageCount}` : '';
 }
 
 /**
@@ -203,7 +204,7 @@ export function capacityState(count, capacity) {
  *
  * @param {{state: ('available'|'full'|'over'|null), selected: boolean, today: boolean, past?: boolean}} cell
  * @returns {{button: string[], day: string[], count: string[], countBadge: string[], usageCount: string[]}}
- *   usageCount はマスの右上の予約の件数の要素（2026-11 追加）
+ *   usageCount は下の行で同時に預かる数の左に並べる予約の件数の要素（2026-11 追加）
  *   count は同時に預かる数の数字の入れ物、countBadge はその中のバッジ（空きありは空。バッジを作らない）
  */
 export function dayCellClasses({ state, selected, today, past = false }) {
@@ -224,8 +225,10 @@ export function dayCellClasses({ state, selected, today, past = false }) {
     // 同時に預かる数の数字はどれも太字（usage-schedule-count。app.scss）。満・超過は中をバッジにする（countBadgeClasses）
     const count = ['d-block', 'small', 'usage-schedule-count'];
 
-    // 右上の予約の件数（2026-11 追加）：控えめな灰色の小さな文字。位置は app.scss の usage-schedule-usage-count
-    const usageCount = ['usage-schedule-usage-count', 'text-body-secondary'];
+    // 予約の件数（2026-11 追加）：下の行で同時に預かる数の左に並べる。控えめな灰色で太字にしない（入れ物の usage-schedule-count は太字のため
+    // fw-normal で戻す）。大きさは同時に預かる数と同じ。あいだは me-2 で少し空ける。
+    // 2026-11 変更：その前は右上に小さく重ねていた（app.scss の位置の指定は消した）
+    const usageCount = ['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2'];
 
     return { button, day, count, countBadge: countBadgeClasses(state), usageCount };
 }

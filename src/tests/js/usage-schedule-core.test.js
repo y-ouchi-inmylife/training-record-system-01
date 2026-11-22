@@ -222,7 +222,7 @@ describe('dayCellClasses', () => {
             day: ['d-block'],
             count: ['d-block', 'small', 'usage-schedule-count'],
             countBadge: [],
-            usageCount: ['usage-schedule-usage-count', 'text-body-secondary'],
+            usageCount: ['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2'],
         });
     });
 });
@@ -405,20 +405,27 @@ describe('過去の日と「0/上限」', () => {
         expect(cellCountAriaText({ count: 2, usageCount: 2, capacity: 3, loaded: false })).toBe('');
     });
 
-    // マスの右上の予約の件数（2026-11 追加）
+    // 予約の件数は、下の行の同時に預かる数の左に並べる（2026-11 変更：その前は右上に小さく、0 件の日は出さなかった）
     it.each([
         [4, true, '4'],
         [1, true, '1'],
-        [0, true, ''],
+        [0, true, '0'],
         [4, false, ''],
         [0, false, ''],
-    ])('右上の件数：件数 %i・読み込み済み %s は「%s」（0 件と読み込む前は出さない）', (usageCount, loaded, text) => {
+    ])('件数：件数 %i・読み込み済み %s は「%s」（0 件も「0」、読み込む前は出さない）', (usageCount, loaded, text) => {
         expect(cellUsageCountText({ usageCount, loaded })).toBe(text);
     });
 
-    it('右上の件数の要素は控えめな灰色の小さな文字（位置は app.scss）', () => {
-        for (const opts of [{}, { today: true }, { past: true }, { selected: true }, { state: CAPACITY_OVER }]) {
-            expect(cell(opts).usageCount).toEqual(['usage-schedule-usage-count', 'text-body-secondary']);
+    it('件数の要素は控えめな灰色で太字にせず、同時に預かる数とのあいだを空ける（どの日でも同じ）', () => {
+        for (const opts of [{}, { today: true }, { past: true }, { selected: true }, { state: CAPACITY_OVER }, { state: CAPACITY_FULL }]) {
+            expect(cell(opts).usageCount).toEqual(['usage-schedule-usage-count', 'text-body-secondary', 'fw-normal', 'me-2']);
+        }
+    });
+
+    it('件数と同時に預かる数は、同じ日も 0 件の日も両方出す', () => {
+        for (const [usageCount, count] of [[4, 3], [2, 2], [0, 0]]) {
+            expect(cellUsageCountText({ usageCount, loaded: true })).toBe(`${usageCount}`);
+            expect(cellCountText({ count, capacity: 3, loaded: true })).toBe(`${count}`);
         }
     });
 

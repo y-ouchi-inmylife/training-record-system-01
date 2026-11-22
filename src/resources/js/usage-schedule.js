@@ -222,16 +222,6 @@ class UsageSchedule {
         button.className = classes.button.join(' ');
         if (selected) button.setAttribute('aria-pressed', 'true');
 
-        // 右上の予約の件数（2026-11 追加）。0 件の日と、読み込む前は出さない
-        const usageCountText = cellUsageCountText({ usageCount, loaded: this.countsLoaded });
-        if (usageCountText !== '') {
-            const usageCountEl = document.createElement('span');
-            usageCountEl.className = classes.usageCount.join(' ');
-            usageCountEl.textContent = usageCountText;
-            usageCountEl.setAttribute('aria-hidden', 'true'); // 読み上げはボタンの aria-label で伝える
-            button.appendChild(usageCountEl);
-        }
-
         const day = document.createElement('span');
         day.className = classes.day.join(' ');
         day.textContent = String(parseInt(ymd.slice(8), 10));
@@ -239,16 +229,30 @@ class UsageSchedule {
 
         const countEl = document.createElement('span');
         countEl.className = classes.count.join(' ');
-        // 読み込む前は同時に預かる数の数字を出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
+        // 下の行：左に予約の件数、右に同時に預かる数（2026-11 変更：件数は右上から、ここに移した）。
+        // 読み込む前はどちらも出さない。そのときも高さをそろえるため、ノーブレークスペースを入れる
         const text = cellCountText({ count, capacity: this.capacity, loaded: this.countsLoaded });
-        if (text !== '' && classes.countBadge.length > 0) {
-            // 満・超過は同時に預かる数の数字を小さなバッジにする（2026-11 変更）
-            const badge = document.createElement('span');
-            badge.className = classes.countBadge.join(' ');
-            badge.textContent = text;
-            countEl.appendChild(badge);
+        const usageCountText = cellUsageCountText({ usageCount, loaded: this.countsLoaded });
+        if (text === '') {
+            countEl.textContent = '\u00a0';
         } else {
-            countEl.textContent = text === '' ? '\u00a0' : text;
+            if (usageCountText !== '') {
+                // 予約の件数（0 件も「0」）。読み上げはボタンの aria-label で伝える
+                const usageCountEl = document.createElement('span');
+                usageCountEl.className = classes.usageCount.join(' ');
+                usageCountEl.textContent = usageCountText;
+                usageCountEl.setAttribute('aria-hidden', 'true');
+                countEl.appendChild(usageCountEl);
+            }
+            if (classes.countBadge.length > 0) {
+                // 満・超過は同時に預かる数の数字を小さなバッジにする（2026-11 変更）
+                const badge = document.createElement('span');
+                badge.className = classes.countBadge.join(' ');
+                badge.textContent = text;
+                countEl.appendChild(badge);
+            } else {
+                countEl.appendChild(document.createTextNode(text));
+            }
         }
         button.appendChild(countEl);
 

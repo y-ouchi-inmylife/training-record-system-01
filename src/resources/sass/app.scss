@@ -376,18 +376,3 @@ h2 {
     line-height: inherit;
 }
 
-// マスの右上の予約の件数（2026-11 追加。設計書 S-0305-M05「予約状況」）。控えめな灰色（text-body-secondary）の小さな数字。
-// マスの中で位置を固定して重ねる（position: absolute）ので、マスの大きさ（67×43 px）・日付の数字・同時に預かる数の位置は変わらない。
-// 選んでいる日の枠（内側 3px。.usage-schedule-selected）と重ならないよう、枠より内側（上 4px・右 5px）に置く
-.usage-schedule-day {
-    position: relative;
-}
-
-.usage-schedule-usage-count {
-    position: absolute;
-    top: 4px;
-    right: 5px;
-    font-size: .7rem;
-    line-height: 1;
-}
-

@@ -32,9 +32,10 @@
         </thead>
         <tbody data-usage-schedule-days></tbody>
     </table>
-    {{-- マスの数字の説明（2026-11 追加。右上の小さな数字＝予約の件数、下の数字＝同時に預かる数）。
+    {{-- マスの数字の説明（2026-11 追加。下の行の左の数字＝予約の件数、右の数字＝同時に預かる数。
+         2026-11 変更：その前は「右上：予約の件数　下：同時に預かる数」）。
          書き方の説明なので、月の預かる数を読み込めなかったときも出したままにする --}}
-    <div class="small text-body-secondary mb-2" data-usage-schedule-legend>右上：予約の件数　下：同時に預かる数</div>
+    <div class="small text-body-secondary mb-2" data-usage-schedule-legend>左：予約の件数　右：同時に預かる数</div>
     {{-- 読み込み中・失敗の知らせ（失敗しても、使う側の入力と保存は止めない） --}}
     <div class="small text-body-secondary mb-2 d-none" data-usage-schedule-status role="status"></div>
 
