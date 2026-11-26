@@ -20,7 +20,7 @@ use Tests\TestCase;
  * 初回設定メールの表示（S-0316、GET /clients/{client}/login-link-mail。要件定義書 6-3-9。2026-11-10 追加）と、
  * 会員詳細（S-0305）の［メールが届かないとき］の出し分け。
  *
- * - 「登録待ち（初回設定）」（初回設定待ちで期限内）のときだけ、宛先・件名・本文を出す。本文のリンクは送ったメールのリンクそのもの
+ * - 「初回設定待ち」（期限内）のときだけ、宛先・件名・本文を出す。本文のリンクは送ったメールのリンクそのもの
  * - 件名・本文は送るメール（ClientLoginLinkMail）と同じ
  * - 読むだけ（ログイン用リンクを作り直さない・消さない）。アクセスログも残さない
  * - 条件に合わないときは「ない」表示（404 にしない）。システム管理者は 403
@@ -252,7 +252,7 @@ class ClientLoginLinkMailTest extends TestCase
     }
 
     #[DataProvider('notAwaitingSetupWithinExpiry')]
-    public function test_登録待ち初回設定でないときは_urlを直接開いてもない表示で_404にしない(string $state): void
+    public function test_初回設定待ちでないときは_urlを直接開いてもない表示で_404にしない(string $state): void
     {
         match ($state) {
             'setup_expired' => [$this->issueRegistrationToken('2026-11-09 23:59:59'), $this->registerEmail(expiresAt: '2026-11-09 23:59:59')],

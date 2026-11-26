@@ -15,7 +15,7 @@ use Tests\TestCase;
 /**
  * 会員詳細（S-0305）のメールアドレス欄の［メールが届かないとき］（2026-11-10 追加。設計書 S-0305「状態と状態別ボタンの対応」）。
  *
- * 「登録待ち（初回設定）」（初回設定待ちで期限内）のときだけ出し、S-0316 を同じタブで開く。期限切れ・ほかの状態では出さない。
+ * 「初回設定待ち」（期限内）のときだけ出し、S-0316 を同じタブで開く。期限切れ・ほかの状態では出さない。
  * 判定はモデルの Client::isAwaitingSetupWithinExpiry()（S-0316 のコントローラと同じ）。
  */
 class ClientDetailLoginLinkMailButtonTest extends TestCase
@@ -138,14 +138,14 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
         return $this->get(route('clients.show', $this->client))->assertOk()->getContent();
     }
 
-    public function test_登録待ち初回設定なら_バッジの右に白抜きの小さいボタンを出し_初回設定メール表示画面を同じタブで開く(): void
+    public function test_初回設定待ちなら_バッジの右に白抜きの小さいボタンを出し_初回設定メール表示画面を同じタブで開く(): void
     {
         $this->issueRegistrationToken();
         $this->registerEmail();
 
         $html = $this->detailPage();
 
-        $this->assertStringContainsString('<span class="badge bg-warning text-dark">登録待ち（初回設定）</span>', $html);
+        $this->assertStringContainsString('<span class="badge bg-warning text-dark">初回設定待ち</span>', $html);
         $this->assertSame(1, substr_count($html, self::BUTTON));
         $this->assertMatchesRegularExpression(
             '/<a href="'.preg_quote(route('client-login-link-mail.show', $this->client), '/').'"\s+class="btn btn-sm btn-outline-primary text-nowrap">メールが届かないとき<\/a>/u',
@@ -169,7 +169,7 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
         $this->assertMatchesRegularExpression(
             '/<div class="d-flex align-items-center flex-wrap gap-2" style="min-height: 1.5rem;">\s*'
             .'<span>owner@example\.com<\/span>\s*'
-            .'<span class="badge bg-warning text-dark">登録待ち（初回設定）<\/span>\s*'
+            .'<span class="badge bg-warning text-dark">初回設定待ち<\/span>\s*'
             .'<a href="'.$url.'"\s+class="btn btn-sm btn-outline-primary text-nowrap">メールが届かないとき<\/a>\s*'
             .'<\/div>/u',
             $html
@@ -184,10 +184,10 @@ class ClientDetailLoginLinkMailButtonTest extends TestCase
     public static function otherStates(): array
     {
         return [
-            '初回設定待ちで期限切れ' => ['setup_expired', '登録待ち（期限切れ）'],
+            '初回設定待ちで期限切れ' => ['setup_expired', '初回設定待ち（期限切れ）'],
             '利用中' => ['in_use', '利用中'],
-            'メールアドレス登録待ち' => ['awaiting_email', '登録待ち'],
-            'メールアドレスなし' => ['no_email', '未登録'],
+            'メールアドレス登録待ち' => ['awaiting_email', 'メールアドレス登録待ち'],
+            'メールアドレスなし' => ['no_email', 'メールアドレスなし'],
         ];
     }
 

@@ -29,7 +29,7 @@ class TraineeCombinedSurveyTokenController extends Controller
     public function store(Request $request, Trainee $trainee, TraineeCombinedSurveyTokenService $service, SurveyMypageRegistrationService $mypage): RedirectResponse
     {
         // 「マイページ登録の案内も発行する」がオンなら、同じトランザクションでマイページ登録の案内も発行する（2026-10-19 追加。
-        // 要件定義書 6-16-18。有効な案内がある会員〔登録待ち〕・登録待ち（初回設定）・利用中なら何もしない）
+        // 要件定義書 6-16-18。有効な案内がある会員〔メールアドレス登録待ち〕・初回設定待ち・初回設定待ち（期限切れ）・利用中なら何もしない）
         [$token, $mypageIssued] = DB::transaction(function () use ($request, $trainee, $service, $mypage) {
             $token = $service->issue($trainee, $request->user());
             $mypageIssued = $token !== null && $request->boolean('with_mypage_registration')

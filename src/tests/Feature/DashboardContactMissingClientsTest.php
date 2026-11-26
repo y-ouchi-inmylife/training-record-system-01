@@ -173,7 +173,7 @@ class DashboardContactMissingClientsTest extends TestCase
 
         $this->assertStringContainsString('<a href="'.route('clients.show', $both).'">', $rows[1]);
         $this->assertMatchesRegularExpression('/>住所<\/span>\s*<span class="badge bg-warning text-dark">電話番号<\/span>/', $rows[1]);
-        // 会員一覧と同じ状態バッジ（メールアドレスもトークンもない会員は「未登録」）
+        // 会員一覧と同じ状態バッジ（メールアドレスもトークンもない会員は「メールアドレスなし」）
         $badge = $both->fresh()->statusBadge();
         $this->assertStringContainsString('<span class="badge '.$badge['class'].'">'.$badge['label'].'</span>', $rows[1]);
     }

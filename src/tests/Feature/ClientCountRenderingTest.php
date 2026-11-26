@@ -1815,7 +1815,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertSame(0, preg_match('/>\s*取消\s*</u', $buttons));
     }
 
-    public function test_登録待ちならマイページ登録の案内を表示と取消のボタンを出す(): void
+    public function test_メールアドレス登録待ちならマイページ登録の案内を表示と取消のボタンを出す(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1837,7 +1837,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('すでにお渡しした案内からは登録できなくなります。', $html);
     }
 
-    public function test_登録待ちで期限切れならマイページ登録の案内を発行のボタンを出す(): void
+    public function test_メールアドレス登録待ち期限切れならマイページ登録の案内を発行のボタンを出す(): void
     {
         $this->fakeMediaDisk();
         $client = $this->makeClient('0001', '山田');
@@ -1908,7 +1908,7 @@ class ClientCountRenderingTest extends TestCase
         $this->assertNoEmailButtons($html);
     }
 
-    public function test_未登録と登録待ちでは上部にマイページ登録を削除を出さない(): void
+    public function test_メールアドレスなしとメールアドレス登録待ちでは上部にマイページ登録を削除を出さない(): void
     {
         $this->fakeMediaDisk();
         $none = $this->makeClient('0001', '山田');
@@ -1946,13 +1946,13 @@ class ClientCountRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/<th>主担当<\/th>\s*(?:\{\{--.*?--\}\}\s*)?<th>マイページ<\/th>\s*<th>最終トレーニング日<\/th>/su', $html);
         $this->assertStringNotContainsString('<th>メールアドレス</th>', $html);
         // 列の中身（マイページの状態のバッジ）は今までどおり
-        $this->assertStringContainsString('<td><span class="badge bg-secondary">未登録</span></td>', $this->listRow($html, '山田'));
+        $this->assertStringContainsString('<td><span class="badge bg-secondary">メールアドレスなし</span></td>', $this->listRow($html, '山田'));
     }
 
-    public function test_マイページの状態のバッジは一覧と詳細で同じ文言_初回設定待ちは登録待ち初回設定(): void
+    public function test_マイページの状態のバッジは一覧と詳細で同じ文言_状態名と同じ6つ(): void
     {
-        // 2026-10-18 変更：初回設定待ち（awaiting_setup）のバッジは「登録待ち（初回設定）」。期限切れは「登録待ち（期限切れ）」
-        // （その前は「初回設定待ち」「初回設定待ち（期限切れ）」）。ほかのバッジ・色は変えない
+        // 2026-11-26 変更：バッジの文言は状態名と同じ 6 つ（期限切れは独立した状態）。色は変えない
+        // （その前は「未登録」「登録待ち」「登録待ち（初回設定）」「利用中」で、期限切れはどちらも「登録待ち（期限切れ）」）
         $this->fakeMediaDisk();
         $none = $this->makeClient('0001', '山田');
         $awaitingEmail = $this->makeClient('0002', '佐藤');
@@ -1969,22 +1969,22 @@ class ClientCountRenderingTest extends TestCase
         $inUse->forceFill(['email' => 'ito@example.com', 'password' => 'hashed'])->save();
 
         $expected = [
-            '山田' => [$none, '<span class="badge bg-secondary">未登録</span>'],
-            '佐藤' => [$awaitingEmail, '<span class="badge bg-warning text-dark">登録待ち</span>'],
-            '鈴木' => [$awaitingEmailExpired, '<span class="badge bg-danger">登録待ち（期限切れ）</span>'],
-            '田中' => [$awaitingSetup, '<span class="badge bg-warning text-dark">登録待ち（初回設定）</span>'],
-            '高橋' => [$awaitingSetupExpired, '<span class="badge bg-danger">登録待ち（期限切れ）</span>'],
+            '山田' => [$none, '<span class="badge bg-secondary">メールアドレスなし</span>'],
+            '佐藤' => [$awaitingEmail, '<span class="badge bg-warning text-dark">メールアドレス登録待ち</span>'],
+            '鈴木' => [$awaitingEmailExpired, '<span class="badge bg-danger">メールアドレス登録待ち（期限切れ）</span>'],
+            '田中' => [$awaitingSetup, '<span class="badge bg-warning text-dark">初回設定待ち</span>'],
+            '高橋' => [$awaitingSetupExpired, '<span class="badge bg-danger">初回設定待ち（期限切れ）</span>'],
             '伊藤' => [$inUse, '<span class="badge bg-success">利用中</span>'],
         ];
 
         $list = $this->get(route('clients.index'))->assertOk()->getContent();
-        $this->assertStringNotContainsString('初回設定待ち', $list);
+        $this->assertStringNotContainsString('登録待ち（初回設定）', $list);
         foreach ($expected as $lastName => [$client, $badge]) {
             $this->assertStringContainsString("<td>{$badge}</td>", $this->listRow($list, $lastName), $lastName);
 
             $show = $this->get(route('clients.show', $client))->assertOk()->getContent();
             $this->assertStringContainsString($badge, $show, $lastName);
-            $this->assertStringNotContainsString('初回設定待ち', $show, $lastName);
+            $this->assertStringNotContainsString('登録待ち（初回設定）', $show, $lastName);
         }
     }
 
@@ -2029,7 +2029,7 @@ class ClientCountRenderingTest extends TestCase
     public function test_表示のボタンは青の白抜きにし取消とマイページ登録を削除は赤の白抜きのまま(): void
     {
         $this->fakeMediaDisk();
-        // 愛犬アンケートは回答待ち、マイページは登録待ち（期限内）
+        // 愛犬アンケートは回答待ち、マイページはメールアドレス登録待ち
         $waiting = $this->makeClient('0001', '山田');
         $this->intakeToken($this->trainee($waiting, 'ポチ'), null, '2026-10-15 09:00:00');
         $this->emailRegToken($waiting, now()->addDays(2)->format('Y-m-d H:i:s'));
@@ -2104,7 +2104,7 @@ class ClientCountRenderingTest extends TestCase
     public function test_三つの案内を表示のリンクは同じタブで開く(): void
     {
         $this->fakeMediaDisk();
-        // マイページは登録待ち（期限内）、愛犬アンケートと性格診断は回答待ち：［…を表示］が 3 つ出る
+        // マイページはメールアドレス登録待ち、愛犬アンケートと性格診断は回答待ち：［…を表示］が 3 つ出る
         $client = $this->makeClient('0001', '山田');
         $this->emailRegToken($client, now()->addDays(2)->format('Y-m-d H:i:s'));
         $traineeId = $this->trainee($client, 'ポチ');
@@ -3251,7 +3251,7 @@ class ClientCountRenderingTest extends TestCase
 
     // ---- 案内の発行のモーダルの「マイページ登録の案内も発行する」（2026-10-19 追加。要件定義書 6-16-18） ----
 
-    public function test_マイページが未登録か登録待ち期限切れならチェックボックスを出し登録待ちと登録待ち初回設定と利用中なら出さない(): void
+    public function test_マイページがメールアドレスなしかメールアドレス登録待ち期限切れならチェックボックスを出しメールアドレス登録待ちと初回設定待ちと利用中なら出さない(): void
     {
         $this->travelTo(Carbon::parse('2026-10-19 12:00:00'));
         $this->fakeMediaDisk();
@@ -3267,14 +3267,14 @@ class ClientCountRenderingTest extends TestCase
         $this->assertStringContainsString('<label class="form-check-label" for="surveyIssueWithMypage">マイページ登録の案内も発行する</label>', $page);
         $this->assertStringContainsString('回答のあと、マイページの登録をご案内します。', $page);
 
-        // 登録待ち（期限内の案内がある）：出さない（2026-10-19 変更：その前は出していた。もう 1 件発行されるように見えて分かりにくいため）
+        // メールアドレス登録待ち（期限内の案内がある）：出さない（2026-10-19 変更：その前は出していた。もう 1 件発行されるように見えて分かりにくいため）
         $tokenId = DB::table('client_email_registration_tokens')->insertGetId(['client_id' => $client->id, 'is_used' => false, 'expires_at' => '2026-10-26 23:59:59']);
         $this->assertStringNotContainsString('with_mypage_registration" value', $html());
-        // 登録待ち（期限切れ）：有効な案内がないので出す
+        // メールアドレス登録待ち（期限切れ）：有効な案内がないので出す
         DB::table('client_email_registration_tokens')->where('id', $tokenId)->update(['expires_at' => '2026-10-18 23:59:59']);
         $this->assertMatchesRegularExpression('/id="surveyIssueWithMypage"\s*aria-describedby="surveyIssueWithMypageHelp" data-default-checked="1" checked>/u', $html());
 
-        // 登録待ち（初回設定）：メールアドレスを入れて登録の途中
+        // 初回設定待ち：メールアドレスを入れて登録の途中
         DB::table('clients')->where('id', $client->id)->update(['email' => 'a@example.com']);
         $this->assertStringNotContainsString('with_mypage_registration" value', $html());
 
@@ -3379,7 +3379,7 @@ class ClientCountRenderingTest extends TestCase
 
         $html = $this->get(route('clients.show', $client))->assertOk()->getContent();
 
-        // 案内中は「登録待ち」と同じ bg-warning text-dark、期限切れは「登録待ち（期限切れ）」と同じ bg-danger（Client::statusBadge）
+        // 案内中は「メールアドレス登録待ち」と同じ bg-warning text-dark、期限切れは「メールアドレス登録待ち（期限切れ）」と同じ bg-danger（Client::statusBadge）
         $inProgress = '<span class="trainee-survey-line"><span class="badge bg-warning text-dark">案内中</span></span>';
         $this->assertStringContainsString($inProgress, (string) $this->inProgressRow($html, 'ポチ'));
         $this->assertStringContainsString($inProgress, (string) $this->inProgressRow($html, 'タマ'));

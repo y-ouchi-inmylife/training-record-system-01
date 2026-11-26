@@ -18,7 +18,7 @@ use Tests\TestCase;
  * 愛犬アンケート・愛犬性格診断の案内に、マイページ登録の案内を付ける（2026-10-19 追加。要件定義書 6-16-18）。
  *
  * - 発行：「マイページ登録の案内も発行する」（with_mypage_registration）がオンなら、同じトランザクションでマイページ登録の案内を作る
- * - 作れるのは、有効なマイページ登録の案内がない会員（「未登録」「登録待ち（期限切れ）」）だけ（2026-10-19 変更）
+ * - 作れるのは、有効なマイページ登録の案内がない会員（「メールアドレスなし」「メールアドレス登録待ち（期限切れ）」）だけ（2026-10-19 変更）
  * - 完了の画面：答えた会員に有効なマイページ登録の案内があれば、お誘いと［マイページに登録する］（2026-10-19 変更：その前は、
  *   案内に結び付けたマイページ登録の案内があるときだけ）
  *
@@ -162,7 +162,7 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->assertSame('2026-10-26 23:59:59', $rows[0]->expires_at);
     }
 
-    public function test_登録待ちの会員にオンで送られても新しく作らない(): void
+    public function test_メールアドレス登録待ちの会員にオンで送られても新しく作らない(): void
     {
         $existing = $this->registrationToken();
 
@@ -186,7 +186,7 @@ class SurveyMypageRegistrationTest extends TestCase
         $this->assertCount(0, $this->registrationRows());
     }
 
-    public function test_利用中と登録待ち初回設定の会員にはオンで送られても作らない(): void
+    public function test_利用中と初回設定待ちの会員にはオンで送られても作らない(): void
     {
         foreach ([['email' => 'a@example.com', 'password' => 'x'], ['email' => 'a@example.com', 'password' => null]] as $state) {
             DB::table('clients')->where('id', $this->client->id)->update($state);
@@ -465,7 +465,7 @@ class SurveyMypageRegistrationTest extends TestCase
                 $this->registrationToken();
                 DB::table('clients')->where('id', $this->client->id)->update(['email' => 'yamada@example.com', 'password' => 'hashed']);
             },
-            '登録待ち（初回設定）' => function () {
+            '初回設定待ち' => function () {
                 $this->registrationToken();
                 DB::table('clients')->where('id', $this->client->id)->update(['email' => 'yamada@example.com']);
             },

@@ -530,7 +530,7 @@ class Client extends Authenticatable
             return self::STATUS_AWAITING_SETUP;
         }
         // メールアドレス登録待ち: `is_used=false` の登録用トークンが 1 件以上ある
-        // （期限内かどうかは問わない。期限切れの添え書きは isEmailRegTokenExpired 側で判定）
+        // （期限内かどうかは問わない。期限切れ〔メールアドレス登録待ち（期限切れ）〕かは show_expired_note で判定）
         if ($this->getAttribute('latest_email_reg_expires_at') !== null) {
             return self::STATUS_AWAITING_EMAIL;
         }
@@ -538,7 +538,8 @@ class Client extends Authenticatable
     }
 
     /**
-     * 「期限切れ」の添え書きを付けるべきか。
+     * 期限切れの状態か（「メールアドレス登録待ち（期限切れ）」「初回設定待ち（期限切れ）」のとき true）。
+     * 名前は、期限切れを状態に添える注記として扱っていたときのもの（2026-11-26 に独立した状態にしたが、名前は変えない）。
      * 対応する登録用トークンが 1 件も存在しないケースも、設計書に従い期限切れ扱い。
      */
     public function getShowExpiredNoteAttribute(): bool
@@ -551,10 +552,10 @@ class Client extends Authenticatable
     }
 
     /**
-     * 初回設定待ちで、メールアドレス登録用 URL が期限内か（2026-11-10 追加。バッジが「登録待ち（初回設定）」になる条件と同じ）。
+     * 状態が「初回設定待ち」か（メールアドレス登録用 URL が期限内。2026-11-10 追加）。
      *
      * 初回設定メールの表示（S-0316。要件定義書 6-3-9）を出せるかの判定。会員詳細（S-0305）の［メールが届かないとき］の出し分けと、
-     * S-0316 のコントローラの両方で使う（判定を 2 か所に持たない）。期限切れ（「登録待ち（期限切れ）」）のときは false。
+     * S-0316 のコントローラの両方で使う（判定を 2 か所に持たない）。「初回設定待ち（期限切れ）」のときは false。
      * show_expired_note を使うため、一覧は withStatusData、単体は loadStatusData() で派生値を先に埋めておくこと
      */
     public function isAwaitingSetupWithinExpiry(): bool
@@ -565,12 +566,13 @@ class Client extends Authenticatable
     /**
      * 状態バッジの表示用情報（文言と Bootstrap クラス）。
      *
-     * 配色は screen-design.md §2-5 の「クライアント状態バッジの 4 状態対応」に従う。
+     * 文言は会員の状態名そのもの（6 状態。screen-design.md §2-5「会員状態バッジの 6 状態対応」・S-0305 状態一覧）。
+     * 内部のキー（status）は 4 つのままで、awaiting_setup / awaiting_email を show_expired_note で期限内と期限切れに分ける。
      * 一覧・詳細で同じ表示にするため、モデル側にひとつだけ置いてビューから参照する。
      *
-     * 2026-10-18 変更：ユーザーレビューで、初回設定待ちのバッジを「初回設定待ち」から「登録待ち（初回設定）」にした
-     * （お客様の画面の名前〔マイページ登録〕に合わせた）。期限切れのときは、メールアドレス登録待ちの期限切れと同じ
-     * 「登録待ち（期限切れ）」にする（「登録待ち（初回設定）（期限切れ）」とかっこが続かないように）。
+     * 2026-11-26 変更：状態名とバッジ文言を 1 対 1 にそろえ、期限切れを独立した状態にした。判定・色は変えない。
+     * その前の文言は「未登録」「登録待ち」「登録待ち（初回設定）」「利用中」で、期限切れのときは
+     * メールアドレス登録待ち・初回設定待ちのどちらも「登録待ち（期限切れ）」だった。
      */
     public function statusBadge(): array
     {
@@ -578,12 +580,9 @@ class Client extends Authenticatable
 
         $label = match ($this->status) {
             self::STATUS_IN_USE => '利用中',
-            self::STATUS_AWAITING_SETUP, self::STATUS_AWAITING_EMAIL => match (true) {
-                $isExpired => '登録待ち（期限切れ）',
-                $this->status === self::STATUS_AWAITING_SETUP => '登録待ち（初回設定）',
-                default => '登録待ち',
-            },
-            self::STATUS_NO_EMAIL => '未登録',
+            self::STATUS_AWAITING_SETUP => $isExpired ? '初回設定待ち（期限切れ）' : '初回設定待ち',
+            self::STATUS_AWAITING_EMAIL => $isExpired ? 'メールアドレス登録待ち（期限切れ）' : 'メールアドレス登録待ち',
+            self::STATUS_NO_EMAIL => 'メールアドレスなし',
         };
 
         $class = match (true) {

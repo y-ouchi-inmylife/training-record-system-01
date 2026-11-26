@@ -70,7 +70,7 @@ class ClientEmailRegistrationTokenController extends Controller
     /**
      * マイページ登録案内の取消処理（6-3-7）
      *
-     * 状態が「メールアドレス登録待ち（期限内）」のときだけ実行できる。未使用の
+     * 状態が「メールアドレス登録待ち」（期限内）のときだけ実行できる。未使用の
      * メールアドレス登録用トークンを物理削除し、発行前の状態（メールアドレスなし）
      * に戻す。クライアント情報とトレーニング記録には触らない。
      *
@@ -82,7 +82,7 @@ class ClientEmailRegistrationTokenController extends Controller
      */
     public function destroy(Client $client): RedirectResponse
     {
-        // 状態が「登録待ち（期限内）」であることを確認。
+        // 状態が「メールアドレス登録待ち」（期限内）であることを確認。
         // 派生値（latest_email_reg_expires_at / has_active_email_reg_token）を
         // 使う `getStatusAttribute` と `getShowExpiredNoteAttribute` を利用するため
         // loadStatusData() で先読みする。
@@ -91,7 +91,7 @@ class ClientEmailRegistrationTokenController extends Controller
         if ($client->status !== Client::STATUS_AWAITING_EMAIL || $client->show_expired_note) {
             // UI 側で取消ボタンをこの状態のときだけ表示しているため通常は到達しない。
             // 直接エンドポイントを叩かれた場合の防御として 409 を返す。
-            abort(409, '登録待ち（期限内）のときだけ取り消せます');
+            abort(409, 'メールアドレス登録待ちのときだけ取り消せます');
         }
 
         DB::transaction(function () use ($client) {
