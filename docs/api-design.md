@@ -577,7 +577,7 @@ Laravelのセッション認証（Cookie + CSRF）で保護する。
 **概要**: 対象クライアントの有効なメールアドレス登録用 URL を、紙の案内シートとしてブラウザの印刷機能で出せる印刷用ページ（S-0307）を表示する。**2026-10-18 変更**：印刷はしなくなった。LINE・メールで送る文面と、その場で読み取ってもらう QR コードの画面にした（トレーナー側のふつうのレイアウト `layouts.app`。`layouts.print` は消した。下の「レスポンス」の印刷専用レイアウトの記述は経緯）。文面（`$copyText`）は `App\Support\InvitationMessage::mypage`（会員の氏名・訓練所名・URL・曜日つきの有効期限。文の中身は `lang/ja/messages.php` の `invitation_message`）で組み立て、画面に出す文とコピーする文に同じものを使う。愛犬アンケート（`GET /trainees/{trainee}/intake-survey-tokens/print`）・愛犬性格診断（`…/personality-diagnosis-tokens/print`）も同じ（`InvitationMessage::intakeSurvey`・`personalityDiagnosis`。トレーニーの呼び名を入れる）。URL・ルート名は変えない
 
 **処理**:
-- 対象クライアントに紐づく `client_email_registration_tokens` のうち、`is_used=false` かつ `expires_at > now()` のトークン 1 件を取得する
+- 対象クライアントに紐づく `client_email_registration_tokens` のうち、`is_used=false` かつ期限内（`expires_at >= now()`。期限ちょうどまでは期限内。screen-design.md S-0305 状態一覧）のトークン 1 件を取得する
 - 有効なトークンが存在すればそのトークンから URL を組み立て、QR コード用データ・URL 文字列・有効期限（日付のみ）を view に渡す
 - **メール／LINE 送付用の案内文面もコントローラで組み立て、view に `$copyText` として渡す**。JavaScript で画面の文字を拾って組み立てる方式はとらない（画面の見た目と文面を独立させるため。screen-design.md S-0307「案内文面のコピー」参照）。事業者名（`config('app.client_portal_company')`）が未設定なら、事業者名の行は文面に含めない
 - 見つからない場合はエラーメッセージ用の view を返す（QR・URL・有効期限・コピー文面は出さない）
