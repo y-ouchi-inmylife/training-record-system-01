@@ -15,7 +15,7 @@ use Tests\TestCase;
  * マイページの HOME（S-1402）の「次回のご予約」の帯（2026-11 追加。要件定義書 6-15-3・6-17-9、設計書 S-1402「次回のご予約」）。
  *
  * - 自分の利用のうち、利用日が今日以降のもの（予約）があるときだけ出す。過去の利用・ほかの会員の利用は数えない
- * - いちばん早い利用日の予約の愛犬の呼び方を、1 行に「、」でつないで出す（開始時刻の順。同じトレーニーは 1 回だけ。名前が未登録なら「愛犬」、
+ * - いちばん早い利用日の予約の愛犬の呼び方を、1 行に「、」でつないで出す（開始時刻の順。表示する呼び方が同じものは 1 回だけ。名前が未登録なら「愛犬」、
  *   トレーニーなしは呼び方を出さず、トレーニーなしだけの日は日付だけ）。時刻は出さない（2026-11 変更）
  * - 次回の日が今日なら「本日のご予約」
  * - 次回の日より後の予約があれば「ほかに n件」、なければ「ご利用回数を確認」（どちらもご利用回数 S-1412 へのリンク）
@@ -227,6 +227,20 @@ class ClientNextReservationRenderingTest extends TestCase
         $notice = $this->notice($this->dashboard());
         $this->assertSame('愛犬', $this->names($notice));
         $this->assertNoTime($notice);
+    }
+
+    public function test_名前が未登録の愛犬が同じ日に2つあっても愛犬は1回だけ(): void
+    {
+        // 表示する呼び方が同じものは 1 回だけ（2026-11 変更：その前はトレーニーごとで「愛犬、愛犬」）
+        $this->usage('2026-11-26', '08:00', '12:00', $this->trainee(null));
+        $this->usage('2026-11-26', '10:00', '13:00', $this->trainee('アイ'));
+        $this->usage('2026-11-26', '13:00', '19:00', $this->trainee(null));
+
+        $notice = $this->notice($this->dashboard());
+        $this->assertSame('愛犬、アイちゃん', $this->names($notice));
+        $this->assertSame(1, substr_count($notice, '愛犬'));
+        // 「ほかに n件」の数は変わらない（同じ日の予約は数えない）
+        $this->assertStringNotContainsString('ほかに', $notice);
     }
 
     public function test_トレーニーなしの利用だけの日は日付だけ_呼び方の行と区切りを出さない(): void

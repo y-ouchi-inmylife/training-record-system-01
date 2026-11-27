@@ -174,7 +174,7 @@ class DashboardController extends Controller
      * いちばん早い利用日（次回の日）の予約を、開始時刻 → 終了時刻 → id の順に読む。
      * callNames は次回の日の予約の愛犬の呼び方（Trainee::client_call_name：「○○ちゃん」。名前が未登録なら「愛犬」）を、
      * 上の順に「、」でつないだ 1 行（2026-11 変更：その前は 1 予約 1 行で時刻も出していた。帯には時刻を出さない）。
-     * 同じトレーニーの予約が 2 つあっても 1 回だけ。トレーニーがない利用は呼び方を出さない（すべてトレーニーがない日は null で、日付だけを出す）。
+     * 表示する呼び方が同じものは 1 回だけ（同じトレーニーの予約が 2 つでも、名前が未登録の愛犬が 2 つ〔どちらも「愛犬」〕でも）。トレーニーがない利用は呼び方を出さない（すべてトレーニーがない日は null で、日付だけを出す）。
      * laterCount は次回の日より後の日の予約の件数（1 以上なら「ほかに n件」、0 なら「ご利用回数を確認」。どちらもご利用回数 S-1412 へ）。
      * 利用のメモ・契約の情報は渡さない（会員さんに一切見せない）
      *
@@ -215,7 +215,8 @@ class DashboardController extends Controller
 
     /**
      * 次回のご予約の帯の愛犬の呼び方（2026-11 追加。設計書 S-1402「次回のご予約」）。
-     * 予約の並び（開始時刻 → 終了時刻 → id）で、トレーニーごとに最初の 1 回だけを取り、「、」でつなぐ。
+     * 予約の並び（開始時刻 → 終了時刻 → id）で、表示する呼び方が同じものは最初の 1 回だけを取り、「、」でつなぐ
+     * （2026-11 変更：その前はトレーニーごとに 1 回で、名前が未登録の愛犬が 2 つあると「愛犬、愛犬」になっていた）。
      * トレーニーがない利用は飛ばす。呼び方が 1 つもなければ null
      *
      * @param  Collection<int, ClientUsage>  $usages
@@ -224,8 +225,8 @@ class DashboardController extends Controller
     {
         $names = $usages
             ->filter(fn (ClientUsage $usage) => $usage->trainee !== null)
-            ->unique('trainee_id')
             ->map(fn (ClientUsage $usage) => $usage->trainee->client_call_name)
+            ->unique()
             ->values();
 
         return $names->isEmpty() ? null : $names->implode('、');
