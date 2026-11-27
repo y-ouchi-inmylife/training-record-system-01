@@ -42,7 +42,8 @@
     @endif
 
     {{-- 次回のご予約（2026-11 追加。設計書 S-1402「次回のご予約」）。今日以降の利用（予約）があるとき、ご連絡先の登録のお願いの下・愛犬のカードの上に出す。
-         中身は Client\DashboardController::nextReservation で組み立て済み（次回の日の予約をすべて・ほかの日の件数・リンク先）。
+         中身は Client\DashboardController::nextReservation で組み立て済み（次回の日の愛犬の呼び方を「、」でつないだ 1 行・ほかの日の件数・リンク先）。
+         時刻は出さない（2026-11 変更：その前は 1 予約 1 行で「開始〜終了　呼び方」）。トレーニーがない利用だけの日は、呼び方の行を出さず日付だけ。
          見た目はお知らせ（紺の系統。.c-reservation-notice）。今日なら見出しを「本日のご予約」の塗りのラベルにし、面を少し濃くする（--today）。
          アイコンは Bootstrap Icons の calendar-event の SVG（会員側は Bootstrap Icons の CSS を読み込まない。読み上げない）。
          利用のメモ・契約の情報は出さない --}}
@@ -54,12 +55,10 @@
                 <span class="c-reservation-notice-title">{{ $nextReservation['heading'] }}</span>
                 <span class="c-reservation-notice-date num-tabular">{{ $nextReservation['dateLabel'] }}</span>
             </p>
-            <ul class="c-reservation-notice-list list-unstyled mb-0">
-                @foreach($nextReservation['items'] as $item)
-                    {{-- 時刻と呼び方のあいだのすきまは CSS で空けているので、読み上げ用の区切り（読点）を見えない形で入れる（2026-11 追加） --}}
-                    <li><span class="c-reservation-notice-time num-tabular">{{ $item['timeRange'] }}</span>@if($item['callName'] !== null)<span class="visually-hidden">、</span><span class="c-reservation-notice-name">{{ $item['callName'] }}</span>@endif</li>
-                @endforeach
-            </ul>
+            @if($nextReservation['callNames'] !== null)
+                {{-- 日付と呼び方のあいだのすきまは CSS で空けているので、読み上げ用の区切り（読点）を見えない形で入れる（2026-11 追加） --}}
+                <p class="c-reservation-notice-names mb-0"><span class="visually-hidden">、</span>{{ $nextReservation['callNames'] }}</p>
+            @endif
             <a href="{{ $nextReservation['url'] }}" class="c-reservation-notice-link">@if($nextReservation['laterCount'] > 0)ほかに <span class="num-tabular">{{ $nextReservation['laterCount'] }}</span>件@elseご利用回数を確認@endif<span aria-hidden="true"> ›</span></a>
         </section>
     @endif

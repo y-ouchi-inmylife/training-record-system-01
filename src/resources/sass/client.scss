@@ -1644,8 +1644,9 @@ input[type="tel"] {
 // ダッシュボード（S-1402）の次回のご予約（2026-11 追加。設計書 S-1402「次回のご予約」）
 //
 // お知らせの帯（左の太い線・薄い面・角丸。回答待ちの案内・ご連絡先の登録のお願いと同じ作り）を、予約の色（$reservation。紺の系統）で。
-// sm 以上：左に「アイコン・見出し・日付」、その右に予約の行を縦に並べ、右下にリンク（3 列の grid）。
-// スマホの幅（sm 未満）：見出しの行 → 予約の行 → リンクの順に縦に並べる。
+// sm 以上：左に「アイコン・見出し・日付」、その右に愛犬の呼び方の 1 行、右下にリンク（3 列の grid）。
+// スマホの幅（sm 未満）：見出しの行 → 呼び方の行 → リンクの順に縦に並べる。
+// 時刻は出さない（2026-11 変更：その前は 1 予約 1 行で「開始〜終了　呼び方」）。トレーニーがない利用だけの日は呼び方の行がない
 // 本日のご予約（--today）：見出しを塗りのラベル（$reservation の地に白）にし、面を少し濃く、左の線を濃い紺（$brand-deep）にする
 // -----------------------------------------------------------------------------
 .c-reservation-notice {
@@ -1693,14 +1694,9 @@ input[type="tel"] {
     background-color: $reservation;
     color: $mat;
 }
-.c-reservation-notice-list {
-    // 1 件 1 行。時刻と呼び方のあいだを空け、狭い幅では呼び方が次の行に回ってもよい
-    li {
-        display: flex;
-        flex-wrap: wrap;
-        column-gap: 0.75rem;
-        line-height: 1.6;
-    }
+.c-reservation-notice-names {
+    // 呼び方を「、」でつないだ 1 行（長いときは折り返す）
+    line-height: 1.6;
 
     @include media-breakpoint-up(sm) {
         // 見出しの行（アイコンの高さ 1.25rem）と 1 行目の文字の高さをそろえる
@@ -1712,6 +1708,8 @@ input[type="tel"] {
     white-space: nowrap;
 
     @include media-breakpoint-up(sm) {
+        // 呼び方の行がない日も、リンクは右の列に置く
+        grid-column: 3;
         align-self: end;
     }
 }

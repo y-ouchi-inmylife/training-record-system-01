@@ -9,6 +9,7 @@ use App\Models\Trainee;
 use App\Models\TraineePersonalityDiagnosisResult;
 use App\Support\RecordTimeline;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 
 /**
  * クライアント閲覧機能（柱2）— ダッシュボードコントローラ
@@ -170,13 +171,15 @@ class DashboardController extends Controller
      * 次回のご予約（2026-11 追加。要件定義書 6-15-3・6-17-9、設計書 S-1402「次回のご予約」）。
      *
      * ログイン中の会員自身の利用のうち、利用日が今日（today()。アプリのタイムゾーン。時刻は使わない）以降のもの（予約）を読み、
-     * いちばん早い利用日（次回の日）の予約をすべて、開始時刻 → 終了時刻 → id の順に並べる。
+     * いちばん早い利用日（次回の日）の予約を、開始時刻 → 終了時刻 → id の順に読む。
+     * callNames は次回の日の予約の愛犬の呼び方（Trainee::client_call_name：「○○ちゃん」。名前が未登録なら「愛犬」）を、
+     * 上の順に「、」でつないだ 1 行（2026-11 変更：その前は 1 予約 1 行で時刻も出していた。帯には時刻を出さない）。
+     * 同じトレーニーの予約が 2 つあっても 1 回だけ。トレーニーがない利用は呼び方を出さない（すべてトレーニーがない日は null で、日付だけを出す）。
      * laterCount は次回の日より後の日の予約の件数（1 以上なら「ほかに n件」、0 なら「ご利用回数を確認」。どちらもご利用回数 S-1412 へ）。
-     * callName は Trainee::client_call_name（「○○ちゃん」。名前が未登録なら「愛犬」）。トレーニーがない利用は null（時刻だけを出す）。
      * 利用のメモ・契約の情報は渡さない（会員さんに一切見せない）
      *
      * @return array{isToday: bool, heading: string, dateLabel: string, date: string,
-     *               items: list<array{timeRange: string, callName: ?string}>, laterCount: int, url: string}|null
+     *               callNames: ?string, laterCount: int, url: string}|null
      */
     private function nextReservation($client): ?array
     {
@@ -204,13 +207,28 @@ class DashboardController extends Controller
             'heading' => $isToday ? '本日のご予約' : '次回のご予約',
             'dateLabel' => ClientUsage::toShortDateLabel($date),
             'date' => $date,
-            'items' => $sameDay->map(fn (ClientUsage $usage) => [
-                'timeRange' => $usage->time_range_label,
-                'callName' => $usage->trainee?->client_call_name,
-            ])->values()->all(),
+            'callNames' => $this->callNames($sameDay),
             'laterCount' => $reservations->count() - $sameDay->count(),
             'url' => route('client-portal.contracts'),
         ];
+    }
+
+    /**
+     * 次回のご予約の帯の愛犬の呼び方（2026-11 追加。設計書 S-1402「次回のご予約」）。
+     * 予約の並び（開始時刻 → 終了時刻 → id）で、トレーニーごとに最初の 1 回だけを取り、「、」でつなぐ。
+     * トレーニーがない利用は飛ばす。呼び方が 1 つもなければ null
+     *
+     * @param  Collection<int, ClientUsage>  $usages
+     */
+    private function callNames($usages): ?string
+    {
+        $names = $usages
+            ->filter(fn (ClientUsage $usage) => $usage->trainee !== null)
+            ->unique('trainee_id')
+            ->map(fn (ClientUsage $usage) => $usage->trainee->client_call_name)
+            ->values();
+
+        return $names->isEmpty() ? null : $names->implode('、');
     }
 
     /**

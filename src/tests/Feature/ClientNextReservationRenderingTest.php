@@ -15,7 +15,8 @@ use Tests\TestCase;
  * マイページの HOME（S-1402）の「次回のご予約」の帯（2026-11 追加。要件定義書 6-15-3・6-17-9、設計書 S-1402「次回のご予約」）。
  *
  * - 自分の利用のうち、利用日が今日以降のもの（予約）があるときだけ出す。過去の利用・ほかの会員の利用は数えない
- * - いちばん早い利用日の予約をすべて「開始〜終了　愛犬の呼び方」で並べる（開始時刻の順。名前が未登録なら「愛犬」、トレーニーなしは時刻だけ）
+ * - いちばん早い利用日の予約の愛犬の呼び方を、1 行に「、」でつないで出す（開始時刻の順。同じトレーニーは 1 回だけ。名前が未登録なら「愛犬」、
+ *   トレーニーなしは呼び方を出さず、トレーニーなしだけの日は日付だけ）。時刻は出さない（2026-11 変更）
  * - 次回の日が今日なら「本日のご予約」
  * - 次回の日より後の予約があれば「ほかに n件」、なければ「ご利用回数を確認」（どちらもご利用回数 S-1412 へのリンク）
  * - 利用のメモは出さない
@@ -119,16 +120,21 @@ class ClientNextReservationRenderingTest extends TestCase
         return preg_match('/<section class="c-reservation-notice[^"]*".*?<\/section>/su', $html, $m) === 1 ? $m[0] : null;
     }
 
-    /** 帯の予約の行の見える文字（読み上げ用の区切りを除き、タグを除き、空白をまとめたもの） */
-    private function rows(string $notice): array
+    /** 帯の呼び方の行の見える文字（読み上げ用の区切りを除き、タグを除いたもの）。行がなければ null */
+    private function names(string $notice): ?string
     {
-        preg_match_all('/<li>(.*?)<\/li>/su', $notice, $m);
+        if (preg_match('/<p class="c-reservation-notice-names mb-0">(.*?)<\/p>/su', $notice, $m) !== 1) {
+            return null;
+        }
 
-        return array_map(fn ($li) => trim(preg_replace('/\s+/u', ' ', strip_tags(str_replace(
-            ['<span class="visually-hidden">、</span>', '</span><span'],
-            ['', '</span> <span'],
-            $li
-        )))), $m[1]);
+        return trim(strip_tags(str_replace('<span class="visually-hidden">、</span>', '', $m[1])));
+    }
+
+    /** 帯に時刻（「8:00」などの時:分・「〜」）が出ていない（2026-11 変更：帯には時刻を出さない） */
+    private function assertNoTime(string $notice): void
+    {
+        $this->assertDoesNotMatchRegularExpression('/\d{1,2}:\d{2}/u', $notice);
+        $this->assertStringNotContainsString('〜', $notice);
     }
 
     private function text(string $html): string
@@ -145,7 +151,7 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertStringNotContainsString('次回のご予約', $this->dashboard());
     }
 
-    public function test_予約が1件なら_次回のご予約と日付と時刻と呼び方_ご利用回数を確認のリンク(): void
+    public function test_予約が1件なら_次回のご予約と日付と呼び方_時刻は出さない_ご利用回数を確認のリンク(): void
     {
         $this->usage('2026-11-26', '08:00', '19:00', $this->trainee('アイ'));
 
@@ -154,25 +160,32 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/^<section class="c-reservation-notice"\s+aria-label="次回のご予約" data-client-next-reservation="2026-11-26">/u', $notice);
         $this->assertStringContainsString('<span class="c-reservation-notice-title">次回のご予約</span>', $notice);
         $this->assertStringContainsString('<span class="c-reservation-notice-date num-tabular">11/26(木)</span>', $notice);
-        $this->assertSame(['8:00〜19:00 アイちゃん'], $this->rows($notice));
+        $this->assertSame('アイちゃん', $this->names($notice));
+        $this->assertNoTime($notice);
+        // 1 予約 1 行の箇条書きはやめた
+        $this->assertStringNotContainsString('<li>', $notice);
         $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('client-portal.contracts'), '/').'" class="c-reservation-notice-link">ご利用回数を確認<span aria-hidden="true"> ›<\/span><\/a>/u', $notice);
         $this->assertStringNotContainsString('ほかに', $notice);
         // カレンダーのアイコン（読み上げない）
         $this->assertMatchesRegularExpression('/<svg class="c-reservation-notice-icon"[^>]*aria-hidden="true"[^>]*data-reservation-notice-icon="calendar-event">/u', $notice);
     }
 
-    public function test_同じ日の予約はすべて開始時刻の順に並べる(): void
+    public function test_同じ日の予約は呼び方を開始時刻の順に読点でつないで1行に出し_同じトレーニーは1回だけ(): void
     {
         $ai = $this->trainee('アイ');
         $amuro = $this->trainee('アムロ');
+        $kuro = $this->trainee('クロ');
         $this->usage('2026-11-26', '13:00', '19:00', $amuro);
         $this->usage('2026-11-26', '08:00', '19:00', $ai);
         $this->usage('2026-11-26', '08:00', '12:00', $amuro);   // 同じ開始時刻なら終了時刻の順
+        $this->usage('2026-11-26', '14:00', '15:00', $kuro);
 
-        $this->assertSame(
-            ['8:00〜12:00 アムロちゃん', '8:00〜19:00 アイちゃん', '13:00〜19:00 アムロちゃん'],
-            $this->rows($this->notice($this->dashboard()))
-        );
+        $notice = $this->notice($this->dashboard());
+        // 並びは 8:00〜12:00 アムロ → 8:00〜19:00 アイ →（13:00 アムロは 2 回目なので出さない）→ 14:00 クロ
+        $this->assertSame('アムロちゃん、アイちゃん、クロちゃん', $this->names($notice));
+        $this->assertSame(1, substr_count($notice, 'アムロちゃん'));
+        $this->assertSame(1, substr_count($notice, 'c-reservation-notice-names'));
+        $this->assertNoTime($notice);
     }
 
     public function test_次回の日より後の予約があれば_ほかにn件がご利用回数へのリンク(): void
@@ -185,7 +198,8 @@ class ClientNextReservationRenderingTest extends TestCase
 
         $notice = $this->notice($this->dashboard());
         $this->assertStringContainsString('11/26(木)', $notice);
-        $this->assertSame(['8:00〜19:00 アイちゃん'], $this->rows($notice));
+        $this->assertSame('アイちゃん', $this->names($notice));
+        // 「ほかに n件」の数え方は今のまま：次回の日より後の日の予約の件数（11/28・12/03 の 2 件）
         $this->assertMatchesRegularExpression('/<a href="'.preg_quote(route('client-portal.contracts'), '/').'" class="c-reservation-notice-link">ほかに <span class="num-tabular">2<\/span>件<span aria-hidden="true"> ›<\/span><\/a>/u', $notice);
         $this->assertStringNotContainsString('ご利用回数を確認', $notice);
     }
@@ -199,19 +213,54 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertMatchesRegularExpression('/^<section class="c-reservation-notice c-reservation-notice--today"\s+aria-label="本日のご予約" data-client-next-reservation="2026-11-22">/u', $notice);
         $this->assertStringContainsString('<span class="c-reservation-notice-title">本日のご予約</span>', $notice);
         $this->assertStringContainsString('11/22(日)', $notice);
-        $this->assertSame(['13:00〜19:00 アイちゃん'], $this->rows($notice));
+        $this->assertSame('アイちゃん', $this->names($notice));
+        $this->assertNoTime($notice);
         $this->assertStringNotContainsString('次回のご予約', $notice);
         $this->assertStringContainsString('ほかに <span class="num-tabular">1</span>件', $notice);
     }
 
-    public function test_名前が未登録なら愛犬_トレーニーなしは時刻だけ(): void
+    public function test_名前が未登録なら愛犬_トレーニーなしの利用は呼び方を出さない(): void
     {
         $this->usage('2026-11-26', '08:00', '12:00', $this->trainee(null));
         $this->usage('2026-11-26', '13:00', '19:00');
 
         $notice = $this->notice($this->dashboard());
-        $this->assertSame(['8:00〜12:00 愛犬', '13:00〜19:00'], $this->rows($notice));
-        $this->assertStringContainsString('<li><span class="c-reservation-notice-time num-tabular">13:00〜19:00</span></li>', $notice);
+        $this->assertSame('愛犬', $this->names($notice));
+        $this->assertNoTime($notice);
+    }
+
+    public function test_トレーニーなしの利用だけの日は日付だけ_呼び方の行と区切りを出さない(): void
+    {
+        $this->usage('2026-11-26', '08:00', '12:00');
+        $this->usage('2026-11-26', '13:00', '19:00');
+        $this->usage('2026-11-28', '08:00', '19:00', $this->trainee('アイ'));
+
+        $notice = $this->notice($this->dashboard());
+        $this->assertNotNull($notice);
+        $this->assertStringContainsString('<span class="c-reservation-notice-date num-tabular">11/26(木)</span>', $notice);
+        $this->assertNull($this->names($notice));
+        $this->assertStringNotContainsString('visually-hidden', $notice);
+        $this->assertNoTime($notice);
+        // 後の日の呼び方は出さない。「ほかに n件」は今のまま（後の日の 1 件）
+        $this->assertStringNotContainsString('アイちゃん', $notice);
+        $this->assertStringContainsString('ほかに <span class="num-tabular">1</span>件', $notice);
+        $this->assertSame('次回のご予約 11/26(木) ほかに 1件 ›', $this->text($notice));
+    }
+
+    public function test_ほかにn件は次回の日の残りを含めず_後の日の予約の件数(): void
+    {
+        $ai = $this->trainee('アイ');
+        $amuro = $this->trainee('アムロ');
+        // 次回の日に 3 件（呼び方は 2 つ）、後の日に 2 件
+        $this->usage('2026-11-26', '08:00', '12:00', $ai);
+        $this->usage('2026-11-26', '13:00', '19:00', $ai);
+        $this->usage('2026-11-26', '08:00', '19:00', $amuro);
+        $this->usage('2026-11-27', '08:00', '19:00', $ai);
+        $this->usage('2026-11-30', '08:00', '19:00');
+
+        $notice = $this->notice($this->dashboard());
+        $this->assertSame('アイちゃん、アムロちゃん', $this->names($notice));
+        $this->assertStringContainsString('ほかに <span class="num-tabular">2</span>件', $notice);
     }
 
     public function test_ほかの会員の予約は出さない(): void
@@ -262,24 +311,24 @@ class ClientNextReservationRenderingTest extends TestCase
         $this->assertTrue($greeting < $contact && $contact < $reservation);
         // 愛犬のカード（名前の見出し「アイちゃん」）は帯より下
         $this->assertGreaterThan($reservation, strpos($html, 'アイちゃん', $reservation + strlen($this->notice($html))));
-        // 帯の文字（回数ではなく予約の日付・時刻だけ）
-        $this->assertSame('次回のご予約 11/26(木) 8:00〜19:00、アイちゃん ご利用回数を確認 ›', $this->text($this->notice($html)));
+        // 帯の文字（回数ではなく予約の日付と愛犬の呼び方だけ。時刻は出さない）
+        $this->assertSame('次回のご予約 11/26(木) 、アイちゃん ご利用回数を確認 ›', $this->text($this->notice($html)));
     }
 
-    public function test_時刻と呼び方のあいだに読み上げ用の区切りを入れ_トレーニーなしの行には入れない(): void
+    public function test_日付と呼び方のあいだに読み上げ用の区切りを入れる(): void
     {
         $this->usage('2026-11-26', '08:00', '12:00', $this->trainee('アイ'));
-        $this->usage('2026-11-26', '13:00', '19:00');
+        $this->usage('2026-11-26', '13:00', '19:00', $this->trainee('アムロ'));
+        $this->usage('2026-11-26', '19:00', '20:00');
 
         $notice = $this->notice($this->dashboard());
-        // 見た目には出さない読点（visually-hidden）を、時刻と呼び方のあいだに置く
-        $this->assertStringContainsString(
-            '<li><span class="c-reservation-notice-time num-tabular">8:00〜12:00</span><span class="visually-hidden">、</span><span class="c-reservation-notice-name">アイちゃん</span></li>',
+        // 見た目には出さない読点（visually-hidden）を、日付の行のあと・呼び方の前に 1 つだけ置く
+        $this->assertMatchesRegularExpression(
+            '/<span class="c-reservation-notice-date num-tabular">11\/26\(木\)<\/span>\s*<\/p>\s*<p class="c-reservation-notice-names mb-0"><span class="visually-hidden">、<\/span>アイちゃん、アムロちゃん<\/p>/u',
             $notice
         );
-        $this->assertStringContainsString('<li><span class="c-reservation-notice-time num-tabular">13:00〜19:00</span></li>', $notice);
         $this->assertSame(1, substr_count($notice, 'visually-hidden'));
         // 読み上げで続けて読まれない（タグを除いた文字に区切りがある）
-        $this->assertStringContainsString('8:00〜12:00、アイちゃん', strip_tags($notice));
+        $this->assertStringContainsString('11/26(木)、アイちゃん、アムロちゃん', preg_replace('/\s+/u', '', strip_tags($notice)));
     }
 }
